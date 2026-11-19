@@ -577,6 +577,27 @@
       .sort((a, b) => Date.parse(a.tratto.ts) - Date.parse(b.tratto.ts));
   }
 
+  // Due frasi qualunque nella stessa lingua stanno già a 0,4-0,6 di coseno, e quanto dipende dal modello (#2369): un
+  // ricordo vale se si stacca dalla mediana della domanda su tutti gli scambi. Sotto gli 8 confronti la mediana non
+  // dice il rumore: null, e decide il ricordo per parole. Misure: patterns/il-ricordo-si-stacca-dal-rumore.md.
+  const MARGINE_RICORDO = 0.25;
+  const MIN_CONFRONTI_RICORDO = 8;
+  function ricordiPerVicinanza(punteggi) {
+    const validi = (Array.isArray(punteggi) ? punteggi : []).filter((p) => p && p.tratto && Number.isFinite(Number(p.score)));
+    if (validi.length < MIN_CONFRONTI_RICORDO) return null;
+    const ordinati = validi.map((p) => Number(p.score)).sort((a, b) => a - b);
+    const meta = ordinati.length >> 1;
+    const fondo = ordinati.length % 2 ? ordinati[meta] : (ordinati[meta - 1] + ordinati[meta]) / 2;
+    return scegliRicordi(validi, { soglia: Math.max(SOGLIA_RICORDO, fondo + MARGINE_RICORDO) });
+  }
+
+  // «ciao», «ok grazie»: senza un argomento non c'è niente da ripescare, e i vettori avvicinerebbero l'ultimo saluto.
+  function domandaConArgomento(domanda) {
+    const CA = global.SN_CHAT_ARCHIVE;
+    if (!CA) return true;
+    return CA.terminiCheDistinguono(CA.paroleDi(domanda), domanda).some((p) => !diCortesia(p));
+  }
+
   // Senza vettori il ricordo va per parole, che è una prova debole: servono almeno due parole rare nelle conversazioni
   // vecchie nello stesso scambio, e vincono gli scambi che ne hanno di più. Una parola che compare in molte
   // conversazioni («grazie», «perfetto») non distingue niente; una che torna in tutta una conversazione sola (il suo
@@ -934,7 +955,8 @@
     TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta,
     tetti, numeroIn, NUMERI_DEI_TETTI, campoDelTetto, numeroDelTetto, limitiAiCampi, stimatoreSoglia, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, ESTERNO_RACCONTO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,
-    provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
+    provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo,
+    MARGINE_RICORDO, MIN_CONFRONTI_RICORDO, ricordiPerVicinanza, domandaConArgomento, rendiRicordi,
     troppoLungo, tettoDopoRifiuto, rifiutaImmagini, pianoDellaCache, richiesta, indiceDellaDomanda, rendiMessaggio: rendi, conGiro,
     RILETTURA_MIN, capRilettura, rilettureDopoRifiuto, giaDavanti, senzaCancellati, ricordoComeAzione,
     eccessoNellaFinestra, MARGINE_PAGINE, eccessoDopoRifiuto, PAGINA_MIN, PESO_RIMANDO, pagineDaTenere, frasePagineLasciate,

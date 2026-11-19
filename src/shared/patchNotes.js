@@ -20,6 +20,7 @@
         { testo: 'A schermo intero, col puntatore in alto vedi le schede senza l\'elenco dei download che copriva mezza pagina. Scende con loro solo la domanda su un programma da scaricare, finché non rispondi.', segnalazione: 2387 },
         { testo: 'Le foto oltre i 4 MB, come quelle del telefono, si allegano alle segnalazioni anche dalla chat: Filo le rimpicciolisce da sé invece di rifiutarle. Entrano anche le immagini AVIF; per un HEIC ti dice di salvarlo come JPEG o PNG.', segnalazione: 1664 },
         { testo: 'Chiedendo all’Aiuto di mandare una segnalazione, le immagini che gli hai dato partono con lei: le vedi in miniatura prima dell’invio.', segnalazione: 1664 },
+        { testo: 'Prima di rispondere Filo riprende una conversazione vecchia solo se c\'entra davvero con quello che chiedi: un saluto, o una domanda su tutt\'altro, non tirano più fuori ricordi a caso.', segnalazione: 2369 },
       ],
     },
     {
