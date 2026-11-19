@@ -1884,9 +1884,6 @@
     }
     for (const [d, p] of bozzaImmagini) addPendingImage(d, p);
     for (const p of bozzaFile) addPendingFile(p);
-    // Nel campo sta una citazione sola: torna quella del primo, se intanto l'utente non ne ha scelta un'altra.
-    const citata = tornati.find((c) => c.citata);
-    if (citata && !Rispondi.inCorso()) Rispondi.rimetti(citata.citata);
     autoGrowInput();
     Comandi.updateInputClass();
     aggiornaTasto();
