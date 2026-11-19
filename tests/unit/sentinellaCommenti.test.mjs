@@ -22,10 +22,11 @@ function corsa(albero) {
       writeFileSync(dest, testo);
     }
     // Senza togliere NODE_TEST_CONTEXT il figlio si crede una sotto-prova di
-    // questa e risponde in binario invece che in TAP: nessuna riga da leggere.
+    // questa e risponde in binario invece che in TAP: nessuna riga da leggere. Il TAP si chiede per nome: da Node 23 il
+    // reporter di serie è spec anche fuori dal terminale.
     const env = { ...process.env, FILO_COMMENTI_ROOT: dir };
     delete env.NODE_TEST_CONTEXT;
-    const r = spawnSync(process.execPath, ['--test', 'tests/unit/commentiRegola.test.mjs'], {
+    const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', 'tests/unit/commentiRegola.test.mjs'], {
       cwd: ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS, env,
     });
     return `${r.stdout || ''}${r.stderr || ''}`;
