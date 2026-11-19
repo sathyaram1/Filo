@@ -123,6 +123,19 @@
       "outputs": [
         "text"
       ]
+    },
+    "pittore": {
+      "label": "Modello che disegna (solo prove)",
+      "provider": "openrouter",
+      "model": "prova/pittore-aperto",
+      "weights": "open",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "image",
+        "text"
+      ]
     }
   };
 
