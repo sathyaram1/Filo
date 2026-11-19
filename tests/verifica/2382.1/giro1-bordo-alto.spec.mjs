@@ -1,5 +1,8 @@
-// Verifica #2382.1, giro 1: il bordo alto dello schermo a finestra massimizzata, col puntatore VERO del sistema (XTest),
-// che passa dalla regione di trascinamento come la mano; e il bordo del menu sopra la barra laterale.
+// Verifica #2382.1, giro 1: la fascia sopra le schede a finestra massimizzata col puntatore VERO del sistema (XTest),
+// che passa dalla regione di trascinamento come la mano (il mouse di Playwright la salta); e il bordo del menu sopra la
+// barra laterale. Sullo schermo virtuale senza gestore di finestre la massimizzazione si finge: per il sistema la
+// finestra resta normale e tiene i suoi 5 px di bordo per ridimensionare, che a finestra massimizzata davvero non ci
+// sono. Il clic va quindi al primo pixel sotto quel bordo, dentro la fascia.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { execFileSync } from 'node:child_process';
@@ -22,6 +25,7 @@ for s in sys.argv[1].split(';'):
 x11.XCloseDisplay(d)
 `;
 const puntatore = (passi) => execFileSync('python3', ['-I', '-c', XTEST, passi], { env: process.env });
+const SOTTO_IL_BORDO_FINTO = 5;
 
 const aperte = (shell) => shell.evaluate(() => [...document.querySelectorAll('#tabs .tab')].map((el) => el.dataset.id));
 const attiva = (shell) => shell.evaluate(() => document.querySelector('#tabs .tab.active')?.dataset.id || null);
@@ -37,7 +41,7 @@ async function treSchede(shell, testServer) {
   return ids;
 }
 
-// La finestra a schermo in (0,0) e il sistema che dice «massimizzata»: il primo pixel della barra è il bordo dello schermo.
+// La finestra a schermo in (0,0) e il sistema che dice «massimizzata».
 async function massimizzataASchermo(app, shell) {
   await Gesti.finestraASchermo(app);
   await app.evaluate(({ BrowserWindow }) => {
@@ -50,89 +54,59 @@ async function massimizzataASchermo(app, shell) {
   await shell.waitForTimeout(500);
 }
 
-// Il punto dello schermo (px veri) sul primo pixel in alto sopra il centro di `sel`.
-async function primoPixelSopra(app, shell, sel) {
-  const r = await shell.evaluate((s) => { const b = document.querySelector(s).getBoundingClientRect(); return { x: b.left + b.width / 2 }; }, sel);
+// Il punto dello schermo (px veri) nella fascia sopra il centro di `sel`, sotto il bordo che il sistema tiene.
+async function nellaFasciaSopra(app, shell, sel) {
+  const r = await shell.evaluate((s) => { const b = document.querySelector(s).getBoundingClientRect(); return { x: b.left + b.width / 2, top: b.top }; }, sel);
   const o = await app.evaluate(({ BrowserWindow, screen }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     return { cb: w.getContentBounds(), z: w.webContents.getZoomFactor() || 1, s: screen.getPrimaryDisplay().scaleFactor };
   });
-  return { x: Math.round((o.cb.x + r.x * o.z) * o.s), y: Math.round(o.cb.y * o.s), s: o.s, z: o.z, cb: o.cb };
+  return { x: Math.round((o.cb.x + r.x * o.z) * o.s), y: Math.round(o.cb.y * o.s) + SOTTO_IL_BORDO_FINTO, top: r.top };
 }
 
 test.describe('col puntatore vero, a finestra massimizzata', () => {
   test.skip(!Gesti.disponibili(), 'servono un display X e XTest (lo schermo virtuale delle prove su Linux)');
 
-  test('esplora', async ({ app, shell, testServer }) => {
+  test('il clic nella fascia sopra una scheda la apre', async ({ app, shell, testServer }) => {
     const ids = await treSchede(shell, testServer);
     await massimizzataASchermo(app, shell);
-    await shell.evaluate(() => { window.__ev = []; for (const t of ['mousedown', 'mouseup', 'click', 'mousemove']) document.addEventListener(t, (e) => window.__ev.push(`${t}@${e.clientX},${e.clientY}`), true); });
-    const info = await app.evaluate(({ BrowserWindow, screen }) => {
-      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-      return { b: w.getBounds(), cb: w.getContentBounds(), vis: w.isVisible(), op: w.getOpacity(), foc: w.isFocused(), cur: screen.getCursorScreenPoint() };
-    });
-    console.log('INFO', JSON.stringify(info));
-    const esiti = [];
-    const vero = await app.evaluate(async ({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-      const proto = Object.getPrototypeOf(w);
-      const m0 = proto.isMaximized.call(w);
-      w.maximize();
-      await new Promise((r) => setTimeout(r, 1500));
-      return { m0, m1: proto.isMaximized.call(w), b: w.getBounds() };
-    });
-    console.log('VERO', JSON.stringify(vero));
-    for (const [i, dy] of [[0, 20], [1, 7], [0, 6], [1, 5], [0, 4], [1, 0]]) {
-      const p = await primoPixelSopra(app, shell, `#tabs .tab[data-id="${ids[i]}"]`);
-      await shell.evaluate((x) => window.filoShell.tabs.activate(x), ids.at(-1));
-      await shell.waitForTimeout(300);
-      puntatore(`move:${p.x}:${p.y + dy};wait:200;down:1;wait:80;up:1;wait:300`);
-      await shell.waitForTimeout(500);
-      esiti.push({ dy, y: p.y, ok: (await attiva(shell)) === ids[i], attiva: await attiva(shell), voluta: ids[i], ev: await shell.evaluate(() => window.__ev.splice(0).filter((e) => !e.startsWith('mousemove')).join(' ')) });
-    }
-    console.log('ESITI', JSON.stringify(esiti, null, 1));
-  });
-
-  test('clic sul primo pixel dello schermo sopra una scheda la apre', async ({ app, shell, testServer }) => {
-    const ids = await treSchede(shell, testServer);
-    await massimizzataASchermo(app, shell);
-    const p = await primoPixelSopra(app, shell, `#tabs .tab[data-id="${ids[0]}"]`);
-    expect(p.y).toBe(0);
+    const p = await nellaFasciaSopra(app, shell, `#tabs .tab[data-id="${ids[0]}"]`);
+    expect(p.y, 'il punto deve stare sopra la scheda').toBeLessThan(p.top);
     puntatore(`move:${p.x}:${p.y};wait:200;down:1;wait:80;up:1;wait:200`);
     await expect.poll(() => attiva(shell), { timeout: 3_000 }).toBe(ids[0]);
   });
 
-  test('col puntatore fermo sul primo pixel la scheda sotto risponde all\'hover', async ({ app, shell, testServer }) => {
+  test('col puntatore nella fascia la scheda sotto risponde all\'hover', async ({ app, shell, testServer }) => {
     const ids = await treSchede(shell, testServer);
     await massimizzataASchermo(app, shell);
-    const p = await primoPixelSopra(app, shell, `#tabs .tab[data-id="${ids[0]}"]`);
+    const p = await nellaFasciaSopra(app, shell, `#tabs .tab[data-id="${ids[0]}"]`);
     puntatore(`move:${p.x}:${p.y + 20};wait:150;move:${p.x}:${p.y};wait:300`);
     await expect.poll(() => shell.evaluate((x) => document.querySelector(`#tabs .tab[data-id="${x}"]`).matches(':hover'), ids[0]), { timeout: 3_000 }).toBe(true);
   });
 
-  test('tasto centrale sul primo pixel sopra una scheda la chiude', async ({ app, shell, testServer }) => {
+  test('il tasto centrale nella fascia sopra una scheda la chiude', async ({ app, shell, testServer }) => {
     const ids = await treSchede(shell, testServer);
     await massimizzataASchermo(app, shell);
-    const p = await primoPixelSopra(app, shell, `#tabs .tab[data-id="${ids[1]}"]`);
+    const p = await nellaFasciaSopra(app, shell, `#tabs .tab[data-id="${ids[1]}"]`);
     puntatore(`move:${p.x}:${p.y};wait:200;down:2;wait:80;up:2;wait:300`);
     await expect.poll(() => aperte(shell), { timeout: 3_000 }).not.toContain(ids[1]);
   });
 
-  test('una scheda presa dal primo pixel e portata in fondo alla fila cambia posto', async ({ app, shell, testServer }) => {
+  test('una scheda presa nella fascia e portata in fondo alla fila cambia posto', async ({ app, shell, testServer }) => {
     const ids = await treSchede(shell, testServer);
     await massimizzataASchermo(app, shell);
-    const da = await primoPixelSopra(app, shell, `#tabs .tab[data-id="${ids[0]}"]`);
-    const a = await primoPixelSopra(app, shell, `#tabs .tab[data-id="${ids.at(-1)}"]`);
+    const da = await nellaFasciaSopra(app, shell, `#tabs .tab[data-id="${ids[0]}"]`);
+    const a = await nellaFasciaSopra(app, shell, `#tabs .tab[data-id="${ids.at(-1)}"]`);
     const passi = [];
-    for (let i = 1; i <= 20; i++) passi.push(`move:${Math.round(da.x + (a.x + 30 - da.x) * i / 20)}:${16}`, 'wait:40');
+    for (let i = 1; i <= 20; i++) passi.push(`move:${Math.round(da.x + (a.x + 30 - da.x) * i / 20)}:${da.y + 12}`, 'wait:40');
     puntatore(`move:${da.x}:${da.y};wait:200;down:1;wait:150;${passi.join(';')};wait:300;up:1;wait:300`);
     await expect.poll(async () => (await aperte(shell)).indexOf(ids[0]), { timeout: 5_000 }).toBe(ids.length - 1);
   });
 
-  test('clic sul primo pixel sopra il pulsante della scheda nuova apre una scheda', async ({ app, shell, testServer }) => {
+  test('il clic nella fascia sopra il pulsante della scheda nuova apre una scheda', async ({ app, shell, testServer }) => {
     const ids = await treSchede(shell, testServer);
     await massimizzataASchermo(app, shell);
-    const p = await primoPixelSopra(app, shell, '#tab-new');
+    const p = await nellaFasciaSopra(app, shell, '#tab-new');
     puntatore(`move:${p.x}:${p.y};wait:200;down:1;wait:80;up:1;wait:300`);
     await expect.poll(async () => (await aperte(shell)).length, { timeout: 3_000 }).toBe(ids.length + 1);
   });
