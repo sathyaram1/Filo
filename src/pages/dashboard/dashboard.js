@@ -377,6 +377,7 @@
   const Tastiera = self.SN_DASH_TASTIERA;
   Tastiera.init({
     send, input: inputEl, dash: $('dash'),
+    campo: () => (Cerca.aperta() ? $('cercaInput') : null),
     impostazioni: () => impostazioniHome,
     usa: (id) => Carte.usa(id),
   });
