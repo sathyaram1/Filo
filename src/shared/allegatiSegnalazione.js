@@ -176,8 +176,11 @@
     return (Array.isArray(voci) ? voci : []).map((v) => {
       const u = v && v.daPreparare && Object.prototype.hasOwnProperty.call(p, v.id) ? p[v.id] : null;
       if (typeof u !== 'string' || !PREPARATA.test(u) || byteDi(u) > limiti().byte) return v;
-      const { problema, daPreparare, byte, ...resto } = v;
-      return { ...resto, dataUrl: u };
+      const pronta = { ...v, dataUrl: u };
+      delete pronta.problema;
+      delete pronta.daPreparare;
+      delete pronta.byte;
+      return pronta;
     });
   }
 
