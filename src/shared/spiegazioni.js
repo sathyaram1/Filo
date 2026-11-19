@@ -208,6 +208,7 @@
       if (chiedi) voci.push(['Spiegami di più', 'piu', () => opzioni.chiedi(`Spiegami di più su «${termine}».`, da)]);
       if (spiegazione) voci.push(['Copia la spiegazione', 'copia', () => copia(spiegazione)]);
       if (!voci.length) return;
+      menuScorso = (doc === global.document && global.SN_MENU?.fotoDelloScorrimento?.(x, y)) || (() => true);
       menu = doc.createElement('div');
       menu.className = 'filo-spiega-menu';
       menu.setAttribute('role', 'menu');
