@@ -193,7 +193,7 @@
   }
 
   global.SN_ALLEGATI_SEGNALAZIONE = {
-    richiesti, haAllegati, inventario, scegli, soloQuesti, problemaDi, oltreIlimiti, payload, anteprime, conPreparati,
+    richiesti, haAllegati, inventario, scegli, soloQuesti, problemaDi, oltreIlimiti, payload, anteprime, conPreparati, vociAiuto,
     nomeDi, limiti,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
