@@ -5,6 +5,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const OPZIONI = 'filo://options/options.html';
 const HOME = 'filo://newtab/';
