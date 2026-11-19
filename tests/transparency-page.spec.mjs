@@ -182,11 +182,9 @@ test('un link a una fonte apre una scheda e non porta via la pagina interna', as
 
   // La fonte è un sito vero: la risponde la prova, che non deve dipendere dalla rete di chi la lancia (#1461.5).
   // Col sito irraggiungibile la scheda passa alla pagina d'errore interna e il suo indirizzo non è più la fonte.
-  await app.evaluate(({ session, net }, { schema, host }) => {
-    session.defaultSession.protocol.handle(schema, (req) => (new URL(req.url).hostname === host
-      ? new Response('<!doctype html><meta charset="utf-8"><title>Fonte</title><h1>Fonte</h1>', { headers: { 'content-type': 'text/html; charset=utf-8' } })
-      : net.fetch(req, { bypassCustomProtocolHandlers: true })));
-  }, { schema: new globalThis.URL(href).protocol.slice(0, -1), host: new globalThis.URL(href).hostname });
+  const fonte = new globalThis.URL(href);
+  await serviSiti(app, { [fonte.hostname]: '<!doctype html><meta charset="utf-8"><title>Fonte</title><h1>Fonte</h1>' },
+    { schemi: [fonte.protocol.slice(0, -1)] });
 
   await link.click();
 
