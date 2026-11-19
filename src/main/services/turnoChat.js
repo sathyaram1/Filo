@@ -1578,6 +1578,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     notes: notes.map((n) => Fonti.nascondi(n).trim()).filter(Boolean), reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
     ...(fonti.length ? { fonti } : {}),
+    ...(immagini.length ? { immagini } : {}),
     ...(senzaRisposta ? { senzaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
