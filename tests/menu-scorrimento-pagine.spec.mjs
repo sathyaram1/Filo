@@ -27,10 +27,8 @@ async function preparaScorrimento(bersaglio, { finestra = false } = {}) {
     chi.dataset.scorreDa = String(chi.scrollTop);
   });
 }
-// Le funzioni passate alla pagina: `scorri` sposta il contenitore preparato nel suo verso.
 const SCORRI = `window.__scorri = (n) => {
-  const chi = document.querySelector('[data-scorre-prova]');
-  chi.scrollBy({ top: n * Number(chi.dataset.verso), behavior: 'instant' });
+  document.querySelector('[data-scorre-prova]').scrollBy({ top: n, behavior: 'instant' });
 }; true`;
 // Scorre e apre col tasto destro nello stesso fotogramma, come chi porta la voce sotto il puntatore e preme subito:
 // l'evento «scroll» arriva al fotogramma dopo, quando il menu ascolta già.
