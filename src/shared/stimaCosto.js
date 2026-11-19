@@ -19,6 +19,8 @@
     breve: { prompt: 1500, completion: 150 },
     immagine: { prompt: 3000, completion: 500 },
     vettori: { prompt: 2000, completion: 0 },
+    // Un'immagine creata: i modelli che disegnano la contano come circa 1.300 token d'uscita al prezzo delle immagini.
+    generazione: { prompt: 400, completion: 100, immagini: 1300 },
     voce: null,
   });
 
