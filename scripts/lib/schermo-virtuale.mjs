@@ -10,6 +10,8 @@ import { datiWorker, displayDelWorker } from './dati-worker.mjs';
 
 const vuota = (v) => !String(v ?? '').trim();
 const VARIABILI = ['DISPLAY', 'XAUTHORITY', 'ELECTRON_DISABLE_SANDBOX'];
+const SEGNO_VIRTUALE = 'FILO_SCHERMO_VIRTUALE';
+export const SCHERMI_LAVORATORI = 'FILO_SCHERMI_LAVORATORI';
 
 /** Linux senza DISPLAY né WAYLAND_DISPLAY: Electron lì non parte. PURA. */
 export function senzaSchermo({ platform = process.platform, env = process.env } = {}) {
