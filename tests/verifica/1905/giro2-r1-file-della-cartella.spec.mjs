@@ -1,4 +1,5 @@
-// Verifica #1905 giro 1, rilievo 1: una pagina locale aperta dall'utente non deve poter leggere le foto della sua cartella.
+// Verifica #1905 giro 2, rilievo 1 (già giro 1): una pagina locale aperta dall'utente non deve poter leggere i file
+// della sua cartella, né i pixel delle foto né il testo di un file caricato come script (il messaggio d'errore).
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, chiedi } from '../../helpers/chatFinta.mjs';
 import { cartellaInCasa, togliCartella } from '../../helpers/percorsi.mjs';
