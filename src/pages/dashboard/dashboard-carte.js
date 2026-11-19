@@ -939,7 +939,7 @@
 
   // ===== Le lettere del doppio tocco, dal tasto destro di un tasto o di una carta =====
   function vociLettera(id, titolo) {
-    if (!Tocco() || !(C.tasto(id) || (C.carta(id) && C.carta(id).url))) return [];
+    if (!Tocco() || !C.prendeLettera(id)) return [];
     const l = letteraDi(id);
     if (!l) return [{ etichetta: 'Assegna una lettera', fai: () => aspettaLettera(id, titolo) }];
     return [
