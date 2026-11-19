@@ -42,6 +42,9 @@ test('un file spostato in Documenti/Bollette si ritrova al clic sulla voce: si a
   try {
     const nuovo = join(doc, 'Bollette', 'bolletta-luce.pdf');
     renameSync(rec.savePath, nuovo);
+    // L'elenco se ne accorge da sé (la sua memoria del disco dura un attimo): la voce si vede già barrata.
+    await expect.poll(async () => ((await shell.evaluate(() => window.filoShell.downloads.list())).items || [])
+      .find((x) => x.id === rec.id)?.missing, { timeout: 10000 }).toBe(true);
     const dl = await openTab('filo://downloads/downloads.html');
     const riga = dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'bolletta-luce.pdf' }) });
     await expect(riga).toHaveAttribute('data-missing', '1', { timeout: 10000 });
