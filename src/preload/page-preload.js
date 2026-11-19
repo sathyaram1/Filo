@@ -996,6 +996,7 @@ function loadScripts() {
   // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina
   // (traduzione, sentinella del testo nuovo) lo riconosce da quel marchio.
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
+  try { require(path.join(SHARED_DIR, 'fontGenerico.js')); } catch (e) { console.error('[Filo CS] fontGenerico', e); } // #1342 — il carattere dei riquadri chiusi
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'clipboardHistory.js')); } catch (e) { console.error('[Filo CS] clipboardHistory', e); } // #256 — PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
