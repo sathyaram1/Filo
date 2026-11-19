@@ -23,7 +23,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'shared', 'pavimento.js'));
 require(join(ROOT, 'src', 'main', 'services', 'webSearch.js'));
-const Chat = require(join(ROOT, 'src', 'main', 'services', 'immaginiChat.js'));
+const Chat = require(join(ROOT, 'src', 'main', 'services', 'immaginiDelleRisposte.js'));
 const Copie = require(join(ROOT, 'src', 'main', 'services', 'copieIcone.js'));
 
 const PNG = (n) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from(`pixel-${n}`)]);
