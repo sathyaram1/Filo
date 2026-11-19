@@ -60,6 +60,7 @@ async function rispostaDopo(page, testo) {
 
 const memoria = (app) => app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getMemory()));
 const attivita = (page) => page.locator('.dash-activity').allInnerTexts().catch(() => []);
+test.beforeEach(({}, info) => { test.skip(!!process.env.SOLO_CONTROLLO && !info.title.includes('controllo')); });
 
 for (let i = 1; i <= RIPETI; i++) {
   test(`togli pepe ${i}`, async ({ app, shell, openTab }) => {
