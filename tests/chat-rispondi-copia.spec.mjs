@@ -513,7 +513,6 @@ test('#2346: più passi nello stesso messaggio, ognuno col suo commento, nell\'o
   await home.screenshot({ path: 'tests/.shots/chat-rispondi-passi-bolla.png' });
   await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }));
   await expect(home.locator('html')).toHaveAttribute('data-sn-theme', 'dark');
-  await home.screenshot({ path: 'tests/.shots/chat-rispondi-passi-bolla-scuro.png' });
 
   // Il modello legge citazione e commento in ordine.
   const detta = await ultimaDomanda(app);
