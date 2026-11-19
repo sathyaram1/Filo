@@ -82,6 +82,8 @@ test('riquadro: una foto oltre i 4 MB entra rimpicciolita, un AVIF entra ridiseg
   await rilascia(page, '__piccola', 'scansione.avif', 'image/avif');
   await expect(miniature).toHaveCount(2, { timeout: 10_000 });
   expect((await miniaturaN(page, 1)).type).toBe('image/png');
+  // E «Allega» lo propone nel selettore, come il trascinamento lo accetta.
+  await expect(page.locator('.sn-fb-file')).toHaveAttribute('accept', /image\/avif.*\.avif/);
 
   await rilascia(page, 'rotta', 'IMG_2042.HEIC', 'image/heic');
   await expect(page.locator('.sn-fb-status')).toContainText('IMG_2042.HEIC', { timeout: 10_000 });
