@@ -177,3 +177,26 @@ test('Gestione: una foto oltre i 4 MB allegata a una risposta sale rimpicciolita
   expect(esito.salite[0].type).toMatch(/^image\/(jpeg|png)$/);
   expect(esito.salite[0].name).toBe('IMG_2041.JPG');
 });
+
+test('Gestione: un AVIF allegato a una risposta sale ridisegnato, un HEIC resta fuori col perché', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForFunction(() => !!window.SN_MG_ALLEGATI && !!window.SN_IMMAGINI_CHAT, null, { timeout: 10_000 });
+  await preparaFoto(page);
+  const esito = await page.evaluate(async () => {
+    const salite = [];
+    window.SN_FEEDBACK.uploadAttachment = async (blob, name) => {
+      salite.push({ type: blob.type, name });
+      return { kind: 'img', url: `https://firebasestorage.example/${encodeURIComponent(name)}`, name, type: blob.type };
+    };
+    const messaggi = [];
+    const A = window.SN_MG_ALLEGATI.crea({ alMessaggio: (_k, t) => { if (t) messaggi.push(t); } });
+    await A.aggiungi('d1', [new File([window.__piccola], 'scansione.avif', { type: 'image/avif' })]);
+    const rotta = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 1, 2, 3]);
+    await A.aggiungi('d1', [new File([rotta], 'IMG_2042.HEIC', { type: 'image/heic' })]);
+    return { salite, messaggi, allegati: A.di('d1').length };
+  });
+  expect(esito.salite).toEqual([{ type: 'image/png', name: 'scansione.avif' }]);
+  expect(esito.allegati).toBe(1);
+  expect(esito.messaggi.join(' ')).toMatch(/IMG_2042\.HEIC.*non sa aprire.*JPEG o PNG/);
+});
