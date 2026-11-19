@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, menuDelloStratoAperto, paginaDelloStrato, statoDelloStrato, statoCronologia } from './helpers/menuContestuale.mjs';
 import { cronologiaPronta } from './helpers/cronologiaAppunti.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 test.use({ stratoDelMenu: true });
 
