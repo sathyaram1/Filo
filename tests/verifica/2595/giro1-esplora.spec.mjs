@@ -205,6 +205,11 @@ test('dopo una domanda a schermo intero, il puntatore sulla parte alta di un riq
     await new Promise((r) => setTimeout(r, 800));
     await page.mouse.move(310, 260, { steps: 2 });
     await new Promise((r) => setTimeout(r, 800));
+    console.log('CIMA', JSON.stringify(await app.evaluate(({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+      const c = tm.schedeInAlto.cimaSulloSchermo;
+      return { y: c ? c.y : null, mosse: tm.schedeInAlto.mossePagina };
+    })));
     await shell.locator('#dl-panel #dl-panel-close').click();
     await expect.poll(async () => (await stato(app)).alto).toBe(0);
     // Ora il riquadro comincia a 50 px dall'alto: il puntatore a metà della sua parte alta, lontano dal bordo.
