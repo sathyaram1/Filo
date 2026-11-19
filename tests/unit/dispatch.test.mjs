@@ -726,28 +726,29 @@ test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro'
     process.stdout.write = (s) => { out += s; return true; };
     process.stderr.write = (s) => { err += s; return true; };
     try { emit(bucket, serverCtx(bucket, { payload })); } finally { process.stdout.write = real; process.stderr.write = realErr; }
-    return { ...JSON.parse(out), err };
+    const j = JSON.parse(out);
+    return { ...j, ruolo: ruoloConsegnato(j), err };
   };
   const storia = [{ critique: 'a' }, { critique: 'b' }];
   const pieno = consegna({ feedback: { text: 't' }, history: storia });
-  assert.match(pieno.instructions, /# verifica piena/);
-  assert.match(pieno.instructions, /Avvertenza di serie/);
+  assert.match(pieno.ruolo, /# verifica piena/);
+  assert.match(pieno.ruolo, /Avvertenza di serie/);
   assert.equal(pieno.payload.scope, 'pieno');
   assert.ok(!('loopCount' in pieno), 'la busta non porta più il conto dei giri');
 
   const chiusura = consegna({ feedback: { text: 't' }, history: storia, scope: 'chiusura', perimetro: { rilievi: [{ level: 2, text: 'Salva non salva' }], shaPrima: 'abc1234' } });
-  assert.match(chiusura.instructions, /# verifica di chiusura/);
-  assert.match(chiusura.instructions, /Perimetro di questo giro[\s\S]*\[2i\] Salva non salva/);
-  assert.ok(!/Avvertenza di serie/.test(chiusura.instructions), 'il giro stretto non invita alla ricerca larga');
+  assert.match(chiusura.ruolo, /# verifica di chiusura/);
+  assert.match(chiusura.ruolo, /Perimetro di questo giro[\s\S]*\[2i\] Salva non salva/);
+  assert.ok(!/Avvertenza di serie/.test(chiusura.ruolo), 'il giro stretto non invita alla ricerca larga');
   assert.equal(chiusura.payload.scope, 'chiusura');
 
   const riall = consegna({ feedback: { text: 't' }, scope: 'riallineamento', perimetro: { reportRebase: 'conflitto nelle schede' } });
-  assert.match(riall.instructions, /# verifica dopo il riallineamento/);
-  assert.match(riall.instructions, /> conflitto nelle schede/);
+  assert.match(riall.ruolo, /# verifica dopo il riallineamento/);
+  assert.match(riall.ruolo, /> conflitto nelle schede/);
 
   const storto = consegna({ feedback: { text: 't' }, scope: 'lampo', perimetro: { rilievi: [] } });
-  assert.match(storto.instructions, /# verifica piena/, 'mai meno verifica per un valore storto');
-  assert.ok(!/Perimetro di questo giro/.test(storto.instructions));
+  assert.match(storto.ruolo, /# verifica piena/, 'mai meno verifica per un valore storto');
+  assert.ok(!/Perimetro di questo giro/.test(storto.ruolo));
   assert.match(storto.err, /ambito di verifica sconosciuto/);
 });
 
