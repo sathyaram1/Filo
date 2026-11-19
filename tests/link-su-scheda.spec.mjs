@@ -104,7 +104,8 @@ test('sul bordo fra due schede ne nasce una nuova proprio lì, davanti; il segno
 
 test('nel tema scuro la scheda che riceve e il segno fra due si vedono', async ({ app, shell, openTab, testServer }) => {
   await treSchede(shell, openTab, testServer);
-  const fondo = () => shell.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const fondo = () => shell.evaluate(() => getComputedStyle(document.querySelector('.tab-row')).backgroundColor
+    + getComputedStyle(document.documentElement).getPropertyValue('--bg') + getComputedStyle(document.documentElement).getPropertyValue('--tab-active'));
   const chiaro = await fondo();
   await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }, { sender: null }));
   await expect.poll(fondo, { timeout: 5_000 }).not.toBe(chiaro);
