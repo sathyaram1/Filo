@@ -161,6 +161,12 @@
       doesNot: 'Lasciata sulla pagina fuori da un campo, o fuori dalla finestra, torna al suo posto: non apre una finestra nuova. Dentro un riquadro incorporato di un altro sito il campo non la riceve.',
     },
     {
+      id: 'link-su-scheda', title: 'Trascina un collegamento su una scheda', category: 'navigation',
+      desc: 'Un collegamento trascinato da una pagina, come la miniatura di un video, e lasciato al centro di una scheda apre la pagina in quella scheda e la porta davanti. Lasciato sul bordo fra due schede, dopo l’ultima, sul + o sulla parte vuota della fila, apre una scheda nuova in quel punto. Mentre lo porti, la scheda che lo riceverebbe si colora, o un segno sottile mostra dove nascerà quella nuova. A schermo intero le schede scendono quando porti il collegamento contro il bordo alto.',
+      invoke: 'Trascina un collegamento o la miniatura di un video sulla fila delle schede.',
+      doesNot: 'Apre solo indirizzi del web (http e https): un collegamento a un file del computer, a una pagina di Filo o a uno script non fa niente. Un testo selezionato che non è un collegamento non si apre. Un’immagine lasciata sulla parte vuota della fila, senza una scheda sotto, va alla chat come sempre.',
+    },
+    {
       id: 'tab-preview', title: 'Anteprima di una scheda al passaggio del mouse', category: 'navigation',
       desc: 'Passando il mouse su una scheda della barra compare una carta con il suo titolo, il sito e un’immagine della pagina com’era l’ultima volta che l’hai vista. Le schede aperte in secondo piano hanno la loro immagine appena finiscono di caricare, anche se non le hai mai aperte. Sulla scheda che hai davanti la carta mostra solo il titolo.',
       invoke: 'Passa il mouse su una scheda. In Preferenze → «Anteprima delle schede» la spegni o scegli la dimensione (piccola, media, grande); lo stesso chiedendolo a Filo ("spegni l\'anteprima delle schede", "anteprima delle schede più grande").',
