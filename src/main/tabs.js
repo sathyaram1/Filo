@@ -2898,7 +2898,7 @@ class TabManager {
   tastoDelBrowser(input, tab) {
     if (!input || !tab) return false;
     // La tastiera può restare un attimo su una scheda di dietro che si carica (#871.5): i tasti valgono per quella davanti.
-    if (tab.id !== this.activeId) tab = this.tabs.find((t) => t.id === this.activeId) || tab;
+    if (tab.id !== this.activeId && this.tabs.includes(tab)) tab = this.tabs.find((t) => t.id === this.activeId) || tab;
     // I tasti di chi arriva da un altro browser, per nome (#1468): anche quelli che Filo non usa.
     if (input.type === 'keyDown') Strade.misura('tasto', input, { incognito: this.incognito });
     // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
