@@ -107,7 +107,8 @@ test('nel tema scuro la scheda che riceve e il segno fra due si vedono', async (
   const fondo = () => shell.evaluate(() => getComputedStyle(document.querySelector('.tab-row')).backgroundColor
     + getComputedStyle(document.documentElement).getPropertyValue('--bg') + getComputedStyle(document.documentElement).getPropertyValue('--tab-active'));
   const chiaro = await fondo();
-  await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }, { sender: null }));
+  // La barra segue il tema del sistema (prefers-color-scheme): qui lo si chiede scuro alla sola barra.
+  await shell.emulateMedia({ colorScheme: 'dark' });
   await expect.poll(fondo, { timeout: 5_000 }).not.toBe(chiaro);
   const video = testServer.html(pagina('Video'));
   await trascina(shell, video, { ...(await punto(shell.locator('.tab').nth(1))), fasi: ['dragEnter', 'dragOver'] });
