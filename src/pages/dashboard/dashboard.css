@@ -1065,9 +1065,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-msg-azione.dash-non-copiato::after { color: var(--dash-accent); }
 .dash-msg-azioni:has(.dash-copiato, .dash-non-copiato) .dash-msg-azione:not(.dash-copiato):not(.dash-non-copiato)::after { opacity: 0; }
 
-/* Le citazioni nella bolla dell'utente, ognuna prima del suo commento (#2346): una striscia sottile e due righe smorzate,
-   senza nome (si risponde solo a Filo; «Tu» quando si cita un proprio messaggio). Il testo sta negli attributi: la
-   bolla resta fatta delle sole parole dell'utente. */
+/* Le citazioni nella bolla, ognuna prima del suo commento (#2346): striscia sottile, due righe smorzate, nome solo per
+   «Tu». Il testo sta negli attributi: la bolla resta fatta delle sole parole dell'utente. */
 .dash-bubble-user { --dash-citata-riga: color-mix(in srgb, var(--dash-paper) 38%, transparent); }
 .dash-citata {
   display: block;
