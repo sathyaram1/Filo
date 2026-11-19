@@ -2163,7 +2163,11 @@
           (c.troncato ? ` È stato accorciato: c'è solo la parte più vicina al campo.` : '') + `\n` +
           (pp ? `Prima del campo:\n${esterno().imbusta({ tipo: 'DATI_PAGINA', testo: pp, max: 20000 })}\n` : '') +
           (pd ? `Dopo il campo:\n${esterno().imbusta({ tipo: 'DATI_PAGINA', testo: pd, max: 20000 })}\n` : '') + `\n`
-        : `La pagina intorno al campo non ha altro testo.\n\n`;
+        // `nonArriva`: la pagina c'è ma è rimasta qui (delicata, o illeggibile). Detta vuota, il modello segnava come poco
+        // chiaro chi risponde a un messaggio che non vedeva (#2132).
+        : c.nonArriva
+          ? `Il testo della pagina intorno al campo non ti arriva: il campo può rispondere a messaggi che non vedi.\n\n`
+          : `La pagina intorno al campo non ha altro testo.\n\n`;
       // Il campo arriva intero; «prima» e «dopo» ci sono solo se chi chiama ne manda una parte.
       return `Oggi è ${GIORNI[d.getDay()]} ${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()} (orologio del computer dell'utente): serve per «domani», «venerdì prossimo» e simili.\n` +
         (l.sito ? `Si scrive sul sito ${unaRigaDiDati(l.sito, 120)}.\n` : '') + `\n` +
