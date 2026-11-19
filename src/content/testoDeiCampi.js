@@ -219,7 +219,7 @@
 
   // Il testo rimesso deve contare per il sito come scritto (#2052): passa dalla regola del correttore, che per farlo
   // prende il fuoco del campo. Chi intanto scrive altrove non se ne accorge (#2052.1): il fuoco torna con la sua
-  // selezione, la pagina resta dov'era, e una parola che si sta componendo (tastiere di altre lingue) si aspetta.
+  // selezione, e una parola che si sta componendo (tastiere di altre lingue) si aspetta.
   function scriviNelCampo(el, valore) {
     const prima = dove();
     rimettendo = true;
