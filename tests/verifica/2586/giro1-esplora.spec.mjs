@@ -71,3 +71,21 @@ test('nome lungo per una categoria nuova: il campo resta e la categoria nasce', 
   await expect(campo, 'il campo è ancora aperto dopo un nome lungo').toBeVisible();
   await expect(campo).toHaveValue(nome);
 });
+
+test('nome corto per una categoria nuova: il campo resta', async ({ openTab }) => {
+  const page = await homeCon(openTab, { schede: 1, categorie: 1 });
+  const card = page.locator('#grid .sn-card[data-page-id="p0"]');
+  await card.click({ button: 'right' });
+  const menu = page.locator('.home-ctxmenu');
+  await menu.locator('.sn-select-option').filter({ hasText: /Sposta/i }).click();
+  await menu.locator('.sn-select-option').last().click();
+  const campo = page.locator('.home-ctxmenu .home-campo');
+  await expect(campo).toBeVisible();
+  await page.evaluate(() => { window.__scroll = []; window.addEventListener('scroll', (e) => window.__scroll.push(e.target.className || e.target.nodeName), true); });
+  await campo.pressSequentially('Ricette', { delay: 10 });
+  await fotogrammi(page);
+  await expect(campo).toBeVisible();
+  await campo.pressSequentially(' della nonna da provare nel fine settimana con gli amici', { delay: 10 });
+  await fotogrammi(page);
+  console.log('scroll visti', JSON.stringify(await page.evaluate(() => window.__scroll)));
+});
