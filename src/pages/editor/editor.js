@@ -1238,6 +1238,7 @@
   function openTitleMenu(x, y, { file = null } = {}) {
     closeTitleMenu();
     if (!file) closeDocPop();
+    titleMenuScorso = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop ed-title-ctxmenu';
     menu.setAttribute('role', 'menu');
