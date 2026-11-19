@@ -457,6 +457,12 @@ const SCRIPT_MENU = `(() => {
     const b = e.target.closest && e.target.closest('[data-v]');
     if (b && api) api.select(b.dataset.v, giro);
   });
+  // Il bordo trasparente dell'ombra non è del menu: il clic lì è per quello che si vede sotto (#2382).
+  document.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('.menu')) return;
+    e.preventDefault();
+    if (api && api.fuori) api.fuori(giro, e.clientX, e.clientY, e.button);
+  });
   document.addEventListener('mousemove', (e) => {
     const b = e.target.closest && e.target.closest('button.item');
     const k = b ? voci().indexOf(b) : -1;
