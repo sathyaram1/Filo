@@ -1048,7 +1048,8 @@ class TabManager {
     }
     // SICUREZZA (#247) — un loadURL programmatico non emette will-navigate: qui convergono
     // TUTTI gli handler IPC che aprono una scheda, e il cammino IPC → file:// va tenuto chiuso.
-    if (isWebUnsafeNav(url)) {
+    const fileConcesso = fileDelComputer && FileDelComputer.concedi(url);
+    if (!fileConcesso && isWebUnsafeNav(url)) {
       fermaNavigazione(url, { win: this.win }); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
       return null;
     }
