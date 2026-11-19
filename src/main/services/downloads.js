@@ -1685,9 +1685,13 @@ function apriScaricato(rec, opts) {
   // dell'apertura non è affidabile su tutte le piattaforme.
   forgetExists(rec.savePath);
   if (!rec.savePath || !fileExists(rec.savePath)) {
-    // La voce è appena diventata «sparita»: le superfici aperte la attenuano senza ricaricare.
-    broadcast('missing', rec);
-    return { ok: false, missing: true, error: MISSING_TEXT };
+    const sparito = (scaduto) => {
+      // La voce è appena diventata «sparita»: le superfici aperte la attenuano senza ricaricare.
+      broadcast('missing', rec);
+      return { ok: false, missing: true, error: scaduto ? CERCATO_TROPPO_TEXT : MISSING_TEXT };
+    };
+    if (rec.state !== 'completed' || !rec.savePath) return sparito(false);
+    return ritrova(rec).then((c) => (c === true ? apriScaricato(rec, opts) : sparito(c === 'scaduto')));
   }
   // #588 — l'UNICA porta verso shell.openPath: aprire un programma è eseguirlo,
   // e qui non si passa senza una seconda risposta. Il gate sta nel main perché
