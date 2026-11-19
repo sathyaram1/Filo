@@ -497,6 +497,10 @@
       // Le fonti controllate della risposta (#2383): i campi del controllo, mai il testo delle pagine.
       const F = global.SN_FONTI_CITATE;
       const fonti = F ? F.perIlDisco(turn.fonti, text) : [];
+      // Le immagini della risposta (#2272): rimandi alle copie locali, mai indirizzi del web da caricare.
+      const IR = global.SN_IMMAGINI_RISPOSTA;
+      const immagini = IR ? IR.perIlDisco(turn.immagini, text) : [];
+      if (immagini.length) out.immagini = immagini;
       if (fonti.length) out.fonti = fonti;
       // Com'è andata ogni azione del turno, comprese le fallite e quelle ferme sulla conferma (#1294, #1130.2): `actions`
       // resta il nome di quelle successe, per chi lo legge già così.
