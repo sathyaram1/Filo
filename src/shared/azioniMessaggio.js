@@ -63,9 +63,31 @@
     try { campo.setSelectionRange(campo.value.length, campo.value.length); } catch (_) {}
   }
 
+  // La parte della selezione che sta nel messaggio `el` (`testo`), e quello che la precede in `el` (`prima`); `null` se
+  // non ne tocca niente. Dentro un'ombra (l'Aiuto sui siti) la selezione è della sua radice.
+  function selezioneIn(el) {
+    if (!el || typeof document === 'undefined') return null;
+    const radice = el.getRootNode ? el.getRootNode() : null;
+    let sel = null;
+    try { sel = (radice && radice !== document && typeof radice.getSelection === 'function' && radice.getSelection()) || global.getSelection(); } catch (_) { sel = null; }
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    const r = sel.getRangeAt(0).cloneRange();
+    if (!r.intersectsNode(el)) return null;
+    const tutto = document.createRange();
+    tutto.selectNodeContents(el);
+    if (r.compareBoundaryPoints(Range.START_TO_START, tutto) < 0) r.setStart(tutto.startContainer, tutto.startOffset);
+    if (r.compareBoundaryPoints(Range.END_TO_END, tutto) > 0) r.setEnd(tutto.endContainer, tutto.endOffset);
+    const testo = r.toString();
+    if (!testo.trim()) return null;
+    const prima = document.createRange();
+    prima.setStart(tutto.startContainer, tutto.startOffset);
+    prima.setEnd(r.startContainer, r.startOffset);
+    return { testo, prima: prima.toString() };
+  }
+
   // `o`: { messaggio (selettore), testo(el), ruolo(el) → 'user'|'filo', pronto(el)?, rispondi(el, testo)?,
-  // copia(testo, el)?, azioni(el)? → ['copia', …], extra? { id: { icona, etichetta, voce, fai(el, testo) } }, classi? }.
-  // Dà `voci(target)`: le stesse azioni per il tasto destro.
+  // copia(testo, el)?, azioni(el)? → ['copia', …], extra? { id: { icona, etichetta, voce, fai(el, testo, sel) } },
+  // classi? }. Rispondi con del testo selezionato nel messaggio cita quello (#2346). Dà `voci(target)` per il tasto destro.
   function attacca(contenitore, o) {
     if (!contenitore || !o || !o.messaggio) return { voci: () => [] };
     const testoDi = (el) => String((o.testo ? o.testo(el) : el.textContent) || '').trim();
