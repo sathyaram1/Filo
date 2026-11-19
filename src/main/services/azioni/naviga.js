@@ -29,7 +29,7 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
     if (typeof action._fileDelComputer !== 'string' || !action._fileDelComputer) return { executed: false, kept: true, output: { blocked: 'file', motivo: 'non_giudicato' } };
     url = require('../fileDelComputer').indirizzoDi(action._fileDelComputer);
   }
-  // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
+  // SICUREZZA: oltre al file giudicato qui sopra, l'agente non apre schemi non-web. Una pagina ostile può
   // iniettare istruzioni nel modello (prompt injection) per fargli aprire
   // un file://attacker (leak hash NTLM su Windows) o data:/javascript:.
   // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui. Un URL
