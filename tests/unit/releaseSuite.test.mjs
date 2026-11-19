@@ -507,8 +507,9 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
     assert.doesNotMatch(`${cancello.corpo}\n${unit.corpo}`, /npm run test:unit/,
       'senza la riprova un flaky su Windows butta un verde, o un giro di pubblicazione');
     assert.match(unit.corpo, /continue-on-error:\s*true/, 'il passo dopo deve poter aprire il feedback');
-    const node = (t) => (t.match(/node-version:\s*(\S+)/) || [])[1];
-    assert.equal(node(lavoro), node(senzaCommenti(job('release'))));
+    const node = (testo, nome) => nodeDeiWorkflow(testo).filter((x) => x.lavoro === nome).map((x) => x.fonte);
+    assert.deepEqual(node(SUITE_YML, LAVORO_UNIT_WINDOWS), node(YML, 'release'));
+    assert.deepEqual(node(YML, 'release'), [{ file: '.node-version' }]);
     assert.match(lavoro, /node scripts\/npm-ci-ritenta\.mjs/);
   });
 
