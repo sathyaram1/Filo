@@ -68,10 +68,12 @@
   // Torna il data: da mandare, o '' se l'immagine non si apre (anche un file rovinato col nome giusto: il modello
   // lo rifiuterebbe). Entro il tetto e in un formato letto resta com'è; un altro formato diventa PNG (tiene la
   // trasparenza di un logo); oltre il tetto si rimpicciolisce in JPEG finché ci sta.
-  async function perLaChat(blob) {
+  function perLaChat(blob) {
+    return entroIlTetto(blob, tetti().tettoImmagineByte || 4 * 1024 * 1024, tetti().latoRimpicciolita || 2048);
+  }
+
+  async function entroIlTetto(blob, tetto, lato) {
     if (!blob) return '';
-    const tetto = tetti().tettoImmagineByte || 4 * 1024 * 1024;
-    const lato = tetti().latoRimpicciolita || 2048;
     const im = await apri(blob);
     if (!im) return '';
     try {
