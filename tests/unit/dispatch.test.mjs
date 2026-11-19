@@ -77,6 +77,7 @@ const {
   leggiOpzioniRegistrazione,
   fermaSenzaDomanda,
   fixedReplyText,
+  esitoRiallineamento,
   FERMA_NOTE,
   verifierScope,
   perimetroNote,
