@@ -463,14 +463,14 @@ test('la password proposta dall’assistente e ritoccata dall’utente non resta
       ['', JSON.stringify({ text: 'Ti propongo questa.', status: 'done', highlight: { selector: '#p', action: 'fill', value: proposta, note: 'Password nuova' } })],
     ],
   });
-  await apriAiuto(shell, page);
-  await scriviAllAiuto(page, 'scegli tu una password');
-  await page.locator('.sn-highlight-accept').click({ timeout: 20_000 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'scegli tu una password');
+  await aiuto.locator('.sn-highlight-accept').click({ timeout: 20_000 });
   await page.locator('#p').press('End');
   await page.locator('#p').pressSequentially('!7');
   await expect(page.locator('#p')).toHaveValue(`${proposta}!7`);
-  await scriviAllAiuto(page, 'e adesso?');
-  await expect(page.locator('.sn-sidebar').getByText('Premi Entra.')).toBeVisible({ timeout: 20_000 });
+  await scriviAllAiuto(aiuto, 'e adesso?');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Premi Entra.')).toBeVisible({ timeout: 20_000 });
   await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('731954');
   expect(await lettiDopoUnRiavvio(app), 'la password ritoccata è rimasta fra i segreti letti').not.toContain(`${proposta}!7`);
 });
