@@ -119,7 +119,10 @@
     const i = intero(r.i);
     const testo = testoDi(r.testo).slice(0, PER_CERCARE);
     if (!chat && !testo.trim()) return null;
-    return { ...(chat ? { chat } : {}), ...(i != null ? { i } : {}), testo, ...(r.role === 'user' ? { role: 'user' } : {}), ...segni(r) };
+    return {
+      ...(chat ? { chat } : {}), ...(i != null ? { i } : {}), testo, ...(r.role === 'user' ? { role: 'user' } : {}),
+      ...(r.passo === true ? { passo: true } : {}), ...segni(r),
+    };
   }
   const daPaginaTutte = (r) => lista(r).map(daPagina).filter(Boolean);
 
