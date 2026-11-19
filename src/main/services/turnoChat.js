@@ -765,7 +765,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // il peso dei turni: la soglia vera, il grezzo che resta e l'anticipo vengono da lì (SN_FILO_COMPATTAZIONE.limiti).
     // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero.
     if (round === 1) {
-      try { Compattazione.segnaBase(incognitoTurno, parteFissaChat(tools, payloadBase.parteUtente)); } catch (_) {}
+      try {
+        const fissi = parteFissaChat(tools, payloadBase.parteUtente);
+        Compattazione.segnaBase(incognitoTurno, fissi);
+        // Una parte fissa più grossa di quella prevista stringe il tratto subito: il tetto vale per la richiesta intera.
+        tettiChat = { ...tettiChat, fissi };
+        if (filo.token > globalThis.SN_FILO_CONTESTO.tettoDelTratto(tettiChat.token, fissi)) {
+          await ricomponi();
+          token = await stimaRichiesta();
+        }
+      } catch (e) { console.warn('[Filo] parte fissa non misurata:', e?.message || e); }
       try { limitiDelTurno = await Compattazione.limiti(incognitoTurno, { tetti: tettiChat }); } catch (_) { limitiDelTurno = null; }
     }
     const l = limitiDelTurno || {};
