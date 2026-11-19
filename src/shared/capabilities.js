@@ -971,7 +971,7 @@
   const STRUMENTO = Object.freeze({
     'new-tab': 'scheda(apri)', 'close-tab': 'scheda(chiudi)', 'reopen-closed-tab': 'scheda(riapri)',
     'navigate-back-forward': SOLO_A_MANO, 'switch-tab-by-number': 'scheda(mostra)', 'switch-tab-next-prev': 'scheda(mostra)',
-    reload: SOLO_A_MANO, home: 'scheda(finestra)', 'address-bar': 'scheda(apri)', incognito: SOLO_A_MANO,
+    reload: SOLO_A_MANO, home: 'scheda(finestra)', 'address-bar': 'scheda(apri)', 'open-local-file': 'scheda(apri)', incognito: SOLO_A_MANO,
     fullscreen: 'scheda(finestra)', sidebar: 'scheda(finestra)', 'fila-tasto-destro': 'home(icona)',
     'pannello-strumenti': 'home(pannello)', 'page-zoom': 'scheda(zoom)', 'network-error-page': SOLO_A_MANO,
     'auto-archive': 'scheda(riordina)', 'restore-tabs': SOLO_A_MANO, 'reorder-tabs': SOLO_A_MANO, 'drag-tab': SOLO_A_MANO,
