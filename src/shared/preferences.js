@@ -758,6 +758,12 @@
     }
     return global.SN_DOPPIO_TOCCO || null;
   }
+  function doppioCtrl() {
+    if (!global.SN_DOPPIO_CTRL && typeof require === 'function') {
+      try { if (!global.SN_CARTE_HOME) require('./carteHome.js'); require('./doppioCtrl.js'); } catch (_) {}
+    }
+    return global.SN_DOPPIO_CTRL || null;
+  }
 
   // Millisecondi da una frase: «0,5 s», «400 ms», «400». Senza unità sono millisecondi, sotto `secondiSotto` secondi.
   function msDaTesto(v, secondiSotto = 0) {
