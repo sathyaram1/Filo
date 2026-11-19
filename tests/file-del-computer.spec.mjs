@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { paginaDellaScheda } from './helpers/schede.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = join(process.cwd(), 'tests', '.shots');
 const FOTO = join(process.cwd(), 'tests', 'fixtures', 'provenienza', 'c2pa-ufficiale-ai.png');
