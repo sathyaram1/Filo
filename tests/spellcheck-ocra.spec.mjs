@@ -272,6 +272,9 @@ test('su una pagina dove Filo chiede prima il controllo aspetta «Controlla», e
   expect(prompt).not.toContain('porto io i biglietti');
   expect(prompt).not.toContain('Anna: ciao!');
   expect(prompt).toContain('sì ci vediamo mercoledì e poi giovedì 9 ottobre 2026');
+  // #2132: la pagina trattenuta non si dice vuota, o chi risponde a un messaggio sembra parlare da solo.
+  expect(prompt).toContain('Il testo della pagina intorno al campo non ti arriva');
+  expect(prompt).not.toContain('non ha altro testo');
   await page.waitForTimeout(800);
   // La citazione sarebbe nella pagina, ma il modello la pagina non l'ha vista: la contraddizione non vale.
   await expect(ocra(page)).toHaveText(['giovedì 9 ottobre 2026']);
