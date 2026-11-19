@@ -152,11 +152,12 @@
     const url = await entroIlTetto(file, tetto, LATO_SEGNALAZIONE);
     const blob = url ? blobDa(url) : null;
     if (!blob) return { motivo: buona ? `troppo grande (max ${Math.round(tetto / 1048576)} MB)` : MOTIVO_FORMATO };
-    try { return { file: new File([blob], nome || 'immagine', { type: blob.type }) }; } catch (_) {
+    const avviso = /^image\/gif$/i.test(file.type || '') && await animata(file) ? { avviso: AVVISO_FERMA } : {};
+    try { return { file: new File([blob], nome || 'immagine', { type: blob.type }), ...avviso }; } catch (_) {
       blob.name = nome;
-      return { file: blob };
+      return { file: blob, ...avviso };
     }
   }
 
-  global.SN_IMMAGINI_CHAT = { perLaChat, perLaSegnalazione, daRidisegnare, blobDa, byteDi, LETTA };
+  global.SN_IMMAGINI_CHAT = { perLaChat, perLaSegnalazione, daRidisegnare, fotogrammiGif, blobDa, byteDi, LETTA };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
