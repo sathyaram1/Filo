@@ -55,6 +55,8 @@ test('il turno si chiude da solo solo quando la pagina ha fatto quello che si er
   for (const s of ['partita', 'originale', 'fermata']) assert.equal(L.parlaDaSe('TRADUCI_PAGINA', esito(s)), true, s);
   for (const s of ['gia_tradotta', 'in_corso', 'niente']) assert.equal(L.parlaDaSe('TRADUCI_PAGINA', esito(s)), false, s);
   assert.equal(L.parlaDaSe('TRADUCI_PAGINA', esito('muto', false)), false);
+  // Su una scheda che non è davanti l'utente non vede cambiare niente: il modello gli dice dove.
+  assert.equal(L.parlaDaSe('TRADUCI_PAGINA', { executed: true, output: { traduzione: 'partita', dietro: true } }), false);
 });
 
 test('la riga del diario dice com\'è andata, non un «tradotta» generico', () => {
