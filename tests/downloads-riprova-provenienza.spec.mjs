@@ -74,6 +74,7 @@ test('«Riprova» su un «Salva immagine come…» caduto a metà presenta la pa
   test.setTimeout(60_000);
   const visti = [];
   let richieste = 0;
+  let salvataggiCaduti = 0;
   const img = await ascolta((req, res) => {
     const ref = String(req.headers.referer || '');
     visti.push(ref);
