@@ -43,4 +43,15 @@ function avvisoIndirizzoFermato(rawUrl) {
   return { testo, chiave: `indirizzo-fermato:${testo}` };
 }
 
-module.exports = { avvisoIndirizzoFermato };
+// Un file del computer chiesto dall'utente che non si apre in una scheda per un motivo suo, non di sicurezza (#1905).
+function avvisoFileNonAperto({ motivo, percorso } = {}) {
+  const p = accorciato(percorso);
+  const testo = motivo === 'assente' ? `File non trovato: ${p}`
+    : motivo === 'cartella' ? `È una cartella, non un file: ${p}`
+      : motivo === 'tipo' ? `Questo tipo di file non si mostra in una scheda: ${p}`
+        : null;
+  if (!testo) return avvisoIndirizzoFermato(`file:${percorso || ''}`) || { testo: 'File del computer bloccato per sicurezza', chiave: 'indirizzo-fermato:file' };
+  return { testo, chiave: `indirizzo-fermato:${testo}` };
+}
+
+module.exports = { avvisoIndirizzoFermato, avvisoFileNonAperto };
