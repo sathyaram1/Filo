@@ -97,7 +97,7 @@
     // ── scheda ──
     NAVIGA: {
       via: ['scheda', 'apri'],
-      description: 'apre un sito in una scheda nuova (background: dietro). Per cercare dentro un sito: url la home e cerca_nel_sito le parole.',
+      description: 'apre un sito in una scheda nuova (background: dietro). Per cercare dentro un sito: url la home e cerca_nel_sito le parole. Apre anche un file del computer da vedere (HTML, PDF, immagini, testo, audio, video): url il percorso com\'è.',
       properties: { url: S(), etichetta: S(), background: B(), cerca_nel_sito: S() }, required: ['url'],
     },
     MOSTRA_SCHEDA: {
