@@ -81,7 +81,7 @@ test('«antilope immagine»: le foto stanno nella risposta, fra un pezzo di test
   test.setTimeout(150_000);
   await preparaImmagini(app, 7);
   await stubModello(app, {
-    chiamata: { azione: 'cerca', query: 'antilope' },
+    chiamata: { azione: 'immagini', query: 'antilope' },
     finale: 'Ecco alcune antilopi.\n\n[[immagini: $ID0, $ID1, $ID2, $ID3, $ID4, $ID5]]\n\nL\'impala è la più diffusa in Africa:\n\n[[immagine: $ID6]]\n\nVive in branchi.',
   });
   const page = await openTab(NEWTAB);
