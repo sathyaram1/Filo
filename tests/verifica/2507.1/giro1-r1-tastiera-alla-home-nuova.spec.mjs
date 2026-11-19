@@ -84,3 +84,26 @@ for (const [nome, apri] of [
     }
   });
 }
+
+// Un collegamento che apre una scheda accanto le dà il fuoco: chi scrive subito dopo scrive lì, non nella pagina lasciata.
+test('r1 la scheda aperta da un collegamento riceve il testo scritto subito dopo', async () => {
+  const { app, shell } = await sulModulo();
+  try {
+    let map;
+    let voce;
+    await expect.poll(async () => {
+      ({ map } = await d.markInteractables(app, shell));
+      await d.clearMarks(app, shell);
+      voce = map.find((x) => x.label === 'Apri accanto');
+      return !!voce;
+    }, { timeout: 10_000 }).toBe(true);
+    const fuoco = await eseguiMossa(app, shell, { azione: 'clic', segno: voce.i }, map, null);
+    await expect.poll(async () => (await d.activeView(app, shell))?.url() || '', { timeout: 15_000 }).toContain('/accanto');
+    await d.sleep(1500);
+    await eseguiMossa(app, shell, { azione: 'scrivi', testo: 'ciao' }, map, fuoco);
+    const v = await d.activeView(app, shell);
+    expect(await v.evaluate(() => document.getElementById('c').value)).toBe('ciao');
+  } finally {
+    await d.closeFilo(app);
+  }
+});
