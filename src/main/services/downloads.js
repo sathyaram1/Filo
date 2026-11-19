@@ -1587,6 +1587,37 @@ function remove(id, scope = '') {
 // Messaggio unico: barra in alto e pagina elenco devono dirlo con le stesse parole.
 const MISSING_TEXT = 'Il file non c’è più: forse è stato spostato o cancellato';
 const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostata o cancellata';
+const CERCATO_TROPPO_TEXT = 'Il file non è più dov’era, e non l’ho trovato nelle cartelle solite';
+
+// #473 — un file spostato si cerca al clic, prima di dirlo sparito: trovato, la voce punta al posto nuovo e l'avviso
+// dice dove. Risolve true se il file ora c'è, false se no, 'scaduto' se la ricerca ha passato il tetto.
+function ritrova(rec) {
+  if (!rec || rec.state !== 'completed' || !rec.savePath) return Promise.resolve(false);
+  if (rec._cercando) return rec._cercando;
+  const prima = rec.savePath;
+  const R = require('./ritrovaFile');
+  let app = null;
+  try { app = electron().app; } catch (_) {}
+  const solite = app ? R.radiciSolite(app) : [];
+  const dov = path.dirname(prima);
+  const nota = solite.find((r) => stessoPercorso(r.dir, dov));
+  const radici = [{ dir: downloadsDir(), nome: 'Download' }, { dir: dov, nome: nota ? nota.nome : path.basename(dov) }, ...solite];
+  rec._cercando = R.cerca(path.basename(prima), rec.totalBytes || rec.receivedBytes, radici).then((esito) => {
+    rec._cercando = null;
+    if (!esito.trovato) return esito.scaduto ? 'scaduto' : false;
+    // Mentre si cercava la voce può essere stata tolta, o il file rimesso dov'era.
+    if (!records.has(rec.id) || rec.savePath !== prima) return fileExists(rec.savePath);
+    forgetExists(prima);
+    rec.savePath = esito.trovato;
+    rec.filename = path.basename(esito.trovato);
+    forgetExists(esito.trovato);
+    persist();
+    broadcast('renamed', rec);
+    shellToast(`Trovato in ${esito.dove}: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'file_ritrovato' }, scopeOf(rec));
+    return true;
+  }, () => { rec._cercando = null; return false; });
+  return rec._cercando;
+}
 
 // #588 — risposta alla domanda "questo programma lo scarico?". `allow` viene da
 // un clic dell'utente: un no cancella il file dalla quarantena, un sì lo fa
