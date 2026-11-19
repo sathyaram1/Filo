@@ -1449,6 +1449,12 @@ function riprova(id, scope = '') {
   if (!ses || typeof ses.downloadURL !== 'function') {
     return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', ...elenco(scope) };
   }
+  // Con la pagina da cui partiva, i byte li prende il main (#1684.1): a un download partito da qui Chromium toglie il
+  // Referer da ogni strada (intestazioni di downloadURL, onBeforeSendHeaders), e i siti protetti rispondono 403.
+  if (rec._pagina) {
+    require('./riprovaConPagina').riprova({ id: rec.id, scope: scopeOf(rec), ses, indirizzo, pagina: rec._pagina, nome: rec.filename });
+    return { ok: true, ...elenco(scope) };
+  }
   const k = chiaveRiprova(scope, indirizzo);
   riprove.set(k, (riprove.get(k) || []).concat(rec.id));
   // La riga riparte subito: il server può metterci un attimo a rispondere, e un clic senza effetto sembra rotto.
