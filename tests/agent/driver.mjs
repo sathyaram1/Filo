@@ -543,9 +543,9 @@ export async function clickComposite(app, shell, cx, cy) {
   await sleep(400);
 }
 
-// `dove`: la Page che ha il fuoco (quella dell'ultimo clic, per esempio la barra indirizzi nella shell); senza, la scheda.
+// `dove`: la superficie dell'ultimo clic; chi riceve davvero lo decide destinatario.
 export async function typeText(app, shell, text, dove = null) {
-  const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
+  const page = await destinatario(app, shell, dove);
   await page.keyboard.type(text, { delay: 10 });
   await sleep(200);
 }
