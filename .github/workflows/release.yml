@@ -101,6 +101,7 @@ jobs:
       actions: read
     outputs:
       sha: ${{ steps.scelta.outputs.sha }}
+      node: ${{ steps.versione-node.outputs.versione }}
     steps:
       - name: Checkout di main (con storia e tag completi)
         uses: actions/checkout@v4
@@ -108,10 +109,18 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      # Il Node lo dice main anche a `release`: il commit scelto puo' essere nato prima del file (#2207).
+      - name: Il Node di Electron
+        id: versione-node
+        run: |
+          V=$(tr -d '[:space:]' < .node-version)
+          [ -n "$V" ] || { echo "::error::.node-version e' vuoto"; exit 1; }
+          echo "versione=$V" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ steps.versione-node.outputs.versione }}
 
       - name: L'ultimo commit di main con la suite verde
         id: scelta
