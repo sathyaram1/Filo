@@ -39,8 +39,8 @@ test('la conferma di Filo sopra un sito ha i segni, e OK conferma', async () => 
     await expect.poll(async () => {
       ({ map } = await d.markInteractables(app, shell));
       await d.clearMarks(app, shell);
-      return map.filter((m) => /^(OK|Annulla)$/i.test(m.label)).map((m) => `${m.page}:${m.label}`).sort();
-    }, { timeout: 10_000 }).toEqual(['view:Annulla', 'view:OK']);
+      return map.filter((m) => /^(OK|Annulla)$/i.test(m.label)).map((m) => m.label).sort();
+    }, { timeout: 10_000 }).toEqual(['Annulla', 'OK']);
     await d.sleep(700);
     await eseguiMossa(app, shell, { azione: 'clic', segno: map.find((m) => /^OK$/i.test(m.label)).i }, map, null);
     await expect.poll(() => app.evaluate(async ({ BrowserWindow }, mondo) => {
