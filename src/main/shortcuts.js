@@ -55,8 +55,12 @@ function staRegistrandoTasti(wc) {
 // quella su cui agire (o una funzione che la dà), mai un'altra finestra di Filo.
 function collegaScorciatoie(wc, finestra) {
   if (!wc || typeof wc.on !== 'function') return;
+  // Il doppio Ctrl (#2377) vede ogni tasto e ogni clic: i tocchi valgono da qualunque vista abbia il fuoco.
+  const Lettere = require('./lettereDiFilo');
+  wc.on('input-event', (_e, input) => { try { Lettere.mouse(wc, input); } catch (_) {} });
   wc.on('before-input-event', (event, input) => {
     if (staRegistrandoTasti(wc)) return;
+    try { if (Lettere.tasto(wc, event, input, finestra)) return; } catch (e) { console.warn('[Filo] doppio Ctrl', e && e.message ? e.message : e); }
     if (tastoSchermoIntero(wc, event, input, finestra)) return;
     const command = comandoDaTasto(input);
     if (!command) return;
