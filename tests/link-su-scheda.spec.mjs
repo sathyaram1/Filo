@@ -118,7 +118,8 @@ test('nel tema scuro la scheda che riceve e il segno fra due si vedono', async (
   await expect(shell.locator('.link-posto')).toBeVisible();
   await expect(shell.locator('.tab.link-sopra')).toHaveCount(0);
   await shell.screenshot({ path: 'tests/.shots/link-su-scheda-fra-due-scuro.png' });
-  await trascina(shell, video, { ...(await punto(shell.locator('.tab').nth(0), 0.95)), fasi: ['dragLeave'] });
+  await trascina(shell, video, { ...(await punto(shell.locator('.tab').nth(0), 0.95)), fasi: ['dragCancel'] });
+  await expect(shell.locator('.link-posto')).toBeHidden();
 });
 
 test('sul «+» o sulla parte vuota della fila si apre in una scheda nuova in fondo; un’immagine sulla parte vuota resta della chat', async ({ app, shell, openTab, testServer }) => {
