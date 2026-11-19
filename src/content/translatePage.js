@@ -1201,8 +1201,28 @@
     return { type: 'item', icon, label: I18n.t('menu_show_original'), onClick: () => restoreOriginal() };
   }
 
+  // Chiesta a parole (#504): fa quello che farebbe l'icona, ma «traduci» non torna mai all'originale e «originale» non
+  // traduce. Risponde com'è andata, perché Filo non dica «fatto» su una pagina che era già così.
+  function daChat(originale) {
+    if (!isTopFrame()) return { stato: 'muto' };
+    ricontrolla();
+    if (originale) {
+      if (!pageTranslating && !pageHasTranslation) return { stato: 'niente' };
+      const fermata = pageTranslating;
+      restoreOriginal();
+      return { stato: fermata ? 'fermata' : 'originale' };
+    }
+    if (pageTranslating) return { stato: 'in_corso' };
+    if (pageHasTranslation && !canContinue()) return { stato: 'gia_tradotta' };
+    const esito = isPartial()
+      ? { stato: 'partita', come: 'ripresa', mancanti: missingCount, di: totalCount }
+      : { stato: 'partita', come: pageHasTranslation ? 'nuovo' : 'pagina' };
+    Promise.resolve(translatePage()).catch((e) => console.warn('[Filo] traduzione dalla chat', e));
+    return esito;
+  }
+
   global.SN_TRANSLATE_PAGE = {
     translatePage, restoreOriginal, hasTranslation,
-    isPartial, hasNewContent, canContinue, ricontrolla, showsRestore, missing, total, buildRestoreOriginalItem,
+    isPartial, hasNewContent, canContinue, ricontrolla, showsRestore, missing, total, buildRestoreOriginalItem, daChat,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
