@@ -720,8 +720,14 @@ class TabManager {
   // Quanta shell resta scoperta dalla vista attiva. Serve a ritagliare lo
   // scatto della barra quando si annota tutta l'app col disegno.
   topChromeHeight() {
-    if (this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili)) return 0;
+    if (this._corniceSalita()) return 0;
     return this.chromeCompact ? this.tabRowHeight : this.shellHeight;
+  }
+
+  // A schermo intero la cornice sale, salvo con le schede scese dal bordo alto o con una domanda che aspetta sopra la
+  // pagina (topInset: a schermo intero lo chiede solo una domanda): coperta dalla pagina, nessuno la vedrebbe (#2595).
+  _corniceSalita() {
+    return !!this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili) && !(this.topInset > 0);
   }
 
   setTopInset(px) {
@@ -3114,11 +3120,11 @@ class TabManager {
   }
 
 
-  // Altezza di chrome riservata in alto: 0 a tutto schermo (salvo le schede scese dal bordo alto), solo la fila di tab
+  // Altezza di chrome riservata in alto: 0 a tutto schermo (vedi _corniceSalita), solo la fila di tab
   // se in chrome compatto (barra indirizzi nascosta), altrimenti l'intera shell.
   // A questo si somma l'eventuale topInset dei dropdown.
   _altezzaCornice() {
-    if (this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili)) return 0;
+    if (this._corniceSalita()) return 0;
     return (this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset;
   }
 
