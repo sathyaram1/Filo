@@ -36,7 +36,7 @@ const {
 } = require('./osservazioniPerModello');
 const {
   noteProvenienzaImmagini, ricordaOrigineInChat, origineGiaLettaInChat, buildMessages, handleAIRequest,
-  lessonsBufferText, lezioniAutomaticheConsentite, maybeRunLessonAgent, compattaDaFermo, parteFissaChat,
+  lessonsBufferText, lezioniAutomaticheConsentite, maybeRunLessonAgent, compattaDaFermo, parteFissaChat, baseDellaChat,
 } = require('./chiamateModello');
 const {
   archiviaDomanda, appendToChatArchive, citazioneDelMessaggio, affidaChat, archiviaAperturaAccoglienza,
