@@ -539,8 +539,8 @@
   }
 
   // Le password scritte a mano (la risposta sotto chi la chiede, «Utente / Password: mario / …», dopo il nome della rete):
-  // le forme del correttore, da un posto solo (riservatiNelTesto.js). Qui solo i valori con una cifra o un simbolo: una
-  // parola qualunque sotto una domanda è spesso il resto della frase, e resta (tests/unit/pavimento.test.mjs).
+  // le forme del correttore, da un posto solo (riservatiNelTesto.js). Qui la risposta conta solo sulle righe sotto la
+  // domanda, e solo un valore con una cifra o un simbolo: una parola qualunque resta (tests/unit/pavimento.test.mjs).
   function scritteAMano(s, out) {
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
     const R = global.SN_RISERVATI_TESTO;
