@@ -797,9 +797,6 @@ function motivoNonEliminato(e) {
 
 // Ogni stato che l'azione scrive diventa un evento del filo nel salvataggio (registroCambi.js):
 // qui si dichiara solo che li ha chiesti la chat, e si raccolgono per il segno sulla bolla.
-// #950 — quanti file per volta: ognuno costa una lettura e una chiamata al modello, e l'elenco va letto prima
-// dell'OK. Oltre, il popup dice quanti ne restano.
-const LOTTO_RINOMINA = 40;
 async function preparaRinomina(action, sender, avanzamento = null) {
   const NF = globalThis.SN_NOMI_FILE;
   const Nomi = require('./nomiFile');
