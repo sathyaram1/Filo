@@ -942,6 +942,8 @@ class TabManager {
   // Una scheda proxata vive in proxy:<tabId> finché vive: partizione diversa vuol dire cookie
   // separati, quindi niente login condivisi, ed è voluto. Le filo:// restano interne.
   _partitionForTab(tab, url) {
+    // Prima del proxy: un file:// fuori dalla sua sessione leggerebbe tutto il disco.
+    if (/^file:/i.test(String(url || ''))) return (tab && tab._fileConcesso) || FileDelComputer.PARTIZIONE;
     if (tab && tab.proxy && url && !url.startsWith('filo://')) {
       return `proxy:${tab.id}`;
     }
