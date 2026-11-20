@@ -1657,3 +1657,123 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
   await link('la guida').first().click();
   await expect.poll(() => apertoVerso(app, 'guida.example'), { timeout: 10_000 }).toBe(true);
 });
+
+// Riscritto dall'utente o proposto dall'assistente, un codice letto prima resta letto: conta solo una lettura arrivata
+// mentre quel pezzo era in viaggio, non da quando il campo è cominciato (#810.8 giri 6 e 11).
+test('il codice letto resta letto quando l’assistente lo propone per la risposta', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, POSTA);
+  await preparaModelli(app);
+  await modelloFinto(app, { aiuto: [['scritto io', proponi(`Il codice è ${CODICE}`)], ['', '{"text":"Ecco.","status":"done"}']] });
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'cosa mi chiedono?');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain(CODICE);
+  await scriviAllAiuto(aiuto, `rispondi che il codice è ${CODICE}, l’ho scritto io`);
+  await expect(aiuto.locator('.sn-highlight-value')).toContainText(CODICE, { timeout: 20_000 });
+  await page.waitForTimeout(800);
+  expect(await lettiDopoUnRiavvio(app), 'il codice letto è sparito dal registro').toContain(CODICE);
+});
+
+test('il codice letto resta letto quando l’utente lo scrive in fondo a una nota cominciata prima', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const nota = await testServer.openReady(openTab, '<!doctype html><html><head><title>Note</title></head><body><textarea id="n"></textarea></body></html>');
+  await nota.locator('#n').click();
+  await nota.keyboard.type('Promemoria per domani: ', { delay: 10 });
+  await nota.waitForTimeout(600);
+  const banca = await testServer.openReady(openTab, POSTA, { pubblico: true });
+  await preparaModelli(app);
+  await modelloFinto(app);
+  const aiuto = await apriAiuto(app, shell, banca);
+  await scriviAllAiuto(aiuto, 'cosa mi chiedono?');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain(CODICE);
+  const id = await shell.evaluate(async () => ((await window.filoShell.tabs.snapshot()).tabs || []).find((t) => /Note/.test(t.title || ''))?.id);
+  await shell.evaluate((x) => window.filoShell.tabs.activate(x), id);
+  await nota.locator('#n').click();
+  await nota.keyboard.press('End');
+  await nota.keyboard.type(`codice ${CODICE}`, { delay: 20 });
+  await nota.waitForTimeout(1000);
+  expect(await lettiDopoUnRiavvio(app), 'il codice letto è sparito dal registro').toContain(CODICE);
+});
+
+// Una proposta dell'assistente diventa dell'utente solo con Accetta, col tetto di un incolla: quaranta righe di cifre
+// che una pagina gli fa proporre non coprono i codici letti dopo su un altro sito (#810.8 giri 9 e 11).
+test('quaranta righe di cifre proposte su un sito non coprono il codice letto dopo sulla banca', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const k = 10, n = 6, a = new Array(k * n).fill(0), s = [];
+  const db = (t, p) => {
+    if (t > n) { if (n % p === 0) for (let j = 1; j <= p; j++) s.push(a[j]); return; }
+    a[t] = a[t - p]; db(t + 1, p);
+    for (let j = a[t - p] + 1; j < k; j++) { a[t] = j; db(t + 1, t); }
+  };
+  db(1, 1);
+  const tutti = s.join('');
+  const righe = Array.from({ length: 40 }, (_, i) => tutti.slice(i * 500, i * 500 + 500));
+  const codice = righe[17].slice(200, 206);
+  const giochi = await testServer.openReady(openTab, '<!doctype html><html><head><title>Giochi</title></head><body><textarea id="risposta"></textarea></body></html>');
+  await preparaModelli(app);
+  await modelloFinto(app, { aiuto: proponi(righe.join('\n')) });
+  const aiuto = await apriAiuto(app, shell, giochi);
+  await scriviAllAiuto(aiuto, 'cosa scrivo nelle note?');
+  await expect(aiuto.locator('.sn-highlight-value')).toContainText(righe[0].slice(0, 20), { timeout: 30_000 });
+  await giochi.waitForTimeout(800);
+  const banca = await testServer.openReady(openTab, `<!doctype html><html><head><title>Banca</title></head><body>
+    <p>Il tuo codice di recupero è ${codice}. Non darlo a nessuno.</p></body></html>`, { pubblico: true });
+  await modelloFinto(app);
+  const aiuto2 = await apriAiuto(app, shell, banca);
+  await scriviAllAiuto(aiuto2, 'cosa devo fare?');
+  await expect.poll(() => lettiSalvati(app), { timeout: 15_000 }).toContain(codice);
+});
+
+// Quello che il browser rimette nel campo (Ctrl+Z) e il testo che la Modifica di Filo vi scrive per l'utente sono suoi.
+test('la carta rimessa con Ctrl+Z dopo un Backspace non resta fra i segreti letti', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGAMENTO('<label for="c">Numero della carta</label><input id="c">'));
+  await oltreLAvviso(app);
+  await preparaModelli(app);
+  await modelloFinto(app);
+  await page.locator('#c').click();
+  await page.keyboard.type(CARTA_UTENTE, { delay: 20 });
+  await page.waitForTimeout(400);
+  await page.keyboard.press('Backspace');
+  await page.waitForTimeout(400);
+  await page.keyboard.press('Control+Z');
+  await expect(page.locator('#c')).toHaveValue(CARTA_UTENTE);
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'aiutami a finire il pagamento');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
+  expect(await lettiDopoUnRiavvio(app), 'la carta è rimasta fra i segreti letti').not.toContain(CARTA_UTENTE.replace(/ /g, ''));
+});
+
+test('la carta che l’utente fa aggiungere al messaggio dalla Modifica non resta fra i segreti letti', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const riscritto = `Ciao Marco, la mia carta è ${CARTA_UTENTE}. A presto`;
+  const page = await testServer.openReady(openTab, PAGAMENTO('<textarea id="m" style="width:500px;height:80px"></textarea>'));
+  await oltreLAvviso(app);
+  await preparaModelli(app);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const s = await globalThis.SN_STORAGE.getSettings();
+    await globalThis.SN_STORAGE.updateSettings({ models: { ...(s.models || {}), [C.ACTIONS.EDIT_TEXT]: 'deepseek-flash' } });
+  });
+  await modelloFinto(app, { aiuto: [['aggiungi in fondo', riscritto], ['', '{"text":"Ecco.","status":"done"}']] });
+  await page.locator('#m').click();
+  await page.keyboard.type('Ciao Marco, a presto', { delay: 10 });
+  await page.evaluate(() => { const t = document.querySelector('#m'); t.focus(); t.select(); });
+  await page.locator('#m').click({ button: 'right' });
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect.poll(() => statoDi(app, page, '.sn-editbox-instruction')).not.toBeNull();
+  const dove = await scrivi(app, page, '.sn-editbox-instruction', `aggiungi in fondo il numero della mia carta ${CARTA_UTENTE}`);
+  await dove.keyboard.press('Enter');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-proposed'))?.testo || '', { timeout: 20_000 }).toContain(CARTA_UTENTE);
+  await clicca(app, page, '.sn-editbox-replace');
+  await expect(page.locator('#m')).toHaveValue(riscritto);
+  const aiuto = await apriAiuto(app, shell, page);
+  await scriviAllAiuto(aiuto, 'correggi il messaggio');
+  await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
+  expect(await lettiDopoUnRiavvio(app), 'la carta è rimasta fra i segreti letti').not.toContain(CARTA_UTENTE.replace(/ /g, ''));
+});
