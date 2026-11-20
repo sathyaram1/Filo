@@ -301,6 +301,8 @@
 
   function classifyOneDet(raw, c) {
     const base = classifyOneLetto(raw, c);
+    // git cambia le sue impostazioni con `git config`, che misura la chiave.
+    if (base === 2 && programOf(dequote(raw)) !== 'git' && toccaIlCuoreDiGit(raw, c)) return { level: 3, motivo: CUORE_GIT };
     // Git con `--output` vale 3 comunque (#1994); sopra un file che c'è già si dice anche perché (#2292).
     const gitOutput = base === 3 && programOf(dequote(raw)) === 'git' && gitScriveFile(dequote(raw));
     if (base === 2 || gitOutput) {
