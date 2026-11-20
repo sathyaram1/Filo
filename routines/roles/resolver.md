@@ -119,6 +119,8 @@ era fermato con una domanda (`ripresa.domanda`) e l'owner ha risposto
 (`ripresa.risposta`; vuota vuol dire che ha rimesso in coda senza scrivere:
 vale quello che era stato proposto). Parti da lì, non richiederla.
 
+<!-- includi: _ripresa-bocciatura.md -->
+
 ## Prima di consegnare, fai tu quello che farà la verifica
 
 Dopo di te arriva un verificatore avversariale, e ogni suo giro costa un agente
