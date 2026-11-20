@@ -76,6 +76,66 @@ test('un file che non si apre dice il suo perché, non «bloccato per sicurezza�
   assert.equal(avvisoFileNonAperto({ motivo: 'rete', percorso: 'file://nas/x.html' }).testo, 'Percorso di rete bloccato per sicurezza: //nas/x.html');
 });
 
+// La concessione di una scheda: cosa legge la pagina del file aperto (sessione e CSP le prova tests/file-del-computer.spec.mjs).
+function conCasa(fn) {
+  const radice = cartellaTemporanea('casa-');
+  const casa = join(radice, 'utente');
+  mkdirSync(casa, { recursive: true });
+  const prima = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+  process.env.HOME = casa;
+  process.env.USERPROFILE = casa;
+  try { return fn(casa, radice); } finally {
+    for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+}
+
+test('in una cartella qualunque la pagina legge le sue risorse e le sottocartelle, non i file nascosti né quelli senza estensione', () => conCasa((casa) => {
+  const dir = join(casa, 'Scaricati', 'sito');
+  const c = F.concessioneDi(join(dir, 'index.html'));
+  const legge = (...p) => F.permesso(c, join(dir, ...p));
+  assert.equal(legge('index.html'), true);
+  assert.equal(legge('foto.png'), true);
+  assert.equal(legge('index_files', 'stile.css'), true);
+  assert.equal(legge('dati.xml'), true);
+  assert.equal(legge('.git', 'config'), false);
+  assert.equal(legge('sub', '.env'), false);
+  assert.equal(legge('pagina'), false, 'un file senza estensione non si apre come pagina');
+  assert.equal(legge('lettera.docx'), false);
+  assert.equal(F.permesso(c, join(casa, 'Scaricati', 'altro.png')), false, 'la cartella sopra no');
+  assert.equal(F.permesso(c, join(casa, '.ssh', 'id_rsa')), false);
+}));
+
+test('aperto un file nella cartella di casa, la pagina legge solo sé e i file che nomina', () => conCasa((casa) => {
+  writeFileSync(join(casa, 'appunti.html'), `<link rel="stylesheet" href="stile.css"><img src='img/a.png'>
+    <img srcset="b.png 1x, c.png 2x"><div style="background:url(&quot;d.jpg&quot;)"></div><style>i{background:url(e.webp)}</style>
+    <img src=".ssh/id_rsa"><script src="chiave"></script><img src="../fuori.png"><a href="Documenti/conto.pdf">conto</a>`);
+  const c = F.concessioneDi(join(casa, 'appunti.html'));
+  assert.equal(c.cartella, null, 'la casa non si concede intera');
+  const legge = (...p) => F.permesso(c, join(casa, ...p));
+  for (const p of [['appunti.html'], ['stile.css'], ['img', 'a.png'], ['b.png'], ['c.png'], ['e.webp'], ['Documenti', 'conto.pdf']]) {
+    assert.equal(legge(...p), true, p.join('/'));
+  }
+  for (const p of [['.ssh', 'id_rsa'], ['chiave'], ['altro.png'], ['Documenti', 'tasse.pdf'], ['img', 'z.png']]) {
+    assert.equal(legge(...p), false, p.join('/'));
+  }
+  assert.equal(F.permesso(c, join(casa, '..', 'fuori.png')), false, 'fuori dalla casa no');
+}));
+
+test('la radice di un disco e una cartella che contiene la casa non si concedono intere', () => conCasa((casa, radice) => {
+  assert.equal(F.concessioneDi(join(path.parse(casa).root, 'x.html')).cartella, null);
+  assert.equal(F.concessioneDi(join(radice, 'x.html')).cartella, null);
+  const sotto = F.concessioneDi(join(casa, 'Desktop', 'x.html'));
+  assert.notEqual(sotto.cartella, null);
+}));
+
+test('la CSP dei file toglie file: a fetch, XHR, riquadri e worker', () => {
+  for (const d of ['connect-src', 'frame-src', 'worker-src']) {
+    const v = F.CSP_DOCUMENTO.split(';').map((s) => s.trim()).find((s) => s.startsWith(d));
+    assert.ok(v && !/\bfile:|\*|'self'/.test(v), d);
+  }
+  assert.match(F.CSP_DOCUMENTO, /object-src 'none'/);
+});
+
 test('un file col percorso non scritto dall\'utente chiede il suo OK, e la conferma dice quale file', () => {
   const L = globalThis.SN_ACTION_LEVELS;
   const a = { type: 'NAVIGA', url: 'file:///home/u/r.html', _fileDelComputer: '/home/u/r.html' };
