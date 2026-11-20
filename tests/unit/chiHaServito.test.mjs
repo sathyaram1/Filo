@@ -75,7 +75,7 @@ test('per fornitore: quote sul totale letto, maiuscole unite, modelli dal più s
   assert.equal(r[1].quota, 0.3);
   assert.deepEqual(r[0].modelli, [{ modello: 'qwen/qwen3', n: 5 }, { modello: 'deepseek/v3', n: 1 }]);
   assert.ok(r.every((x) => !x.violazione), 'con la lista vuota nessuno viola');
-  assert.equal(r.reduce((a, x) => a + x.quota, 0), 1);
+  assert.ok(Math.abs(r.reduce((a, x) => a + x.quota, 0) - 1) < 1e-9);
 });
 
 test('il giudizio segue la lista data: escluso per tutte le righe, «non dal produttore» solo dove il modello lo chiede', () => {
