@@ -1785,7 +1785,7 @@ async function risolviNome(richiesta) {
     // Dimenticare non è mai «già fatto»: quello che si legge nell'elenco è ancora abbinato o conosciuto.
     const gia = q.dimentica ? false
       : q.cosa === 'wifi' ? x.attiva === true : typeof x.collegato === 'boolean' && x.collegato === q.collega;
-    return { nome: s.scelto, gia };
+    return { nome: s.scelto, gia, ...(q.cosa === 'bluetooth' && x.indirizzo ? { indirizzo: x.indirizzo } : {}) };
   }
   const errore = s.candidati ? 'ambiguo' : q.cosa === 'wifi' ? 'nessuna-rete' : 'nessun-dispositivo';
   return { esito: { ...fallito(errore, q), candidati: s.candidati || nomi } };
