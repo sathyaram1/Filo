@@ -87,7 +87,7 @@
     CURL_ACCESSORY_WRITE_RE, CURL_WRITE_OUT_FILE_RE, CURL_CONFIG_RE, curlCambiaIlServer, ROBOCOPY_DESTRUCTIVE_RE,
     DANGEROUS_FLAG_RE, lungaPericolosa, LUNGHE_PERICOLOSE, PS_READ, classifyDetail, fuoriDa, contesto, dove, MOTIVI,
     dentroCasa, PROFILO_APERTE, nomeNorm, CANCELLANO, GIT_READ, segniInterni, PROGRAMMI_RETE, subcommandOf, comeCmd,
-    gitChiaveInerte,
+    gitChiaveInerte, gitProgrammaScritto,
   } = P;
 
   // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
@@ -186,7 +186,7 @@
   }
 
   // Cancellare senza cestino (#1909): un comando che lo fa vuole la parola «conferma» a ogni livello, come ogni «per
-  // sempre». Si guarda il programma di ogni pezzo (anche dopo sudo, xargs, `cmd /c`, `find -exec` e negli scriptblock):
+  // sempre». Si guarda il programma di ogni pezzo (anche dopo sudo, xargs, `cmd /c`, `find -exec`, `git rebase -x` e negli scriptblock):
   // sbagliare per eccesso costa una parola da scrivere, per difetto il comando resta comunque al costo più alto.
   // Chi lancia un altro comando, e le parole di shell che lo precedono (`for …; do rm`, `if …; then rm`): dopo di loro si
   // guarda il comando che segue.
@@ -213,6 +213,12 @@
         if (CANCELLANO.has(prog) || /^mkfs(\.|$)/.test(prog)) return true;
         if (prog === 'find' && resto.includes('-delete')) return true;
         if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
+        if (prog === 'git') {
+          const p = gitProgrammaScritto(resto);
+          if (!p || !p.length) break;
+          tok.splice(i, tok.length - i, ...p);
+          continue;
+        }
         if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
         // Gli allineamenti di cartelle del Mac e di Linux, come robocopy /MIR: tolgono dalla destinazione quello che
         // manca nella sorgente (#1909.5). rclone si guarda su ogni parola: un'opzione col valore sposta il sotto-comando.

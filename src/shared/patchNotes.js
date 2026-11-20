@@ -23,6 +23,7 @@
         { testo: 'Prima di mandare un feedback Filo ricontrolla anche i file di testo allegati, come un log, e la segnalazione che scrive per te in chat: se ci vede una password o una chiave te lo dice, e scegli tu se mandarla così.', segnalazione: 1403 },
         { testo: 'Dal terminale, un comando git che imposta un programma da far partire più avanti ti chiede di scrivere «conferma», come lo stesso programma dato a un comando solo. Scegliere l\'editor, il pager o il gestore delle password più comuni, o la chiave ssh, resta a un OK.', segnalazione: 2619 },
         { testo: 'Sul Mac e su Linux, quando Filo allinea due cartelle con rsync --delete o rclone sync, che cancellano dalla destinazione senza cestino, ti chiede di digitare «conferma» come per robocopy /MIR su Windows. Prima bastava un OK.', segnalazione: 1909 },
+        { testo: 'Un comando git che fa partire un altro programma, come un rebase con -x o un submodule foreach, ti chiede di scrivere «conferma», come se quel programma lo lanciassi da solo.', segnalazione: 2619 },
       ],
     },
     {
