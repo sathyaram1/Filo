@@ -152,7 +152,7 @@ const RIGIOCO_MS = 3000;
 // (ripetizione) non è un gesto nuovo.
 function tastoDestroInAttesa(finestra = globalThis.window) {
   let tenuto = null;
-  const scarta = (e) => { if (false && e.isTrusted && !e.repeat) tenuto = null; };
+  const scarta = (e) => { if (e.isTrusted && !e.repeat) tenuto = null; };
   for (const tipo of ['pointerdown', 'keydown']) finestra.addEventListener(tipo, scarta, true);
   return {
     tieni(e) { tenuto = { evento: e, copia: copiaDelClic(e), alle: Date.now() }; return tenuto; },
