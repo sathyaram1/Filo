@@ -1518,6 +1518,7 @@ class TabManager {
       this._nelFilo('schedaChiusa', tab);
       this._archiveClosedTab(tab, 'manual', { voce: this._ricordaChiusa(tab) }); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+      FileDelComputer.revoca(tab._fileConcesso);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
       ChiusuraConCaselle.chiudi(tab.view.webContents);
     }
