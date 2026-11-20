@@ -113,6 +113,7 @@ async function main() {
     console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}`);
     if (b.errore) console.log(`Stato non letto: ${b.errore}`);
     if (b.inAttesa) console.log(`Letture esterne annotate solo in locale, non ancora ricevute dal server: ${b.inAttesa}.`);
+    if (b.riservatoInAttesa) console.log(`Letture di dati privati annotate solo in locale, non ancora ricevute dal server: ${b.riservatoInAttesa}.`);
     const motivi = (b.stato && Array.isArray(b.stato.sporcatoDa)) ? b.stato.sporcatoDa : [];
     for (const m of motivi) console.log(`  - ${new Date(Number(m.at) || 0).toISOString()} ${String(m.motivo || '').replace(/[\u0000-\u001f\u007f]/g, ' ')}`);
     return 0;
