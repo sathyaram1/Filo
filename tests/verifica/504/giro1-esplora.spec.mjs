@@ -217,8 +217,11 @@ test('Aiuto sulla pagina: «traducimi questa pagina»', async ({ app, shell, ope
     const tr = P.completeWithFallback;
     globalThis.__aiuto = [];
     const aiuto = (attempts, messages) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      if (!sistema.includes('# Protocollo di risposta')) return { ...base, text: '{}' };
       globalThis.__aiuto.push(JSON.parse(JSON.stringify(messages)));
-      return { model: attempts[0].model, provider: attempts[0].provider, usage: {},
+      return { ...base,
         text: JSON.stringify({ action: 'filo', filo: { type: 'TRADUCI_PAGINA' }, text: 'Traduco la pagina.', status: 'done' }) };
     };
     P.completeWithFallback = async (args) => {
