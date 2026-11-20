@@ -3,6 +3,7 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello, ripristina } from '../../helpers/chatFinta.mjs';
+import { paginaDellAiuto } from '../../helpers/riquadri.mjs';
 
 const ARTICLE = `<!doctype html><html lang="en"><head><title>Football era</title></head><body style="font:16px sans-serif;padding:20px">
   <h1 id="title">The end of an era in European football</h1>
