@@ -174,23 +174,51 @@
     return out;
   }
 
-  // I segreti trovati senza modello (chiavi, password annunciate, quelli che Filo custodisce): ogni comparsa nel testo.
+  // Il tipo di un valore trovato senza modello (`regola` di SN_GUARDIANO_STATICO.segretiNelTesto): carte e conti sono
+  // un documento, il resto un segreto.
+  function tipoDi(v) {
+    const regola = v && typeof v === 'object' ? v.regola : '';
+    return regola === 'iban' || regola === 'carta' ? 'documento' : 'segreto';
+  }
+
+  // I valori trovati senza modello (stringhe o `{ valore, regola }`): ogni comparsa nel testo.
   function daValori(testo, valori) {
     const t = String(testo == null ? '' : testo);
     const out = [];
     for (const v of Array.isArray(valori) ? valori : []) {
-      const s = String(v == null ? '' : v);
+      const s = String((v && typeof v === 'object' ? v.valore : v) ?? '');
       if (!s) continue;
+      const tipo = tipoDi(v);
       let i = t.indexOf(s);
       let guardia = 0;
       while (i >= 0 && guardia++ < 50) {
         if (!out.some((y) => y.inizio === i && y.fine === i + s.length)) {
-          out.push({ tipo: 'segreto', dove: 'testo', inizio: i, fine: i + s.length, pezzo: s });
+          out.push({ tipo, dove: 'testo', inizio: i, fine: i + s.length, pezzo: s });
         }
         i = t.indexOf(s, i + s.length);
       }
     }
     return out;
+  }
+
+  // I tratti dei segreti custoditi (SN_GUARDIANO_STATICO.trattiSegreti), anche travestiti: il pezzo è quello scritto.
+  function daTratti(testo, tratti) {
+    const t = String(testo == null ? '' : testo);
+    const out = [];
+    for (const r of Array.isArray(tratti) ? tratti : []) {
+      const [a, b] = Array.isArray(r) ? r : [];
+      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b <= a || b > t.length) continue;
+      out.push({ tipo: 'segreto', dove: 'testo', inizio: a, fine: b, pezzo: t.slice(a, b) });
+    }
+    return out;
+  }
+
+  // Un allegato di testo: `{ tipo, dove: 'allegato', allegato: <indice da zero> }` per ogni tipo trovato.
+  function daAllegato(k, valori, tratti) {
+    const tipi = new Set();
+    for (const v of Array.isArray(valori) ? valori : []) tipi.add(tipoDi(v));
+    if (Array.isArray(tratti) && tratti.length) tipi.add('segreto');
+    return [...tipi].map((tipo) => ({ tipo, dove: 'allegato', allegato: k }));
   }
 
   // Le frasi dell'avviso, una per caso e nell'ordine dei tipi: mai un punteggio, mai una cifra.
@@ -202,6 +230,9 @@
     }
     for (const tipo of TIPI_IMMAGINE) {
       if (lista.some((x) => x.dove === 'immagine' && x.tipo === tipo)) frasi.push(FRASI_IMMAGINE[tipo]);
+    }
+    for (const tipo of Object.keys(FRASI_ALLEGATO)) {
+      if (lista.some((x) => x.dove === 'allegato' && x.tipo === tipo)) frasi.push(FRASI_ALLEGATO[tipo]);
     }
     if (redTeam && lista.some((x) => x.tipo === 'inganno')) frasi.push(FRASE_RED_TEAM);
     return { titolo: TITOLO, frasi };
