@@ -8,19 +8,34 @@ function nuova() { return { prima: [], dopo: [] }; }
 
 // Le voci della vista come le vede l'utente: la pagina d'errore vale per l'indirizzo fallito, il resto non si riapre.
 // `inArrivo`: la pagina che una vista appena nata sta caricando conta già, o un secondo Indietro di fila la perde.
+// `indici`: la voce della cronologia della vista da cui viene ogni voce.
 function vociDellaVista(entries, attiva, utente = (u) => u, inArrivo = null) {
   const voci = [];
+  const indici = [];
   let a = -1;
   (Array.isArray(entries) ? entries : []).forEach((e, i) => {
     const url = String(utente(String((e && e.url) || '')) || '');
     if (!tornabile(url)) return;
     voci.push({ url, titolo: String((e && e.title) || '') });
+    indici.push(i);
     if (i <= attiva) a = voci.length - 1;
   });
   if (!voci.length && inArrivo && tornabile(inArrivo.url)) {
-    return { voci: [{ url: String(inArrivo.url), titolo: String(inArrivo.titolo || '') }], attiva: 0 };
+    return { voci: [{ url: String(inArrivo.url), titolo: String(inArrivo.titolo || '') }], attiva: 0, indici: [] };
   }
-  return { voci, attiva: Math.max(0, a) };
+  return { voci, attiva: Math.max(0, a), indici };
+}
+
+// Un passo chiesto a una vista caduta (#1868): non naviga più, quindi tutta la sua cronologia passa nella scheda e
+// ne rinasce una sulla voce a `passo` dall'attuale (0 è Ricarica). null se lì non c'è una pagina.
+function daCaduta(storia, { voci, attiva }, passo) {
+  const s = storia || nuova();
+  const tutte = [...s.prima, ...voci, ...s.dopo];
+  if (!Number.isInteger(passo) || (!voci.length && !passo)) return null;
+  // Senza voci la vista sta fra il dietro e il davanti della scheda.
+  const t = voci.length ? s.prima.length + attiva + passo : s.prima.length + passo - (passo > 0 ? 1 : 0);
+  if (t < 0 || t >= tutte.length) return null;
+  return { meta: tutte[t], storia: { prima: tutte.slice(0, t), dopo: tutte.slice(t + 1) } };
 }
 
 // Prima di buttare la vista. 'nuova': un indirizzo nuovo, il davanti si perde come in ogni browser.
