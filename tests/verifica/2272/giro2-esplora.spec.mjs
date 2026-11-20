@@ -88,6 +88,45 @@ test('risposta di sole immagini, marcatore dentro un elenco, finestra stretta', 
   await page.screenshot({ path: 'tests/.shots/2272-g2-stretta.png' }).catch(() => {});
 });
 
+test('streaming lento con marcatore, poi Ferma', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await preparaImmagini(app, 2);
+  await stubModello(app, [{ strumento: { azione: 'immagini', query: 'antilope' } }, { testo: 'x' }]);
+  await app.evaluate(() => {
+    const prima = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => {
+      if (globalThis.__passo === 0) return prima(o);
+      globalThis.__passo++;
+      const visto = o.messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+      const ids = [...new Set(visto.match(/\b[ig]\d+\b(?=:|,|\))/g) || [])];
+      const text = `Ecco le antilopi che ho trovato per te.\n\n[[immagini: ${ids[0]}, ${ids[1]}]]\n\n` + 'Testo lungo che continua a arrivare piano piano. '.repeat(40);
+      for (let i = 0; i < text.length; i += 4) {
+        if (o.signal && o.signal.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
+        o.onDelta && o.onDelta(text.slice(i, i + 4));
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      return { model: o.attempts[0].model, provider: o.attempts[0].provider, usage: {}, reasoningDetails: [], text, toolCalls: [], finishReason: 'stop' };
+    };
+  });
+  const page = await openTab(NEWTAB);
+  await chiedi(page, 'antilope immagine');
+  const visti = [];
+  for (let k = 0; k < 40; k++) {
+    visti.push(await page.locator('.dash-bubble-filo').last().textContent().catch(() => ''));
+    await page.waitForTimeout(60);
+  }
+  console.log('GREZZI', visti.filter((t) => /\[\[|immagini:/.test(t || '')).slice(0, 3));
+  const ferma = page.locator('#stopBtn, [aria-label="Ferma"], [data-tip="Ferma"]').first();
+  console.log('FERMA visibile', await ferma.isVisible().catch(() => false));
+  await ferma.click().catch((e) => console.log('ferma err', e.message));
+  await page.waitForTimeout(2500);
+  console.log('DOPO FERMA gallerie', await page.locator('.dash-bubble-filo .filo-galleria-img').count());
+  await page.screenshot({ path: 'tests/.shots/2272-g2-ferma.png' }).catch(() => {});
+  await page.reload();
+  await page.waitForTimeout(3000);
+  console.log('RIAPERTA gallerie', await page.locator('.dash-bubble-filo .filo-galleria-img').count(), await page.locator('.dash-bubble-filo').last().textContent());
+});
+
 test('solo marcatore, niente testo', async ({ app, openTab }) => {
   test.setTimeout(150_000);
   await preparaImmagini(app, 2);
