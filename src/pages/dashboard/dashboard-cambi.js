@@ -91,7 +91,10 @@
       b.disabled = true;
       b.classList.add('dash-cambi-in-corso');
       const r = await esegui(s, id);
-      if (!r || !r.ok) {
+      if (r && r.rinuncia) {
+        b.disabled = false;
+        b.classList.remove('dash-cambi-in-corso');
+      } else if (!r || !r.ok) {
         b.disabled = false;
         b.classList.remove('dash-cambi-in-corso');
         b.textContent = 'non riuscito';
