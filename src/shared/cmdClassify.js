@@ -107,7 +107,7 @@
     // In PowerShell Where-Object e `?` sono il filtro di `where`: esegue solo il suo blocco (#2292).
     if ((prog === 'where-object' || prog === '?') && shell !== 'cmd') return segmentIsRead(raw, false) ? 1 : 3;
 
-    if (prog === 'git') return classifyGit(trimmed);
+    if (prog === 'git') return classifyGit(trimmed, raw);
     if (prog === 'npm' || prog === 'pip' || prog === 'pip3') return classifyNpm(trimmed);
 
     // Codice arbitrario → 3, salvo la sola interrogazione di versione o aiuto → 1.
