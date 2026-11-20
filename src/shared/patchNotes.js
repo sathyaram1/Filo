@@ -17,6 +17,7 @@
         { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
         { testo: 'Se il computer risponde lento una volta, la home torna da sola a leggere subito Bluetooth e Wi-Fi, senza riavviare Filo, e dopo una pausa del computer non ti mostra come attuale lo stato di prima.', segnalazione: 2394 },
         { testo: 'In modalità terminale, un comando git che cambia il server dove finisce il prossimo push, scegliendo il remoto di un ramo o quello predefinito, ti chiede di digitare «conferma», come quando cambi l\'indirizzo di un remoto. Prima bastava un OK, e il push dopo mandava il codice lì.', segnalazione: 2623 },
+        { testo: 'Quando Filo legge con git un progetto in un\'altra cartella non ti chiede più conferma ogni volta: vale come quando ci entra prima di leggerlo.', segnalazione: 1994 },
       ],
     },
     {
