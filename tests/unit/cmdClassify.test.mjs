@@ -1279,6 +1279,26 @@ test('cancellaPerSempre: i comandi che cancellano senza cestino, in ogni shell',
   }
 });
 
+// #1909.5 — allineare due cartelle sul Mac e su Linux cancella dalla destinazione come robocopy /MIR.
+test('cancellaPerSempre: rsync con --delete e rclone sync chiedono la parola come robocopy /MIR', () => {
+  for (const cmd of [
+    'rsync -a --delete vuota/ ~/Documenti/', 'rsync -av --del a/ b/', 'rsync -a --delete-after a/ b/',
+    'rsync -a --delete-before a/ b/', 'rsync -a --delete-during a/ b/', 'rsync -a --delete-delay a/ b/',
+    'rsync -a --delete-excluded --exclude "*.tmp" a/ b/', 'rsync -a --delete-missing-args x b/', 'RSYNC -a --DELETE a/ b/',
+    'sudo rsync -a --delete a/ /srv/b/', '/usr/bin/rsync -a --delete a/ b/', 'cd ~ && rsync -a "--delete" a/ b/',
+    'rsync -e "ssh -p 22" -a --delete a/ host:b/',
+    'rclone sync a remote:b', 'rclone --config c.conf sync a remote:b', 'rclone bisync a remote:b', 'rclone purge remote:b',
+    'rclone delete remote:b', 'rclone deletefile remote:b/x', 'rclone rmdirs remote:b', 'rclone cleanup remote:',
+  ]) {
+    assert.equal(C.cancellaPerSempre(cmd), true, cmd);
+    assert.equal(lvl(cmd), 3, cmd);
+  }
+  for (const cmd of ['rsync -a a/ b/', 'rsync -av --delay-updates a/ b/', 'rsync -a --dry-run a/ b/', 'echo rsync --delete',
+    'rclone copy a remote:b', 'rclone ls remote:', 'grep --delete a.txt']) {
+    assert.equal(C.cancellaPerSempre(cmd), false, cmd);
+  }
+});
+
 // Un elenco solo dei programmi che cancellano: chi chiede la parola è anche al costo più alto.
 test('cancellaPerSempre: ogni programma che cancella senza cestino è anche livello 3', () => {
   for (const cmd of ['rm x', 'srm x', 'wipe x', 'rimraf x', 'Remove-Item x', 'ri x', 'Clear-RecycleBin', 'shred x', 'deltree x']) {
