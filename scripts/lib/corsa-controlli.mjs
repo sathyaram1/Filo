@@ -111,7 +111,7 @@ function causaDellUccisione(memoria, prima, daMs) {
   if (perMemoria === true) return 'il kernel ha ucciso processi per memoria';
   if (perMemoria === null) return sessione === 'stessa' ? `memoria non leggibile; ${STESSA}` : 'causa non leggibile (fermato a mano, al tempo massimo del comando o da un colpo da fuori)';
   if (sessione === 'stessa') return `nessun processo ucciso per memoria e ${STESSA}`;
-  const avvioNoto = Number.isFinite(memoria.avvioS) && ((prima && Number.isFinite(prima.avvioS)) || Number.isFinite(daMs));
+  const avvioNoto = memoria && Number.isFinite(memoria.avvioS) && ((prima && Number.isFinite(prima.avvioS)) || Number.isFinite(daMs));
   return avvioNoto
     ? 'nessun processo ucciso per memoria e il contenitore non è ripartito: fermato da chi l\'ha lanciato (a mano, o al tempo massimo del comando) o da un colpo da fuori dei comandi (la sessione o l\'harness)'
     : 'nessun processo ucciso per memoria: fermato da chi l\'ha lanciato (a mano, o al tempo massimo del comando) o da un colpo da fuori dei comandi (la sessione, l\'harness o un riavvio del contenitore)';
