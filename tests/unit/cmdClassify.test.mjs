@@ -1397,8 +1397,8 @@ test('cancellaPerSempre: il programma che git lancia da sé si guarda come gli a
   }
 });
 
-// #2623: il remoto di un ramo e quello predefinito accettano un indirizzo al posto di un nome, e il `git push` nudo
-// che segue (2) lo raggiunge: scriverli vale come scrivere l'indirizzo di un remoto.
+// #2623: il remoto di un ramo e quello predefinito accettano un indirizzo al posto di un nome, un file incluso scrive
+// l'indirizzo di un remoto, e il `git push` nudo che segue (2) li raggiunge: valgono come `git remote set-url`.
 const CHIAVI_DEL_PUSH = ['branch.main.pushRemote', 'remote.pushDefault', 'branch.main.remote'];
 test('git config — il remoto di un ramo o quello predefinito, scritti, decidono dove va il push (3) (#2623)', () => {
   for (const chiave of [...CHIAVI_DEL_PUSH, 'branch.feature/x.y.pushremote', 'REMOTE.PUSHDEFAULT', 'include.path',
