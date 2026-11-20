@@ -23,7 +23,7 @@ test('tasto destro: copia immagine e indirizzo', async ({ app, openTab }) => {
   const copia = menu.locator('[data-tip="Copia immagine"], [title="Copia immagine"], .sn-menu-item:has-text("Copia immagine")').first();
   await copia.click();
   await page.waitForTimeout(1500);
-  const dopoCopia = await app.evaluate(({ clipboard }) => ({ formati: clipboard.availableFormats(), size: clipboard.readImage().getSize(), testo: clipboard.readText() }));
+  const dopoCopia = await app.evaluate(async ({ clipboard }) => (await clipboard.read()).map((v) => v.types));
   console.log('COPIA', JSON.stringify(dopoCopia));
   await page.keyboard.press('Escape');
 
