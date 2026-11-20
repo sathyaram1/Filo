@@ -236,13 +236,18 @@ export function testoGuasto({
   if (Number.isFinite(chiusoMs)) {
     return pulito(`guasto: strumento worker: il worker ha chiuso la sessione alle ${ora(chiusoMs)} senza rilasciare il biglietto, e da ${minuti} minuti nella cartella non lavora nessuno. ${coda}`);
   }
-  // #2571: un worker vivo risponde a un'uscita 137; tacere dopo vuol dire che è morta anche la sua sessione.
+  // #2571.1: una sessione di Claude Code ripartita dopo l'ultimo strumento non torna, e la risposta che manca non è un
+  // permesso. Un worker vivo risponde a un'uscita di segnale (oltre 128): tacere dopo vuol dire che col comando si è
+  // fermata anche la sua sessione.
+  const ultimoMs = attesa && Number.isFinite(attesa.ms) ? attesa.ms : ultimo && Number.isFinite(ultimo.ms) ? ultimo.ms : NaN;
+  const ripartita = sessioneDellaCorsa(memoria, corsa && corsa.memoria, ultimoMs) === 'ripartita';
   const ucciso = !attesa && ultimo && ultimo.risposta && ultimo.uscita >= UCCISO_DA;
-  if (!attesa && (corsa || ucciso)) {
-    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}), segno che col comando è morta anche la sua sessione. ${coda}`;
-    return corsa
-      ? guastoDellaCorsa(corsa, memoria, dopo)
-      : testoUcciso({ programma: ultimo.programma, cosa: `${ultimo.nome} delle ${ora(ultimo.ms)}`, codice: ultimo.uscita, memoria, daMs: ultimo.ms, coda: dopo });
+  if (ripartita || ucciso) {
+    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}): ${ripartita ? 'la sua sessione non è tornata' : 'col comando si è fermata anche la sua sessione'}. ${coda}`;
+    if (corsa) return guastoDellaCorsa(corsa, memoria, dopo);
+    const quale = attesa || ultimo;
+    const programma = attesa ? (attesa.nome === 'Bash' ? programmaDi(attesa.comando) : attesa.nome) : ultimo.programma || ultimo.nome;
+    return testoUcciso({ programma, cosa: `${quale.nome} delle ${ora(ultimoMs)}`, codice: ucciso ? ultimo.uscita : NaN, memoria, daMs: ultimoMs, coda: dopo });
   }
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
