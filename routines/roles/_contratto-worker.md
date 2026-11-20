@@ -168,8 +168,9 @@ toccate, più qualche minuto di unit: un ramo largo passa l'ora; la durata
 prevista la stampa prima di partire, e in sottofondo gli dai il tetto più
 largo), l'installazione di Electron.
 
-Dopo un'uscita 137 (processo ucciso) lancia `aspetta`: se `finish:check` è
-morto a metà, ti dice cosa fare.
+Dopo un'uscita 137 (processo ucciso) lancia `aspetta`: se `finish:check` si è
+interrotto a metà, ti dice cosa fare. Un `finish:check` che hai fermato tu
+perché non ti serve più non è un guasto.
 
 **Mai un'attesa scritta da te nella shell**: `sleep`, un ciclo `until` o
 `while` che dorme, `tail --pid`, `timeout N bash -c …`. In cloud l'harness
