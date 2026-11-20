@@ -433,24 +433,9 @@ export async function sporca(motivo, opts = {}) {
  * parte alla prossima chiamata (`inAttesa`). Mai un'eccezione.
  * @returns {Promise<{ segnati: number, inAttesa?: number, senzaBiglietto?: true, errori: string[] }>}
  */
-export async function segnaRiservato(motivo, { env, cwd, deps = {}, nowMs = Date.now() } = {}) {
-  const m = String(motivo || '').trim().slice(0, 300);
-  const out = { segnati: 0, errori: [] };
-  if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
-  const trovati = trovaBiglietti({ env, cwd });
-  if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
-  let inAttesa = 0;
-  for (const b of trovati) {
-    let aggiunta = '';
-    try { annotaRiservato(b, m, nowMs); } catch (_) { aggiunta = m; }
-    const r = await consegnaRiservati(b, { deps, nowMs, aggiunta });
-    if (!r.errore) out.segnati += 1;
-    else {
-      out.errori.push(r.errore);
-      if (r.restano) inAttesa += 1;
-    }
-  }
-  return inAttesa ? Object.assign(out, { inAttesa }) : out;
+export async function segnaRiservato(motivo, opts = {}) {
+  const { fatti, ...resto } = await segnaInCoda(CODE.riservato, consegnaRiservati, motivo, opts);
+  return Object.assign({ segnati: fatti }, resto);
 }
 
 /** La riga per chi ha letto dati privati, da dire prima che escano: '' se il server ha preso il segno. */
