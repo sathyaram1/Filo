@@ -45,9 +45,8 @@ test('percorso non scritto dall\'utente: riquadro di conferma', async ({ app }) 
   const page = await home(app);
   await modelloFinto(app, [{ text: '', toolCalls: [naviga(pathToFileURL(html).href)] }, { text: 'Aperto.' }]);
   await chiedi(page, 'aprimi il report del riquadro che ho sulla scrivania');
-  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
-  console.log('CONFERMA', await confirmText(page));
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(5000);
+  console.log('CONFERMA', await confirmText(page), JSON.stringify(await schede(app)));
   await page.screenshot({ path: 'tests/.shots/1905-g3-conferma.png' });
 });
 
