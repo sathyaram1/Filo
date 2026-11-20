@@ -2440,3 +2440,14 @@ test('chiedeFiduciaPerLaCoda: solo il lavoro server non fidato; il suo tasto è 
   assert.deepEqual({ ...a }, { ...b }, 'le due strade danno lo stesso tasto');
   assert.equal(MR.ownerActionFor(allineato, 'accept'), null, 'niente «→ In coda» che lo lascerebbe non fidato');
 });
+
+test('ownerActions: una bocciatura del controllo di sicurezza si rimanda in correzione, le altre fermate restano «→ In coda» (#2575)', () => {
+  const bocciata = { status: 'design', statusReason: 'secaudit', fiducia: 'fidato' };
+  const a = MR.ownerActionFor(bocciata, 'accept');
+  assert.deepEqual({ to: a.to, label: a.label, correzione: a.correzione, primary: a.primary }, { to: 'todo', label: 'Rimanda in correzione', correzione: true, primary: true });
+  assert.deepEqual(chiavi(bocciata), ['accept', 'archive']);
+  for (const statusReason of ['clarify', 'decisione', 'loop', '']) {
+    const altra = MR.ownerActionFor({ status: 'design', statusReason, fiducia: 'fidato' }, 'accept');
+    assert.deepEqual([altra.label, !!altra.correzione], ['→ In coda', false], statusReason);
+  }
+});

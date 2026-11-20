@@ -789,8 +789,13 @@ sopra; a manutentore spento il fermo non c'è), e una consegna `design` + `guast
 uguale di seguito il server apre una domanda col conteggio, che smista il compito
 «Gestisci la domanda» (SPEC-DOMANDE §3.5, §3.8). Non è lavoro per regola: quello è
 `locale`, e la sua nota dice quale regola lo tiene fuori dalla cloud. La risposta dell'owner appende
-alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
-«Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
+alla chat e (se decide) muove a `todo`. Sul caso `secaudit` (#2575) anche la
+bocciatura lascia il segnalibro di ripresa (motivo `secaudit`, i verdetti restano): il
+tasto si chiama «Rimanda in correzione», il commento è cosa correggere, e il correttore
+sul ramo riceve commento e perché della bocciatura (`ripresa.bocciatura`, il perché solo
+da un controllo pulito su un feedback fidato); un lavoro rimesso in coda senza segnalibro,
+col commento scritto dopo la bocciatura, lo riceve alla presa in carico. L'owner ha anche
+«Salta il controllo», che toglie il segnalibro: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
 ramo; l'esito è quello di un'approvazione (fuso → `done`; bloccato → richiesta
 di fusione in attesa, o la nota che quella versione era già decisa; conflitto →

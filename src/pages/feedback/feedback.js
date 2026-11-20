@@ -777,8 +777,9 @@
       }
       // #913: «Lavoro locale» scrive anche il segno e il sì dell'owner, come nella gemella.
       const locale = a.locale ? ` data-local="1" title="${escapeHtml(TITOLO_LAVORO_LOCALE)}"` : '';
+      const correzione = a.correzione ? ' data-correzione="1" title="Torna a chi corregge, col testo che scrivi qui"' : '';
       return `<button class="sn-btn${a.primary ? '' : ' sn-btn-secondary'} fb-act"`
-        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}${locale}>${escapeHtml(a.label)}</button>`;
+        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}${locale}${correzione}>${escapeHtml(a.label)}</button>`;
     }).join('\n');
   }
 
@@ -1230,9 +1231,52 @@
 
   // Serve in due momenti: dopo un render completo e quando una sola scheda si riscrive AL
   // PROPRIO POSTO — l'unico modo di aggiornarla senza rimescolare la lista sotto il puntatore.
+  // «Rimanda in correzione» come in Gestione (#2575): il testo per chi corregge sta in una casella sopra i tasti, e senza
+  // testo il primo gesto arma l'avviso. → il testo da mandare, o null se questo gesto apre o arma soltanto.
+  function testoCorrezione(btn, detail) {
+    const card = btn.closest('.fb-card');
+    const tasti = card && card.querySelector('.fb-tasti');
+    if (!tasti) return null;
+    let ta = card.querySelector('.fb-correzione-text');
+    const testo = ta ? ta.value.trim() : '';
+    if (testo) return testo;
+    if (btn.dataset.armato) return detail > 1 ? null : '';
+    if (!ta) {
+      ta = document.createElement('textarea');
+      ta.className = 'fb-reopen-text fb-correzione-text';
+      ta.rows = 3;
+      ta.addEventListener('input', () => {
+        const armato = tasti.querySelector('.fb-act[data-correzione][data-armato]');
+        if (!armato || !ta.value.trim()) return;
+        delete armato.dataset.armato;
+        window.SN_CONFERMA_SUL_POSTO.disarma(armato, armato.dataset.etichetta);
+        ta.placeholder = MR.CORREZIONE.segnaposto;
+        ta.classList.remove('fb-correzione-text--avviso');
+      });
+      // Invio va a capo; Ctrl+Invio (Cmd sul Mac) passa dal tasto, avviso compreso.
+      ta.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' || !(ev.ctrlKey || ev.metaKey) || ev.isComposing) return;
+        const t = tasti.querySelector('.fb-act[data-correzione]');
+        if (!t || t.disabled) return;
+        ev.preventDefault();
+        t.click();
+      });
+      tasti.parentNode.insertBefore(ta, tasti);
+    }
+    btn.dataset.armato = '1';
+    btn.dataset.etichetta = btn.textContent;
+    window.SN_CONFERMA_SUL_POSTO.arma(btn, MR.CORREZIONE.etichettaSenzaTesto);
+    ta.placeholder = MR.CORREZIONE.avviso;
+    ta.classList.add('fb-correzione-text--avviso');
+    ta.focus();
+    return null;
+  }
+
   function bindCardActions(root) {
     root.querySelectorAll('.fb-act').forEach((b) => {
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
+        const correzione = b.dataset.correzione ? testoCorrezione(b, e.detail) : null;
+        if (b.dataset.correzione && correzione === null) return;
         const to = b.dataset.to; // stato CANONICO (todo | done | archived | *_confirmed)
         const id = b.dataset.id;
         const payload = { status: to };
@@ -1244,6 +1288,8 @@
           payload.reviewDecision = 'accepted';
           payload.reviewedAt = new Date().toISOString();
           ottimistico.reviewDecision = 'accepted';
+          // Un'ora nuova col commento vecchio lo farebbe arrivare a chi corregge come correzione (#2575).
+          if (correzione !== null) { payload.reviewComment = correzione; ottimistico.reviewComment = correzione; }
         }
         if (b.dataset.local) {
           payload.localOnly = true;
