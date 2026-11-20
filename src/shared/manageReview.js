@@ -855,6 +855,8 @@
         acts[0].primary = false;
         acts.push(lavoroServer);
       }
+      // Una bocciatura del controllo di sicurezza torna a chi corregge, col commento come istruzione (#2575).
+      else if (status === 'design' && statusReason === 'secaudit') Object.assign(acts[0], { label: 'Rimanda in correzione', correzione: true });
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
       // ancora classificato: le conferme possibili sono DUE, non una.
