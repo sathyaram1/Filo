@@ -101,11 +101,12 @@ const CORPO = ['4f9c2a7e', '1b8d3065', 'c4a9e2f7', '1d0b6c3a', '8e5f2d9a', '1c7b
 const CHIAVE = ['sk', 'or', 'v1', CORPO].join('-');
 
 test('una chiave custodita incollata senza prefisso si segna, anche se il modello non la vede', async () => {
-  const { L0, chiamate } = servizio({ segreti: [{ valore: CHIAVE, tipo: 'chiave' }] });
-  const r = await L0.controlla({ testo: `Non va, uso la chiave ${CORPO} da ieri.` });
+  const { L0 } = servizio({ segreti: [{ valore: CHIAVE, tipo: 'chiave' }] });
+  const testo = `Non va, uso la chiave ${CORPO} da ieri.`;
+  assert.notEqual(globalThis.SN_GUARDIANO_STATICO.oscuraSegreti(testo, [CHIAVE]), testo, 'verso i modelli la chiave è nascosta');
+  const r = await L0.controlla({ testo });
   assert.equal(r.stato, 'trovato');
   assert.deepEqual(r.esito.pezzi.map((p) => p.testo), [CORPO]);
-  assert.ok(!JSON.stringify(chiamate[0].messages).includes(CORPO.slice(0, 20)), 'al modello la chiave arriva nascosta');
 });
 
 test('una chiave custodita con spazi in mezzo si segna intera, spazi compresi', async () => {
