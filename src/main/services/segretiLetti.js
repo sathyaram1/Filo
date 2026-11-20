@@ -159,9 +159,9 @@ function dellUtente(x, fonte) {
   for (const r of immessi.values()) if (copre(r, x)) return true;
   return false;
 }
-// `desde`: quando l'utente ha cominciato a scrivere il valore. Un codice letto prima resta letto: riscriverlo non lo fa
-// diventare suo (giro 5). Senza, come una proposta dell'assistente, vale ogni lettura.
-function tieni(chiave, r, desde = 0) {
+// `desde`: quando è partito il pezzo che l'utente ha appena immesso. Un codice letto prima resta letto: riscriverlo non
+// lo fa diventare suo (giri 5 e 6).
+function tieni(chiave, r, desde) {
   const prima = immessi.get(chiave);
   if (prima === r) return;
   if (prima !== undefined) { immessi.delete(chiave); caratteriImmessi -= prima.length; }
