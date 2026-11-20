@@ -236,20 +236,39 @@ async function appendToChatArchive(chatId, turn, meta) {
   catch (e) { console.warn('[Filo] chat non archiviata:', e?.message || e); return null; }
 }
 
-// La risposta che il messaggio cita (#1620), ritrovata nell'archivio: si salva il suo posto, e il modello ne legge il
-// testo da lì, non da quello che manda la pagina. Una bolla che l'archivio non ha (un errore) si cita col suo testo.
+// Le risposte che il messaggio cita (#1620), o i loro passi (#2346), ritrovate nell'archivio: si salva il loro posto, e
+// il modello ne legge il testo da lì, non da quello che manda la pagina. Una bolla che l'archivio non ha (un errore) si
+// cita col suo testo. `citata` è l'elenco, nell'ordine in cui stanno nel messaggio.
 async function citazioneDelMessaggio(rispostaA, chatId) {
-  const p = RispostaA ? RispostaA.daPagina(rispostaA) : null;
-  if (!p) return { ref: null, citata: null };
+  const lista = RispostaA ? RispostaA.daPaginaTutte(rispostaA) : [];
+  const refs = [];
+  const citate = [];
+  for (const p of lista) {
+    const { ref, citata } = await unaCitazione(p, chatId);
+    if (ref) refs.push(ref);
+    if (citata) citate.push(citata);
+  }
+  return { ref: RispostaA ? RispostaA.daSalvare(refs) : null, citata: citate.length ? citate : null };
+}
+async function unaCitazione(p, chatId) {
+  const pos = p.pos ? { pos: p.pos } : {};
   const id = p.chat || chatId;
   let chat = null;
   try { chat = id && FiloChats ? await FiloChats.get(id) : null; } catch (_) { chat = null; }
   // La sua conversazione è stata cancellata mentre si scriveva: il testo se n'è andato con lei, e qui non rinasce.
-  if (p.chat && !chat) return { ref: null, citata: { manca: true } };
+  if (p.chat && !chat) return { ref: null, citata: { manca: true, ...pos } };
   const i = chat ? RispostaA.posto(chat, { i: p.i, testo: p.testo, role: p.role }) : -1;
+  // `da`/`a` contano sul testo che la pagina manda; senza testo (una citazione riletta dal filo) sul messaggio stesso.
+  const passo = p.a != null ? p.testo.slice(p.da, p.a) : '';
+  let segni = p.a != null ? { da: p.da, a: p.a } : {};
+  if (i >= 0 && passo.trim() && String(chat.messages[i].text || '') !== p.testo) {
+    // Ritrovato per posto con un testo un po' diverso: il passo si rimisura sul testo dell'archivio.
+    const t = RispostaA.trovaPasso(String(chat.messages[i].text || ''), passo);
+    segni = t && !t.tutto ? { da: t.da, a: t.a } : {};
+  }
   const ref = i >= 0
-    ? RispostaA.riferimento({ chat: chat.id, i, ts: chat.messages[i].ts })
-    : RispostaA.riferimento({ testo: p.testo, role: p.role });
+    ? RispostaA.riferimento({ chat: chat.id, i, ts: chat.messages[i].ts, ...segni, ...pos })
+    : RispostaA.riferimento({ testo: passo || p.testo, role: p.role, ...pos });
   return { ref, citata: ref ? RispostaA.risolvi(ref, () => chat, { max: RispostaA.PER_IL_MODELLO }) : null };
 }
 

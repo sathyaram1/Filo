@@ -33,8 +33,8 @@
       text: String(m.text == null ? '' : m.text),
     };
     const R = global.SN_RISPOSTA_A;
-    const citata = m.rispostaA && R ? R.risolvi(m.rispostaA, trovaChat) : null;
-    if (citata) v.rispostaA = citata;
+    const citate = m.rispostaA && R ? R.risolviTutte(m.rispostaA, trovaChat) : [];
+    if (citate.length) v.rispostaA = citate;
     if (Array.isArray(m.actions) && m.actions.length) v.actions = m.actions.slice();
     // Com'è andata ogni azione (#1294): riaperta, la chat la racconta riga per riga, coi bottoni dei file.
     if (Array.isArray(m.esiti) && m.esiti.length) v.esiti = m.esiti.slice();

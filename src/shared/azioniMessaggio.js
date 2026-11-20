@@ -16,6 +16,8 @@
     copia: Object.freeze({ icona: 'copy', etichetta: 'Copia', voce: 'Copia il messaggio' }),
     rispondi: Object.freeze({ icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi' }),
   });
+  // Le azioni che citano: con del testo selezionato nel messaggio citano quello.
+  const CITANO = new Set(['rispondi', 'cita']);
   // Un tasto della barra: l'etichetta (aria-label e quella che compare al passaggio) e l'icona vengono dalla definizione.
   function tasto(def, classe, size = 15) {
     const b = document.createElement('button');
@@ -48,22 +50,46 @@
     if (t.length > CITA_MAX) t = `${t.slice(0, CITA_MAX).trimEnd()}…`;
     return unaRiga ? `«${t}» ` : `> ${t}\n`;
   }
-  // Mette la citazione in testa al campo, una sola: citare un altro messaggio sostituisce quella di prima.
+  // La prima citazione va in testa al campo, sopra quello che c'è già scritto; le altre in fondo, ognuna dopo il commento
+  // a quella prima (#2346). In un campo di una riga ne sta una sola: la nuova sostituisce quella di prima.
   function citaNelCampo(campo, testo) {
     if (!campo) return;
     const unaRiga = campo.tagName !== 'TEXTAREA';
     const q = citazione(testo, { unaRiga });
     if (!q) return;
-    const resto = String(campo.value || '').replace(unaRiga ? /^«[^»]*» / : /^> [^\n]*\n/, '');
-    campo.value = q + resto;
+    const valore = String(campo.value || '');
+    if (unaRiga) campo.value = q + valore.replace(/^«[^»]*» /, '');
+    else campo.value = /^> /.test(valore) ? `${valore.replace(/\s+$/, '')}\n${q}` : q + valore;
     try { campo.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
     campo.focus();
     try { campo.setSelectionRange(campo.value.length, campo.value.length); } catch (_) {}
   }
 
+  // La parte della selezione che sta nel messaggio `el` (`testo`), e quello che la precede in `el` (`prima`); `null` se
+  // non ne tocca niente. Dentro un'ombra (l'Aiuto sui siti) la selezione è della sua radice.
+  function selezioneIn(el) {
+    if (!el || typeof document === 'undefined') return null;
+    const radice = el.getRootNode ? el.getRootNode() : null;
+    let sel = null;
+    try { sel = (radice && radice !== document && typeof radice.getSelection === 'function' && radice.getSelection()) || global.getSelection(); } catch (_) { sel = null; }
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    const r = sel.getRangeAt(0).cloneRange();
+    if (!r.intersectsNode(el)) return null;
+    const tutto = document.createRange();
+    tutto.selectNodeContents(el);
+    if (r.compareBoundaryPoints(Range.START_TO_START, tutto) < 0) r.setStart(tutto.startContainer, tutto.startOffset);
+    if (r.compareBoundaryPoints(Range.END_TO_END, tutto) > 0) r.setEnd(tutto.endContainer, tutto.endOffset);
+    const testo = r.toString();
+    if (!testo.trim()) return null;
+    const prima = document.createRange();
+    prima.setStart(tutto.startContainer, tutto.startOffset);
+    prima.setEnd(r.startContainer, r.startOffset);
+    return { testo, prima: prima.toString() };
+  }
+
   // `o`: { messaggio (selettore), testo(el), ruolo(el) → 'user'|'filo', pronto(el)?, rispondi(el, testo)?,
-  // copia(testo, el)?, azioni(el)? → ['copia', …], extra? { id: { icona, etichetta, voce, fai(el, testo) } }, classi? }.
-  // Dà `voci(target)`: le stesse azioni per il tasto destro.
+  // copia(testo, el)?, azioni(el)? → ['copia', …], extra? { id: { icona, etichetta, voce, fai(el, testo, sel) } },
+  // classi? }. Rispondi con del testo selezionato nel messaggio cita quello (#2346). Dà `voci(target)` per il tasto destro.
   function attacca(contenitore, o) {
     if (!contenitore || !o || !o.messaggio) return { voci: () => [] };
     const testoDi = (el) => String((o.testo ? o.testo(el) : el.textContent) || '').trim();
@@ -71,7 +97,7 @@
     const cl = { ...CLASSI, ...(o.classi || {}) };
     const DEF = {
       copia: AZIONI.copia,
-      ...(typeof o.rispondi === 'function' ? { rispondi: { ...AZIONI.rispondi, fai: (m, t) => o.rispondi(m, t) } } : {}),
+      ...(typeof o.rispondi === 'function' ? { rispondi: { ...AZIONI.rispondi, fai: (m, t, sel) => o.rispondi(m, t, sel) } } : {}),
       ...(o.extra || {}),
     };
     let barra = null;
@@ -99,9 +125,14 @@
       t.innerHTML = icona(ok === true ? 'check' : 'copy');
       if (ok != null) t._timer = setTimeout(() => esito(t, null), COPIATO_MS);
     }
-    async function fai(azione, m, t = null) {
+    // `fissata`: la selezione di quando si è aperto il menu, che il clic sulla voce può aver già spento.
+    async function fai(azione, m, t = null, fissata = null) {
       const testo = testoDi(m);
-      if (azione !== 'copia') { DEF[azione].fai(m, testo); return true; }
+      if (azione !== 'copia') {
+        const sel = CITANO.has(azione) ? (selezioneIn(m) || fissata) : null;
+        DEF[azione].fai(m, sel ? sel.testo.trim() : testo, sel);
+        return true;
+      }
       if (!testo) return false;
       let ok = false;
       try { ok = await copia(testo, m); } catch (_) { ok = false; }
@@ -147,13 +178,16 @@
       const m = messaggioDi(target);
       if (!m) return [];
       const a = azioniDi(m);
-      return [...a.filter((x) => x !== 'copia'), ...a.filter((x) => x === 'copia')]
-        .map((x) => ({ azione: x, label: DEF[x].voce, icona: DEF[x].icona, fai: () => fai(x, m) }));
+      const sel = selezioneIn(m);
+      return [...a.filter((x) => x !== 'copia'), ...a.filter((x) => x === 'copia')].map((x) => ({
+        azione: x, label: sel && CITANO.has(x) ? `${DEF[x].voce} a questo passo` : DEF[x].voce, icona: DEF[x].icona,
+        fai: () => fai(x, m, null, sel),
+      }));
     }
     // Le stesse voci già nella forma del menu del tasto destro: ogni chat le passa così com'è.
     const vociMenu = (target) => voci(target).map((v) => ({ type: 'item', icon: icona(v.icona, 16), label: v.label, onClick: () => { v.fai(); } }));
     return { voci, vociMenu, messaggioDi };
   }
 
-  global.SN_AZIONI_MESSAGGIO = { attacca, tasto, AZIONI, citazione, citaNelCampo, copiaTesto, CITA_MAX };
+  global.SN_AZIONI_MESSAGGIO = { attacca, tasto, AZIONI, citazione, citaNelCampo, copiaTesto, selezioneIn, CITA_MAX };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

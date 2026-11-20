@@ -185,6 +185,9 @@
     vaiA: (o) => Coda.vaiA(o),
     modificabile: (b) => composizioni.has(b),
     modifica: (b) => modificaMessaggio(b),
+    campoCambiato: () => aggiornaTasto(),
+    daFuori: () => testoDaFuori,
+    segnaDaFuori: () => { testoDaFuori = true; ricordaDaFuori(inputEl.value); },
   });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
@@ -352,7 +355,7 @@
     loadDashboard: () => loadDashboard(),
     // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
     rispondi: (testo) => {
-      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length) return false;
+      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length || Rispondi.commenti()) return false;
       submitMessage(testo);
       return true;
     },
@@ -635,9 +638,10 @@
   function rigaDiStoria(m, { quante, guardate, types, esiti = [] }) {
     const text = String(m.text || '');
     if (m.role === 'user') {
+      const citate = m.rispostaA ? Rispondi.perLoStorico(Rispondi.dalFilo(m.rispostaA)) : null;
       return {
         role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
-        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
+        ...(citate ? { rispostaA: citate } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
       };
     }
     return {
@@ -1457,7 +1461,7 @@
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
   // `soloTesto`: parte solo `text`, e la bozza nella barra (testo, allegati, citazione) resta dov'è.
   async function submitMessage(text, { daModello = false, soloTesto = false } = {}) {
-    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
+    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0 && (soloTesto || !Rispondi.commenti())) || sending) return;
     const c = soloTesto && text ? composizione(text) : prendiComposizione(text);
     await inviaComposto(c, { daModello });
   }
@@ -1466,9 +1470,13 @@
   const DOMANDA_SOLO_IMMAGINI = 'Descrivi questa immagine.';
   const domandaDi = (c) => c.text || DOMANDA_SOLO_IMMAGINI;
   function prendiComposizione(text) {
+    // Le citazioni nel campo, coi loro commenti: le parole del messaggio diventano tutti i commenti, in ordine (#2346).
+    const conCitate = Rispondi.prendi(String(text || ''));
+    if (conCitate) text = conCitate.testo;
     // Un messaggio che non viene dalla casella (una scelta cliccata, l'avviso di un sito) è scritto lo stesso.
-    const scritto = inputEl.value.trim() ? inputEl.value : String(text || '');
-    const incollato = testoDaFuori;
+    const scritto = conCitate ? conCitate.testo : inputEl.value.trim() ? inputEl.value : String(text || '');
+    // Un commento incollato sotto una citazione vale come il campo incollato: il messaggio è testo di altri (#1840).
+    const incollato = testoDaFuori || !!(conCitate && conCitate.daFuori);
     const immagini = pendingImages.slice();
     const file = pendingFiles.slice();
     const percorsi = new Map(immagini.filter((d) => percorsiImmagini.has(d)).map((d) => [d, percorsiImmagini.get(d)]));
@@ -1482,7 +1490,7 @@
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
-    const citata = Rispondi.prendi();
+    const citata = conCitate ? conCitate.citate : null;
     const schede = Gettoni ? Gettoni.schede() : [];
     if (Gettoni) Gettoni.svuota();
     return composizione(text, { immagini, daFuori, scritto, incollato, file, percorsi, citata, schede });
@@ -1520,9 +1528,8 @@
     }
     let scritto = righe.join('\n');
     if (foto.length && scritto.trim() === DOMANDA_SOLO_IMMAGINI) scritto = '';
-    const c = Rispondi.dalFilo(m.rispostaA);
-    const citata = c && !c.manca ? { ...c, scritto: c.testo } : null;
-    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata };
+    const citate = Rispondi.dalFilo(m.rispostaA).filter((c) => !c.manca);
+    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata: citate.length ? citate : null };
   }
   // Il messaggio già nel campo (un secondo clic, un doppio clic) non si rimette una seconda volta: ci si torna sopra.
   let rimesso = null;
@@ -1632,7 +1639,7 @@
   // Mentre Filo lavora il posto dell'invio lo prende un quadrato, e Invio da tastiera fa la stessa cosa. Fermato, lo
   // stesso posto offre di riprendere finché l'utente non scrive altro. Racconto: patterns/il-filo-dell-attesa.md.
   function aggiornaTasto() {
-    const vuoto = !inputEl.value.trim() && !pendingImages.length && !pendingFiles.length;
+    const vuoto = !inputEl.value.trim() && !pendingImages.length && !pendingFiles.length && !Rispondi.commenti();
     const quadrato = sending || (ripresa && vuoto && appenaFermato());
     const modo = ripresa && vuoto && !quadrato ? 'riprendi' : 'invia';
     if (sendBtn.dataset.modo !== modo) {
@@ -1865,7 +1872,10 @@
   // immagini, documenti e citazione. Vale per il seguito che non parte (#1296) e per «Chat nuova» (#1596).
   function rimettiNellaCasella(tornati) {
     if (!tornati.length) return;
-    const testi = tornati.map((c) => String(c.scritto || '').trim()).filter(Boolean);
+    // Le citazioni tornano con la prima composizione che ne ha, se intanto l'utente non ne ha scelte altre: ognuna col
+    // suo commento, e l'ultimo nel campo.
+    const conCitate = Rispondi.inCorso() ? null : tornati.find((c) => c.citata);
+    const testi = tornati.map((c) => (c === conCitate ? Rispondi.rimetti(c.citata, c.scritto) : String(c.scritto || '').trim())).filter(Boolean);
     const bozza = inputEl.value.trim() ? [inputEl.value] : [];
     inputEl.value = [...testi, ...bozza].join('\n');
     if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
@@ -1879,9 +1889,6 @@
     }
     for (const [d, p] of bozzaImmagini) addPendingImage(d, p);
     for (const p of bozzaFile) addPendingFile(p);
-    // Nel campo sta una citazione sola: torna quella del primo, se intanto l'utente non ne ha scelta un'altra.
-    const citata = tornati.find((c) => c.citata);
-    if (citata && !Rispondi.inCorso()) Rispondi.rimetti(citata.citata);
     autoGrowInput();
     Comandi.updateInputClass();
     aggiornaTasto();
@@ -2243,12 +2250,12 @@
     e.preventDefault();
     // Mentre Filo lavora l'invio non ha tasto (c'è il quadrato): arriva qui solo dal microfono, e fa quello di Invio.
     if (sending) {
-      if (inputEl.value.trim() || pendingImages.length || pendingFiles.length) accodaSeguito();
+      if (inputEl.value.trim() || pendingImages.length || pendingFiles.length || Rispondi.commenti()) accodaSeguito();
       return;
     }
     const text = inputEl.value.trim();
     // Il secondo colpo di chi ha appena fermato (clic o Invio) non riprende: il menu, scelta deliberata, sì.
-    if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { if (!appenaFermato()) riprendi(); return; }
+    if (!text && pendingImages.length === 0 && pendingFiles.length === 0 && !Rispondi.commenti()) { if (!appenaFermato()) riprendi(); return; }
     if (await comandoLocale(text, { incollato: testoDaFuori })) { if (!inputEl.value) testoDaFuori = false; return; }
     submitMessage(text);
   });
@@ -2289,7 +2296,7 @@
       if (e.repeat) return;
       // Mentre Filo lavora, con qualcosa nella casella Invio manda un seguito (#1296); a casella vuota è il quadrato.
       if (sending) {
-        if (inputEl.value.trim() || pendingImages.length || pendingFiles.length) accodaSeguito();
+        if (inputEl.value.trim() || pendingImages.length || pendingFiles.length || Rispondi.commenti()) accodaSeguito();
         else if (!quadratoAppena()) fermaTurno();
         return;
       }

@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home } from './helpers/chatFinta.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { seleziona } from './helpers/selezione.mjs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 import { paginaDellAiuto, statoDi, conta, clicca, tastieraDi, scrivi } from './helpers/riquadri.mjs';
 
@@ -101,6 +102,43 @@ test('l’Aiuto dell’Editor: Copia e Rispondi sotto domanda e risposta, anche 
   await expect(menuDi(editor).voce('Rispondi').first()).toBeVisible();
   await menuDi(editor).voce('Copia il messaggio').first().click();
   await expect.poll(() => appunti(app)).toBe('Cosa ne pensi del capitolo sui licheni?');
+});
+
+test('#2346: nell’Aiuto Rispondi cita solo il passo selezionato, e i passi dopo si aggiungono in fondo, dopo il commento', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  const editor = await openTab('filo://editor/editor.html');
+  await editor.waitForSelector('#doc');
+  await apriAiuto(app, editor);
+  await chiediAllAiuto(editor, 'Cosa ne pensi del capitolo sui licheni?');
+  const risposta = editor.locator('.sn-sidebar-msg-assistant', { hasText: 'licheni va accorciato' });
+  await expect(risposta).toBeVisible({ timeout: 10_000 });
+  const campo = editor.locator('.sn-sidebar-input textarea');
+  await campo.fill('');
+
+  await seleziona(risposta, 'Il resto regge.');
+  await risposta.hover();
+  await risposta.getByRole('button', { name: 'Rispondi' }).click();
+  await expect(campo).toHaveValue('> Il resto regge.\n');
+  await campo.press('End');
+  await campo.pressSequentially('davvero?');
+  await seleziona(risposta, 'licheni va accorciato');
+  await risposta.hover();
+  await risposta.getByRole('button', { name: 'Rispondi' }).click();
+  await expect(campo).toHaveValue('> Il resto regge.\ndavvero?\n> licheni va accorciato\n');
+
+  // Dal tasto destro su una selezione la voce lo dice, e cita lo stesso solo il passo.
+  await campo.fill('');
+  await seleziona(risposta, 'capitolo sui licheni');
+  const r = await risposta.evaluate((el) => {
+    const radice = el.getRootNode();
+    const s = radice !== document && radice.getSelection ? radice.getSelection() : getSelection();
+    const b = s.getRangeAt(0).getBoundingClientRect();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  });
+  await editor.mouse.click(r.x, r.y, { button: 'right' });
+  await menuDi(editor).voce('Rispondi a questo passo').first().click();
+  await expect(campo).toHaveValue('> capitolo sui licheni\n');
 });
 
 test('l’Aiuto sopra un sito: la barra compare sotto la risposta senza spostarla, e Copia copia', async ({ app, shell, openTab, testServer }) => {

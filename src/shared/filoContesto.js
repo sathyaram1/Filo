@@ -230,7 +230,31 @@
       return `(l'utente risponde al testo arrivato ${r.esterno}${dove}${come})`;
     }
     const t = String(r.testo == null ? '' : r.testo).trim();
-    return t ? `(l'utente risponde ${di}${dove}: «${t}»)` : `(l'utente risponde ${di}${dove})`;
+    const cosa = !r.passo ? di : r.role === 'user' ? 'a un passo di un suo messaggio' : 'a un passo del tuo messaggio';
+    return t ? `(l'utente risponde ${cosa}${dove}: «${t}»)` : `(l'utente risponde ${cosa}${dove})`;
+  }
+
+  // Le parole dell'utente con le citazioni al loro posto (#2346): citazione, commento, citazione, commento. `pos` dice
+  // dove comincia il commento di ogni citazione; una senza `pos` (quelle di sempre) apre il messaggio.
+  function conCitazioni(testo, citate) {
+    const t = String(testo == null ? '' : testo);
+    const lista = (Array.isArray(citate) ? citate : citate ? [citate] : []).filter((c) => c && typeof c === 'object');
+    if (!lista.length) return t;
+    const ordinate = lista
+      .map((c, k) => ({ c, k, pos: Math.min(Number.isInteger(c.pos) && c.pos > 0 ? c.pos : 0, t.length) }))
+      .sort((x, y) => x.pos - y.pos || x.k - y.k);
+    const out = [];
+    let da = 0;
+    for (const { c, pos } of ordinate) {
+      const prima = t.slice(da, pos).trim();
+      if (prima) out.push(prima);
+      const nota = notaRisposta(c);
+      if (nota) out.push(nota);
+      da = pos;
+    }
+    const resto = t.slice(da).trim();
+    if (resto) out.push(resto);
+    return out.join('\n');
   }
 
   // Una risposta di Filo riletta altrove vale la classe peggiore che la sua chat aveva letto (#1508); una salvata prima
@@ -297,11 +321,11 @@
     const daFuori = daFuoriIl(m);
     const testo = daFuori ? '' : (intero ? String(m.text == null ? '' : m.text) : tienilo(m.text, tetto, m.chat));
     if (m.role === 'user') {
-      const nota = notaRisposta(m.rispostaA);
+      const corpo = conCitazioni(testo, m.rispostaA);
       const pre = String(preambolo || '').trim();
       const detto = pre
-        ? `${intestazione(m.ts, m.chat)}\n${pre}\n${nota ? `${nota}\n` : ''}${testo}`.trim()
-        : `${intestazione(m.ts, m.chat)} ${nota ? `${nota}\n` : ''}${testo}`.trim();
+        ? `${intestazione(m.ts, m.chat)}\n${pre}\n${corpo}`.trim()
+        : `${intestazione(m.ts, m.chat)} ${corpo}`.trim();
       const note = (Array.isArray(dopo) ? dopo : []).map((x) => String(x || '').trim()).filter(Boolean);
       const quante = numeroImmagini(m);
       if (!quante) return { role: 'user', content: note.length ? `${detto}\n\n${note.join('\n\n')}` : detto };
@@ -961,7 +985,7 @@
 
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, tettoDelTratto, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
-    TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta,
+    TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta, conCitazioni,
     tetti, numeroIn, NUMERI_DEI_TETTI, campoDelTetto, numeroDelTetto, limitiAiCampi, stimatoreSoglia, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, ESTERNO_RACCONTO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,
     provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo,

@@ -10,6 +10,9 @@
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
       version: '0.2.294', date: '2026-11-19',
+      features: [
+        { testo: 'Nella home puoi rispondere a un solo pezzo di una risposta di Filo: selezionalo e premi Rispondi. Nello stesso messaggio citi più pezzi, ognuno col suo commento, e un clic su una citazione ti riporta al testo citato.', segnalazione: 2346 },
+      ],
       fixes: [
         { testo: 'Con la finestra massimizzata o a schermo intero prendi una scheda anche cliccando sul bordo alto dello schermo, senza mirare, come in Chrome.', segnalazione: 2382 },
         { testo: 'Nella home un clic su un punto vuoto rimette il cursore nel campo della chat, o in quello della ricerca se è aperta: Backspace, Ctrl+V (Cmd+V su Mac), frecce e Invio funzionano come se ci avessi cliccato dentro.', segnalazione: 2372 },

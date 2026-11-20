@@ -591,11 +591,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const riprovata = imageList.length && String(m.text || '') === String(userMessage || '');
     const quanteFoto = role === 'user' && !riprovata ? FCx.numeroImmagini(m) : 0;
     if (quanteFoto) content = `${content}\n${FCx.notaImmagini(quanteFoto)}`;
-    // La risposta citata, come la pagina l'ha davanti: qui arrivano solo i messaggi che il filo non ha (#1620).
-    const citataQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPagina(m.rispostaA) : null;
-    if (citataQui && citataQui.testo.trim()) {
-      content = `${FCx.notaRisposta({ role: citataQui.role === 'user' ? 'user' : 'filo', testo: RispostaA.taglia(citataQui.testo, RispostaA.PER_IL_MODELLO) })}\n${content}`;
-    }
+    // Le risposte citate, come la pagina le ha davanti: qui arrivano solo i messaggi che il filo non ha (#1620, #2346).
+    const citateQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPaginaTutte(m.rispostaA) : [];
+    const lette = citateQui.map((c) => {
+      const passo = c.a != null ? c.testo.slice(c.da, c.a) : '';
+      return { role: c.role === 'user' ? 'user' : 'filo', testo: RispostaA.taglia(passo || c.testo, RispostaA.PER_IL_MODELLO), ...(passo || c.passo ? { passo: true } : {}), ...(c.pos ? { pos: c.pos } : {}) };
+    }).filter((c) => c.testo);
+    if (lette.length) content = FCx.conCitazioni(content, lette);
     const msg = { role, content };
     if (role === 'assistant') {
       const parts = [];
@@ -629,10 +631,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   const indiceDomanda = threadMessages.length;
   const giaLetta = origineGiaLettaInChat(chatId);
-  const notaCitazione = FCx.notaRisposta(citazione.citata);
   // #1373 — la ripresa dopo l'OK porta com'è andata, come il risultato di uno strumento: il registro lo scrive, non la scheda.
   const esitoDopoOk = dopoOk ? globalThis.SN_ESITO.perModello(globalThis.SN_ESITO.vociArchivio(dopoOk)) : '';
-  const domandaConCitazione = [notaCitazione, String(userMessage || ''), esitoDopoOk].filter(Boolean).join('\n');
+  const domandaConCitazione = [FCx.conCitazioni(String(userMessage || ''), citazione.citata), esitoDopoOk].filter(Boolean).join('\n');
   const gettoniLetti = notaDeiGettoni(lettureGettoni);
   // Le note di questo turno sulla domanda: tornano con lei nei turni dopo (src/main/services/contestoFilo.js).
   let origineImmagini = '';
