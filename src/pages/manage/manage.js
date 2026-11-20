@@ -5725,10 +5725,12 @@
     b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
     b.id = s.id;
     b.dataset.strada = s.key;
-    b.textContent = s.label;
-    b.title = titoloStrada(fb, s.key);
+    // Su una bocciatura la strada è la stessa del tasto della riga, col suo nome (#2575).
+    const correzione = !!(s.azione && s.azione.correzione);
+    b.textContent = correzione ? s.azione.label : s.label;
+    b.title = correzione ? TITOLO_CORREZIONE : titoloStrada(fb, s.key);
     b.disabled = azioniInVolo;
-    b.addEventListener('click', () => applyAction(s.azione, null));
+    b.addEventListener('click', (e) => applyAction(s.azione, null, { btn: b, detail: e.detail }));
     return b;
   }
 
