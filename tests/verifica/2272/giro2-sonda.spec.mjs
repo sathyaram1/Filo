@@ -28,10 +28,9 @@ test('sonda', async ({ app, openTab }) => {
   console.log('SONDA', JSON.stringify(r));
   await page.waitForTimeout(3000);
   const r2 = await app.evaluate(async (_e, copie) => {
-    const fs = require('node:fs');
-    const path = require('node:path');
+    const fs = process.mainModule.require('node:fs');
     const C = globalThis.__filoCopieIcone;
-    const esiste = () => copie.map((s) => fs.existsSync(path.join(C.cartella(), C.nomeDa(s))));
+    const esiste = () => copie.map((s) => fs.existsSync(`${C.cartella()}/${C.nomeDa(s)}`));
     const out = { dopoRemove: esiste() };
     C.togliSeOrfane(copie);
     await new Promise((r) => setTimeout(r, 300));
