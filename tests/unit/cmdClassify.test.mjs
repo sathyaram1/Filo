@@ -11,7 +11,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { sorgenteDelClassificatore } from '../helpers/sorgenteClassificatore.mjs';
 
 const require = createRequire(import.meta.url);
