@@ -456,7 +456,7 @@ test('git config — scrivere una chiave che avvia un programma chiede «conferm
   for (const cmd of [
     'git config user.name "Mario Rossi"', 'git config --global user.email a@b.c', 'git config pull.rebase true',
     'git config core.autocrlf false', 'git config core.fsmonitor true', 'git config init.defaultBranch main',
-    'git config merge.conflictstyle diff3', 'git config branch.main.remote origin', 'git config --global --add safe.directory /x',
+    'git config merge.conflictstyle diff3', 'git config branch.main.merge refs/heads/main', 'git config --global --add safe.directory /x',
     'git config set user.name Bob', 'git config --type bool commit.gpgsign true', 'git config color.ui auto',
   ]) {
     assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
