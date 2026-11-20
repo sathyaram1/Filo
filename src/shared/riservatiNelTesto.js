@@ -146,7 +146,7 @@ const CHI_SCRIVE = new Set(['io', 'tu', 'me', 'you', 'i']);
 // Sotto la richiesta `r` c'è già la risposta: una riga di chi scrive, o una riga corta con un valore dalla forma di
 // password («gatto2024», «certo, gatto2024»). Un «PS:», un orario o un altro del gruppo non la chiudono (#1723).
 function chiusa(l, r) {
-  const G = globalThis.SN_GUARDIANO_STATICO;
+  const G = guardiano();
   const righe = l.slice(r.fine).split('\n');
   if (r.fine > 0 && l[r.fine - 1] !== '\n') righe.shift();
   return righe.some((riga) => {
