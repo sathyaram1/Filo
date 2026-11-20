@@ -100,10 +100,11 @@ async function main() {
   }
   if (args.cmd === 'riservato') {
     const r = await B.segnaRiservato(args.motivo);
-    if (r.senzaBiglietto) { console.error('Nessun biglietto trovato da qui: niente da segnare.'); return 1; }
+    if (r.senzaBiglietto) { console.error('Nessun biglietto trovato da qui: niente da segnare, e i compiti e le domande che scrivi da questo repo nascono riservati.'); return 1; }
     if (r.segnati) console.log('Biglietto riservato: compiti, feedback e domande che scrivi da qui portano il segno.');
-    if (r.errori.length) console.error(`Non segnati: ${r.errori.join('; ')}`);
-    return r.segnati ? 0 : 1;
+    if (r.inAttesa) console.log(`Server non raggiunto (${r.errori.join('; ')}): il segno riservato è annotato in locale e parte alla prossima chiamata; intanto i compiti e le domande che scrivi nascono riservati.`);
+    else if (r.errori.length) console.error(`Non segnati: ${r.errori.join('; ')}`);
+    return r.segnati || r.inAttesa ? 0 : 1;
   }
   if (args.cmd === 'stato') {
     const trovati = B.trovaBiglietti();
