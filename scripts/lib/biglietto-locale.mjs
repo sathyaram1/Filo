@@ -322,13 +322,14 @@ export async function haCredenzialeOwner() {
   }
 }
 
-/** Lo stato di ogni biglietto trovato, letto dal server dopo avergli consegnato lo sporco annotato. Un biglietto
- * illeggibile, o con sporco rimasto solo in locale (`inAttesa`), vale sporco. */
+/** Lo stato di ogni biglietto trovato, letto dal server dopo avergli consegnato sporco e segno riservato annotati. Un
+ * biglietto illeggibile, o con sporco rimasto solo in locale (`inAttesa`), vale sporco; `riservatoInAttesa` dice il segno. */
 async function statiDi(biglietti, deps) {
   const out = [];
   for (const b of biglietti) {
     const { restano } = await consegnaSporchi(b, { deps });
-    const attesa = restano ? { inAttesa: restano } : {};
+    const riservati = (await consegnaRiservati(b, { deps })).restano;
+    const attesa = Object.assign(restano ? { inAttesa: restano } : {}, riservati ? { riservatoInAttesa: riservati } : {});
     try {
       const s = await chiama('stato', { ticket: b.ticket }, deps);
       out.push(Object.assign({}, b, { fiducia: s.fiducia === 'fidato' && s.chiuso !== true && !restano ? 'fidato' : 'non_fidato', stato: s }, attesa));
