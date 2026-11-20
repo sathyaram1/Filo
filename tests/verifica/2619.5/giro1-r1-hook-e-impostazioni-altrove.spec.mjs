@@ -34,7 +34,7 @@ test.afterAll(() => togliCartella(radice));
 
 const ctx = () => {
   const casa = join(radice, 'casa');
-  return { cwd: join(casa, 'progetto'), home: casa, win: process.platform === 'win32', maiuscole: process.platform !== 'linux', esiste, gitLancia: () => '' };
+  return { cwd: join(casa, 'progetto'), home: casa, win: process.platform === 'win32', maiuscole: process.platform !== 'linux', esiste, gitLancia: (d) => T.gitLanciaIn(d) };
 };
 
 test('r1 copiare o spostare un hook nella cartella degli hook scelta dal repository vale quanto scriverlo con la redirezione', () => {
