@@ -581,6 +581,8 @@
     // Un'azione fermata perché avrebbe portato fuori un segreto (#810): si vede anche a blocco chiuso.
     FERMATA: (n) => (n > 1 ? `fermato ${n} azioni` : 'fermato un\'azione'),
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
+    IMMAGINI_WEB: (n) => (n > 1 ? `cercato immagini ${n} volte` : 'cercato immagini'),
+    GENERA_IMMAGINE: (n) => (n > 1 ? `disegnato ${n} immagini` : 'disegnato un\'immagine'),
     CERCA_CHAT: (n) => (n > 1 ? `cercato nel filo ${n} volte` : 'cercato nel filo'),
     ESPANDI_FILO: (n) => (n > 1 ? `riletto il filo ${n} volte` : 'riletto il filo'),
     RICORDO_FILO: () => 'ripescato un ricordo dal filo',
@@ -1846,6 +1848,9 @@
       return stepTrace(c ? `⚙ Leggo come è impostato: ${c}` : '⚙ Leggo le impostazioni');
     }
     if (type === 'CERCA_DOCUMENTI') return stepTrace(`🔎 ${testoRicercaDocumenti(a)}`);
+    // #2272 — le immagini stanno nella risposta: qui resta solo la traccia del passo.
+    if (type === 'IMMAGINI_WEB') return stepTrace(`🖼 Cerco immagini: ${a.query || ''}`.trim());
+    if (type === 'GENERA_IMMAGINE') return stepTrace('🖌 Disegno un\'immagine');
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
       // per iscritto prima di rispondere sul perché di un modello o di un dato.

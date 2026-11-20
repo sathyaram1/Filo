@@ -446,6 +446,7 @@
     // Motivi di blocco quando un modello non è adatto alla funzione.
     caps_block_output_text: 'questa funzione richiede un modello che produca testo',
     caps_block_output_audio: 'questa funzione richiede un modello di sintesi vocale (audio)',
+    caps_block_output_image: 'questa funzione richiede un modello che crei immagini',
     caps_block_input_image: 'questa funzione richiede un modello che accetti immagini in input',
     caps_block_input_audio: 'questa funzione richiede un modello che accetti audio in input',
     caps_block_output_embedding: 'questa funzione richiede un modello di indicizzazione (produce vettori, non testo)',
@@ -498,6 +499,7 @@
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
     options_action_file_name: 'Nome sensato ai file (legge l\'inizio del file o una miniatura)',
     options_action_embed_cookie_check: 'Contenuti incorporati rotti dai cookie (guarda il riquadro)',
+    options_action_image_gen: 'Immagini create in chat (serve un modello che disegna)',
     // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:
     // quelli che girano sui server di Filo e quelli che un modello non lo usano.
     options_h_model_usage: 'Dove altro Filo usa un modello',

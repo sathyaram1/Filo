@@ -3,8 +3,8 @@
 // Le regole della stima stanno in src/shared/stimaCosto.js.
 
 const CATALOGO = 'https://openrouter.ai/api/v1/models';
-// Il catalogo semplice elenca solo i modelli di testo: voce, dettatura e vettori stanno in liste a parte.
-const LISTE = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
+// Il catalogo semplice elenca solo i modelli di testo: voce, dettatura, vettori e immagini stanno in liste a parte.
+const LISTE = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings', '?output_modalities=image'];
 const FRESCO_MS = 6 * 60 * 60 * 1000;
 const RIPROVA_MS = 60 * 1000;
 const ATTESA_MS = 15 * 1000;

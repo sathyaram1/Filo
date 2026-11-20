@@ -1067,17 +1067,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
   const archiviaGiaFatto = async () => {
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
-    // Anche la parte già scritta porta le sue fonti controllate, mai i marcatori grezzi (#2383).
-    const F = globalThis.SN_FONTI_CITATE;
-    const citate = F.controlla(unisciTesti(risposta), F.sorgenti(renderedActions));
+    // Anche la parte già scritta porta le sue fonti e immagini controllate, mai i marcatori grezzi (#2383, #2272).
+    const citate = globalThis.SN_IMMAGINI_RISPOSTA.controllaConFonti(unisciTesti(risposta), renderedActions);
     const giaScritta = citate.text;
-    if (!chatId || (!successe.length && !giaScritta)) return;
+    if (!chatId || (!successe.length && !giaScritta && !citate.immagini.length)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
     const dopo = await appendToChatArchive(chatId, {
       role: 'filo', text: giaScritta, actions: successe, esiti: renderedActions, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}),
       ...(citate.fonti.length ? { fonti: citate.fonti } : {}),
+      ...(citate.immagini.length ? { immagini: citate.immagini } : {}),
     }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
@@ -1396,9 +1396,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const mutoDopoOk = dopoOk && !String(textReply || '').trim() && !rawActions.length;
   // #2383 — i marcatori di fonte si controllano qui, prima che la risposta si salvi o si mostri: resta l'etichetta solo
   // per un indirizzo letto in questo turno, con la frase cercata nella pagina intera.
-  const Fonti = globalThis.SN_FONTI_CITATE;
-  const citate = Fonti.controlla(textReply, Fonti.sorgenti(renderedActions));
+  // #2272 — lo stesso per le immagini: restano solo quelle trovate o create in questo turno, al posto del marcatore.
+  const Immagini = globalThis.SN_IMMAGINI_RISPOSTA;
+  const Fonti = { nascondi: (t) => Immagini.nascondi(globalThis.SN_FONTI_CITATE.nascondi(t)) };
+  const citate = Immagini.controllaConFonti(textReply, renderedActions);
   const fonti = citate.fonti;
+  const immagini = citate.immagini;
   textReply = citate.text || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
   if (notaRisposta) notaRisposta = Fonti.nascondi(notaRisposta).trim();
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
@@ -1480,6 +1483,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
         ...(cambi.length ? { cambi } : {}),
         ...(fonti.length ? { fonti } : {}),
+        ...(immagini.length ? { immagini } : {}),
       },
       { onboarding: onbActive },
     );
@@ -1574,6 +1578,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     notes: notes.map((n) => Fonti.nascondi(n).trim()).filter(Boolean), reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
     ...(fonti.length ? { fonti } : {}),
+    ...(immagini.length ? { immagini } : {}),
     ...(senzaRisposta ? { senzaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(linkDaConfermare.length ? { linkDaConfermare } : {}),

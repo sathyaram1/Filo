@@ -2465,17 +2465,17 @@
       { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image_link'), onClick: a.copyLink },
       { type: 'item', azione: 'search-image', label: I18n.t('menu_search_image'), onClick: a.search },
       { type: 'item', azione: 'ocr', label: I18n.t('menu_transcribe'), onClick: a.transcribe },
-    ];
+    ].filter((v) => typeof v.onClick === 'function');
   }
 
   // Le azioni di un'immagine e di un collegamento, una volta sola: le voci del menu e le icone della fila (#1434) fanno
-  // la stessa cosa.
+  // la stessa cosa. Un'immagine senza un indirizzo del web (creata da Filo, #2272) non ha indirizzo da copiare o cercare.
   function azioniDellImmagine(imgEl) {
+    const fuori = Actions.indirizzoDellImmagine(imgEl);
     return {
       copy: () => Actions.copyImage(imgEl),
       save: () => Actions.downloadImage(imgEl),
-      copyLink: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
-      search: () => Actions.searchImageOnWeb(imgEl),
+      ...(fuori ? { copyLink: () => Actions.copyUrlToClipboard(fuori), search: () => Actions.searchImageOnWeb(imgEl) } : {}),
       transcribe: () => Actions.transcribeImage(imgEl),
       ask: () => chiediDellImmagine(imgEl),
     };

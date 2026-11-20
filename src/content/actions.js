@@ -1398,6 +1398,27 @@
       document.body.appendChild(a); a.click(); a.remove();
       return;
     }
+    // Una copia che Filo tiene per sé (filo://, le immagini delle risposte #2272): i byte li legge la pagina, che la
+    // mostra già; il main scarica solo dal web.
+    if (/^filo:/i.test(src)) {
+      try {
+        const r = await fetch(src);
+        const blob = r.ok ? await r.blob() : null;
+        if (!blob || !blob.size || !/^image\//i.test(blob.type)) throw new Error('non leggibile');
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl;
+        const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/[^a-z0-9]/gi, '');
+        const daFuori = indirizzoDellImmagine(imgEl);
+        const base = daFuori ? decodeURIComponent(new URL(daFuori).pathname.split('/').pop() || '').replace(/\.[a-z0-9]{2,5}$/i, '') : '';
+        a.download = `${base || 'immagine'}.${ext}`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
+      } catch (_) {
+        Popup.toastErrore('toast_image_save_failed');
+      }
+      return;
+    }
     // Sulle immagini http(s) cross-origin Chromium ignora l'attributo download e la scheda
     // NAVIGAVA sull'immagine (#274): scarica il main, che risponde a download concluso.
     try {
@@ -1755,7 +1776,19 @@
 
   // Lens-style reverse search (più affidabile di searchbyimage)
   function imageSearchUrlFor(imgEl) {
-    return global.SN_URL_NAV.indirizzoRicercaImmagine(imgEl && (imgEl.currentSrc || imgEl.src));
+    return global.SN_URL_NAV.indirizzoRicercaImmagine(indirizzoDellImmagine(imgEl));
+  }
+
+  // L'indirizzo di un'immagine per chi lo usa fuori da Filo (copiarlo, cercarlo). Una copia di Filo (#2272) vale
+  // l'indirizzo da cui viene (`data-originale`), o nessuno se è stata creata: mai il rimando interno alla copia.
+  function indirizzoDellImmagine(imgEl) {
+    if (!imgEl) return '';
+    const src = imgEl.currentSrc || imgEl.src || '';
+    if (imgEl.hasAttribute && imgEl.hasAttribute('data-originale')) {
+      const o = imgEl.getAttribute('data-originale') || '';
+      return /^https?:\/\//i.test(o) ? o : '';
+    }
+    return /^filo:/i.test(src) ? '' : src;
   }
 
   function searchImageOnWeb(imgEl) {
@@ -2292,6 +2325,7 @@
     searchUrlFor,
     searchImageOnWeb,
     imageSearchUrlFor,
+    indirizzoDellImmagine,
     // video / audio
     buildMediaItems,
     azioniDelMedia,

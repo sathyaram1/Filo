@@ -81,6 +81,8 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    IMMAGINI_WEB: (a) => ({ icon: '🖼', text: `Cerco immagini: ${a.query || ''}` }),
+    GENERA_IMMAGINE: () => ({ icon: '🖌', text: 'Disegno un’immagine' }),
     ESPANDI_FILO: (a) => {
       const o = a._output || {};
       return { icon: '💬', text: o.righe ? `Rileggo il filo di quelle ore · ${o.righe} cose` : 'Rileggo il filo di quelle ore' };
@@ -420,7 +422,7 @@
     DIMENTICA: 'Niente da dimenticare',
     TOGLI_CHAT: 'Conversazione non trovata', RIMETTI_CHAT: 'Conversazione nascosta non trovata',
     CORREGGI_MEMORIA: 'Niente da correggere',
-    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
+    CERCA_WEB: 'Ricerca non riuscita', IMMAGINI_WEB: 'Nessuna immagine trovata', GENERA_IMMAGINE: 'Immagine non creata', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     ELIMINA_FILE: 'Niente cancellato',
     CERCA_CHAT: 'Conversazione non ritrovata', ESPANDI_FILO: 'Filo di quelle ore non riletto',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',

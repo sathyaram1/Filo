@@ -625,6 +625,7 @@ const AZIONI = Object.freeze(Object.assign(Object.create(null),
   require('./azioni/proxy'),
   require('./azioni/impostazioni'),
   require('./azioni/sistema'),
+  require('./azioni/immagini'),
 ));
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {

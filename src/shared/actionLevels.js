@@ -620,6 +620,29 @@
         return ['Cercare sul web ', cit(q)];
       },
     },
+    // #2272 — come CERCA_WEB: la ricerca porta fuori la sua query, e il main alza il costo se ci viaggia un segreto.
+    IMMAGINI_WEB: {
+      costo: (a) => (a && a._exfil ? 2 : 0),
+      campo: 'web',
+      uscita: (a) => ricercaImmaginiDi(a),
+      fonte: (a, out) => (Array.isArray(out.immagini) && out.immagini.length
+        ? { classe: 5, campo: 'web', chiave: 'web:immagini', motivo: 'ho cercato immagini sul web' } : null),
+      describe: (a) => {
+        const q = ricercaImmaginiDi(a);
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return [`Cercare immagini sul web con un testo${why}:\n`, cit(q),
+            '\n\nPotrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.'];
+        }
+        return ['Cercare immagini di ', cit(q)];
+      },
+    },
+    // Disegnare costa qualche centesimo e non tocca niente dell'utente: si annulla ignorando l'immagine.
+    GENERA_IMMAGINE: {
+      costo: 1,
+      campo: null,
+      describe: (a) => ['Disegnare un\'immagine: ', cit(String(a.descrizione || a.prompt || ''))],
+    },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
       // le cose che ha scoperto o detto e dichiara quando l'intervista è
@@ -1746,7 +1769,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-    'LEGGI_MEMORIA', 'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO',
+    'LEGGI_MEMORIA', 'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO', 'IMMAGINI_WEB',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
@@ -1882,5 +1905,16 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo, cosaAccount };
+  // Il testo di una ricerca di immagini (#2272): chi la esegue, il freno sulle uscite e quello sui segreti leggono questo.
+  const CAMPI_RICERCA_IMMAGINI = ['query', 'cerca', 'testo', 'q', 'text'];
+  function ricercaImmaginiDi(action) {
+    if (!action || typeof action !== 'object') return '';
+    for (const k of CAMPI_RICERCA_IMMAGINI) {
+      const v = action[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return '';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

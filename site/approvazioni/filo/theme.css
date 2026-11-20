@@ -333,6 +333,62 @@
 .filo-spiega-riquadro p { margin: 0 0 6px; }
 .filo-spiega-riquadro > :last-child { margin-bottom: 0; }
 .filo-md-img { display: block; max-width: 100%; height: auto; margin: 6px 0; }
+/* Le immagini di una risposta (#2272): foto appoggiate sulla pagina, una fila che scorre di lato quando sono più d'una. */
+.filo-galleria { position: relative; margin: 10px 0; }
+.filo-galleria-scorre {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  /* Si scorre con rotella, trackpad e frecce: la barra sarebbe un oggetto in più sotto ogni fila. */
+  scrollbar-width: none;
+}
+.filo-galleria-voce { flex: 0 0 auto; margin: 0; scroll-snap-align: start; display: flex; flex-direction: column; gap: 4px; }
+.filo-galleria-img {
+  display: block;
+  height: var(--sn-galleria-altezza, 190px);
+  width: auto;
+  max-width: min(420px, 80vw);
+  object-fit: cover;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sn-fg) 6%, transparent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--sn-fg) 14%, transparent);
+  cursor: zoom-in;
+  transition: transform calc(140ms * var(--sn-motion, 1)) ease, box-shadow calc(140ms * var(--sn-motion, 1)) ease;
+}
+.filo-galleria-img:hover { transform: translateY(-1px); box-shadow: 0 4px 12px color-mix(in srgb, var(--sn-fg) 18%, transparent); }
+/* Una foto sola si stringe dentro la risposta: non ha frecce per mostrare la parte che uscirebbe. */
+.filo-galleria-una .filo-galleria-voce { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.filo-galleria-una .filo-galleria-img { height: auto; max-height: var(--sn-galleria-una-altezza, 340px); max-width: 100%; object-fit: contain; }
+.filo-galleria-voce figcaption {
+  max-width: 220px;
+  font-size: 11.5px;
+  color: var(--sn-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.filo-galleria-freccia {
+  position: absolute;
+  top: calc(var(--sn-galleria-altezza, 190px) / 2 - 16px);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--sn-border);
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--sn-shadow);
+  opacity: 0;
+  transition: opacity calc(140ms * var(--sn-motion, 1)) ease, background-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.filo-galleria-prima { left: 6px; }
+.filo-galleria-dopo { right: 6px; }
+.filo-galleria:hover .filo-galleria-freccia, .filo-galleria-freccia:focus-visible { opacity: 0.95; }
+.filo-galleria-freccia:hover { background: var(--sn-hover); }
+.filo-galleria-freccia[hidden] { display: none; }
 .filo-spiega-menu { padding: 4px; min-width: 180px; }
 .filo-spiega-voce {
   display: block;

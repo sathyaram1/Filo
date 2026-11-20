@@ -84,8 +84,8 @@
   // e `onToolCall` (una chiamata appena il modello ne pronuncia il nome, in
   // streaming) passano tali e quali al provider.
   // `cache`: il piano dei punti di cache (SN_FILO_CONTESTO.pianoDellaCache); ogni fornitore lo scrive nel suo formato.
-  async function complete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal });
+  async function complete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal, modalities }) {
+    return getProvider(provider).complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal, modalities });
   }
 
   async function streamComplete({ provider, apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
@@ -107,7 +107,7 @@
     try { fn(err, { modello: aModel, host: (err && err.hostFallito) || '', provider }); } catch (_) {}
   }
 
-  async function completeWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onFallback, onTentativoFallito }) {
+  async function completeWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onFallback, onTentativoFallito, modalities }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
@@ -115,7 +115,7 @@
       try {
         const r = await withNetworkRetry(() => getProvider(a.provider).complete({
           apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
-          providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal,
+          providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal, modalities,
         }), null, signal);
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.

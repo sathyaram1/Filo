@@ -27,25 +27,31 @@
     }
   }
 
+  // L'unica domanda a Tavily: la usano anche le immagini della chat (#2272), che chiedono `extra` in più.
+  async function richiestaTavily({ query, apiKey, maxResults, extra = {}, signal }) {
+    const r = await fetch(TAVILY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify({
+        ...extra,
+        api_key: apiKey,
+        query,
+        max_results: maxResults,
+        search_depth: 'basic',
+        include_answer: false,
+      }),
+    });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      throw new Error(`tavily ${r.status}: ${errText.slice(0, 200)}`);
+    }
+    return r.json();
+  }
+
   async function searchTavily({ query, apiKey, maxResults }) {
     return withTimeout(async (signal) => {
-      const r = await fetch(TAVILY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal,
-        body: JSON.stringify({
-          api_key: apiKey,
-          query,
-          max_results: maxResults,
-          search_depth: 'basic',
-          include_answer: false,
-        }),
-      });
-      if (!r.ok) {
-        const errText = await r.text().catch(() => '');
-        throw new Error(`tavily ${r.status}: ${errText.slice(0, 200)}`);
-      }
-      const data = await r.json();
+      const data = await richiestaTavily({ query, apiKey, maxResults, signal });
       const results = (data.results || []).slice(0, maxResults).map((row) => ({
         title: clip(row.title, 200),
         url: row.url || '',
@@ -106,12 +112,16 @@
     if (!q) return { ok: false, results: [], reason: 'query vuota' };
     if (conDatoRiservato(String(query || ''))) return { ok: false, results: [], reason: FRASE_PAVIMENTO, pavimento: true };
     const r = await cerca(q, { tavilyKey, maxResults });
-    try {
-      global.SN_ACCADUTI?.ricerca({ testo: q, motore: r && r.provider, risultati: r && Array.isArray(r.results) ? r.results.length : 0 });
-    } catch (_) {}
+    annota(q, r && r.provider, r && Array.isArray(r.results) ? r.results.length : 0);
     try { global.SN_CONTATORI_MAIN?.attivita('ricercaWeb', { da, ...global.SN_CONTATORI.esitoRicerca(r) }); } catch (_) {}
     return r;
   }
+
+  // Anche la ricerca di immagini della chat (#2272) entra nel filo da qui, e col suo stesso pavimento.
+  function annota(testo, motore, risultati) {
+    try { global.SN_ACCADUTI?.ricerca({ testo, motore, risultati }); } catch (_) {}
+  }
+  const riservata = (q) => (conDatoRiservato(String(q || '')) ? FRASE_PAVIMENTO : '');
 
   async function cerca(q, { tavilyKey, maxResults }) {
     // `ripiego`: Tavily c'era e non ha risposto (lo contano i contatori, #1467).
@@ -131,5 +141,5 @@
     }
   }
 
-  global.SN_WEB_SEARCH = { search };
+  global.SN_WEB_SEARCH = { search, annota, riservata, richiestaTavily };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

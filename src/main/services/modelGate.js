@@ -305,13 +305,13 @@
       } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
-    async function completeMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}, m) {
+    async function completeMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback, modalities } = {}, m) {
       const { s, chain } = await chainFor({ action, settings, attempts, messages });
       let r;
       try {
         const daMandare = await senzaSegreti(messages, action);
         r = await providers().completeWithFallback({
-          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore, modalities,
         });
       } catch (e) {
         throw conLaFunzione(e, s, action);

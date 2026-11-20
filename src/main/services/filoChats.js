@@ -175,6 +175,8 @@
     try { global.SN_CONTESTO_FILO?.dimentica(chat.id); } catch (_) {}
     await global.SN_RICORDI_FILO?.dimentica(chat.id);
     await global.SN_COMPATTAZIONE?.dimenticaChat(chat.id).catch((e) => console.warn('[Filo] diario della chat cancellata:', e?.message || e));
+    // Le immagini delle sue risposte (#2272): la copia che nessun'altra chat nomina sparisce dal disco.
+    try { require('./copieIcone').togliSeOrfane(global.SN_IMMAGINI_RISPOSTA.copieDi(chat.messages)); } catch (_) {}
     const forme = CA().formeDaDimenticare((chat.messages || []).map((m) => m && m.text));
     if (!forme.length) return;
     const C = global.SN_AI_CACHE;
@@ -229,10 +231,12 @@
   }
 
   async function clear() {
-    const ids = (await list({ nascoste: true })).map((c) => c.id);
+    const tutte = await list({ nascoste: true });
+    const ids = tutte.map((c) => c.id);
     if (ids.length) {
       await F().transazione((t) => t.scrivi(ids.map((id) => t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' }))));
     }
+    try { require('./copieIcone').togliSeOrfane(tutte.flatMap((c) => global.SN_IMMAGINI_RISPOSTA.copieDi(c.messages))); } catch (_) {}
     try { global.SN_CONTESTO_FILO?.dimentica(null); } catch (_) {}
     await global.SN_RICORDI_FILO?.dimentica(null).catch(() => {});
     await global.SN_COMPATTAZIONE?.dimenticaChat(null).catch(() => {});

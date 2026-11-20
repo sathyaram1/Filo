@@ -92,6 +92,8 @@
         return { output: M.TEXT, inputs: [M.AUDIO] };
       case A.TTS:
         return { output: M.AUDIO, inputs: [] };
+      case A.IMAGE_GEN:
+        return { output: M.IMAGE, inputs: [] };
       // L'indicizzazione dell'archivio schede vuole VETTORI, non parole: la validazione
       // impedisce entrambi gli scambi (testo qui, indicizzazione nelle funzioni di testo).
       case A.ARCHIVE_EMBED:
@@ -117,7 +119,8 @@
     if (!caps.outputs.includes(req.output)) {
       const key = req.output === M.AUDIO ? 'caps_block_output_audio'
         : req.output === M.EMBED ? 'caps_block_output_embedding'
-          : 'caps_block_output_text';
+          : req.output === M.IMAGE ? 'caps_block_output_image'
+            : 'caps_block_output_text';
       return { ok: false, reason: t(key) };
     }
     for (const inp of req.inputs) {

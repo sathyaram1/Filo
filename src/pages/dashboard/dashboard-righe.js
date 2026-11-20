@@ -105,7 +105,7 @@
     // Le risposte di Filo con la formattazione leggera della home (come nell'app dove sono nate): il renderer escapa
     // l'HTML e filtra i link. Le domande dell'utente restano letterali.
     if (m.role !== 'user' && global.SN_MARKDOWN) {
-      div.innerHTML = global.SN_MARKDOWN.render(testo, { fonti: m.fonti });
+      div.innerHTML = global.SN_MARKDOWN.render(testo, { fonti: m.fonti, immagini: m.immagini });
       div.classList.add('dash-bubble-md');
     } else if (Array.isArray(m.schede) && m.schede.length && global.SN_SCHEDE_IN_CHAT) {
       // Le schede lasciate nel messaggio (#2085): i gettoni come nella bolla della home.

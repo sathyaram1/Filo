@@ -22,6 +22,8 @@
   const SENTINELLE = /[\uE000\uE001]/g;
   const SEGNAPOSTO = /\uE000(\d+)\uE001/g;
   const POSTO_FONTE = /\uE002(\d+)\uE003|[\uE002\uE003]/g;
+  // I posti delle gallerie (E006/E007, src/shared/immaginiRisposta.js): un posto vale solo da riga a s\u00E9.
+  const POSTI_GALLERIA = /[\uE006\uE007]/g;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -192,7 +194,7 @@
     const tokens = [];
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
     const rimetti = (s) => s.replace(SEGNAPOSTO, (m, i) => tokens[Number(i)] || '');
-    let t = String(escaped).replace(ctx ? SENTINELLE : TUTTE_LE_SENTINELLE, '');
+    let t = String(escaped).replace(ctx ? SENTINELLE : TUTTE_LE_SENTINELLE, '').replace(POSTI_GALLERIA, '');
     const c = ctx || nuovoCtx();
 
     t = marcatori(t, c, stash);
@@ -277,16 +279,24 @@
   // codice ``` e formattazione inline. Escape dell'HTML PRIMA di trasformare.
   // Le spiegazioni viaggiano con l'HTML in un <template> (inerte: niente si carica finché non si apre), così ogni
   // superficie che riceve il render le ha già; le apre src/shared/spiegazioni.js.
-  function render(text, { fonti = null } = {}) {
+  // `immagini`: le gallerie controllate dal main (src/shared/immaginiRisposta.js); il testo da solo non ne disegna.
+  function render(text, { fonti = null, immagini = null } = {}) {
     const F = global.SN_FONTI_CITATE;
-    const conFonti = F && Array.isArray(fonti) && fonti.length ? F.conPosti(text, fonti) : null;
+    const I = global.SN_IMMAGINI_RISPOSTA;
+    const conImmagini = I && Array.isArray(immagini) && immagini.length ? I.conPosti(text, immagini, fonti) : null;
+    const base = conImmagini ? conImmagini.text : String(text == null ? '' : text).replace(POSTI_GALLERIA, '');
+    const fontiQui = conImmagini ? conImmagini.fonti : fonti;
+    const gallerie = conImmagini ? conImmagini.gallerie : [];
+    const conFonti = F && Array.isArray(fontiQui) && fontiQui.length ? F.conPosti(base, fontiQui) : null;
     const ctx = nuovoCtx(conFonti ? conFonti.fonti : null);
     const riga = (r) => inlineMd(r, ctx);
     const out = [];
-    for (const b of blocchi(prepara(conFonti ? conFonti.text : text, ctx))) {
+    for (const b of blocchi(prepara(conFonti ? conFonti.text : base, ctx))) {
+      const posto = b.k === 'p' && b.righe.length === 1 && I ? I.RIGA_POSTO.exec(b.righe[0].trim()) : null;
+      if (posto) { if (gallerie[Number(posto[1])]) out.push(I.html(gallerie[Number(posto[1])])); continue; }
       if (b.k === 'p') out.push('<p>' + b.righe.map(riga).join('<br>') + '</p>');
       else if (b.k === 'h') out.push('<h' + b.livello + '>' + riga(b.riga) + '</h' + b.livello + '>');
-      else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n').replace(POSTO_FONTE, '') + '</code></pre>');
+      else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n').replace(POSTO_FONTE, '').replace(POSTI_GALLERIA, '') + '</code></pre>');
       else {
         out.push(b.k === 'ol' && b.da !== 1 ? '<ol start="' + b.da + '">' : '<' + b.k + '>');
         for (const v of b.voci) out.push('<li>' + riga(v) + '</li>');

@@ -19,6 +19,8 @@
     breve: { prompt: 1500, completion: 150 },
     immagine: { prompt: 3000, completion: 500 },
     vettori: { prompt: 2000, completion: 0 },
+    // Un'immagine creata: i modelli che disegnano la contano come circa 1.300 token d'uscita al prezzo delle immagini.
+    generazione: { prompt: 400, completion: 100, immagini: 1300 },
     voce: null,
   });
 
@@ -63,6 +65,7 @@
     [A.TRANSCRIBE_IMAGE]: ['immagine', U('immagine', 'immagini')],
     [A.FILE_NAME]: ['immagine', U('file', 'file')],
     [A.EMBED_COOKIE_CHECK]: ['immagine', U('riquadro', 'riquadri')],
+    [A.IMAGE_GEN]: ['generazione', U('immagine', 'immagini')],
     [A.ARCHIVE_EMBED]: ['vettori', U('scheda', 'schede')],
     [A.TTS]: ['voce', U('lettura', 'letture')],
     [A.TRANSCRIBE_AUDIO]: ['voce', U('dettatura', 'dettature')],
@@ -100,6 +103,8 @@
     if (req) out.request = req;
     const cache = numeroListino(pricing.input_cache_read);
     if (cache != null) out.cacheRead = cache;
+    const immagini = numeroListino(pricing.image_output);
+    if (immagini) out.immagineUscita = immagini;
     // Il listino a scaglioni (Haiku 5.5 sopra 100.000 token di prompt costa cinque volte tanto, su tutta la richiesta).
     const sopra = (Array.isArray(pricing.overrides) ? pricing.overrides : [])
       .map((o) => ({ da: numeroListino(o && o.min_prompt_tokens), p: prezzoDaCatalogo({ ...o, overrides: null }) }))
@@ -168,21 +173,23 @@
 
   // I token di un uso tipico: la media dell'utente se ce n'è abbastanza, altrimenti quella prudente del tipo.
   function tokenTipici(action, registro) {
+    const tipo = funzione(action).tipo;
     const r = registro && registro[action];
-    if (r && Number(r.n) >= CAMPIONI_MINIMI && (Number(r.prompt) + Number(r.completion)) > 0) {
+    // I token d'uscita di un'immagine creata hanno il loro prezzo, che il registro non separa: vale la media prudente.
+    if (tipo !== 'generazione' && r && Number(r.n) >= CAMPIONI_MINIMI && (Number(r.prompt) + Number(r.completion)) > 0) {
       return { prompt: Number(r.prompt) || 0, completion: Number(r.completion) || 0, cached: Number(r.cached) || 0, fonte: 'registro' };
     }
-    const tipo = funzione(action).tipo;
     const LC = global.SN_FILO_COMPATTAZIONE;
     const t = tipo === 'compattazione' ? (LC && global.SN_FILO_CONTESTO ? LC.usoTipico() : null) : TIPI[tipo];
-    return t ? { prompt: t.prompt, completion: t.completion, cached: 0, fonte: 'prudente' } : null;
+    return t ? { prompt: t.prompt, completion: t.completion, ...(t.immagini ? { immagini: t.immagini } : {}), cached: 0, fonte: 'prudente' } : null;
   }
 
   function costoUsd(prezzo, token) {
     if (!prezzo || !token) return null;
     const cached = Math.min(token.prompt, token.cached || 0);
     const leggeCache = prezzo.cacheRead != null ? prezzo.cacheRead : prezzo.prompt;
-    return (token.prompt - cached) * prezzo.prompt + cached * leggeCache + token.completion * prezzo.completion + (prezzo.request || 0);
+    const immagini = (token.immagini || 0) * (prezzo.immagineUscita != null ? prezzo.immagineUscita : prezzo.completion);
+    return (token.prompt - cached) * prezzo.prompt + cached * leggeCache + token.completion * prezzo.completion + immagini + (prezzo.request || 0);
   }
 
   // ── Numeri in parole ─────────────────────────────────────────────────────
