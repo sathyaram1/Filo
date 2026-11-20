@@ -211,6 +211,10 @@
         if (prog === 'find' && resto.includes('-delete')) return true;
         if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
         if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
+        // Gli allineamenti di cartelle del Mac e di Linux, come robocopy /MIR: tolgono dalla destinazione quello che
+        // manca nella sorgente (#1909.5). rclone si guarda su ogni parola: un'opzione col valore sposta il sotto-comando.
+        if (prog === 'rsync' && resto.some((x) => RSYNC_CANCELLA.test(x))) return true;
+        if (prog === 'rclone' && resto.some((x) => RCLONE_CANCELLA.has(x))) return true;
         // `gci | ForEach-Object Delete`, `% Delete`: il metodo che cancella chiamato per nome.
         if (/^(foreach-object|foreach|%)$/.test(prog) && resto.filter((x) => !x.startsWith('-'))[0] === 'delete') return true;
         // forfiles lancia quello che sta dopo `/c`.
