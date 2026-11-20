@@ -149,6 +149,7 @@
     return NOMI[motivo] || String(motivo || '');
   }
 
-  global.SN_PAGINE_DELICATE = { PREDEFINITI, CLASSI, host, elenco, sitiUtente, nonDelicati, classifica, nome, risolviSchede };
+  // `pulisci` e `dentro` sono la forma unica degli elenchi di siti: li usano anche i livelli di privacy.
+  global.SN_PAGINE_DELICATE = { PREDEFINITI, CLASSI, host, pulisci, dentro, elenco, sitiUtente, nonDelicati, classifica, nome, risolviSchede };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAGINE_DELICATE;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
