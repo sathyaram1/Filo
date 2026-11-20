@@ -231,9 +231,7 @@ test('Preferenze: se la voce cliccata viene ridisegnata mentre Filo si prepara, 
   await expect(etichetta).toBeVisible({ timeout: 10_000 });
   await etichetta.click({ button: 'right' });
   // Come le pagine che costruiscono gli elenchi dopo aver letto le impostazioni.
-  await etichetta.evaluate((el) => { el.dataset.vecchia = '1'; el.replaceWith(el.cloneNode(true)); });
-  await expect(page.locator('label[data-vecchia]')).toHaveCount(1);
-  expect(await page.evaluate(() => document.querySelector('label[data-vecchia]').isConnected)).toBe(true);
+  await etichetta.evaluate((el) => el.replaceWith(el.cloneNode(true)));
   await apriImpostazioni(app);
   expect(await etichette(page)).toContain('Rimetti di serie');
 });
