@@ -146,3 +146,69 @@ test('allegati di testo: tutti i tipi del riquadro, carte e conti col loro nome,
   const pulito = await L0.controlla({ testo: 'vedi allegato', allegati: [{ name: 'ok.log', type: 'text/plain', dataUrl: dataUrl('tutto normale, errore 500 alle 12:30') }] });
   assert.equal(pulito.stato, 'pulito');
 });
+
+// #1403.1, giro 1, r1: quello che il pavimento nasconde ai modelli il modello della rilettura non lo vede.
+const FORME_DI_LOG = [
+  ['config.json', 'application/json', '{"utente":"mario.rossi","password":"hunter22"}'],
+  ['filo.log', 'text/plain', 'utente=mario.rossi password=hunter22\nerrore 401'],
+  ['note.md', 'text/markdown', 'Config:\n- pwd: hunter22'],
+  ['env.txt', 'text/plain', 'DB_PASSWORD=hunter22'],
+  ['rete.log', '', 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdefghijklmnop'],
+  ['accessi.log', '', 'GET https://example.com/reset?token=8f7d6c5b4a3928171615 200'],
+  ['comandi.txt', 'text/plain', 'mysql -u root -pSegreto123'],
+];
+test('le password scritte come nei log e nelle configurazioni si segnano, negli allegati e nel testo', async () => {
+  const { L0, chiamate } = servizio();
+  for (const [name, type, corpo] of FORME_DI_LOG) {
+    const r = await L0.controlla({ testo: 'Allego il file: il login fallisce sempre', allegati: [{ name, type, dataUrl: dataUrl(corpo) }] });
+    assert.equal(r.stato, 'trovato', name);
+    assert.deepEqual(r.esito.allegati, [0], name);
+  }
+  for (const testo of ['nel file ho password=hunter22 e mi dà 401', 'il PIN 4821 del bancomat non va', 'Il CVV della carta è 123 e il pagamento fallisce']) {
+    const r = await L0.controlla({ testo });
+    assert.equal(r.stato, 'trovato', testo);
+    assert.deepEqual(r.esito.frasi, [globalThis.SN_FEEDBACK_L0.FRASI_TESTO.segreto], testo);
+    assert.equal(r.esito.pezzi.length, 1, testo);
+    assert.ok(testo.includes(r.esito.pezzi[0].testo), testo);
+  }
+  assert.ok(chiamate.length > 0);
+  const normale = await L0.controlla({ testo: 'Il campo password non accetta i simboli e il PIN si dimentica' });
+  assert.equal(normale.stato, 'pulito');
+});
+
+test('una password senza forma si segna solo dove sta, non in ogni parola uguale', async () => {
+  const { L0 } = servizio();
+  const testo = 'La password: gattino. Ho anche un gattino vero.';
+  const r = await L0.controlla({ testo });
+  assert.equal(r.stato, 'trovato');
+  assert.deepEqual(r.esito.pezzi.map((p) => p.testo), ['gattino']);
+});
+
+// r2: Windows salva testo anche in UTF-16.
+test('un allegato in UTF-16, con o senza segno d\'ordine, si legge come testo', async () => {
+  const { L0 } = servizio();
+  const riga = 'avvio...\r\npassword = hunter22\r\nerrore 401\r\n';
+  const le = Buffer.from(riga, 'utf16le');
+  const be = Buffer.from(le).swap16();
+  const casi = {
+    'LE con segno': Buffer.concat([Buffer.from([0xFF, 0xFE]), le]),
+    'BE con segno': Buffer.concat([Buffer.from([0xFE, 0xFF]), be]),
+    'LE senza segno': le,
+    'BE senza segno': be,
+  };
+  for (const [nome, b] of Object.entries(casi)) {
+    const r = await L0.controlla({ testo: 'vedi log', allegati: [{ name: 'output.txt', type: 'text/plain', dataUrl: `data:text/plain;base64,${b.toString('base64')}` }] });
+    assert.equal(r.stato, 'trovato', nome);
+  }
+  const utf8 = await L0.controlla({ testo: 'vedi log', allegati: [{ name: 'ok.txt', type: 'text/plain', dataUrl: dataUrl('città: è tutto normale, errore 500') }] });
+  assert.equal(utf8.stato, 'pulito');
+});
+
+// r3: una carta scritta nel testo del feedback ha la frase delle carte, non quella delle password.
+test('una carta valida nel testo: la frase di carte e conti, e la carta evidenziata', async () => {
+  const { L0 } = servizio();
+  const r = await L0.controlla({ testo: 'Il pagamento con la carta 4539 1488 0343 6467 viene rifiutato' });
+  assert.equal(r.stato, 'trovato');
+  assert.deepEqual(r.esito.frasi, [globalThis.SN_FEEDBACK_L0.FRASI_TESTO.documento]);
+  assert.ok(r.esito.pezzi.every((p) => p.tipo === 'documento'));
+});
