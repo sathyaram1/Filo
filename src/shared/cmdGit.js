@@ -185,9 +185,11 @@
     const pos = gitConfigOperandi(args);
     const ops = pos.map((i) => args[i]);
     const chiave = (ops[0] || '').toLowerCase();
-    // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
+    // Le chiavi che decidono dove va il codice al prossimo push: l'indirizzo è `git remote set-url` per un'altra strada
+    // (#530), e il remoto di un ramo o quello predefinito accettano anche un indirizzo al posto di un nome (#2623).
     const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
-    if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test(chiave)) return 3;
+    if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$|^branch\..+\.(push)?remote$|^remote\.pushdefault$/
+      .test(chiave)) return 3;
     // Il valore scritto, tolti gli interruttori senza valore di git config. Un'opzione col valore dopo la chiave resta
     // dentro: potrebbe stare nel valore fra virgolette (`"vim --default +!x"`), e allora il controllo cade.
     // `--get chiave modello` legge: git rifiuta due azioni insieme (#2621).
