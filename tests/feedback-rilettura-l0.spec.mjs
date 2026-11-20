@@ -209,6 +209,164 @@ test('il modello non risponde: dopo 8 secondi il feedback parte lo stesso', asyn
   await expect(page.locator('.sn-fb-modal')).toHaveCount(0);
 });
 
+// #1403.1 — gli allegati di testo li rilegge il controllo senza modello.
+test('un log allegato con una password: il riquadro si riapre con l\'avviso e il file segnato, «Manda così» lo manda', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-text').fill('Allego il log: il login fallisce sempre.');
+  const log = 'avvio...\nutente = mario.rossi\npassword = hunter22\nerrore 401\n';
+  await page.locator('.sn-fb-file').setInputFiles([
+    { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('niente di strano qui') },
+    { name: 'filo.log', mimeType: 'text/plain', buffer: Buffer.from(log) },
+  ]);
+  await expect(page.locator('.sn-fb-file-chip')).toHaveCount(2);
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 1_000 });
+
+  const avviso = page.locator('.sn-fb-l0');
+  await expect(avviso).toBeVisible({ timeout: 12_000 });
+  await expect(avviso).toContainText('In un file allegato c’è una password');
+  await expect(page.locator('.sn-fb-file-chip--l0')).toHaveCount(1);
+  await expect(page.locator('.sn-fb-file-chip--l0')).toContainText('filo.log');
+  expect(await invii(app)).toEqual([]);
+  expect(await app.evaluate(() => JSON.stringify(globalThis.__l0)).then((s) => s.includes('hunter22')), 'il log non va a nessun modello').toBe(false);
+  await page.locator('.sn-fb-modal').screenshot({ path: `${SHOTS}/1403.1-allegato.png` });
+
+  await avviso.locator('.sn-fb-l0-manda').click();
+  await expect(toast(page, 'Grazie! Feedback inviato.')).toHaveCount(1, { timeout: 15_000 });
+  expect(await app.evaluate(() => globalThis.__invii.map((p) => (p.files || []).map((f) => f.name)))).toEqual([['note.txt', 'filo.log']]);
+});
+
+test('testo che scorre: lo sfondo delle evidenze va a capo come la casella, barra di scorrimento compresa', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }] }) });
+  const righe = Array.from({ length: 30 }, (_, i) => `Passo ${i + 1} del racconto.`);
+  const dopo = Array.from({ length: 12 }, (_, i) => `Nota ${i + 1} in fondo.`);
+  const testo = `Il login non va.\n${righe.join('\n')}\nQuinta riga.\nLa password è ${PASSWORD} e non entra.\n${dopo.join('\n')}`;
+  await scriviEInvia(page, testo);
+  await expect(page.locator('.sn-fb-l0')).toBeVisible({ timeout: 12_000 });
+  await expect(page.locator('.sn-fb-evidenze mark')).toHaveText([PASSWORD]);
+
+  // Righe sempre più lunghe in mezzo: a ogni lunghezza la casella e lo sfondo vanno a capo negli stessi punti.
+  const esito = await page.evaluate(() => {
+    const ta = document.querySelector('.sn-fb-text');
+    const ev = document.querySelector('.sn-fb-evidenze');
+    const base = ta.value;
+    const at = base.indexOf('Quinta riga.');
+    const diverse = [];
+    for (let k = 1; k < 160; k++) {
+      ta.value = `${base.slice(0, at)}Il codice di errore era ${'x'.repeat(k)}\n${base.slice(at)}`;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      if (ta.scrollHeight !== ev.scrollHeight) diverse.push(k);
+    }
+    ta.scrollTop = ta.scrollHeight;
+    ta.dispatchEvent(new Event('scroll'));
+    const m = ev.querySelector('mark').getBoundingClientRect();
+    const r = ta.getBoundingClientRect();
+    return { diverse, barra: ta.offsetWidth - ta.clientWidth - 2, dentro: m.top >= r.top && m.bottom <= r.bottom, scorrono: ev.scrollTop === ta.scrollTop };
+  });
+  test.info().annotations.push({ type: 'barra', description: `${esito.barra} px` });
+  expect(esito.diverse, `righe che vanno a capo in punti diversi (barra di ${esito.barra} px)`).toEqual([]);
+  expect(esito.scorrono).toBe(true);
+  await page.locator('.sn-fb-modal').screenshot({ path: `${SHOTS}/1403.1-evidenza-scorre.png` });
+});
+
+// La scheda cambiata mentre la rilettura trova qualcosa: niente riquadro da riaprire, la segnalazione resta fra le
+// non partite e la finestra lo dice.
+test('pagina cambiata durante la rilettura che trova qualcosa: non parte, resta fra le non partite e la finestra lo dice', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  await imposta(app, { ritardo: 2_000, testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }] }) });
+  await scriviEInvia(page, TESTO);
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 1_000 });
+  await page.evaluate(() => { location.href = 'filo://newtab/?altra=1'; });
+  await expect(shell.getByText('Il tuo feedback non è partito', { exact: false })).toBeVisible({ timeout: 12_000 });
+  const mie = await app.evaluate(async () => (await globalThis.SN_SEGNALAZIONI_MIE.elenco()).map((v) => ({ testo: v.testo, stato: v.stato })));
+  expect(mie).toEqual([{ testo: TESTO, stato: 'non_partita' }]);
+  expect(await invii(app)).toEqual([]);
+  expect(await app.evaluate(() => globalThis.SN_FEEDBACK_OUTBOX.size())).toBe(0);
+});
+
+test('con un altro riquadro di feedback aperto, quello rimandato indietro aspetta che si chiuda e poi si riapre', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  await imposta(app, { ritardo: 1_500, testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }] }) });
+  await scriviEInvia(page, TESTO);
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 1_000 });
+  // Un secondo feedback, aperto prima che la rilettura torni.
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-text').fill('Un altro problema');
+  await expect.poll(() => app.evaluate(() => globalThis.__l0.chiamate.includes('testo')), { timeout: 5_000 }).toBe(true);
+  await page.waitForTimeout(2_500);
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(1);
+  await expect(page.locator('.sn-fb-text')).toHaveValue('Un altro problema');
+  await expect(page.locator('.sn-fb-l0')).toBeHidden();
+  await page.locator('.sn-fb-cancel').click();
+  await expect(page.locator('.sn-fb-l0')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('.sn-fb-text')).toHaveValue(TESTO);
+  await expect(page.locator('.sn-fb-evidenze mark')).toHaveText([PASSWORD]);
+  expect(await invii(app)).toEqual([]);
+});
+
+// #1403.1 — la segnalazione scritta da Filo in chat e confermata passa dalla stessa rilettura.
+const segnalazioneDaChat = async (app, testo) => {
+  const r = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca' });
+  return { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca', _confirm: { level: 2, text: r.describe, parti: r.parti } };
+};
+
+test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non mandarla» la tiene, «Manda così» la manda', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }] }) });
+  const action = await segnalazioneDaChat(app, TESTO);
+  const proponi = (id) => page.evaluate(({ a, id }) => {
+    const host = document.createElement('div');
+    host.id = id;
+    document.body.appendChild(host);
+    window.__filoDashActions.renderActions(host, [a], { autoConfirm: true });
+  }, { a: action, id });
+
+  await proponi('prova-chat-1');
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
+  expect(await confirmText(page)).toContain('password');
+  await page.screenshot({ path: `${SHOTS}/1403.1-chat-rilettura.png` });
+  await clickConfirm(page, 'cancel');
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  expect(await invii(app), '«Non mandarla»: non parte').toEqual([]);
+
+  await proponi('prova-chat-2');
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
+  const chiamate = await chiamateTesto(app);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([TESTO]);
+  expect(await app.evaluate(() => globalThis.__invii[0].clientId)).toBe('filo:chat');
+  expect(await chiamateTesto(app), '«Manda così» non rilegge').toBe(chiamate);
+});
+
+test('dall\'Aiuto: la segnalazione confermata con una password si ferma, e «Manda così» la manda', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, { type: 'INVIA_FEEDBACK', testo: TESTO, titolo: 'Accesso alla banca' });
+  await clickConfirm(page, 'ok');
+  // Il modello finto non trova niente: la password la riconosce il controllo senza modello.
+  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
+  expect(await invii(app)).toEqual([]);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([TESTO]);
+  await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
+});
+
 testSenzaFixture('Filo chiuso durante la rilettura: il feedback resta salvato e parte alla riapertura', async () => {
   testSenzaFixture.setTimeout(120_000);
   const userData = cartellaTemporanea('filo-l0-riavvio-');
