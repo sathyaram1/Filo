@@ -265,7 +265,8 @@ test('testo che scorre: lo sfondo delle evidenze va a capo come la casella, barr
       ta.dispatchEvent(new Event('input', { bubbles: true }));
       if (ta.scrollHeight !== ev.scrollHeight) diverse.push(k);
     }
-    ta.scrollTop = ta.scrollHeight;
+    // La riga della password a metà della casella, come dopo «Correggi».
+    ta.scrollTop = Math.max(0, ev.querySelector('mark').offsetTop - ta.clientHeight / 2);
     ta.dispatchEvent(new Event('scroll'));
     const m = ev.querySelector('mark').getBoundingClientRect();
     const r = ta.getBoundingClientRect();
@@ -274,6 +275,7 @@ test('testo che scorre: lo sfondo delle evidenze va a capo come la casella, barr
   test.info().annotations.push({ type: 'barra', description: `${esito.barra} px` });
   expect(esito.diverse, `righe che vanno a capo in punti diversi (barra di ${esito.barra} px)`).toEqual([]);
   expect(esito.scorrono).toBe(true);
+  expect(esito.dentro, 'l\'evidenza si vede nella casella, sotto la password').toBe(true);
   await page.locator('.sn-fb-modal').screenshot({ path: `${SHOTS}/1403.1-evidenza-scorre.png` });
 });
 
