@@ -3,11 +3,11 @@
 // Senza risposta entro `attesaMs` torna null: la pagina non ha il preload di Filo, o non è ancora in piedi.
 'use strict';
 
-const { ipcMain } = require('electron');
 const { randomUUID } = require('node:crypto');
 
 function chiediAllaPagina(wc, { canale, eco, dati = {}, attesaMs }) {
   if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return Promise.resolve(null);
+  const { ipcMain } = require('electron');
   const rid = `${canale}-${randomUUID()}`;
   return new Promise((resolve) => {
     let chiuso = false;
