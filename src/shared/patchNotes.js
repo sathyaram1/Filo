@@ -28,6 +28,7 @@
         { testo: 'Se avevi la protezione delle pagine delicate accesa, dopo l\'aggiornamento Filo resta su «Chiedi sulle delicate»: da posta, banca, sanità, enti pubblici e pagine con una password non parte niente da solo finché non lo cambi tu.', segnalazione: 1589 },
         { testo: '«Annulla» sul segno di un tuo messaggio in chat, e dal tasto destro sulla bolla, rimette anche un livello di privacy più largo: ti chiede di scrivere «conferma», come l\'elenco dei cambi nella home.', segnalazione: 1589 },
         { testo: 'Una password scritta a mano in una chat, come risposta sotto chi te la chiede, non arriva ai modelli né alla ricerca web, neanche quando chiedi a Filo di spiegare la pagina.', segnalazione: 1589 },
+        'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
       ],
     },
     {
@@ -47,7 +48,6 @@
         { testo: 'Sul Mac e su Linux, quando Filo allinea due cartelle con rsync --delete o rclone sync, che cancellano dalla destinazione senza cestino, ti chiede di digitare «conferma» come per robocopy /MIR su Windows. Prima bastava un OK.', segnalazione: 1909 },
         { testo: 'In modalità terminale, copiare o spostare un file sopra le impostazioni o gli hook di git, o scegliere con git config il programma che git fa partire, ti chiede di digitare «conferma», come scriverci con una redirezione. Prima bastava un OK.', segnalazione: 2619 },
         { testo: 'Un comando git che fa partire un altro programma, come un rebase con -x o un submodule foreach, ti chiede di scrivere «conferma», come se quel programma lo lanciassi da solo.', segnalazione: 2619 },
-        'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
       ],
     },
     {
