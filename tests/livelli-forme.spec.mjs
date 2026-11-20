@@ -909,6 +909,10 @@ test('salto col ramo mosso dopo i controlli: lo dice, non ripropone il salto e l
     await page.screenshot({ path: `tests/.shots/1040-1-salto-ramo-mosso-${tema}.png` });
   }
 
+  // Senza testo per chi corregge la correzione parte al secondo gesto (#2575).
+  await rimanda.click();
+  await expect(page.locator('#mgAcceptComment')).toHaveClass(/mg-accept-comment--avviso/);
+  expect(await page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta']);
   await rimanda.click();
   await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta', 'feedback_update']);
   expect(await page.evaluate(() => window.__chiamate[1])).toMatchObject({ id: FB_BOCCIATO._id, status: 'todo', reviewDecision: 'accepted' });
