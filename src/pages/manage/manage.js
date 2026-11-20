@@ -4274,9 +4274,11 @@
       const conCommento = azioni.some((a) => a.kind === 'accept' || a.kind === 'reject');
       mgAcceptComment.hidden = !conCommento;
       mgAcceptComment.value = '';
-      mgAcceptComment.placeholder = MR.classifyBlock(fb)
-        ? 'Commento (opzionale): perché lo sblocchi…'
-        : 'Commento (opzionale): perché lo approvi…';
+      mgAcceptComment.placeholder = azioni.some((a) => a.correzione)
+        ? `Cosa correggere: il testo arriva a chi corregge (${TASTO_MANDA} per mandarlo)…`
+        : MR.classifyBlock(fb)
+          ? 'Commento (opzionale): perché lo sblocchi…'
+          : 'Commento (opzionale): perché lo approvi…';
     }
     for (const a of azioni) {
       const b = document.createElement('button');
@@ -4285,11 +4287,13 @@
       const id = ACTION_BTN_ID[a.key];
       if (id) b.id = id;
       b.dataset.actionKey = a.key;
+      if (a.correzione) b.dataset.correzione = '1';
       b.textContent = a.label;
-      b.title = a.key === 'accept_local' ? titoloLavoroLocale(fb) : (ACTION_TITLE[a.key] || a.label);
-      b.addEventListener('click', () => {
+      b.title = a.correzione ? TITOLO_CORREZIONE
+        : a.key === 'accept_local' ? titoloLavoroLocale(fb) : (ACTION_TITLE[a.key] || a.label);
+      b.addEventListener('click', (e) => {
         if (a.kind === 'reopen') { apriRiapertura(); return; }
-        applyAction(a, null);
+        applyAction(a, null, { btn: b, detail: e.detail });
       });
       mgActionsRow.appendChild(b);
     }
