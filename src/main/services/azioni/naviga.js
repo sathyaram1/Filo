@@ -6,6 +6,7 @@ const { daFilo, origineDi } = require('../handlers/origine');
 const SempreAperte = require('../sempreAperte');
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const { winOf, targetWebTab, nomeDellaScheda } = require('../handlersComuni');
+const { chiediAllaPagina } = require('../domandaAllaPagina');
 const { getEffectiveSettings } = require('../impostazioniEffettive');
 const { contaZoomDallaChat, contaPaginaDallaChat, dallaChat } = require('../autonomiaFonti');
 const {
