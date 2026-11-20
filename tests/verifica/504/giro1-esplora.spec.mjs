@@ -245,6 +245,13 @@ test('Aiuto sulla pagina: «traducimi questa pagina»', async ({ app, shell, ope
   await page.waitForTimeout(5000);
   console.log('AIUTO-TITOLO', await page.locator('#title').innerText());
   console.log('AIUTO-LOG', await pannello.locator('.sn-sidebar').innerText().catch(() => '?'));
+  const dir = (p) => p.evaluate(async () => {
+    try { return JSON.stringify(await chrome.runtime.sendMessage({ type: 'filo_run_action', action: { type: 'TRADUCI_PAGINA' } })); } catch (e) { return 'ERR ' + e.message; }
+  }).catch((e) => 'EVAL ' + e.message);
+  console.log('AIUTO-DIRETTO-PANNELLO', await dir(pannello));
+  console.log('AIUTO-DIRETTO-PAGINA', await dir(page));
+  const m = prompt.match(/.{60}tradu[a-z]* (la|questa|l'intera) pagina.{60}/i);
+  console.log('AIUTO-MATCH', m && m[0]);
   await pannello.screenshot({ path: 'tests/.shots/v504-aiuto.png' });
 });
 
