@@ -117,6 +117,23 @@ async function azioneInviaFeedback(action, {
       if (p.errore) return { executed: false, kept: false, output: { error: p.errore } };
       payload = p.payload;
     }
+    // La rilettura L0 (#1403.1) vale anche qui: dopo l'OK il riquadro di conferma la ripropone con l'avviso, e un
+    // secondo sì («Manda così») arriva con `senzaRilettura`. Al modello e al diario vanno solo le frasi, mai i pezzi.
+    const L0 = senzaRilettura ? null : require('../feedbackL0').corrente();
+    if (L0) {
+      const letto = await L0.controlla({ testo, immagini: (payload.images || []).map((i) => i && i.dataUrl), allegati: payload.files });
+      if (letto.stato === 'trovato' && letto.esito) {
+        const { titolo: t, frasi } = letto.esito;
+        return {
+          executed: false,
+          kept: false,
+          output: {
+            error: `la segnalazione non è partita: prima di mandarla ci ho visto qualcosa da ricontrollare. ${frasi.join(' ')}`,
+            rilettura: { titolo: t, frasi },
+          },
+        };
+      }
+    }
     const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
     const allegati = (payload.images || []).length + (payload.files || []).length;
     const nonSaliti = r && Array.isArray(r.failed) ? r.failed.map((f) => f && f.name).filter(Boolean) : [];
