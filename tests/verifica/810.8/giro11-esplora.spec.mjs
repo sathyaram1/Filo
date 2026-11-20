@@ -141,6 +141,28 @@ test('esplora proposta lunga: le righe di 500 cifre proposte su un sito coprono 
   expect(await dopoUnRiavvio(app), 'il codice della banca non è stato ricordato fra i segreti letti').toContain(codice);
 });
 
+test('esplora nota cominciata: il codice letto resta letto quando l’utente lo scrive in fondo a una nota cominciata prima', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const nota = await testServer.openReady(openTab, `<!doctype html><html><head><title>Note</title></head><body><h1>Note</h1>
+    <textarea id="n" style="width:500px;height:120px"></textarea></body></html>`);
+  await nota.locator('#n').click();
+  await nota.keyboard.type('Promemoria per domani: ', { delay: 10 });
+  await nota.waitForTimeout(600);
+  const banca = await testServer.openReady(openTab, POSTA, { pubblico: true });
+  await modelli(app);
+  const aiuto = await apriAiuto(app, shell, banca);
+  await chiedi(aiuto, 'cosa mi chiede Marco?');
+  await expect.poll(() => letti(app), { timeout: 10_000 }).toContain(CODICE);
+  await nota.bringToFront();
+  const id = await shell.evaluate(async () => ((await window.filoShell.tabs.snapshot()).tabs || []).find((t) => /Note/.test(t.title || ''))?.id);
+  if (id) await shell.evaluate((x) => window.filoShell.tabs.activate(x), id);
+  await nota.locator('#n').click();
+  await nota.keyboard.press('End');
+  await nota.keyboard.type(`codice ${CODICE}`, { delay: 20 });
+  await nota.waitForTimeout(1000);
+  expect(await dopoUnRiavvio(app), 'il codice letto è sparito dal registro').toContain(CODICE);
+});
+
 test('esplora proposta: il codice letto resta letto quando l’assistente propone di metterlo nel campo', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, POSTA);
