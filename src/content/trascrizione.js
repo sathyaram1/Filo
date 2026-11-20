@@ -51,27 +51,22 @@
     return { x: v[0], y: v[1], w: v[2], h: v[3] };
   }
 
-  // Con `limite` (byte) il lato si riduce perché il JPEG ci stia sotto con margine.
-  function inJpeg(dataUrl, limite = 0) {
-    return new Promise((fatto) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          if (!img.naturalWidth || !img.naturalHeight) { fatto(dataUrl); return; }
-          const k = limite > 0 ? Math.min(0.9, Math.sqrt((limite * 0.8) / dataUrl.length)) : 1;
-          const c = document.createElement('canvas');
-          c.width = Math.max(1, Math.round(img.naturalWidth * k));
-          c.height = Math.max(1, Math.round(img.naturalHeight * k));
-          const g = c.getContext('2d');
-          g.fillStyle = '#fff';
-          g.fillRect(0, 0, c.width, c.height);
-          g.drawImage(img, 0, 0, c.width, c.height);
-          fatto(c.toDataURL('image/jpeg', 0.9));
-        } catch (_) { fatto(dataUrl); }
-      };
-      img.onerror = () => fatto(dataUrl);
-      img.src = dataUrl;
-    });
+  // L'immagine in grigi, per ritrovare nei pixel dove cadono le parole di ogni riga. null se il canvas non la legge.
+  function grigi(img) {
+    try {
+      const k = Math.min(1, LATO_GRIGI / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * k));
+      const h = Math.max(1, Math.round(img.naturalHeight * k));
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0, w, h);
+      const d = g.getImageData(0, 0, w, h).data;
+      const luma = new Uint8Array(w * h);
+      for (let i = 0, j = 0; j < luma.length; i += 4, j++) luma[j] = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
+      return { w, h, luma };
+    } catch (_) { return null; }
   }
 
   function chiudi() {
