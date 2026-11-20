@@ -118,7 +118,7 @@ function nominati(percorso, cartella) {
       if (!ref || ref.startsWith('#')) continue;
       let p = null;
       try { p = percorsoDi(new URL(ref, base).href); } catch (_) {}
-      if (p && dentro(cartella, chiave(p)) && permessoNellaCartella(chiave(cartella), chiave(p))) fuori.push(chiave(p));
+      if (p && dentro(k, chiave(p)) && permessoNellaCartella(k, chiave(p))) fuori.push(chiave(p));
     }
   }
   return fuori;
