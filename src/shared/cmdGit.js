@@ -261,9 +261,9 @@
       if (args.includes('--')) return 3;
       // Flag che dichiarano «sto lavorando sui FILE» anche senza scrivere il percorso:
       // `--pathspec-from-file`, `-p`/`--patch`, `--ours`/`--theirs` scartano comunque modifiche.
-      if (args.some((a) => /^(--pathspec-from-file(=|$)|--pathspec-file-nul$|-p$|--patch$|--ours$|--theirs$)/.test(a))) return 3;
+      if (args.includes('-p') || conOpzione(args, 'pathspec-from-file', 'pathspec-file-nul', 'patch', 'ours', 'theirs')) return 3;
       // `-b`/`-B`/`--orphan`/`--detach` creano o spostano un ramo, non toccano i path.
-      if (args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a))) return 2;
+      if (args.some((a) => a === '-b' || a === '-B') || conOpzione(args, 'orphan', 'detach')) return 2;
       const ops = args.filter((a) => !a.startsWith('-'));
       if (ops.some(looksLikePathspec)) return 3; // scarta le modifiche dei file
       if (ops.length >= 2) return 3;             // `<ref> <path>` senza `--`
