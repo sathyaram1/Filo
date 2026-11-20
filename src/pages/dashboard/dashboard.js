@@ -1148,6 +1148,10 @@
     let streamedText = '';
     // La risposta scritta nei giri di soli bottoni (#1167) resta in testa alla bolla: i giri dopo scrivono sotto.
     let rispostaPrima = '';
+    // Lo stesso testo coi marcatori, e le azioni finite del turno con le loro foto: un turno fermato o fallito a metà
+    // ridisegna le foto della parte già scritta (#2272).
+    let rispostaPrimaGrezza = '';
+    const azioniDelTurno = [];
     let giroIniziato = false;
     const unisci = (...parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
     // I marcatori di fonti e immagini non si vedono mentre arrivano: li disegna la risposta finale, controllata (#2383, #2272).
