@@ -186,10 +186,13 @@ function ascoltaIn(w, invia) {
     if (!el || typeof el !== 'object') return;
     if (el.isContentEditable) el = radiceModificabile(el);
     const t = voce(el);
+    // Il main toglie dal registro solo i segreti letti da quando questo pezzo è partito, non da quando il campo è
+    // cominciato: un codice letto prima e scritto in fondo a una nota vecchia resta letto (giro 6).
+    if (!t.inViaggio) t.inViaggio = Date.now();
     if (dati) contati(t, dati);
     const nuovo = fn ? fn(t.testo) : t.testo;
     if (nuovo !== t.testo) t.testo = taglia(nuovo);
-    if (fn) fila.testo = taglia(fn(fila.testo));
+    if (fn) { if (!fila.inViaggio) fila.inViaggio = Date.now(); fila.testo = taglia(fn(fila.testo)); }
     daDire.add(el);
     presto();
   }
