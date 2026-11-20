@@ -1291,7 +1291,10 @@
     // suo esito arriva nel blocco, che si chiude allora (patterns/il-filo-dell-attesa.md).
     const r = await Promise.race([inviato, turno.fermata]);
     if (turno.fermato) {
-      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, testoDelGiro()) });
+      const chiusa = apriTurnoFermato({
+        pending, streamBubble, streamedText: unisci(rispostaPrima, testoDelGiro()),
+        grezzo: unisci(rispostaPrimaGrezza, testoGrezzoDelGiro()), azioni: azioniDelTurno,
+      });
       turno.voce = chiusa.entry;
       const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown, chat: msg.chatId }); });
       return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura, _chat: msg.chatId };
