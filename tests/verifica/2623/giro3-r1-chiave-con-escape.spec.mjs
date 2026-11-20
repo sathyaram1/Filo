@@ -18,6 +18,17 @@ test('r1 la chiave del push scritta col backslash della shell chiede conferma', 
   }
 });
 
+// Stessa causa: la chiave del push si cerca solo nel primo operando, e un'opzione col valore staccato la sposta.
+test('r1 la chiave del push dopo un\'opzione che prende un valore chiede conferma', () => {
+  for (const cmd of [
+    'git config --comment nota branch.main.pushRemote https://altrove.example/r.git',
+    'git config --type string remote.pushDefault https://altrove.example/r.git',
+    'git config --file .git/config branch.main.remote https://altrove.example/r.git',
+  ]) {
+    expect(C.classify(cmd), cmd).toBe(3);
+  }
+});
+
 test('r1 la stessa grafia su una chiave innocua resta un OK leggero', () => {
   expect(C.classify('git config branch.main.mer\\ge refs/heads/main')).toBe(2);
 });
