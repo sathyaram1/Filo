@@ -935,7 +935,6 @@ module.exports = {
   shellDeiComandi,
   segretiCustoditi,
   ricordaLettoDallAiuto,
-  ricordaPropostaDellAiuto,
   ricordaLettoInChat,
   testoDiAltriNelleAzioni,
   controllaUscita,
