@@ -254,7 +254,9 @@ export function testoGuasto({
     const cosa = attesa.comando ? `${attesa.nome} «${comandoLeggibile(attesa.comando)}»` : attesa.nome;
     return pulito(`guasto: permessi ${nome}: permesso in attesa: il worker non dà segni di vita da ${minuti} minuti (${segni}) e il suo ultimo strumento non ha mai avuto risposta: ${cosa}. In cloud nessuno approva un permesso. ${coda}`);
   }
-  return pulito(`guasto: strumento worker: worker fermo da ${minuti} minuti (${segni}), senza uno strumento in attesa: forse un permesso, forse il modello. ${coda}`);
+  // Una corsa interrotta senza un'uscita di segnale può averla fermata il worker stesso: è un fatto del quadro, non il fermo.
+  const primaCorsa = corsa ? `Prima: ${guastoDellaCorsa(corsa, memoria).slice(PREFISSO_CORSA.length)} ` : '';
+  return pulito(`guasto: strumento worker: worker fermo da ${minuti} minuti (${segni}), senza uno strumento in attesa: forse un permesso, forse il modello. ${primaCorsa}${coda}`);
 }
 
 /** Le righe degli ultimi 512 KB di un transcript: la prima può essere tagliata, e si salta. Illeggibile: nessuna. */
