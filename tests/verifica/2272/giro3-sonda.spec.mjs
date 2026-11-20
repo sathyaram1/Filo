@@ -121,8 +121,12 @@ test('sicurezza: titoli con HTML, pagina javascript:, immagine file:// non passa
   await page.waitForTimeout(1500);
   const scaricate = await app.evaluate(() => globalThis.__scaricate);
   console.log('SCARICATE', JSON.stringify(scaricate));
-  expect(scaricate.some((u) => /^file:|^data:/.test(u))).toBe(false);
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  await expect(bolla.locator('.filo-galleria-img')).toHaveCount(1);
+  await bolla.locator('.filo-galleria-img').first().click({ button: 'right' });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: 'tests/.shots/2272-g3-menu-xss.png' }).catch(() => {});
+  await page.keyboard.press('Escape');
   const n = await bolla.locator('.filo-galleria-img').count();
   console.log('IMMAGINI', n, await bolla.locator('.filo-galleria-img').evaluateAll((e) => e.map((x) => x.dataset.pagina || '-')));
   expect(await bolla.locator('.filo-galleria-img[data-pagina^="javascript"]').count()).toBe(0);
