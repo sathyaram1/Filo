@@ -8,7 +8,6 @@ const { safeFetch } = require('./safe-fetch');
 const { tipoImmagine } = require('./iconaScheda');
 const Copie = require('./copieIcone');
 
-const TAVILY_URL = 'https://api.tavily.com/search';
 const COMMONS_URL = 'https://commons.wikimedia.org/w/api.php';
 const ATTESA_RICERCA_MS = 8000;
 const ATTESA_IMMAGINE_MS = 10000;
