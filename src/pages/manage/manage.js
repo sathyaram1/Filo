@@ -384,7 +384,7 @@
   const CAP2_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP2) || 'filo_automation_cap2';
   const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
   const TETTO_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_TETTO_VERIFICHE) || 'filo_automation_tetto_verifiche';
-  const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10, TETTO_VERIFICHE_MIN: 1, TETTO_VERIFICHE_MAX: 50 };
+  const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10 };
   // Nessun default dei bilanci nel codice: i numeri stanno solo nel documento del server; un
   // campo che lì non c'è si mostra vuoto, e lo si dice.
 
