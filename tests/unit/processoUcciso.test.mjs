@@ -434,9 +434,12 @@ describe('il guasto di un processo ucciso', () => {
     assert.match(testoGuasto({ fermoMs: 21 * 60000, attesa, memoria: stessa }), /^guasto: permessi npm:/);
   });
 
-  test('#2571.1 in questo sistema, sotto Claude Code, la sessione si legge: pid, avvio prima di adesso', { skip: (!ENV_VERO.CLAUDE_PID || process.platform !== 'linux') && 'fuori da Claude Code o senza /proc' }, () => {
-    const s = sessioneClaude(ENV_VERO);
-    assert.equal(s.claudePid, Number(ENV_VERO.CLAUDE_PID));
-    assert.ok(s.claudeAvvioS > 1e9 && s.claudeAvvioS * 1000 <= Date.now() + 5000, JSON.stringify(s));
+  test('#2571.1 in questo sistema l\'avvio di un processo vero si legge da /proc: questo, nato da poco', { skip: process.platform !== 'linux' && 'senza /proc' }, () => {
+    const s = sessioneClaude({ CLAUDE_PID: String(process.pid), CLAUDE_CODE_WORKER_EPOCH: '4' });
+    const nato = Date.now() - process.uptime() * 1000;
+    assert.equal(s.claudePid, process.pid);
+    assert.equal(s.epoca, 4);
+    assert.ok(Math.abs(s.claudeAvvioS * 1000 - nato) < 5000, `${s.claudeAvvioS * 1000} contro ${nato}`);
+    assert.ok(Number.isNaN(letturaMemoria().claudePid), 'la sessione che lancia le prove non arriva alle prove');
   });
 });
