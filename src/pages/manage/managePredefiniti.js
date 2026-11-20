@@ -775,9 +775,8 @@
     ul.className = 'sn-wallet-scheda-elenco sn-wallet-router';
     for (const r of window.SN_WALLET.chiHaServito(servito.conti, collectExcluded())) {
       const li = document.createElement('li');
-      li.className = 'sn-servito-riga';
       li.classList.toggle('is-flagged', Boolean(r.violazione));
-      li.title = r.modelli.map((m) => `${m.modello || '—'}: ${m.n.toLocaleString('it-IT')}`).join('\n');
+      li.title = r.modelli.map((m) => `${m.modello || '—'}: ${numeroIt(m.n)}`).join('\n');
       const a = document.createElement('span');
       a.textContent = [r.host || I18n.t('admin_defaults_servito_non_detto'), r.fuori].filter(Boolean).join(' · ');
       const b = document.createElement('span');
