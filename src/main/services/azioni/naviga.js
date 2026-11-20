@@ -410,7 +410,7 @@ async function azioneTraduciPagina(action, { sender }) {
     const intero = (n) => (Number.isInteger(n) && n >= 0 ? n : 0);
     if (output.come === 'ripresa') { output.mancanti = intero(r.mancanti); output.di = intero(r.di); }
   }
-  if ((stato === 'partita' || stato === 'originale' || stato === 'fermata') && dallaChat()) {
+  if (globalThis.SN_ACTION_LEVELS.traduzioneFatta(stato) && dallaChat()) {
     require('../contatoriStrade').misura('azione', 'translate', 'chat', { incognito: !!(win && win._filoIncognito) });
   }
   return { executed: STATI_TRADUZIONE[stato], kept: false, output };
