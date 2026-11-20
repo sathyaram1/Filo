@@ -31,7 +31,7 @@ function ramoDi(root) {
 /**
  * Apre il segno della corsa: `fase(nome)` lo aggiorna, l'uscita normale lo toglie, `bilancio()` dice la memoria da
  * quando è partita. I segnali non si intercettano: durante una prova lanciata in modo sincrono il gestore non girerebbe
- * fino alla sua fine, e la corsa fermata andrebbe avanti; un segno col processo morto dice già «ucciso».
+ * fino alla sua fine, e la corsa fermata andrebbe avanti; un segno col processo morto dice già «interrotta».
  */
 export function apriCorsa(root, { sha = '', ramo = ramoDi(root), proc = process, ora = () => new Date().toISOString(), memoria = letturaMemoria } = {}) {
   const file = fileCorsa(root);
