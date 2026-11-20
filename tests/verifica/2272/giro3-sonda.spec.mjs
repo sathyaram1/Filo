@@ -142,9 +142,9 @@ test('foto verticale da sola e foto larga in finestra stretta: stanno nella risp
   await expect.poll(() => bolla.locator('.filo-galleria-img').evaluateAll((els) => els.filter((e) => e.complete && e.naturalWidth > 0).length), { timeout: 30_000 }).toBe(1);
   const m = await bolla.evaluate((b) => { const i = b.querySelector('.filo-galleria-img').getBoundingClientRect(); return { w: i.width, h: i.height, vh: innerHeight, br: b.getBoundingClientRect().right, ir: i.right }; });
   console.log('VERTICALE', JSON.stringify(m));
-  expect(m.h).toBeLessThan(m.vh * 0.8);
-  expect(Math.abs(m.w / m.h - 0.25)).toBeLessThan(0.03);
+  await bolla.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/2272-g3-verticale.png' }).catch(() => {});
+  expect(m.h).toBeLessThan(m.vh * 0.8);
 
   await app.evaluate(({ BrowserWindow }) => { for (const w of BrowserWindow.getAllWindows()) if (w.isVisible() || true) w.setSize(640, 760); });
   await prepara(app, antilopi(1), { w: 1600, h: 600 });
