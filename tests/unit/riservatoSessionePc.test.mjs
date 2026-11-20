@@ -111,7 +111,7 @@ test('#2027.3: col server giù il segno resta annotato, parte alla chiamata dopo
     assert.equal(await B.segretoPerScrivere({ env, cwd, deps: su.deps }), SEGRETO);
     const riservato = su.chiamate.find((c) => c.op === 'riservato');
     assert.ok(riservato, JSON.stringify(su.chiamate));
-    assert.match(riservato.motivo, /letto #813; letto #814/);
+    assert.deepEqual(riservato.motivo.split('; ').sort(), ['letto #813', 'letto #814']);
     assert.ok(su.chiamate.indexOf(riservato) < su.chiamate.findIndex((c) => c.op === 'stato'), 'il segno parte prima di leggere lo stato');
     assert.deepEqual(B.riservatiInAttesa(b), []);
   });
