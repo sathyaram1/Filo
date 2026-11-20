@@ -21,6 +21,8 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
   nota, in `domanda`, dice cosa serve lì, e tu hai le istruzioni del lavoro
   server.
 
+<!-- includi: _ripresa-bocciatura.md -->
+
 `payload.feedback` è la richiesta originale; `payload.history` le critiche dei
 giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
 `payload.decisioni` tiene TUTTE le risposte dell'owner su questo feedback, in
