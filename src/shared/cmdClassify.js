@@ -195,6 +195,9 @@
     'do', 'then', 'else']);
   // Gli script di una riga (python, node, ruby, .NET) che cancellano chiamando una funzione.
   const CANCELLA_IN_UNO_SCRIPT = /(?:\.|::)delete\s*\(|\b(?:os\.(?:remove|unlink|rmdir|removedirs)|shutil\.rmtree|fileutils\.rm(?:_rf|_r|dir)?)\s*\(|(?:\.|\b)(?:unlink|rmsync|unlinksync|rmdirsync|rmtree)\s*\(|\b(?:fs|fsp|promises|fse)\.(?:rm|rmdir|remove)\s*\(/;
+  // --delete e le sue varianti (--del, --delete-after, --delete-excluded, --delete-missing-args…).
+  const RSYNC_CANCELLA = /^--del(?:ete(?:-[a-z]+)*)?$/;
+  const RCLONE_CANCELLA = new Set(['sync', 'bisync', 'delete', 'deletefile', 'purge', 'rmdir', 'rmdirs', 'cleanup']);
   const nomeProgramma = (tok) => String(tok || '').split(/[\\/]/).pop().replace(/\.(exe|cmd|bat|ps1|com)$/, '');
   function cancellaPerSempre(cmd) {
     if (typeof cmd !== 'string' || !cmd.trim()) return false;
@@ -211,6 +214,10 @@
         if (prog === 'find' && resto.includes('-delete')) return true;
         if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
         if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
+        // Gli allineamenti di cartelle del Mac e di Linux, come robocopy /MIR: tolgono dalla destinazione quello che
+        // manca nella sorgente (#1909.5). rclone si guarda su ogni parola: un'opzione col valore sposta il sotto-comando.
+        if (prog === 'rsync' && resto.some((x) => RSYNC_CANCELLA.test(x))) return true;
+        if (prog === 'rclone' && resto.some((x) => RCLONE_CANCELLA.has(x))) return true;
         // `gci | ForEach-Object Delete`, `% Delete`: il metodo che cancella chiamato per nome.
         if (/^(foreach-object|foreach|%)$/.test(prog) && resto.filter((x) => !x.startsWith('-'))[0] === 'delete') return true;
         // forfiles lancia quello che sta dopo `/c`.
