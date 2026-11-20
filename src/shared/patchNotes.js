@@ -14,6 +14,7 @@
         { testo: 'Nella home puoi rispondere a un solo pezzo di una risposta di Filo: selezionalo e premi Rispondi. Nello stesso messaggio citi più pezzi, ognuno col suo commento, e un clic su una citazione ti riporta al testo citato.', segnalazione: 2346 },
       ],
       fixes: [
+        { testo: 'Sui siti che aprono i collegamenti sempre nella stessa finestra, come tanti siti vecchi e intranet, ogni clic ti porta davanti la scheda con la pagina nuova, invece di caricarla dietro.', segnalazione: 737 },
         { testo: 'Con la finestra massimizzata o a schermo intero prendi una scheda anche cliccando sul bordo alto dello schermo, senza mirare, come in Chrome.', segnalazione: 2382 },
         { testo: 'Nella home un clic su un punto vuoto rimette il cursore nel campo della chat, o in quello della ricerca se è aperta: Backspace, Ctrl+V (Cmd+V su Mac), frecce e Invio funzionano come se ci avessi cliccato dentro.', segnalazione: 2372 },
         { testo: 'Se dai a un\'altra cosa una lettera della home già usata, Filo ti dice cosa apriva prima, dalle Preferenze, dal tasto destro e quando glielo chiedi a parole.', segnalazione: 2372 },
