@@ -1837,6 +1837,10 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-sis-voce[data-stato="bassa"],
 .dash-sis-voce[data-stato="offline"] { color: var(--dash-accent); }
 .dash-sis-voce[data-stato="spento"] .dash-sis-icona { opacity: 0.55; }
+/* #2394 — lo stato di prima di una pausa del lettore: la radio non si dice accesa né spenta finché non la rilegge. */
+.dash-sis-voce[data-stato="leggendo"] .dash-sis-icona { animation: dash-sis-respira calc(1.6s * var(--sn-motion, 1)) ease-in-out infinite; }
+@keyframes dash-sis-respira { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.8; } }
+@media (prefers-reduced-motion: reduce) { .dash-sis-voce[data-stato="leggendo"] .dash-sis-icona { animation: none; opacity: 0.5; } }
 
 .dash-sis-box {
   position: fixed;
@@ -1908,6 +1912,10 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   animation: sn-rinomina-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
 }
 .dash-sis-attesa .dash-sis-rotella { margin-right: 0; }
+/* #2394 — l'elenco di prima resta in vista mentre arriva quello nuovo: la rotellina accanto al titolo lo dice. */
+.dash-sis-titolo .dash-sis-aggiorno { width: 7px; height: 7px; margin: 0 0 0 6px; }
+.dash-sis-titolo .dash-sis-aggiorno[hidden] { display: none; }
+.dash-sis-errore.dash-sis-parziale { color: var(--sn-muted); }
 @media (prefers-reduced-motion: reduce) { .dash-sis-rotella { animation-duration: calc(2.4s * var(--sn-motion, 1)); } }
 .dash-sis-box .sn-select-option.dash-sis-occupato { color: var(--sn-muted); cursor: progress; }
 .dash-sis-box .sn-select-option.dash-sis-attuale { font-weight: 600; }

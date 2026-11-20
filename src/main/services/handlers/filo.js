@@ -273,7 +273,13 @@ module.exports = function register(on, ctx) {
   // gesto dell'utente su una superficie di Filo: non passa dai livelli, che servono a ciò che decide il modello.
   on(MSG.SISTEMA_COMANDA, require('./origine').soloFilo(async (msg) => {
     const Comandi = require('../comandiSistema');
-    return require('../registroCambi').con({ via: 'interfaccia', dove: 'home' }, () => Comandi.comanda(msg && msg.richiesta));
+    const r = await require('../registroCambi').con({ via: 'interfaccia', dove: 'home' }, () => Comandi.comanda(msg && msg.richiesta));
+    // La frase di una richiesta malformata è scritta per il modello: nel riquadro dice cosa fare (#2394).
+    if (r && r.errore === 'richiesta') {
+      console.warn('[Filo] richiesta del riquadro di sistema non valida:', r.frase);
+      return { ...r, frase: 'Filo non ha capito il comando dato da qui: chiudi il riquadro, riaprilo e riprova.' };
+    }
+    return r;
   }));
   on(MSG.SISTEMA_APRI_IMPOSTAZIONI, require('./origine').soloFilo(async (msg) => {
     const C = require('../comandiSistema');

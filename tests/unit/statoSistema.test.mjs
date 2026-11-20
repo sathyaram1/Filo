@@ -377,10 +377,165 @@ test('Windows: un PowerShell che muore subito si riprova tre volte, poi il letto
   assert.equal(senza.attivo(), false);
 });
 
+// #2394 — l'elenco degli abbinati lo legge il PowerShell già acceso: niente processo nuovo per ogni apertura.
+test('Windows: gli elenchi si chiedono al PowerShell del lettore su stdin, e la sua risposta non è una lettura dello stato', async () => {
+  const richieste = [];
+  let f = null;
+  const w = L.lettoreWindows({
+    avvia: (_file, _args, opzioni) => {
+      assert.deepEqual(opzioni.stdio, ['pipe', 'pipe', 'ignore']);
+      f = figlioFinto();
+      f.stdin = new PassThrough();
+      f.stdin.setEncoding('utf8');
+      f.stdin.on('data', (r) => {
+        richieste.push(r);
+        const elenco = { cosa: 'bluetooth', acceso: true, dispositivi: [{ indirizzo: '001122334455', nome: 'PulseSound', collegato: true, le: false, contenitore: 'c' }] };
+        setTimeout(() => f.stdout.write(`${JSON.stringify({ elenco })}\n`), 20);
+      });
+      setTimeout(() => f.stdout.write(`${JSON.stringify({ batteria: { livello: 50, inCarica: false, collegata: false } })}\n`), 5);
+      return f;
+    },
+  });
+  w.assicura();
+  await w.pronto(2000);
+  const [a, b] = await Promise.all([w.chiedi('bluetooth'), w.chiedi('bluetooth')]);
+  assert.deepEqual(richieste, ['bluetooth\n'], 'due richieste uguali in volo sono una');
+  assert.equal(a, b);
+  assert.equal(a.dispositivi[0].nome, 'PulseSound');
+  assert.equal(w.ultimo().batteria.livello, 50, 'la risposta a un elenco non prende il posto dello stato');
+  assert.equal(L.elencoDaRiga(JSON.stringify({ batteria: {} })), null);
+  assert.equal(await w.chiedi('stampante'), null);
+  w.ferma();
+  assert.equal(await w.chiedi('bluetooth'), null, 'col lettore fermo si passa allo script');
+});
+
+test('Windows: un PowerShell vivo che non risponde agli elenchi li rimanda allo script; uno che sta partendo dice «tempo scaduto»', async () => {
+  const w = L.lettoreWindows({
+    avvia: () => {
+      const f = figlioFinto();
+      f.stdin = new PassThrough();
+      setTimeout(() => f.stdout.write(`${JSON.stringify({ volume: { livello: 10, muto: false } })}\n`), 5);
+      return f;
+    },
+  });
+  w.assicura();
+  assert.deepEqual(await w.chiedi('wifi', 30), { tempo: true }, 'prima della prima riga è ancora la partenza');
+  await w.pronto(2000);
+  assert.equal(await w.chiedi('wifi', 30), null);
+  assert.equal(await w.chiedi('bluetooth', 1000), null, 'da lì in poi senza aspettare');
+  w.ferma();
+  // Un processo che muore con una richiesta in volo la scioglie subito.
+  const m = L.lettoreWindows({ avvia: () => { const f = figlioFinto(); f.stdin = new PassThrough(); f.stdin.on('data', () => setImmediate(() => f.emit('exit', 1, null))); return f; } });
+  m.assicura();
+  assert.equal(await m.chiedi('bluetooth', 5000), null);
+});
+
+// #2394.1 — una risposta lenta (PC occupato, ripresa dalla sospensione) segna muto quel PowerShell, non il lettore: la
+// sua risposta, arrivata tardi, lo toglie; e il processo nuovo che riparte con la home non lo eredita.
+test('Windows: il PowerShell che ha risposto tardi torna a dare gli elenchi, e quello nuovo non nasce muto', async () => {
+  let lento = true;
+  let figli = 0;
+  const w = L.lettoreWindows({
+    avvia: () => {
+      figli += 1;
+      const f = figlioFinto();
+      f.stdin = new PassThrough();
+      f.stdin.setEncoding('utf8');
+      f.stdin.on('data', (r) => {
+        const cosa = String(r).trim();
+        setTimeout(() => f.stdout.write(`${JSON.stringify({ elenco: { cosa, acceso: true, dispositivi: [] } })}\n`), lento ? 120 : 5);
+      });
+      setTimeout(() => f.stdout.write(`${JSON.stringify({ volume: { livello: 10, muto: false } })}\n`), 5);
+      return f;
+    },
+  });
+  w.assicura();
+  await w.pronto(2000);
+  assert.equal(await w.chiedi('bluetooth', 30), null, 'la risposta non arriva in tempo: si passa allo script');
+  assert.equal(await w.chiedi('wifi', 1000), null, 'finché quel PowerShell tace, senza aspettarlo');
+  // La risposta di prima arriva: il PowerShell c'è, e gli elenchi tornano a lui.
+  await new Promise((r) => setTimeout(r, 200));
+  lento = false;
+  const r = await w.chiedi('wifi', 1000);
+  assert.equal(r && r.cosa, 'wifi');
+  // Muto di nuovo, poi la home si chiude e il lettore riparte con un processo nuovo che risponde subito.
+  lento = true;
+  assert.equal(await w.chiedi('bluetooth', 30), null);
+  w.ferma();
+  lento = false;
+  w.assicura();
+  await w.pronto(2000);
+  assert.equal(figli, 2);
+  const nuovo = await w.chiedi('bluetooth', 1000);
+  w.ferma();
+  assert.equal(nuovo && nuovo.cosa, 'bluetooth');
+});
+
+test('una radio letta più di due giri fa è «vecchia» per chi riceve lo stato, finché il lettore o un elenco non la rileggono', async () => {
+  const P = L._perProve;
+  let bt = { acceso: false, dispositivi: [] };
+  await P.usaLettore(async () => ({ bluetooth: bt, wifi: { acceso: true }, batteria: { livello: 50, inCarica: false, collegata: false } }));
+  try {
+    assert.equal(L.stato().vecchio, undefined);
+    P.invecchia(L.VECCHIO_MS + 1000);
+    assert.deepEqual(L.stato().vecchio, ['bluetooth', 'wifi']);
+    assert.equal(L.stato().bluetooth.acceso, false, 'il dato resta, ma chi lo mostra sa che è vecchio');
+    // L'elenco dei dispositivi ha letto la radio accesa: vale per il Bluetooth, non per il Wi-Fi.
+    L.radioLetta('bluetooth', true);
+    assert.deepEqual(L.stato().vecchio, ['wifi']);
+    assert.equal(L.stato().bluetooth.acceso, true);
+    // Una lettura nuova del lettore rinfresca tutto, e vale lei.
+    bt = { acceso: false, dispositivi: [] };
+    await P.leggiOra();
+    assert.equal(L.stato().vecchio, undefined);
+    assert.equal(L.stato().bluetooth.acceso, false);
+    L.radioLetta('wifi', 'forse');
+    assert.equal(L.stato().wifi.acceso, true, 'una lettura che non dice sì o no non cambia niente');
+    // Il lettore non si rende al computer vero: su Windows partirebbe un PowerShell che non esce e il file non finisce più.
+  } finally { await P.usaLettore(async () => ({ batteria: null, rete: null, bluetooth: null })).catch(() => {}); }
+});
+
+test('Windows: «Unknown» della radio non è spento', () => {
+  const d = L.datiDaWindows(JSON.stringify({ bluetooth: { acceso: null, dispositivi: null } }));
+  const x = SIS.descrivi(d).bluetooth;
+  assert.equal(x.spento, false);
+  assert.equal(x.ignoto, true);
+});
+
+// #2394.1 — acceso solo se Windows dice On, spento solo se dice Off o Disabled: una funzione sola, che usano il giro
+// del lettore (Bluetooth e Wi-Fi) e l'elenco dei dispositivi, nello script e nel lettore. Una copia a parte tornerebbe
+// a scrivere «spento» sopra il «non so».
+test('Windows: la regola di acceso e spento delle radio sta in AccesoRadio, e la usano tutte le letture', () => {
+  const C = require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'));
+  const elenco = C._interni.PS_ELENCO_BT;
+  const regola = /function AccesoRadio\(\$radio\) \{\n  if \(@\(\$radio \| Where-Object \{ \[string\]\$_\.State -eq 'On' \}\)\.Count -gt 0\) \{ return \$true \}\n  if \(@\(\$radio \| Where-Object \{ @\('Off', 'Disabled'\) -contains \[string\]\$_\.State \}\)\.Count -gt 0\) \{ return \$false \}\n  return \$null\n\}/;
+  assert.match(elenco, regola);
+  const fuori = (s) => s.replace(regola, '');
+  for (const [dove, s] of [['lettore', L.scriptWindows(1)], ['elenco', elenco], ['sorgenti', SORGENTE + readFileSync(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'), 'utf8')]]) {
+    assert.ok(!/'Disabled'\)? -contains|-contains \[string\]\$_\.State|\.State -eq 'On'/.test(fuori(s)), `${dove}: una copia della regola fuori da AccesoRadio`);
+  }
+  assert.match(elenco, /\$esito\.acceso = AccesoRadio \$bt\n/);
+  const giro = L.scriptWindows(1).slice(L.scriptWindows(1).indexOf('while ($true)'));
+  assert.match(giro, /\$wfAcceso = AccesoRadio \$wf\n\s*if \(\$null -ne \$wfAcceso\) \{ \$o\.wifi = \[ordered\]@\{ acceso = \$wfAcceso \} \}/);
+  assert.match(giro, /\$acceso = AccesoRadio \$bt\n/);
+  // La funzione è definita prima del giro che la chiama.
+  assert.ok(L.scriptWindows(1).indexOf('function AccesoRadio') < L.scriptWindows(1).indexOf('while ($true)'));
+});
+
 test('Windows: lo script non chiede permessi e non usa le API del Wi-Fi, e scrive solo ASCII', () => {
   const s = L.SCRIPT_WINDOWS;
-  assert.ok(!/RequestAccessAsync|netsh|Wlan|WiFiAdapter|Geolocat|Get-WmiObject|GetConnectedSsid/i.test(s),
+  // Le reti conosciute (wlanapi, che da Windows 11 24H2 vuole la posizione) solo quando l'utente apre il riquadro del
+  // Wi-Fi e la pagina lo chiede (#2394): il giro delle letture non le tocca.
+  const giro = s.slice(s.indexOf('while ($true)'));
+  const risposte = /function Rispondi[\s\S]*?\n}\n/.exec(s)[0];
+  assert.ok(!/RequestAccessAsync|netsh|Wlan|WiFiAdapter|Geolocat|Get-WmiObject|GetConnectedSsid/i.test(s.replace(risposte, '')),
     'una lettura che vuole un permesso (radio, posizione) si omette, non si chiede');
+  assert.ok(!/Wlan|Rispondi \$|ElencoBt/.test(giro.replace(/Rispondi \$riga\.Trim\(\)/, '')), 'il giro risponde solo alle richieste, non legge elenchi da sé');
+  for (const parte of [L.scriptWindows(1)]) assert.ok(!/RequestAccessAsync|netsh|Geolocat|GetConnectedSsid/i.test(parte));
+  assert.ok(!/"/.test(require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'))._interni.PS_ELENCO_BT),
+    'niente virgolette doppie neanche nell\'elenco dei dispositivi, che il lettore incorpora');
+  // La riga di comando di Windows sta in 32.767 caratteri, virgolette protette comprese.
+  assert.ok(JSON.stringify(L.scriptWindows(123456)).length < 30000);
   assert.match(s, /GetProcessById\(\$genitore\)/);
   assert.match(s, /\[regex\]::Replace\(\$json, '\[\^ -~\]'/, 'l\'uscita è tutta ASCII: la console non può storpiare un nome');
   assert.match(s, /OutputEncoding/);
@@ -597,6 +752,43 @@ const S = require(MODULO);
   console.log(JSON.stringify(storia)); process.exit(0);
 })();`);
   assert.deepEqual(mac, [false, false, false, false, false, false]);
+});
+
+// #2394.1 — il volume cambiato da Filo e l'avviso del caricatore ritoccano lo stato senza rileggere le radio: mentre il
+// lettore riparte, il Bluetooth di prima della pausa resta «vecchio» finché non lo rilegge una lettura vera o un comando.
+test('il volume cambiato da Filo e il caricatore non fanno passare per letta la radio di prima della pausa', () => {
+  const esito = simula(`
+const S = require(MODULO);
+const pc = (bt) => ({ batteria: { livello: 50, inCarica: false, collegata: false }, rete: null, bluetooth: { acceso: bt, dispositivi: [] }, wifi: { acceso: true }, volume: { livello: 20, muto: false } });
+(async () => {
+  await S._perProve.usaLettore(async () => pc(false));
+  S.richiedi();
+  await attesa(50);
+  // Il lettore ha dormito e riparte lento: la sua lettura resta in volo finché la prova non la libera.
+  let libera = null;
+  S._perProve.usaLettore(() => new Promise((r) => { libera = r; }));
+  S._perProve.invecchia(5 * 60 * 1000);
+  const vecchie = () => (S.stato().vecchio || []).join(',');
+  const prima = vecchie();
+  S.dopoComando({ volume: { livello: 40, muto: false } });
+  const volume = [vecchie(), S.stato().volume.livello];
+  pm.emit('on-ac');
+  const caricatore = [vecchie(), S.stato().batteria.collegata, S.stato().bluetooth.acceso];
+  S.dopoComando({ bluetooth: { acceso: true } });
+  const comandoBt = vecchie();
+  libera(pc(true));
+  await attesa(50);
+  const letto = vecchie();
+  S.ferma();
+  console.log(JSON.stringify({ prima, volume, caricatore, comandoBt, letto })); process.exit(0);
+})();`);
+  assert.deepEqual(esito, {
+    prima: 'bluetooth,wifi',
+    volume: ['bluetooth,wifi', 40],
+    caricatore: ['bluetooth,wifi', true, false],
+    comandoBt: 'wifi',
+    letto: '',
+  });
 });
 
 test('con un adattatore virtuale Chromium dice online a rete giù: la sorveglianza rilegge poche volte, non ogni 30 secondi', () => {

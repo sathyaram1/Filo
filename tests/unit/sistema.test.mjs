@@ -243,3 +243,23 @@ test('le percentuali si dicono con l\'articolo giusto: allo 0%, all\'8%, al 25%'
   assert.equal(S.alPercento(100), 'al 100%');
   assert.deepEqual(S.descrivi({ volume: { livello: 0, muto: false } }).volume.dettaglio, ['Volume allo 0%']);
 });
+
+// #2394 — lo stato di prima di una pausa del lettore non si mostra come vero: «leggo», non «spento».
+test('una radio vecchia o che il sistema non sa dire non è né accesa né spenta', () => {
+  const S = globalThis.SN_SISTEMA;
+  const spento = { bluetooth: { acceso: false, dispositivi: [] }, wifi: { acceso: false }, rete: { online: false } };
+  assert.equal(S.descrivi(spento).bluetooth.spento, true);
+  const vecchio = S.descrivi({ ...spento, vecchio: ['bluetooth', 'wifi'] });
+  assert.equal(vecchio.bluetooth.spento, false);
+  assert.equal(vecchio.bluetooth.leggendo, true);
+  assert.equal(vecchio.bluetooth.ignoto, true);
+  assert.deepEqual(vecchio.bluetooth.dettaglio, ['Leggo lo stato del Bluetooth…']);
+  assert.notEqual(vecchio.rete.hover, 'Wi-Fi spento', 'il Wi-Fi vecchio non si dice spento');
+  const ignoto = S.descrivi({ bluetooth: { acceso: null } }).bluetooth;
+  assert.equal(ignoto.spento, false);
+  assert.equal(ignoto.leggendo, false);
+  assert.match(ignoto.dettaglio[0], /non dice se/);
+  assert.ok(S.righePrompt({ bluetooth: { acceso: null } }).righe.includes('Bluetooth: c\'è, ma il sistema non dice se è acceso.'));
+  // Senza un Bluetooth la voce non c'è, come prima.
+  assert.equal(S.descrivi({ bluetooth: null }).bluetooth, null);
+});

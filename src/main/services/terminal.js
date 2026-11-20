@@ -213,7 +213,8 @@ function shellInvocation(shell, command) {
 
 // Con la cartella tracciata PowerShell legge da stdin, come la dashboard: con `-Command <testo>` un throw
 // salterebbe la sonda, a meno di un try che però cambia gli errori (righePowerShell). Il resto va in argv.
-function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
+// `preludio: false` solo per chi scrive già tutto in ASCII (gli script di comandiSistema.js): chcp costa un secondo.
+function invocazione(shell, command, { trackCwd = false, mark = '', preludio = true } = {}) {
   if (trackCwd && resolveShell(shell) === 'powershell') {
     return {
       file: 'powershell.exe',
@@ -221,7 +222,7 @@ function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
       stdin: PREPARA_STDIN_POWERSHELL + PRELUDI_CODIFICA.powershell + withCwdProbe(shell, command, mark),
     };
   }
-  const testo = encodingPrelude(shell) + (trackCwd ? withCwdProbe(shell, command, mark) : command);
+  const testo = (preludio || trackCwd ? encodingPrelude(shell) : '') + (trackCwd ? withCwdProbe(shell, command, mark) : command);
   return { ...shellInvocation(shell, testo), stdin: null };
 }
 
@@ -455,7 +456,7 @@ function extractCwdMark(rawStdout, mark) {
 
 // Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
 // esito da mostrare. `tettoUscita`: chi legge l'uscita col codice (un elenco intero) non ha il tetto del modello.
-function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false, tettoUscita = MAX_OUTPUT_CHARS } = {}) {
+function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false, tettoUscita = MAX_OUTPUT_CHARS, preludio = true } = {}) {
   const cmd = String(command || '').trim();
   const env = ambienteDelModello(chiesto);
   const startedAt = Date.now();
@@ -493,7 +494,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
     // preludio che mette la shell in UTF-8 (#551), altrimenti i nomi con
     // accenti e trattini lunghi tornano storpiati.
     const mark = trackCwd ? nuovoMarcatore() : '';
-    const { file, args, stdin } = invocazione(usedShell, cmd, { trackCwd, mark });
+    const { file, args, stdin } = invocazione(usedShell, cmd, { trackCwd, mark, preludio });
     let stdout = '';
     let codaOut = ''; // ultimi caratteri dello stdout, anche oltre il tetto
     let stderr = '';

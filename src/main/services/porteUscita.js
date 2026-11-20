@@ -133,7 +133,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra, file: action._file },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, indirizzo: action._indirizzoSistema, finestra: action._finestra, file: action._file },
   });
 }
 function consumePendingConfirm(sender, action) {
@@ -155,7 +155,7 @@ function chiaveSchermo(sender) {
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra, file: action._file };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, indirizzo: action._indirizzoSistema, finestra: action._finestra, file: action._file };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
@@ -631,17 +631,23 @@ async function primaVoltaDelTerminale() {
 }
 
 // #874 — l'azione della chat nella forma che capiscono i tasti della home: il tipo dice cosa, il resto passa.
+// L'indirizzo Bluetooth no: vale solo per i tasti di Filo, e a scriverlo qui sarebbe il modello, che sceglie un
+// dispositivo mentre la conferma ne nomina un altro (#2394.1).
 function richiestaDiSistema(type, action) {
-  const { _richiestaSistema, _nomeSistema, ...resto } = action || {};
+  const { _richiestaSistema, _nomeSistema, _indirizzoSistema, indirizzo, ...resto } = action || {};
   return { ...resto, cosa: type === 'VOLUME' ? 'volume' : type === 'WIFI' ? 'wifi' : 'bluetooth' };
 }
 
-// Parte la rete o il dispositivo che la conferma ha nominato: il nome vero, non le parole del modello.
+// Parte la rete o il dispositivo che la conferma ha nominato: il nome vero, non le parole del modello, e per il
+// Bluetooth l'indirizzo che il main ha trovato con quel nome.
 function richiestaDaEseguire(type, action) {
   const r = richiestaDiSistema(type, action);
   const nome = action && action._nomeSistema;
   if (nome && type === 'WIFI') return { ...r, rete: nome };
-  if (nome && type === 'BLUETOOTH') return { ...r, dispositivo: nome };
+  if (nome && type === 'BLUETOOTH') {
+    const ind = action._indirizzoSistema;
+    return { ...r, dispositivo: nome, ...(typeof ind === 'string' && ind ? { indirizzo: ind } : {}) };
+  }
   return r;
 }
 

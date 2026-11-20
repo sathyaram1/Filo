@@ -24,6 +24,7 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
     globalThis.__pcLetture = [];
     const pc = globalThis.__pc;
     const disp = a.dispositivi;
+    globalThis.__pcDisp = disp;
     const reti = a.reti;
     const traccia = (nome, p) => globalThis.__pcChiamate.push([nome, p || {}]);
     const lettura = () => (a.lettureFerme ? new Promise((r) => globalThis.__pcLetture.push(r)) : Promise.resolve());
@@ -53,6 +54,12 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
         d.collegato = p.collega;
         pc.bluetooth.dispositivi = disp.filter((x) => x.collegato).map((x) => x.nome);
         return { ok: true, collegato: p.collega };
+      },
+      async btDimentica(p) {
+        traccia('btDimentica', p);
+        const i = disp.findIndex((x) => x.indirizzo === p.indirizzo);
+        if (i >= 0) disp.splice(i, 1);
+        return { ok: true };
       },
       async wifiElenco() { traccia('wifiElenco'); await lettura(); return { ok: true, acceso: pc.wifi.acceso, reti: reti.map((r) => ({ nome: r, attiva: pc.rete.nome === r })), attuale: pc.rete.nome || null }; },
       async wifiCollega(p) {
@@ -93,7 +100,8 @@ test('«alza il volume al 40%» in chat: il volume del computer è al 40% e la v
   await expect.poll(async () => (await computer(app)).volume.livello).toBe(40);
   await expect(voce(page, 'volume')).toHaveText('40%', { timeout: 5_000 });
   await expect(page.locator('.dash-activity-row', { hasText: 'Volume al 40%' }).first()).toBeAttached();
-  expect(await chiamate(app)).toEqual([['volume', { livello: 40 }]]);
+  // Le letture degli elenchi (quella dei dispositivi parte all'apertura della home, #2394) non cambiano niente.
+  expect((await chiamate(app)).filter((c) => !/Elenco$/.test(c[0]))).toEqual([['volume', { livello: 40 }]]);
 });
 
 test('«spegni il Bluetooth» in chat e il tasto nel riquadro della home fanno la stessa cosa allo stesso computer', async ({ app }) => {
@@ -341,6 +349,92 @@ test('in chat, quello che è già com\'è chiesto non chiede conferma: rete già
   expect((await chiamate(app)).some((c) => c[0] === 'wifiCollega')).toBe(false);
 });
 
+// #2394.1 — lo «spento» letto prima di una pausa del lettore non è «già spento»: la chat chiede la conferma e spegne.
+test('in chat, col Bluetooth spento letto prima di una pausa, «spegni il Bluetooth» chiede la conferma e lo spegne davvero', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo');
+  await computerFinto(app, { lettureFerme: true, stato: { ...PARTENZA, bluetooth: { acceso: false, dispositivi: [] } } });
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth spento', { timeout: 8_000 });
+  // Il lettore ha dormito e riparte lento; intanto il Bluetooth si è acceso dal sistema. Gli elenchi restano in volo.
+  await app.evaluate(() => {
+    globalThis.__pc.bluetooth = { acceso: true, dispositivi: [] };
+    globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(() => new Promise((r) => { globalThis.__liberaLettore = () => r(globalThis.__pc); }));
+    globalThis.SN_SISTEMA_MAIN._perProve.invecchia(5 * 60 * 1000);
+  });
+  expect(await app.evaluate(() => globalThis.SN_SISTEMA_MAIN.stato().vecchio)).toContain('bluetooth');
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'v1', name: 'BLUETOOTH', arguments: JSON.stringify({ acceso: false }) }] },
+    { text: 'Spento.' },
+  ]);
+  await chiedi(page, 'spegni il Bluetooth');
+  await expect.poll(() => confirmText(page), { timeout: 15_000 }).toContain('Spegnere il Bluetooth');
+  await clickConfirm(page, 'ok');
+  await expect.poll(async () => (await computer(app)).bluetooth.acceso).toBe(false);
+  expect((await chiamate(app)).filter((c) => c[0] === 'radio')).toEqual([['radio', { radio: 'bluetooth', acceso: false }]]);
+  await app.evaluate(() => globalThis.__liberaLettore && globalThis.__liberaLettore());
+  await liberaLetture(app);
+});
+
+// #2394.1 — l'indirizzo Bluetooth vale per i tasti della home, non per il modello: dalla chat il dispositivo lo sceglie
+// il nome che la conferma mostra, e la conferma lo fissa.
+const CUFFIE_E_CASSE = () => [
+  { indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony', collegato: true },
+  { indirizzo: '00:11:22:33:44:66', nome: 'Casse JBL', collegato: true },
+];
+
+test('in chat, un indirizzo Bluetooth senza nome non scollega niente: torna al modello, senza conferma', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo');
+  await computerFinto(app, { dispositivi: CUFFIE_E_CASSE() });
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'a1', name: 'BLUETOOTH', arguments: JSON.stringify({ indirizzo: '00:11:22:33:44:55', collega: false }) }] },
+    { text: 'Non ci sono riuscito.' },
+  ]);
+  await chiedi(page, 'scollega quel dispositivo');
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 8_000 }).toBe(2);
+  expect(JSON.stringify((await chiamateAlModello(app))[1])).toContain('Non fatto');
+  expect(await confirmText(page).catch(() => '')).toBe('');
+  expect((await chiamate(app)).filter((c) => c[0] === 'btCollega')).toEqual([]);
+  expect((await app.evaluate(() => globalThis.__pcDisp)).every((d) => d.collegato)).toBe(true);
+});
+
+test('in chat, col nome di un dispositivo e l\'indirizzo di un altro, si scollega quello nominato nella conferma', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo');
+  await computerFinto(app, { dispositivi: CUFFIE_E_CASSE() });
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'a2', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'Casse JBL', indirizzo: '00:11:22:33:44:55', collega: false }) }] },
+    { text: 'Scollegate.' },
+  ]);
+  await chiedi(page, 'scollega le casse');
+  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('Casse JBL');
+  expect(await confirmText(page)).not.toContain('Cuffie Sony');
+  // Fra la domanda e l'OK si abbina un altro dispositivo con lo stesso nome: parte quello che la conferma ha mostrato.
+  await app.evaluate(() => globalThis.__pcDisp.unshift({ indirizzo: '00:11:22:33:44:77', nome: 'Casse JBL', collegato: true }));
+  await clickConfirm(page, 'ok');
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega'))
+    .toEqual([['btCollega', { indirizzo: '00:11:22:33:44:66', collega: false }]]);
+  const dopo = await app.evaluate(() => globalThis.__pcDisp);
+  expect(dopo.map((d) => [d.indirizzo, d.collegato])).toEqual([['00:11:22:33:44:77', true], ['00:11:22:33:44:55', true], ['00:11:22:33:44:66', false]]);
+});
+
+// Il costo 3 del dimenticare passa da un giudizio che qui non c'è: la stessa porta della chat, chiamata direttamente.
+test('«dimentica le casse» dalla chat: la conferma nomina il dispositivo vero, e all\'OK si dimentica quello anche se ne arriva un omonimo', async ({ app }) => {
+  await computerFinto(app, { dispositivi: CUFFIE_E_CASSE() });
+  await home(app);
+  const azione = { type: 'BLUETOOTH', dispositivo: 'le casse', dimentica: true };
+  const esegui = (opts) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a.azione, a.opts), { azione, opts });
+  const chiesta = await esegui({});
+  expect(chiesta.executed).toBe(false);
+  expect(chiesta.needsConfirm).toBeGreaterThanOrEqual(2);
+  expect(chiesta.describe).toContain('Dimenticare il dispositivo Bluetooth «Casse JBL»');
+  await app.evaluate(() => globalThis.__pcDisp.unshift({ indirizzo: '00:11:22:33:44:77', nome: 'Casse JBL', collegato: false }));
+  const fatta = await esegui({ confirmed: true });
+  expect(fatta.executed).toBe(true);
+  expect((await chiamate(app)).filter((c) => c[0] === 'btDimentica')).toEqual([['btDimentica', { indirizzo: '00:11:22:33:44:66' }]]);
+  expect((await app.evaluate(() => globalThis.__pcDisp)).map((d) => d.indirizzo)).toEqual(['00:11:22:33:44:77', '00:11:22:33:44:55']);
+});
+
 test('acceso o spento dal riquadro o da fuori, l\'elenco del riquadro aperto si rilegge e non dice il contrario della radio', async ({ app }) => {
   const cuffie = { indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: true };
   await computerFinto(app, { dispositivi: [cuffie], reti: ['Casa', 'Ufficio'], stato: { ...PARTENZA, bluetooth: { acceso: true, dispositivi: ['Cuffie'] } } });
@@ -395,11 +489,11 @@ test('con tante reti conosciute il riquadro scorre, con la rotella e con le frec
   await expect(riquadro(page)).toHaveCount(0);
   await page.evaluate(() => document.getElementById('spazio-prova').remove());
 
-  // Dalla prima voce, freccia su gira in fondo (Nascondi, Copia, poi l'ultima rete), sotto il bordo del riquadro.
+  // Dalla prima voce, freccia su gira in fondo (Nascondi, poi l'ultima rete), sotto il bordo del riquadro.
   await voce(page, 'rete').click();
   await expect(ultima).toBeAttached({ timeout: 5_000 });
   await riquadro(page).locator('.sn-select-option').first().focus();
-  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+  for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowUp');
   await page.waitForTimeout(300);
   await expect(page.locator(':focus')).toHaveText('Collegati a Rete numero 40');
   await page.keyboard.press('Enter');
