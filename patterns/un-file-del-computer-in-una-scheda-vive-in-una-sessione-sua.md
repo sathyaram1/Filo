@@ -21,7 +21,8 @@ sua quella richiesta non parte nemmeno.
 
 Il confine è la cartella, non il file, perché una pagina locale vera (un report, un sito salvato) si porta dietro
 immagini, stili e script accanto a sé. Leggerli come dati resta chiuso: la CSP ferma fetch e XHR, e i riquadri
-`file:` non si caricano.
+`file:` non si caricano. La CSP va su tutto perché anche un `.xml` nel namespace XHTML, o un file senza estensione
+che Chromium riconosce come HTML, esegue script (controllo di sicurezza di #1905).
 
 ## Chi decide se si apre
 
