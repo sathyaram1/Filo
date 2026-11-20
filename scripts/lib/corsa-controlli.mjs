@@ -1,6 +1,6 @@
-// Il segno di finish:check in corso, nella cartella git (#2571): ucciso (exit 137) non lo toglie, e chi viene dopo sul
-// suo ramo (aspetta, la veglia, il lancio seguente) sa cosa è morto, in che fase e con quanta memoria. Non decide niente.
-// Regole: tests/unit/processoUcciso.test.mjs.
+// Il segno di finish:check in corso, nella cartella git (#2571): una corsa interrotta non lo toglie, e chi viene dopo sul
+// suo ramo (aspetta, la veglia, il lancio seguente) sa cosa si è fermato, in che fase, con quanta memoria e se la sessione
+// è ripartita. Il segno non sa con quale segnale: niente numeri d'uscita. Regole: tests/unit/processoUcciso.test.mjs.
 
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -8,7 +8,6 @@ import { gitIn } from './branch-integrity.mjs';
 import { leggiFile, letturaMemoria, ripartito, testoMemoria, uccisiPerMemoria } from './memoria-contenitore.mjs';
 
 export const FILE_CORSA = 'filo-controlli-in-corso.json';
-export const CODICE_SIGKILL = 137;
 
 // Un guasto finisce fra virgolette doppie in una riga di comando e nelle note: una riga, senza virgolette, apici
 // inversi, dollari. Lo usano anche i testi della veglia: una copia sola.
