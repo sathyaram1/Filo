@@ -379,33 +379,17 @@ async function azioneZoomPagina(action, { sender }) {
 const STATI_TRADUZIONE = Object.freeze({
   partita: true, in_corso: true, gia_tradotta: true, originale: true, fermata: true, niente: true, spento: false, muto: false,
 });
-// Il preload dà a Filo 3 secondi per montarsi nella pagina prima di rispondere: oltre, la pagina non c'è.
+// La pagina aspetta che Filo si monti al massimo `entroMs`, che le diamo noi: così risponde sempre prima della scadenza.
 const ATTESA_TRADUZIONE_MS = 5000;
+const MARGINE_RISPOSTA_MS = 1500;
 
-function chiediTraduzione(tab, originale) {
-  const { ipcMain } = require('electron');
+async function chiediTraduzione(tab, originale) {
   const wc = tab.view && tab.view.webContents;
-  if (!wc || wc.isDestroyed()) return Promise.resolve({ stato: 'muto' });
-  const rid = `traduci-${require('node:crypto').randomUUID()}`;
-  return new Promise((resolve) => {
-    let chiuso = false;
-    const fine = (v) => {
-      if (chiuso) return;
-      chiuso = true;
-      clearTimeout(scadenza);
-      ipcMain.removeListener('filo:traduci-pagina-esito', eco);
-      resolve(v);
-    };
-    // Solo il documento della scheda a cui l'abbiamo chiesto: un riquadro o un'altra pagina non parlano per lei.
-    const eco = (e, msg) => {
-      if (!msg || String(msg.rid || '') !== rid || e.sender !== wc) return;
-      if (e.senderFrame && e.senderFrame !== wc.mainFrame) return;
-      fine(msg);
-    };
-    const scadenza = setTimeout(() => fine({ stato: 'muto' }), ATTESA_TRADUZIONE_MS);
-    ipcMain.on('filo:traduci-pagina-esito', eco);
-    try { wc.send('filo:traduci-pagina', { rid, originale }); } catch (_) { fine({ stato: 'muto' }); }
+  const r = await chiediAllaPagina(wc, {
+    canale: 'filo:traduci-pagina', eco: 'filo:traduci-pagina-esito', attesaMs: ATTESA_TRADUZIONE_MS,
+    dati: { originale, entroMs: ATTESA_TRADUZIONE_MS - MARGINE_RISPOSTA_MS },
   });
+  return r || { stato: 'muto' };
 }
 
 async function azioneTraduciPagina(action, { sender }) {
