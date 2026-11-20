@@ -178,7 +178,7 @@
 
   // git legge un'opzione lunga anche accorciata (`--unset-a` è `--unset-all`, `--verb` è `--verbose`), ma un nome
   // scritto intero vince sugli altri che comincia: `--get` non è `--get-regexp`, `--unset` non è `--unset-all`.
-  const GIT_NOMI_INTERI = new Set(['get', 'unset', 'bool']);
+  const GIT_NOMI_INTERI = new Set(['get', 'unset']);
   function gitOpzione(a, nomi) {
     return nomi.some((n) => {
       if (opzioneLunga(a, n, 1) == null) return false;
