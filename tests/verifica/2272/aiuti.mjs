@@ -2,10 +2,9 @@
 
 export const NEWTAB = 'filo://newtab/';
 
-export async function preparaImmagini(app, quante) {
-  await app.evaluate(({ nativeImage }, quante) => {
+export async function preparaImmagini(app, quante, { w = 320, h = 220 } = {}) {
+  await app.evaluate(({ nativeImage }, { quante, w, h }) => {
     const png = (k) => {
-      const w = 320; const h = 220;
       const buf = Buffer.alloc(w * h * 4);
       for (let i = 0; i < w * h; i++) { buf[i * 4] = (40 * k) % 255; buf[i * 4 + 1] = 120; buf[i * 4 + 2] = 200 - 20 * k; buf[i * 4 + 3] = 255; }
       return nativeImage.createFromBitmap(buf, { width: w, height: h }).toPNG();
