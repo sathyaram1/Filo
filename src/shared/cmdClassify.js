@@ -226,8 +226,15 @@
     if (CANCELLA_IN_UNO_SCRIPT.test(t)) return true;
     for (const pezzo of t.split(/[;&|(){}\r\n]|\s-(?:exec|execdir|ok|okdir)\s/)) {
       // `$x = Remove-Item …`: l'assegnazione davanti non cambia il comando.
-      const testo = pezzo.replace(/^\s*(?:\[[\w.]+\]\s*)?\$[\w:]+\s*=\s*/, '').trim();
-      const tok = testo.split(/\s+/).filter(Boolean);
+      let testo = pezzo.replace(/^\s*(?:\[[\w.]+\]\s*)?\$[\w:]+\s*=\s*/, '').trim();
+      let tok = testo.split(/\s+/).filter(Boolean);
+      // `git rebase -x "rm …"`, `git submodule foreach rm …`: il programma che git lancia da sé si guarda al posto di git.
+      while (nomeProgramma(tok[0]) === 'git') {
+        const p = gitProgrammaScritto(tok.slice(1));
+        if (!p || !p.length) break;
+        tok = p;
+        testo = p.join(' ');
+      }
       if (!tok.length) continue;
       if (cancellaDa(tok, 0)) return true;
       const prog = nomeProgramma(tok[0]);
