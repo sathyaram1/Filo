@@ -112,7 +112,7 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
       });
       const entro = (p) => Promise.race([p, scadenza]);
       const parti = [
-        statici(t),
+        statici(t, testiAllegati),
         t.trim() ? entro(rileggiTesto(t)) : Promise.resolve([]),
         imm.length ? entro(chiedi(azioni.FEEDBACK_L0_IMMAGINI, L().richiestaImmagini(t, imm), (raw) => L().leggiImmagini(raw, imm.length), 'immagini', ferma.signal)) : Promise.resolve([]),
       ];
