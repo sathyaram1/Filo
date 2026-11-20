@@ -625,3 +625,59 @@ test('la scelta generale cambiata mentre il salvataggio viaggia resta, e la conf
   await expect(stato).toHaveText('Modifiche non ancora propagate.', { timeout: 8_000 });
   await expect(page.locator('#providerSort')).toHaveValue('throughput');
 });
+
+// ── Chi ha servito le ultime richieste (#542) ───────────────────────────────
+// L'host che scambiava le risposte (#518) è venuto fuori solo dal banco di prova: accanto alla lista degli esclusi la
+// pagina mostra chi ha servito le ultime richieste dei crediti e in che proporzione, giudicato con la lista sullo schermo.
+
+const SERVITO = {
+  limite: 1000, letti: 10, dal: '2026-11-18T08:00:00.000Z', al: '2026-11-20T10:00:00.000Z',
+  conti: [
+    { host: 'DeepInfra', modello: 'qwen/qwen3', n: 5 },
+    { host: 'Novita', modello: 'qwen/qwen3', n: 2 },
+    { host: 'Novita', modello: 'deepseek/deepseek-v3', n: 1 },
+    { host: 'Amazon Bedrock', modello: 'anthropic/claude-sonnet', n: 1 },
+    { host: '', modello: 'qwen/qwen3', n: 1 },
+  ],
+};
+
+test('accanto agli esclusi: chi ha servito le ultime richieste, in che proporzione, e chi viola la lista sullo schermo', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { excludedProviders: ['Google', 'Novita'], __servito: SERVITO });
+  const stato = page.locator('#servitoStato');
+  const righe = page.locator('#servitoList li');
+
+  await expect(stato).toHaveText(/^Chi ha servito le 10 richieste pagate coi crediti di Filo, dal 18 nov/);
+  await expect(righe).toHaveCount(4);
+  await expect(righe.nth(0)).toHaveText(/^DeepInfra\s*50% \(5\)$/);
+  await expect(righe.nth(1)).toHaveText(/^Novita · fornitore escluso\s*30% \(3\)$/);
+  await expect(righe.nth(2)).toHaveText(/^Amazon Bedrock · non servito dal produttore\s*10% \(1\)$/);
+  await expect(righe.nth(3)).toHaveText(/^non detto\s*10% \(1\)$/);
+  await expect(righe.nth(1)).toHaveClass(/is-flagged/);
+  await expect(righe.nth(0)).not.toHaveClass(/is-flagged/);
+  await expect(righe.nth(1)).toHaveAttribute('title', 'qwen/qwen3: 2\ndeepseek/deepseek-v3: 1');
+  const sent = await page.evaluate(() => window.__sent.filter((m) => m.type === 'wallet_owner_served_by').length);
+  expect(sent).toBe(1);
+  await page.locator('#sec-excluded').screenshot({ path: 'tests/.shots/admin-defaults-servito.png' }).catch(() => {});
+
+  // La lista cambiata e non ancora salvata cambia il giudizio subito: DeepInfra escluso, Novita rimessa.
+  await page.click('#addExcludedRow');
+  await page.locator('#excludedList .sn-excluded-row').last().locator('.sn-excluded-name').fill('DeepInfra');
+  await expect(righe.nth(0)).toHaveText(/^DeepInfra · fornitore escluso/);
+  await expect(righe.nth(0)).toHaveClass(/is-flagged/);
+  await page.locator('#excludedList .sn-excluded-row').nth(1).getByRole('button', { name: 'Rimuovi' }).click();
+  await expect(righe.nth(1)).toHaveText(/^Novita\s*30% \(3\)$/);
+  await expect(righe.nth(1)).not.toHaveClass(/is-flagged/);
+});
+
+test('chi ha servito: al tetto la riga dice «ultime», senza richieste lo dice, e un errore porta il suo motivo', async ({ openTab }) => {
+  let page = await openStubbedEditor(openTab, { __servito: { ...SERVITO, letti: 1000 } });
+  await expect(page.locator('#servitoStato')).toHaveText(/^Chi ha servito le ultime 1\.000 richieste pagate coi crediti di Filo, dal /);
+
+  page = await openStubbedEditor(openTab, { __servito: { limite: 1000, letti: 0, dal: '', al: '', conti: [] } });
+  await expect(page.locator('#servitoStato')).toHaveText('Nessuna richiesta pagata coi crediti di Filo per ora: qui comparirà chi le serve.');
+  await expect(page.locator('#servitoList li')).toHaveCount(0);
+
+  page = await openStubbedEditor(openTab, { __servitoErrore: 'registro d\'uso 403 PERMISSION_DENIED' });
+  await expect(page.locator('#servitoStato')).toHaveText('Non riesco a leggere chi ha servito le ultime richieste (registro d\'uso 403 PERMISSION_DENIED).');
+  await expect(page.locator('#servitoList li')).toHaveCount(0);
+});
