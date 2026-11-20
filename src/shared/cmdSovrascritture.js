@@ -265,9 +265,13 @@
   function toccaIlCuoreDiGit(raw, c) {
     const parole = new Set(['.', ...dequote(raw).split(/\s+/)]);
     const elenchi = forsePowerShell(c);
-    for (const vuote of [false, true]) {
-      const lette = argomenti(raw, { ...c, vuote, elenchi }).map((a) => a.testo);
-      for (const p of lette.concat((shellPosix(c) || c.sistemaIgnoto ? graffe(lette) : null) || [])) parole.add(p);
+    // Senza sistema la shell può anche essere bash, che decodifica `$'\x2egit'` e `.g\it`.
+    const shell = c.sistemaIgnoto ? [c, { ...c, sistemaIgnoto: false, win: false, shell: 'sh' }] : [c];
+    for (const cs of shell) {
+      for (const vuote of [false, true]) {
+        const lette = argomenti(raw, { ...cs, vuote, elenchi }).map((a) => a.testo);
+        for (const p of lette.concat((shellPosix(cs) || cs.sistemaIgnoto ? graffe(lette) : null) || [])) parole.add(p);
+      }
     }
     for (const p of parole) {
       // Il valore di un'opzione: `--target-directory=x`, `-Destination:x`, `/LOG:x`.
