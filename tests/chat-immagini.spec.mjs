@@ -183,3 +183,160 @@ test('senza un modello che disegna Filo non chiama nessuno e il modello sa dove 
   expect(visto).toContain('Immagine NON creata');
   expect(visto).toContain('alla voce «Immagini create in chat»');
 });
+
+async function fotoInRisposta(app, openTab, { quante = 2, finale = 'Ecco.\n\n[[immagini: $ID0, $ID1]]\n\nFine.', w, h } = {}) {
+  await preparaImmagini(app, quante, { w, h });
+  await stubModello(app, { chiamata: { azione: 'immagini', query: 'antilope' }, finale });
+  const page = await openTab(NEWTAB);
+  await chiedi(page, 'antilope immagine');
+  const imgs = page.locator('.dash-bubble-filo .filo-galleria-img');
+  await expect(imgs.first()).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => imgs.evaluateAll((els) => els.every((e) => e.complete && e.naturalWidth > 0)), { timeout: 15_000 }).toBe(true);
+  return { page, imgs };
+}
+
+test('una foto sola e larga (16:9) sta tutta dentro la risposta, senza parti fuori dal bordo', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const { page } = await fotoInRisposta(app, openTab, { quante: 1, w: 800, h: 450, finale: 'Ecco la savana.\n\n[[immagine: $ID0]]\n\nBella.' });
+  const bolla = page.locator('.dash-bubble-filo', { hasText: 'Ecco la savana.' });
+  const m = await bolla.evaluate((b) => {
+    const s = b.querySelector('.filo-galleria-scorre');
+    const i = b.querySelector('.filo-galleria-img').getBoundingClientRect();
+    return { foto: i.right, bolla: b.getBoundingClientRect().right, fuori: s.scrollWidth - s.clientWidth, larga: i.width, alta: i.height };
+  });
+  expect(m.fuori, JSON.stringify(m)).toBeLessThanOrEqual(1);
+  expect(m.foto, JSON.stringify(m)).toBeLessThanOrEqual(m.bolla);
+  expect(Math.abs(m.larga / m.alta - 16 / 9), 'non deformata').toBeLessThan(0.05);
+});
+
+test('tasto destro su una foto trovata: salva il file, copia e cerca l\'indirizzo del web, mai quello della copia', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  const fs = await import('node:fs');
+  const { page, imgs } = await fotoInRisposta(app, openTab);
+  const menu = menuDi(page);
+  const originale = await app.evaluate(() => globalThis.__scaricate[0]);
+  expect(originale).toMatch(/^https:\/\/upload\.wikimedia\.org\//);
+
+  await app.evaluate(({ clipboard }) => clipboard.clear());
+  await imgs.first().click({ button: 'right' });
+  await menu.voce('Copia URL immagine').click();
+  await expect.poll(() => app.evaluate(async ({ clipboard }) => clipboard.readText()), { timeout: 8000 }).toBe(originale);
+
+  await imgs.first().click({ button: 'right' });
+  await menu.voce('Cerca immagine').click();
+  const lens = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => w.getURL()).find((u) => /lens\.google/.test(u)) || '');
+  await expect.poll(lens, { timeout: 10_000 }).toContain(encodeURIComponent(originale));
+
+  const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR || '');
+  expect(dir).not.toBe('');
+  await imgs.first().click({ button: 'right' });
+  await menu.voce('Salva immagine come').click();
+  const salvate = () => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.png$/i.test(f)) : []);
+  await expect.poll(() => salvate().length, { timeout: 15_000 }).toBeGreaterThan(0);
+  expect(fs.statSync(`${dir}/${salvate()[0]}`).size).toBeGreaterThan(100);
+});
+
+test('tasto destro su un\'immagine creata: niente indirizzo da copiare o cercare, perché non ne ha uno', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await stubModello(app, { chiamata: { azione: 'disegna', descrizione: 'un drago' }, finale: 'Ecco il drago.' });
+  const page = await openTab(NEWTAB);
+  await chiedi(page, 'disegnami un drago');
+  const img = page.locator('.dash-bubble-filo .filo-galleria-img[data-generata="1"]');
+  await expect(img).toHaveCount(1, { timeout: 30_000 });
+  await img.click({ button: 'right' });
+  const menu = menuDi(page);
+  await expect(menu.voce('Copia immagine')).toBeVisible({ timeout: 10_000 });
+  await expect(menu.voce('Copia URL immagine')).toHaveCount(0);
+  await expect(menu.voce('Cerca immagine')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+});
+
+test('ingrandita una foto del carosello, le frecce della tastiera passano alle altre', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const { page, imgs } = await fotoInRisposta(app, openTab, { quante: 3, finale: 'Ecco.\n\n[[immagini: $ID0, $ID1, $ID2]]' });
+  const srcs = await imgs.evaluateAll((els) => els.map((e) => e.getAttribute('src')));
+  await imgs.first().click();
+  const grande = page.locator('#lightbox.open img');
+  await expect(grande).toHaveAttribute('src', srcs[0]);
+  await page.keyboard.press('ArrowRight');
+  await expect(grande).toHaveAttribute('src', srcs[1]);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(grande).toHaveAttribute('src', srcs[0]);
+  await page.keyboard.press('ArrowLeft');
+  await expect(grande).toHaveAttribute('src', srcs[2]);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#lightbox.open')).toHaveCount(0);
+});
+
+test('fermata a metà, la risposta tiene a schermo le foto della parte già scritta', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaImmagini(app, 2);
+  await stubModello(app, { chiamata: { azione: 'immagini', query: 'antilope' }, finale: 'x' });
+  await app.evaluate(() => {
+    const prima = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => {
+      if (globalThis.__chiamate === 0) return prima(o);
+      globalThis.__chiamate++;
+      const visto = o.messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+      const ids = [...new Set(visto.match(/\b[ig]\d+\b(?=:|,|\))/g) || [])];
+      const text = `Ecco le antilopi che ho trovato.\n\n[[immagini: ${ids[0]}, ${ids[1]}]]\n\n` + 'Un testo lungo che arriva piano. '.repeat(80);
+      for (let i = 0; i < text.length; i += 4) {
+        if (o.signal && o.signal.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
+        if (o.onDelta) o.onDelta(text.slice(i, i + 4));
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      return { model: o.attempts[0].model, provider: o.attempts[0].provider, usage: {}, reasoningDetails: [], text, toolCalls: [], finishReason: 'stop' };
+    };
+  });
+  const page = await openTab(NEWTAB);
+  await chiedi(page, 'antilope immagine');
+  const bolla = page.locator('.dash-bubble-filo', { hasText: 'Ecco le antilopi' });
+  await expect(bolla).toContainText('Un testo lungo', { timeout: 30_000 });
+  await page.locator('#stopBtn, [aria-label="Ferma"], [data-tip="Ferma"]').first().click();
+  await expect(page.getByText('Fermato a metà della risposta')).toBeVisible({ timeout: 10_000 });
+  await expect(bolla.locator('.filo-galleria-img')).toHaveCount(2, { timeout: 10_000 });
+  await expect(bolla).not.toContainText('[[immagin');
+});
+
+test('le copie delle foto restano finché una chat le nomina, e se ne vanno con la chat cancellata', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  await fotoInRisposta(app, openTab);
+  const file = await app.evaluate(async () => {
+    const C = globalThis.__filoCopieIcone;
+    const chats = await globalThis.SN_FILO_CHATS.list({ nascoste: true });
+    const chat = chats.find((c) => (c.messages || []).some((m) => Array.isArray(m.immagini) && m.immagini.length));
+    const srcs = globalThis.SN_IMMAGINI_RISPOSTA.copieDi(chat.messages);
+    return { chat: chat.id, cartella: C.cartella(), nomi: srcs.map((s) => C.nomeDa(s)) };
+  });
+  expect(file.nomi.length).toBe(2);
+  const percorsi = file.nomi.map((n) => path.join(file.cartella, n));
+  for (const p of percorsi) expect(fs.existsSync(p), p).toBe(true);
+  // La pulizia dell'avvio, passata la grazia delle copie appena scritte: quelle di una chat viva restano.
+  await new Promise((r) => setTimeout(r, 1500));
+  await app.evaluate(() => globalThis.__filoCopieIcone.pulisci());
+  for (const p of percorsi) expect(fs.existsSync(p), `dopo la pulizia: ${p}`).toBe(true);
+  // Cancellata la conversazione, le sue copie se ne vanno.
+  await app.evaluate((id) => globalThis.SN_FILO_CHATS.remove(id), file.chat);
+  await expect.poll(() => percorsi.filter((p) => fs.existsSync(p)).length, { timeout: 10_000 }).toBe(0);
+});
+
+test('«cancella tutte le conversazioni» porta via anche le copie delle foto', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  await fotoInRisposta(app, openTab);
+  const percorsi = await app.evaluate(async () => {
+    const C = globalThis.__filoCopieIcone;
+    const chats = await globalThis.SN_FILO_CHATS.list({ nascoste: true });
+    return chats.flatMap((c) => globalThis.SN_IMMAGINI_RISPOSTA.copieDi(c.messages)).map((s) => C.cartella() + '\u0000' + C.nomeDa(s));
+  });
+  const veri = percorsi.map((x) => path.join(...x.split('\u0000')));
+  expect(veri.length).toBe(2);
+  for (const p of veri) expect(fs.existsSync(p), p).toBe(true);
+  await new Promise((r) => setTimeout(r, 1200));
+  await app.evaluate(() => globalThis.SN_FILO_CHATS.clear());
+  await expect.poll(() => veri.filter((p) => fs.existsSync(p)).length, { timeout: 10_000 }).toBe(0);
+});
