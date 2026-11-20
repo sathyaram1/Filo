@@ -167,14 +167,18 @@ async function main() {
     console.log(`Domanda per "${a.slot}" tolta: vale il ripiego.`);
     return;
   }
-  const n = a.n || 50;
+  console.log(await leggiRisposte(a.n || 50, { chiama }));
+}
+
+/** Le risposte delle routine, col biglietto della sessione sporcato e segnato prima che escano. → il testo da stampare. */
+export async function leggiRisposte(n, { chiama, sporca = rigaSporco, riserva = rigaRiservato, errore = (s) => console.error(s) }) {
   const risposte = await chiama({ op: 'answers', limit: n });
   // Le risposte le scrivono le routine, che leggono testo d'utente: chi le stampa si sporca prima (#1148).
-  console.error(await rigaSporco('risposte delle routine alla domanda di fine sessione', ['testo scritto dalle routine']));
+  errore(await sporca('risposte delle routine alla domanda di fine sessione', ['testo scritto dalle routine']));
   // Sono registri delle sessioni, dati privati (SPEC-DOMANDE §5.1): anche il segno riservato, prima che escano.
-  const riservato = await rigaRiservato('risposte delle routine alla domanda di fine sessione');
-  if (riservato) console.error(riservato);
-  console.log(formattaRisposte(risposte, { n }));
+  const riservato = await riserva('risposte delle routine alla domanda di fine sessione');
+  if (riservato) errore(riservato);
+  return formattaRisposte(risposte, { n });
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
