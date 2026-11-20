@@ -1026,7 +1026,6 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
   try { require(path.join(SHARED_DIR, 'gestiContati.js')); } catch (e) { console.error('[Filo CS] gestiContati', e); } // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
-  try { require(path.join(SHARED_DIR, 'guardianoStatico.js')); } catch (e) { console.error('[Filo CS] guardianoStatico', e); } // «è un segreto?» e la forma di una carta: PRIMA di campoTesto ed extractContext (#810.7, #810.8)
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'schedeInChat.js')); } catch (e) { console.error('[Filo CS] schedeInChat', e); } // #2085 — gettoni delle schede: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'schedaTrascinata.js')); } catch (e) { console.error('[Filo CS] schedaTrascinata', e); } // #2084 — la scheda lasciata qui: PRIMA di content.js e sidebar.js
