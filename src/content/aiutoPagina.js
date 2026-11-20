@@ -179,7 +179,28 @@
     share_link: { target: 'link', costo: 2, label: 'condividi link' },
     // la pagina intera: la stessa strada di «Salva per dopo» del menu, che poi chiude la scheda (niente passo dopo).
     save_page: { target: 'none', costo: 1, label: 'salva la pagina per dopo', chiude: true },
+    // #504 — la traduzione dell'icona, con le stesse risposte della chat: «traduci» non torna mai all'originale.
+    translate_page: { target: 'none', costo: 1, label: 'traduci la pagina' },
   });
+
+  // Com'è andata la traduzione chiesta all'Aiuto, in una riga del diario: gli stati sono quelli di SN_TRANSLATE_PAGE.daChat.
+  const RIGHE_TRADUZIONE = Object.freeze({
+    partita: (r) => (r.come === 'ripresa' ? 'traduzione della pagina ripresa da dove si era fermata'
+      : r.come === 'nuovo' ? 'traduzione partita sul solo testo comparso dopo' : 'traduzione della pagina partita'),
+    in_corso: () => 'la pagina si sta già traducendo',
+    gia_tradotta: () => 'la pagina è già tradotta tutta',
+    originale: () => 'pagina rimessa nella lingua originale',
+    fermata: () => 'traduzione fermata, pagina rimessa nella lingua originale',
+    niente: () => 'la pagina non era tradotta: è già nella lingua originale',
+  });
+  function traduciPagina(page) {
+    const T = global.SN_TRANSLATE_PAGE;
+    const originale = page.originale === true || String(page.originale ?? '').trim().toLowerCase() === 'true';
+    const r = T && typeof T.daChat === 'function' ? T.daChat(originale) : null;
+    const riga = r && RIGHE_TRADUZIONE[r.stato];
+    if (!riga) return { ok: false, riga: 'traduci la pagina: qui non si può tradurre' };
+    return { ok: true, riga: riga(r) };
+  }
 
   // Come Alt+S: le pagine di Filo non si mettono da parte, tranne quella d'errore, che salva il sito non caricato.
   function paginaDaSalvare() {
@@ -321,6 +342,7 @@
           return { ok: true, riga: 'pagina salvata in «Aperti per dopo»: chiudo la scheda' };
         }
         case 'share_link': await Actions?.shareLink(linkEl); break;
+        case 'translate_page': return traduciPagina(page);
         default: return { ok: false, riga: `${label}: non riuscita` };
       }
     } catch (_) {

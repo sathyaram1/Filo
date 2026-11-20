@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.296', date: '2026-11-20',
+      features: [
+        { testo: 'La traduzione della pagina si chiede anche a Filo, nella chat o nell\'Aiuto della pagina: «traducimi questa pagina», «riprendi la traduzione», «torna all\'originale». Se la pagina è già tradotta o già com\'era, te lo dice. Il tasto che traduce la selezione, premuto senza niente di selezionato, traduce la pagina.', segnalazione: 504 },
+      ],
+    },
+    {
       version: '0.2.295', date: '2026-11-20',
       features: [
         { testo: 'Nella chat della home Filo ti mostra le immagini dentro la risposta, fra un pezzo di testo e l\'altro: una sola o una fila che scorri di lato, col sito da cui viene ognuna. Clic per ingrandirla. Con un modello che disegna, scelto in Impostazioni alla voce «Immagini create in chat», crea anche le immagini che gli chiedi, segnate come fatte con l\'AI.', segnalazione: 2272 },

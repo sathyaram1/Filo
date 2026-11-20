@@ -6,8 +6,9 @@ const { daFilo, origineDi } = require('../handlers/origine');
 const SempreAperte = require('../sempreAperte');
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const { winOf, targetWebTab, nomeDellaScheda } = require('../handlersComuni');
+const { chiediAllaPagina } = require('../domandaAllaPagina');
 const { getEffectiveSettings } = require('../impostazioniEffettive');
-const { contaZoomDallaChat, contaPaginaDallaChat } = require('../autonomiaFonti');
+const { contaZoomDallaChat, contaPaginaDallaChat, dallaChat } = require('../autonomiaFonti');
 const {
   schedeChiusePerChat, voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, bersaglioPausa, bersaglioAudio, salvatePerChat,
   apriPaginaSalvata, leggiPaginaDa, contoRestano,
@@ -374,6 +375,48 @@ async function azioneZoomPagina(action, { sender }) {
   };
 }
 
+// #504 — «traducimi la pagina», «riprendi la traduzione», «torna all'originale»: la traduzione la fa la pagina, come
+// dall'icona (page-preload.js → SN_TRANSLATE_PAGE.daChat), e risponde com'è andata. Gli stati sono quelli di daChat.
+const STATI_TRADUZIONE = Object.freeze({
+  partita: true, in_corso: true, gia_tradotta: true, originale: true, fermata: true, niente: true, spento: false, muto: false,
+});
+// La pagina aspetta che Filo si monti al massimo `entroMs`, che le diamo noi: così risponde sempre prima della scadenza.
+const ATTESA_TRADUZIONE_MS = 5000;
+const MARGINE_RISPOSTA_MS = 1500;
+
+async function chiediTraduzione(tab, originale) {
+  const wc = tab.view && tab.view.webContents;
+  const r = await chiediAllaPagina(wc, {
+    canale: 'filo:traduci-pagina', eco: 'filo:traduci-pagina-esito', attesaMs: ATTESA_TRADUZIONE_MS,
+    dati: { originale, entroMs: ATTESA_TRADUZIONE_MS - MARGINE_RISPOSTA_MS },
+  });
+  return r || { stato: 'muto' };
+}
+
+async function azioneTraduciPagina(action, { sender }) {
+  const originale = globalThis.SN_ACTION_LEVELS.alOriginale(action);
+  const { win, tm, tab } = targetWebTab(sender);
+  if (!tm || !tab) return { executed: false, kept: false, output: { traduzione: 'no-page', originale } };
+  // Sotto l'avviso del sito pericoloso la pagina non si vede: le sue azioni aspettano, come nella barra laterale.
+  if (typeof tm.paginaScoperta === 'function' && !tm.paginaScoperta(tab)) {
+    return { executed: false, kept: false, output: { traduzione: 'coperta', originale } };
+  }
+  const r = await chiediTraduzione(tab, originale);
+  const stato = Object.hasOwn(STATI_TRADUZIONE, r && r.stato) ? r.stato : 'muto';
+  const output = { traduzione: stato, originale };
+  // Chiesta dalla home, la pagina è l'ultima scheda web usata: l'utente non la vede cambiare, e va detto dove.
+  if (tab.id !== tm.activeId) output.dietro = true;
+  if (stato === 'partita') {
+    output.come = ['ripresa', 'nuovo'].includes(r.come) ? r.come : 'pagina';
+    const intero = (n) => (Number.isInteger(n) && n >= 0 ? n : 0);
+    if (output.come === 'ripresa') { output.mancanti = intero(r.mancanti); output.di = intero(r.di); }
+  }
+  if (globalThis.SN_ACTION_LEVELS.traduzioneFatta(stato) && dallaChat()) {
+    require('../contatoriStrade').misura('azione', 'translate', 'chat', { incognito: !!(win && win._filoIncognito) });
+  }
+  return { executed: STATI_TRADUZIONE[stato], kept: false, output };
+}
+
 async function azioneChiudiSchede(action, { sender }) {
   const tm = winOf(sender)?._filoTabs;
   const chiuse = tm ? tm.chiudiSchede(action._targetIds) : [];
@@ -399,5 +442,6 @@ module.exports = {
   STILE_PAGINA: azioneStilePagina,
   RIPRISTINA_STILE_PAGINA: azioneRipristinaStilePagina,
   ZOOM_PAGINA: azioneZoomPagina,
+  TRADUCI_PAGINA: azioneTraduciPagina,
   CHIUDI_SCHEDE: azioneChiudiSchede,
 };

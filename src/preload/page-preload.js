@@ -919,6 +919,25 @@ ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
   deliver();
 });
 
+// «Traduci la pagina» chiesto a Filo in chat (#504): la stessa traduzione dell'icona, con la risposta su com'è andata.
+// Dove Filo è spento il menu non c'è, e nemmeno questa strada.
+ipcRenderer.on('filo:traduci-pagina', (_event, d = {}) => {
+  if (IS_SUBFRAME) return;
+  const rid = String((d && d.rid) || '');
+  const rispondi = () => {
+    let esito = { stato: 'muto' };
+    if (globalThis.__snFiloSpento === true) esito = { stato: 'spento' };
+    else if (contenutiPronti()) {
+      try { esito = globalThis.SN_TRANSLATE_PAGE.daChat(d.originale === true) || esito; } catch (_) {}
+    }
+    try { ipcRenderer.send('filo:traduci-pagina-esito', { rid, ...esito }); } catch (_) {}
+  };
+  // Chi chiede dice quanto può aspettare (`entroMs`): oltre, la sua risposta «muta» arriverebbe prima della nostra.
+  const entro = Number(d && d.entroMs);
+  if (!contenutiPronti()) { waitForContentScripts(rispondi, Number.isFinite(entro) && entro > 0 ? entro : undefined); return; }
+  rispondi();
+});
+
 const STYLES = [
   'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
@@ -1133,8 +1152,8 @@ function contenutiPronti() {
   return globalThis.__snFiloSpento === true;
 }
 
-function waitForContentScripts(fn) {
-  const deadline = Date.now() + 3000;
+function waitForContentScripts(fn, entroMs = 3000) {
+  const deadline = Date.now() + entroMs;
   const tick = () => {
     if (contenutiPronti() || Date.now() > deadline) { try { fn(); } catch (_) {} return; }
     setTimeout(tick, 16);

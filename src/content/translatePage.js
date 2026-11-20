@@ -1201,8 +1201,37 @@
     return { type: 'item', icon, label: I18n.t('menu_show_original'), onClick: () => restoreOriginal() };
   }
 
+  // Chiesta a parole (#504): fa quello che farebbe l'icona, ma «traduci» non torna mai all'originale e «originale» non
+  // traduce. Risponde com'è andata, perché Filo non dica «fatto» su una pagina che era già così.
+  function daChat(originale) {
+    if (!isTopFrame()) return { stato: 'muto' };
+    ricontrolla();
+    if (originale) {
+      if (!pageTranslating && !pageHasTranslation) return { stato: 'niente' };
+      const fermata = pageTranslating;
+      restoreOriginal();
+      return { stato: fermata ? 'fermata' : 'originale' };
+    }
+    // Dove l'icona offrirebbe «Mostra originale» a parole non c'è niente da tradurre: la regola è una, showsRestore.
+    if (showsRestore()) return { stato: pageTranslating ? 'in_corso' : 'gia_tradotta' };
+    const esito = isPartial()
+      ? { stato: 'partita', come: 'ripresa', mancanti: missingCount, di: totalCount }
+      : { stato: 'partita', come: pageHasTranslation ? 'nuovo' : 'pagina' };
+    Promise.resolve(translatePage()).catch((e) => console.warn('[Filo] traduzione dalla chat', e));
+    return esito;
+  }
+
+  // Alt+T senza selezione (#504): esattamente l'icona Traduci, che traduce, continua o torna all'originale.
+  function dalTasto() {
+    if (!isTopFrame()) return false;
+    ricontrolla();
+    if (showsRestore()) restoreOriginal();
+    else Promise.resolve(translatePage()).catch((e) => console.warn('[Filo] traduzione dal tasto', e));
+    return true;
+  }
+
   global.SN_TRANSLATE_PAGE = {
     translatePage, restoreOriginal, hasTranslation,
-    isPartial, hasNewContent, canContinue, ricontrolla, showsRestore, missing, total, buildRestoreOriginalItem,
+    isPartial, hasNewContent, canContinue, ricontrolla, showsRestore, missing, total, buildRestoreOriginalItem, daChat, dalTasto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

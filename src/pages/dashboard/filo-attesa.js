@@ -76,6 +76,7 @@
     STILE_PAGINA: ['Cambiato l\'aspetto della pagina', (k) => `Cambiato l'aspetto della pagina ${n(k)} volte`, 'aspetto della pagina'],
     RIPRISTINA_STILE_PAGINA: ['Rimessa la pagina com\'era', (k) => `Rimesse ${n(k)} pagine com'erano`, 'aspetto della pagina'],
     ZOOM_PAGINA: ['Cambiato lo zoom', (k) => `Cambiato lo zoom ${n(k)} volte`, 'zoom'],
+    TRADUCI_PAGINA: ['Comandata la traduzione della pagina', (k) => `Comandata la traduzione della pagina ${n(k)} volte`, 'traduzione'],
     VOLUME: ['Cambiato il volume', (k) => `Cambiato il volume ${n(k)} volte`, 'volume'],
     BLUETOOTH: ['Comandato il Bluetooth', (k) => `Comandato il Bluetooth ${n(k)} volte`, 'Bluetooth'],
     WIFI: ['Comandato il Wi-Fi', (k) => `Comandato il Wi-Fi ${n(k)} volte`, 'Wi-Fi'],

@@ -1666,6 +1666,13 @@
         return 'Cambiare lo zoom della pagina';
       },
     },
+    // #504 — la traduzione della pagina chiesta a parole: la stessa dell'icona, che si disfa con «Mostra originale». Costa
+    // i token della traduzione come il clic; dopo una lettura di testo altrui, al livello Conservativo chiede.
+    TRADUCI_PAGINA: {
+      costo: 1,
+      campo: null,
+      describe: (a) => (alOriginale(a) ? 'Rimettere la pagina nella sua lingua originale' : 'Tradurre la pagina in italiano'),
+    },
     // #1397 — riparte la scheda che suonava, o si riapre il suo indirizzo: si disfa mettendo in pausa o chiudendo.
     RIPRENDI_AUDIO: {
       costo: 1,
@@ -1786,6 +1793,9 @@
     CANCELLA_SVEGLIA: fatta,
     MODIFICA_SVEGLIA: fatta,
     ZOOM_PAGINA: senza('limitato'),
+    // Già tradotta, già all'originale o già al lavoro: lo dice il modello, l'utente aveva chiesto altro. Così su una
+    // scheda che non è davanti: l'utente non la vede cambiare.
+    TRADUCI_PAGINA: (r) => fatta(r) && !!r.output && !r.output.dietro && traduzioneFatta(r.output.traduzione),
     VOLUME: senza('limitato'),
     RIPRENDI_AUDIO: senza('nonPartita'),
     PAUSA_AUDIO: senza('nessuna'),
@@ -1916,5 +1926,16 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount };
+  // TRADUCI_PAGINA che torna all'originale: il popup e chi esegue leggono lo stesso campo, anche scritto come testo.
+  function alOriginale(action) {
+    const v = action && action.originale;
+    return v === true || String(v ?? '').trim().toLowerCase() === 'true';
+  }
+
+  // Gli esiti di TRADUCI_PAGINA in cui la pagina è cambiata davvero: chiudono il turno da soli e contano come uso.
+  function traduzioneFatta(stato) {
+    return stato === 'partita' || stato === 'originale' || stato === 'fermata';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale, traduzioneFatta };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

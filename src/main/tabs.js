@@ -2,10 +2,11 @@
 // la barra della shell. Qui vivono il loro ciclo di vita, il layout, lo schermo
 // intero, il proxy per scheda e le guardie sulle navigazioni.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen, webFrameMain, webContents } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, screen, webFrameMain, webContents } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
+const { chiediAllaPagina } = require('./services/domandaAllaPagina');
 const Sito = require('../shared/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const { testoDellaRichiesta, corpoDa, LIMITE_CORPO } = require('./services/testoInviato');
@@ -3252,31 +3253,9 @@ class TabManager {
 
   _chiediZoom(active, spec) {
     if (!active || !active.view) return Promise.resolve(null);
-    const wc = active.view.webContents;
-    const rid = `zoom-${randomUUID()}`;
-    return new Promise((resolve) => {
-      let chiuso = false;
-      const fine = (v) => {
-        if (chiuso) return;
-        chiuso = true;
-        clearTimeout(scadenza);
-        try { ipcMain.removeListener('filo:zoom-applicato', onEco); } catch (_) {}
-        resolve(v);
-      };
-      // Solo la scheda a cui l'abbiamo chiesto può rispondere: un'altra pagina
-      // non deve poter mettere un numero in bocca a Filo.
-      const onEco = (e, msg) => {
-        if (!msg || String(msg.rid || '') !== rid) return;
-        if (e.sender !== wc) return;
-        fine(msg);
-      };
-      // Nessuna risposta: la pagina non ha il nostro preload (un visualizzatore
-      // interno, una pagina d'errore) o non è ancora in piedi. È diverso da
-      // «non c'è nessuna scheda», e chi riferisce all'utente deve poterlo dire.
-      const scadenza = setTimeout(() => fine({ muto: true }), 2000);
-      ipcMain.on('filo:zoom-applicato', onEco);
-      try { wc.send('filo:zoom-key', { ...spec, rid }); } catch (_) { fine({ muto: true }); }
-    });
+    // Nessuna risposta è diverso da «non c'è nessuna scheda», e chi riferisce all'utente deve poterlo dire.
+    return chiediAllaPagina(active.view.webContents, { canale: 'filo:zoom-key', eco: 'filo:zoom-applicato', dati: spec, attesaMs: 2000 })
+      .then((r) => r || { muto: true });
   }
 
 

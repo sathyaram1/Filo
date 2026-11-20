@@ -315,6 +315,18 @@
       const p = Number(a._output && a._output.percentuale);
       return { icon: '🔍', text: Number.isFinite(p) && p > 0 ? `Zoom ${globalThis.SN_SISTEMA.alPercento(p)}` : 'Zoom cambiato' };
     },
+    // #504 — gli stati sono quelli che la pagina riferisce (SN_TRANSLATE_PAGE.daChat).
+    TRADUCI_PAGINA: (a) => {
+      const o = a._output || {};
+      const frasi = {
+        in_corso: 'Traduzione della pagina già in corso', gia_tradotta: 'Pagina già tradotta',
+        originale: 'Pagina rimessa nella lingua originale', fermata: 'Traduzione fermata · pagina rimessa com’era',
+        niente: 'Pagina già nella lingua originale',
+      };
+      const partita = o.come === 'ripresa' ? 'Traduzione della pagina ripresa'
+        : o.come === 'nuovo' ? 'Traduzione del testo nuovo avviata' : 'Traduzione della pagina avviata';
+      return { icon: '🌐', text: frasi[o.traduzione] || partita };
+    },
     // #874 — il numero e i nomi veri, quelli che il sistema ha confermato.
     VOLUME: (a) => {
       const o = a._output || {};
@@ -451,7 +463,7 @@
     PULSANTE_PREFERENZE: 'Pulsante delle Preferenze non premuto',
     CARTA_HOME: 'Carta della home non cambiata',
     BARRA_SITI: 'Barra dei siti non cambiata',
-    CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
+    CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato', TRADUCI_PAGINA: 'Traduzione non cambiata',
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
     ORDINA_DESKTOP: 'Icone del desktop non spostate', BLOCCA_PC: 'Computer non bloccato',

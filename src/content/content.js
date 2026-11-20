@@ -3114,7 +3114,10 @@
       else Popup.toastErrore('err_no_selection');
     } else if (command === 'translate-selection') {
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
-      else Popup.toastErrore('err_no_selection');
+      // Senza selezione il tasto fa quello che farebbe l'icona Traduci (#504): sulle pagine di Filo non c'è niente da tradurre.
+      else if (location.protocol === 'filo:' || !TranslatePage || !TranslatePage.dalTasto || !TranslatePage.dalTasto()) {
+        Popup.toastErrore('err_no_selection');
+      }
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     } else if (command === 'aiuto-dalla-barra') {

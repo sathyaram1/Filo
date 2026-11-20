@@ -101,7 +101,10 @@
       const prima = String(o.stderr || o.stdout || '').split('\n').map((s) => s.trim()).find(Boolean) || '';
       return `uscito con codice ${o.code}${prima ? `: ${pulito(prima)}` : ''}`;
     }
-    if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
+    if (o.restyle === 'no-page' || o.traduzione === 'no-page') return 'nessuna pagina web aperta';
+    if (o.traduzione === 'spento') return 'Filo è spento su questo sito';
+    if (o.traduzione === 'muto') return 'la pagina non risponde';
+    if (o.traduzione === 'coperta') return 'la pagina è sotto l’avviso del sito';
     if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
