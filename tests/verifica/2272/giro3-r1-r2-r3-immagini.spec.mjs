@@ -67,7 +67,7 @@ test('r1 nel turno con le foto il modello non ha anche la regola «al massimo un
   const visto = await app.evaluate(() => globalThis.__visti[1]);
   expect(visto).toContain('[[immagini:');
   // Le due istruzioni si contraddicono: la regola di stile, se resta, deve escludere le foto dei marcatori.
-  const regola = (/[^.\n]*Al massimo un'immagine nel testo[^.\n]*\.[^.\n]*\./.exec(visto) || [''])[0];
+  const regola = (/[^\n]*Al massimo un'immagine nel testo[^\n]*/.exec(visto) || [''])[0];
   expect(regola === '' || /marcator|\[\[immagini|carosell|fila/i.test(regola), regola).toBe(true);
 });
 
