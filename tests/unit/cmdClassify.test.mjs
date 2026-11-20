@@ -1400,7 +1400,8 @@ test('cancellaPerSempre: il programma che git lancia da sé si guarda come gli a
 // che segue (2) lo raggiunge: scriverli vale come scrivere l'indirizzo di un remoto.
 const CHIAVI_DEL_PUSH = ['branch.main.pushRemote', 'remote.pushDefault', 'branch.main.remote'];
 test('git config — il remoto di un ramo o quello predefinito, scritti, decidono dove va il push (3) (#2623)', () => {
-  for (const chiave of [...CHIAVI_DEL_PUSH, 'branch.feature/x.y.pushremote', 'REMOTE.PUSHDEFAULT']) {
+  for (const chiave of [...CHIAVI_DEL_PUSH, 'branch.feature/x.y.pushremote', 'REMOTE.PUSHDEFAULT', 'include.path',
+    'includeIf.gitdir:~/lavoro/.path', 'includeIf.onbranch:main.path']) {
     for (const cmd of [`git config ${chiave} https://altrove.example/r.git`, `git config ${chiave} altrove.example:r.git`,
       `git config ${chiave} origin`, `git config --global ${chiave} ../altrove`, `git config --add ${chiave} x`,
       `git config --replace-all ${chiave} x`, `git config set ${chiave} https://x/r.git`, `git config set --append ${chiave} x`]) {
