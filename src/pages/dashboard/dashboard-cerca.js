@@ -126,6 +126,8 @@
     mostrato = b;
     if (d.mostraFilo) d.mostraFilo();
     if (r.k === 'pagina') { if (d.coda.vaiAPagina) d.coda.vaiAPagina({ url: r.url, ts: r.ts }).catch(() => {}); return; }
+    // La riga di pagine aperta da un risultato di prima si richiude anche passando a un messaggio.
+    if (d.coda.richiudiPagine) d.coda.richiudiPagine();
     d.coda.vaiA({ chat: r.chat, i: r.i, app: !!r.app, ts: r.ts }).catch(() => {});
   }
   // Dopo una pausa nello scrivere il centro va sul primo risultato, il più probabile.

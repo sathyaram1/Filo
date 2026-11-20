@@ -932,14 +932,14 @@
     } else {
       menu.push({ etichetta: v.tasto ? 'Rimetti in vista' : 'Rimetti nella home', fai: rimetti });
     }
-    const lettera = v.tasto || v.url ? vociLettera(v.id, v.titolo) : [];
+    const lettera = vociLettera(v.id, v.titolo);
     if (lettera.length) menu.push(null, ...lettera);
     return menu;
   }
 
   // ===== Le lettere del doppio tocco, dal tasto destro di un tasto o di una carta =====
   function vociLettera(id, titolo) {
-    if (!Tocco() || !(C.tasto(id) || (C.carta(id) && C.carta(id).url))) return [];
+    if (!Tocco() || !C.prendeLettera(id)) return [];
     const l = letteraDi(id);
     if (!l) return [{ etichetta: 'Assegna una lettera', fai: () => aspettaLettera(id, titolo) }];
     return [
@@ -970,7 +970,7 @@
       const r = Tocco().assegna(dati.impostazioni && dati.impostazioni.doppioTocco, l, { tasto: id });
       if (r.rifiuto) { avviso(r.rifiuto); return; }
       scriviImpostazione({ doppioTocco: { lettere: r.lettere } });
-      avviso(`«${l}${l}» nella home: ${titolo}`);
+      avviso(Tocco().conPrima(`«${l}${l}» nella home: ${titolo}`, r));
     };
     attesaLettera = { tasto, fine: () => fineAttesaLettera() };
     global.addEventListener('keydown', tasto, true);
@@ -1434,10 +1434,11 @@
     aperta: (nome) => dati.aperte[nome] === true,
     // Il doppio tocco (#2372): un tasto fa quello che fa il suo clic, una carta apre la sua app.
     usa(id) {
-      if (C.tasto(id)) { usaTasto(id, altroEl && altroEl.querySelector(`.dash-altro-app[data-id="${CSS.escape(id)}"]`)); return true; }
-      const c = C.carta(id);
-      if (c && c.url) { apri(c.url); return true; }
-      return false;
+      const x = C.prendeLettera(id);
+      if (!x) return false;
+      if (C.tasto(id)) usaTasto(id, altroEl && altroEl.querySelector(`.dash-altro-app[data-id="${CSS.escape(id)}"]`));
+      else apri(x.url);
+      return true;
     },    setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];

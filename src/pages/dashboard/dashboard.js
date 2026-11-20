@@ -377,6 +377,7 @@
   const Tastiera = self.SN_DASH_TASTIERA;
   Tastiera.init({
     send, input: inputEl, dash: $('dash'),
+    campo: () => (Cerca.aperta() ? $('cercaInput') : null),
     impostazioni: () => impostazioniHome,
     usa: (id) => Carte.usa(id),
   });
@@ -2559,7 +2560,8 @@
   // stato auth vive nel main: ci si iscrive a `auth_changed` per aggiornarla dal vivo.
   function applyAccountProfile(profile) {
     ultimoProfilo = profile || null;
-    if (!accountCtrlBtn || !accountIco || !accountCtrlBtn.isConnected) return;
+    // Il tasto ridisegnato arriva qui prima di entrare nella pagina: la foto la prende lo stesso.
+    if (!accountCtrlBtn || !accountIco) return;
     const btn = accountCtrlBtn;
     const ico = accountIco;
     const ICONS = self.SN_ICONS || {};
