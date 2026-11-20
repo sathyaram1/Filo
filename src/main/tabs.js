@@ -6,6 +6,7 @@ const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain,
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
+const { chiediAllaPagina } = require('./services/domandaAllaPagina');
 const Sito = require('../shared/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const { testoDellaRichiesta, corpoDa, LIMITE_CORPO } = require('./services/testoInviato');
