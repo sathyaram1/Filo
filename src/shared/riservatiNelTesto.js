@@ -249,8 +249,9 @@ const valoreDi = (x) => String((x && x.valore) || '');
 const lunghi = (vs) => vs.map(valoreDi).filter((v) => v.length >= 4);
 
 // I valori (minuscoli, da quattro caratteri) che in questo testo sono una password scritta a mano: le forme libere e
-// la risposta sotto chi la chiede. Mai un throw.
-function trova(testo) {
+// la risposta sotto chi la chiede. Mai un throw. Con `sotto` (una pagina intera, non un campo che risponde) vale solo la
+// risposta a chi chiede una password, sulle righe dopo la domanda: «Come cambio la password di Gmail? Ordine 1234…» resta.
+function trova(testo, { sotto = false } = {}) {
   const out = [];
   const l = String(testo == null ? '' : testo).toLowerCase();
   if (!l.trim()) return [];
@@ -259,6 +260,7 @@ function trova(testo) {
     // Un testo lungo che ripete la stessa domanda e la stessa risposta si legge una volta sola.
     const viste = new Set();
     for (const r of richieste(l)) {
+      if (sotto && (r.tipo !== 'password' || !(l[r.fine - 1] === '\n' || /^[^\S\n]*\n/.test(l.slice(r.fine, r.fine + 200))))) continue;
       const risposta = l.slice(r.fine, r.fine + RISPOSTA_MAX);
       const k = `${r.tipo}:${risposta}`;
       if (!viste.has(k)) { viste.add(k); out.push(...valoriRisposta(risposta, r.tipo)); }
