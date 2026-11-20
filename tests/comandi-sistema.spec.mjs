@@ -55,6 +55,12 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
         pc.bluetooth.dispositivi = disp.filter((x) => x.collegato).map((x) => x.nome);
         return { ok: true, collegato: p.collega };
       },
+      async btDimentica(p) {
+        traccia('btDimentica', p);
+        const i = disp.findIndex((x) => x.indirizzo === p.indirizzo);
+        if (i >= 0) disp.splice(i, 1);
+        return { ok: true };
+      },
       async wifiElenco() { traccia('wifiElenco'); await lettura(); return { ok: true, acceso: pc.wifi.acceso, reti: reti.map((r) => ({ nome: r, attiva: pc.rete.nome === r })), attuale: pc.rete.nome || null }; },
       async wifiCollega(p) {
         traccia('wifiCollega', p);
