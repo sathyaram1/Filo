@@ -3042,7 +3042,8 @@
     const fermo = fermoRestaLocale(fb, progress);
     if (fermo) {
       const dal = fermo.atMs ? ` Visto così il ${formatDateTime(new Date(fermo.atMs).toISOString())}.` : '';
-      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Per farlo ripartire serve un gesto. ${fermo.sblocchi.join(' ')}${dal}`;
+      const cause = fermo.cause.length ? ` Perché: ${fermo.cause.join('; ')}.` : '';
+      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}).${cause} Per farlo ripartire serve un gesto. ${fermo.sblocchi.join(' ')}${dal}`;
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(perche)}">Fermo: resta locale</span></div>`;
     }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.

@@ -2225,7 +2225,10 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
 test('restaLocale: il fermo di un lavoro server che nascerebbe non fidato, coi motivi, solo in coda (#2036)', () => {
   const srv = (extra) => Object.assign({ status: 'revision_security', localOnly: { by: 'owner', at: '2026-10-01' } }, extra);
   const segno = { motivi: ['ramo non pulito', ' '], ruolo: 'secaudit', atMs: 5 };
-  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], sblocchi: [MR.sbloccoFermo('ramo non pulito')], atMs: 5 });
+  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], sblocchi: [MR.sbloccoFermo('ramo non pulito')], cause: [], atMs: 5 });
+  // #2565: il motivo del buco che il server scrive fra le cause arriva alla scheda.
+  const conCausa = Object.assign({}, segno, { cause: ['ramo dell’app: il commit 1234abcd non l’ha dichiarato nessun biglietto pulito', ' ', 7] });
+  assert.deepEqual(MR.restaLocale(srv({ restaLocale: conCausa })).cause, ['ramo dell’app: il commit 1234abcd non l’ha dichiarato nessun biglietto pulito', '7']);
   assert.deepEqual(MR.restaLocale(srv({ status: 'todo', restaLocale: segno })).motivi, ['ramo non pulito']);
   assert.equal(MR.restaLocale(srv({ restaLocale: segno }), { lavoriServer: false }), null, 'lavori server spenti: in mano locale (#2036.1)');
   assert.ok(MR.restaLocale(srv({ restaLocale: segno }), { lavoriServer: true }));
@@ -2237,14 +2240,18 @@ test('restaLocale: il fermo di un lavoro server che nascerebbe non fidato, coi m
 });
 
 test('sbloccoFermo: ogni motivo del fermo dice il gesto che lo toglie, nessuno promette una ripartenza da sola (#2036.1)', () => {
-  const ramo = MR.sbloccoFermo('ramo non pulito', 'worker/x-1');
-  assert.match(ramo, /sanatoria/);
-  assert.match(ramo, /fiducia:sana -- worker\/x-1;/);
-  assert.match(MR.sbloccoFermo('ramo del server non pulito', 'worker/x-1'), /fiducia:sana -- worker\/x-1 --server/);
-  assert.match(MR.sbloccoFermo('ramo non pulito'), /fiducia:sana -- <ramo>/, 'senza ramo noto non inventa un nome');
+  const ramo = MR.sbloccoFermo('ramo non pulito');
+  // #2565: il buco che la sanatoria toglie lo toglie la coda; il fermo che resta lo sblocca solo la dichiarazione.
+  assert.match(ramo, /la sanatoria non lo copre.*«Dichiara fidato com’è»/);
+  assert.doesNotMatch(ramo, /fiducia:sana/);
+  assert.match(MR.sbloccoFermo('ramo del server non pulito'), /^Il ramo del server non risulta pulito/);
+  // Su un feedback non fidato la coda la sanatoria non la prova: la scheda non dice che non lo copre.
+  const conFeedback = MR.sbloccoFermo('ramo non pulito', ['feedback non fidato', 'ramo non pulito']);
+  assert.doesNotMatch(conFeedback, /la sanatoria non lo copre/);
+  assert.match(conFeedback, /la coda da sé quando segni fidato il feedback/);
+  assert.doesNotMatch(MR.sbloccoFermo('ramo del server non pulito'), /fiducia:sana/);
   // Lo sporco lo toglie il gesto di #2258 in Gestione, non una sessione sul PC.
   assert.match(MR.sbloccoFermo('contenuto scritto da un biglietto sporco'), /non torna pulito da solo.*«Dichiara fidato com’è»/);
-  assert.match(ramo, /biglietto sporco, «Dichiara fidato com’è»/);
   assert.doesNotMatch(ramo, /sessione locale/);
   assert.doesNotMatch(MR.sbloccoFermo('ramo scritto da un biglietto sporco'), /sanatoria/, 'uno sporco non si sana');
   assert.match(MR.sbloccoFermo('feedback non fidato'), /segni fidato/);
