@@ -932,7 +932,9 @@ ipcRenderer.on('filo:traduci-pagina', (_event, d = {}) => {
     }
     try { ipcRenderer.send('filo:traduci-pagina-esito', { rid, ...esito }); } catch (_) {}
   };
-  if (!contenutiPronti()) { waitForContentScripts(rispondi); return; }
+  // Chi chiede dice quanto può aspettare (`entroMs`): oltre, la sua risposta «muta» arriverebbe prima della nostra.
+  const entro = Number(d && d.entroMs);
+  if (!contenutiPronti()) { waitForContentScripts(rispondi, Number.isFinite(entro) && entro > 0 ? entro : undefined); return; }
   rispondi();
 });
 
