@@ -1932,5 +1932,10 @@
     return v === true || String(v ?? '').trim().toLowerCase() === 'true';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale };
+  // Gli esiti di TRADUCI_PAGINA in cui la pagina è cambiata davvero: chiudono il turno da soli e contano come uso.
+  function traduzioneFatta(stato) {
+    return stato === 'partita' || stato === 'originale' || stato === 'fermata';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale, traduzioneFatta };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
