@@ -1436,7 +1436,8 @@ test('git vero: dopo una di quelle chiavi, il `git push` nudo manda il codice al
     git(lavoro, 'remote', 'add', 'origin', origine);
     git(lavoro, 'commit', '-q', '--allow-empty', '-m', 'primo');
     git(lavoro, 'push', '-q', '-u', 'origin', 'main');
-    for (const chiave of [...CHIAVI_DEL_PUSH, 'include.path']) {
+    // branch.main.remote per ultima: tolta, il ramo resta senza remoto.
+    for (const chiave of ['include.path', ...CHIAVI_DEL_PUSH]) {
       const altrove = join(base, `altrove-${chiave}.git`);
       git(base, 'init', '-q', '--bare', altrove);
       git(lavoro, 'commit', '-q', '--allow-empty', '-m', chiave);
