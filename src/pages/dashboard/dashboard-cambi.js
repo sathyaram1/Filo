@@ -261,5 +261,5 @@
     });
   }
 
-  global.SN_DASH_CAMBI = { init, segna, aggiorna, fotografa, rimetti };
+  global.SN_DASH_CAMBI = { init, segna, aggiorna, fotografa, rimetti, annulla };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
