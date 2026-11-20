@@ -409,6 +409,35 @@ test('una finestra la apre solo un gesto vero di adesso, uno per finestra, anche
   } finally { orologio.mock.restore(); }
 });
 
+// #737.8 — la finestra che la pagina tiene torna davanti con lo stesso clic delle finestre nuove, senza spenderlo.
+test('richiamare una finestra vuole il clic segnalato dalla pagina, come aprirla, e non lo spende', () => {
+  let ora = 1_500_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://notizie.example/');
+    wc.mainFrame = { parent: null };
+    Permessi.seguiGesti(wc);
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    assert.equal(Permessi.gestoPerRichiamare(wc), 0, 'l\'input visto dal main non sa ancora se è caduto su Filo');
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    const t = ora;
+    ora += 50;
+    assert.equal(Permessi.gestoPerRichiamare(wc), t);
+    assert.equal(Permessi.gestoPerRichiamare(wc), t, 'non si spende');
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'la finestra nuova dello stesso clic passa ancora');
+    assert.equal(Permessi.gestoPerRichiamare(wc), 0, 'speso da una finestra nuova non richiama');
+    ora += 300;
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    Permessi.gestoDiFilo(wc);
+    assert.equal(Permessi.gestoPerRichiamare(wc), 0, 'il clic sull\'interfaccia di Filo sopra la pagina non vale');
+    ora += 300;
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    ora += 1600;
+    assert.equal(Permessi.gestoPerRichiamare(wc, '', 1500), 0, 'oltre il tempo chiesto');
+    assert.ok(Permessi.gestoPerRichiamare(wc), 'entro i cinque secondi');
+  } finally { orologio.mock.restore(); }
+});
+
 // #737.1 giro 2 — il rilascio dello stesso clic o il carattere dello stesso tasto non aprono una seconda finestra.
 test('un gesto apre una finestra sola: la pressione la apre, il rilascio dello stesso clic no', async () => {
   let ora = 2_000_000;

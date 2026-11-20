@@ -17,6 +17,7 @@
         { testo: 'Se Filo risponde coi suoi crediti perché la tua chiave OpenRouter è stata rifiutata mentre sei in un\'altra applicazione, l\'avviso che lo dice ti aspetta e compare quando torni su Filo.', segnalazione: 662 },
         'Un avviso che Filo manda mentre la finestra finisce di aprirsi compare sempre, invece di perdersi.',
         { testo: 'Nel calcolatore di probabilità dei mazzi, «faccio mulligan delle mani con meno di 3 terre» detto in chat conta un mulligan e lo scrive nella risposta; nel riquadro, un mulligan senza la mano da tenere ti avvisa che non è contato.', segnalazione: 791 },
+        { testo: 'Sui siti che aprono collegamenti, aiuto o anteprime sempre nella stessa finestra, come tanti siti vecchi e intranet, ogni clic ti porta davanti quella scheda, invece di aggiornarla dietro.', segnalazione: 737 },
       ],
     },
     {

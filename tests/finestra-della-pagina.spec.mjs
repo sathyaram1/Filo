@@ -76,6 +76,104 @@ test('nella finestra tenuta dalla pagina Filo c\'è: da sola non apre schede, co
   await expect.poll(async () => (await schede(app)).some((s) => s.url === dalClic), { timeout: 8000 }).toBe(true);
 });
 
+const davanti = (app, u) => app.evaluate(({ BrowserWindow }, url) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+  tm.activate(tm.tabs.find((x) => x.view.webContents.getURL() === url).id);
+}, u);
+
+// Come nei browser la finestra chiesta di nuovo per nome dal clic torna davanti, coi collegamenti e con window.open (#737.8).
+for (const [forma, apri] of [
+  ['un collegamento con target="_new"', (id, dest) => `<a id="${id}" href="${dest}" target="_new" style="display:block;width:200px;height:60px">vai</a>`],
+  ['window.open con lo stesso nome', (id, dest) => pulsante(id, 'aiuto', `window.open(${JSON.stringify(dest)},'aiuto')`)],
+  ['un modulo con target="_new"', (id, dest) => `<form action="${dest}" target="_new"><button id="${id}" style="width:200px;height:60px">cerca</button></form>`],
+]) {
+  test(`la finestra chiesta di nuovo per nome da ${forma} torna davanti con la seconda pagina`, async ({ app, openTab, testServer }) => {
+    const prima = testServer.html('<title>PRIMA DEST</title>');
+    const seconda = testServer.html('<title>SECONDA DEST</title>');
+    const page = await openTab(testServer.html(`<title>ELENCO</title>${apri('a', prima)}${apri('b', seconda)}`));
+    const n = (await schede(app)).length;
+    await page.click('#a');
+    await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'PRIMA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+    await davanti(app, page.url());
+    await page.click('#b');
+    await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'SECONDA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+    expect((await schede(app)).length, 'la stessa scheda di prima, riempita con la seconda pagina').toBe(n + 1);
+  });
+}
+
+test('anche dal riquadro di un altro sito la finestra chiesta per nome col clic torna davanti', async ({ app, openTab, testServer }) => {
+  const prima = testServer.html('<title>PRIMA DEST</title>');
+  const seconda = testServer.html('<title>SECONDA DEST</title>');
+  const link = (id, dest) => `<a id="${id}" href="${dest}" target="_new" style="display:block;width:200px;height:40px">vai</a>`;
+  const riquadro = testServer.html(`${link('a', prima)}${link('b', seconda)}`, { pubblico: true });
+  const page = await openTab(testServer.html(`<title>ELENCO</title><iframe src="${riquadro}" width="300" height="120"></iframe>`));
+  await expect.poll(() => page.frames().some((f) => f.url() === riquadro), { timeout: 8000 }).toBe(true);
+  const fr = () => page.frames().find((f) => f.url() === riquadro);
+  await fr().click('#a');
+  await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'PRIMA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+  await davanti(app, page.url());
+  await fr().click('#b');
+  await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'SECONDA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+});
+
+test('Ctrl+clic su un collegamento che apre per nome apre dietro, e la pagina che si legge resta davanti', async ({ app, openTab, testServer }) => {
+  const dest = testServer.html('<title>DIETRO</title>');
+  const page = await openTab(testServer.html(`<title>ELENCO</title><a id="a" href="${dest}" target="_new" style="display:block;width:200px;height:60px">vai</a>`));
+  await page.click('#a', { modifiers: ['Control'] });
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'DIETRO'), { timeout: 8000 }).toBe(true);
+  await page.waitForTimeout(800);
+  expect((await schede(app)).find((s) => s.titolo === 'ELENCO')?.attiva).toBe(true);
+});
+
+// Anche quando la richiesta non carica una pagina nuova: un'ancora della stessa pagina, l'anteprima riscritta, il focus.
+for (const [forma, pagina, attesa] of [
+  ['un collegamento a un\'altra ancora della stessa pagina', (aiuto) => `<a id="a" href="${aiuto}#uno" target="aiuto" style="display:block;width:200px;height:40px">uno</a>
+    <a id="b" href="${aiuto}#due" target="aiuto" style="display:block;width:200px;height:40px">due</a>`, 'AIUTO'],
+  ['l\'anteprima riscritta dalla pagina', () => `<script>function scrivi(t){var w=window.open('','anteprima');w.document.open();w.document.write('<title>'+t+'</title>');w.document.close();}</script>
+    ${pulsante('a', 'prima', "scrivi('ANTEPRIMA')")}${pulsante('b', 'seconda', "scrivi('ANTEPRIMA 2')")}`, 'ANTEPRIMA 2'],
+  ['«se è già aperta riportala davanti»', (aiuto) => `<script>var w=null;function apri(){if(w&&!w.closed)w.focus();else w=window.open(${JSON.stringify(aiuto)},'aiuto');}</script>
+    ${pulsante('a', 'aiuto', 'apri()')}${pulsante('b', 'aiuto di nuovo', 'apri()')}`, 'AIUTO'],
+]) {
+  test(`la finestra chiesta di nuovo per nome con ${forma} torna davanti`, async ({ app, openTab, testServer }) => {
+    const aiuto = testServer.html('<title>AIUTO</title><h1 id="uno">uno</h1><div style="height:3000px"></div><h1 id="due">due</h1>');
+    const page = await openTab(testServer.html(`<title>ELENCO</title>${pagina(aiuto)}`));
+    const n = (await schede(app)).length;
+    await page.click('#a');
+    await expect.poll(async () => (await schede(app)).find((s) => s.attiva)?.titolo, { timeout: 8000 }).not.toBe('ELENCO');
+    await davanti(app, page.url());
+    await page.waitForTimeout(300);
+    await page.click('#b');
+    await expect.poll(async () => (await schede(app)).find((s) => s.attiva)?.titolo, { timeout: 8000 }).toBe(attesa);
+    expect((await schede(app)).length, 'la stessa finestra di prima').toBe(n + 1);
+  });
+}
+
+// Col blocco spento la finestra nuova non spende il clic: lì conta che la finestra nata da quel clic resti dove l'ha messa.
+for (const blocco of [true, false]) {
+  test(`Ctrl+clic su un pulsante che apre una finestra per nome la apre dietro, anche se la pagina la riporta davanti (blocco popup ${blocco ? 'acceso' : 'spento'})`, async ({ app, openTab, testServer }) => {
+    await app.evaluate(({ BrowserWindow }, b) => { BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.security.blockPopups = b; }, blocco);
+    const dest = testServer.html('<title>DIETRO</title>');
+    const page = await openTab(testServer.html(`<title>ELENCO</title>${pulsante('a', 'apri', `var w=window.open(${JSON.stringify(dest)},'aiuto');setTimeout(function(){w.focus()},300)`)}`));
+    await page.click('#a', { modifiers: ['Control'] });
+    await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'DIETRO'), { timeout: 8000 }).toBe(true);
+    await page.waitForTimeout(1000);
+    expect((await schede(app)).find((s) => s.titolo === 'ELENCO')?.attiva).toBe(true);
+  });
+}
+
+test('la finestra con nome che la pagina riempie da sola, senza clic, resta dietro', async ({ app, openTab, testServer }) => {
+  const prima = testServer.html('<title>PRIMA DEST</title>');
+  const seconda = testServer.html('<title>SECONDA DEST</title>');
+  const page = await openTab(testServer.html(`<title>ELENCO</title>${pulsante('a', 'apri', `window.open(${JSON.stringify(prima)},'aiuto')`)}`));
+  await page.click('#a');
+  await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'PRIMA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+  await davanti(app, page.url());
+  await page.waitForTimeout(5500);
+  await page.evaluate((u) => { window.open(u, 'aiuto'); }, seconda);
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'SECONDA DEST'), { timeout: 8000 }).toBe(true);
+  expect((await schede(app)).find((s) => s.titolo === 'ELENCO')?.attiva, 'senza un clic la pagina che si legge resta davanti').toBe(true);
+});
+
 test('la pagina chiude la ricevuta che ha scritto, e Filo resta aperto', async ({ app, openTab, testServer }) => {
   const page = await openTab(testServer.html(`${pulsante('b', 'Stampa', "window.__w=window.open('');window.__w.document.write('<title>RICEVUTA</title>');window.__w.document.close();")}${pulsante('c', 'Chiudi', 'window.__w.close()')}`));
   const prima = (await schede(app)).length;

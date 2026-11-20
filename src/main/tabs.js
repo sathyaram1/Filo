@@ -2,7 +2,7 @@
 // la barra della shell. Qui vivono il loro ciclo di vita, il layout, lo schermo
 // intero, il proxy per scheda e le guardie sulle navigazioni.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen, webFrameMain } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen, webFrameMain, webContents } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
@@ -96,6 +96,8 @@ const HOVER_INPUT_TYPES = new Set([
 const gestoPerIlFilo = (tab) => Math.max(tab._userInputAt || 0, tab._gestoFiloAt || 0);
 // Il salto dalla pagina d'errore al sito è un «Riprova» premuto se arriva entro questo tempo da un input vero (#1469).
 const RIPROVA_GESTO_MS = 5_000;
+// Il focus chiesto dalla pagina che tiene la finestra arriva subito dopo il suo clic (#737.8, richiamataDallaPagina).
+const RICHIAMO_DA_FOCUS_MS = 1500;
 
 // #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
 // conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
@@ -1172,6 +1174,7 @@ class TabManager {
       const wc = view.webContents;
       AzioniContate.scheda(wc);
       wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id, { daSola: true }); }));
+      wc.on('did-start-navigation', (e) => this._chiestaPerNome(tab, wc, e));
     }
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
@@ -3976,7 +3979,10 @@ class TabManager {
           createWindow: (options) => {
             // Un collegamento (Maiuscolo+clic, target=_blank) non dà una finestra da tenere: la scheda carica da sé.
             if (!options.webContents) { daLei(this.openTab(url, opzioni)); return undefined; }
-            daLei(this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } }));
+            const id = this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } });
+            daLei(id);
+            const tenuta = this.tabs.find((t) => t.id === id);
+            if (tenuta) Object.assign(tenuta, { _nomeFinestra: details.frameName || '', _chiestaDa: wc, _adottataAlle: Date.now() });
             return options.webContents;
           },
         };
@@ -3999,6 +4005,48 @@ class TabManager {
     let storia = 1;
     try { storia = wc.navigationHistory.length(); } catch (_) {}
     if (tab._openedByLink || storia <= 1) this.closeTab(tab.id, { daSola: true });
+  }
+
+  // La finestra tenuta dalla pagina, riempita da un'altra scheda col clic (un target o window.open con lo stesso nome),
+  // torna davanti come nei browser; senza clic resta dietro (#737.8).
+  _chiestaPerNome(tab, wc, e) {
+    if (!e || !e.isMainFrame || e.isSameDocument || !e.initiator || this.activeId === tab.id || !this.tabs.includes(tab)) return;
+    // La prima navigazione è l'apertura stessa, già davanti o dietro come ha chiesto il clic (Ctrl+clic: dietro).
+    let aperta = '';
+    try { aperta = wc.getURL(); } catch (_) {}
+    if (!aperta) return;
+    let da = null;
+    try { da = webContents.fromFrame(e.initiator); } catch (_) {}
+    let chiede = '';
+    try { chiede = e.initiator.url; } catch (_) {}
+    if (da && da !== wc) this._richiamata(tab, da, chiede);
+  }
+
+  // Le richieste che non caricano una pagina nuova (un collegamento a un'ancora, window.open senza indirizzo, focus) le
+  // segnala il preload (#737.8): `nome` dalla pagina che chiede, null dalla finestra stessa a cui hanno chiesto focus.
+  richiamataDallaPagina(wc, frame, nome) {
+    if (nome == null) {
+      const tab = this.tabs.find((t) => t.view.webContents === wc);
+      // Il focus non dice chi l'ha chiesto: vale solo a ridosso del clic sulla pagina che la tiene, non quello che la
+      // finestra si dà da sé più tardi (in Chromium serve il gesto di chi chiama).
+      if (tab && tab._chiestaDa && !(frame && frame.parent)) this._richiamata(tab, tab._chiestaDa, '', RICHIAMO_DA_FOCUS_MS);
+      return;
+    }
+    const tab = this.tabs.find((t) => t._chiestaDa === wc && t._nomeFinestra === nome);
+    let chiede = '';
+    try { chiede = (frame && frame.url) || ''; } catch (_) {}
+    if (tab) this._richiamata(tab, wc, chiede);
+  }
+
+  // Torna davanti se la chiede, col clic che la pagina ha ricevuto, la scheda che l'utente sta guardando; la finestra
+  // nata da quello stesso clic resta dove l'ha messa l'apertura (Ctrl+clic: dietro).
+  _richiamata(tab, da, chiede, entro) {
+    if (this.activeId === tab.id || !this.tabs.includes(tab)) return;
+    const attiva = this.tabs.find((t) => t.id === this.activeId);
+    if (!attiva || attiva.view.webContents !== da) return;
+    const t = Permessi.gestoPerRichiamare(da, chiede, entro);
+    if (!t || (tab._adottataAlle || 0) >= t) return;
+    this.activate(tab.id);
   }
 
   // Una scheda proxata ha la partizione sua, e in privacy ogni sito la sua: lì la finestra non può restare alla pagina.
