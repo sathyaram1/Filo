@@ -165,13 +165,12 @@ function ascoltaIn(w, invia) {
   };
 
   // Si chiama PRIMA che il testo entri: `base` è quello che c'era, e a campo vuoto si riparte (la chat dopo un invio).
-  // `desde` è quando l'utente ha cominciato questo valore: il main toglie dal registro solo i segreti letti da lì in poi.
   function voce(el) {
     let t = testi.get(el);
     if (!t) {
-      t = { n: ++numero, testo: '', conti: new Map(), quanti: 0, base: valoreVero(el) || '', desde: Date.now() };
+      t = { n: ++numero, testo: '', conti: new Map(), quanti: 0, base: valoreVero(el) || '', inViaggio: 0 };
       testi.set(el, t);
-    } else if (vuoto(el)) { t.base = ''; t.desde = Date.now(); }
+    } else if (vuoto(el)) t.base = '';
     return t;
   }
   function contati(t, dati) {
