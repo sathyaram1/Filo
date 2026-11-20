@@ -532,7 +532,7 @@
         if (!out.ok) continue;
         nonFidato = true;
         if (out.url) linkNoti.add(chiaveLink(out.url));
-        daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, out.url ? `dalla pagina ${hostDi(out.url)}` : 'da una pagina letta');
+        daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, fonteDallaPagina(out.url ? hostDi(out.url) : '', FONTI_DI_PAGINA.letta));
       } else if (type === 'SCHEDE_CHIUSE' || type === 'RIAPRI_SCHEDA') {
         // #884 — titoli e riassunti delle schede chiuse li hanno scritti i siti (o un modello leggendoli): testo di fuori.
         const schede = type === 'RIAPRI_SCHEDA' ? (out.titolo || out.riassunto ? [out] : [])
