@@ -27,6 +27,12 @@
     recapito: 'In un’immagine si vede un indirizzo o un recapito personale.',
     persone: 'In un’immagine ci sono dati di un’altra persona.',
   });
+  // Gli allegati di testo li rilegge il controllo senza modello: un log è il posto dove una password finisce senza
+  // accorgersene, e mandarlo intero a un modello costerebbe quanto il log.
+  const FRASI_ALLEGATO = Object.freeze({
+    segreto: 'In un file allegato c’è una password, una chiave o un codice di accesso.',
+    documento: 'In un file allegato c’è il numero di una carta o di un conto.',
+  });
   // Solo col Red Team aperto (#896): in pausa non lo si propone come posto dove provarci.
   const FRASE_RED_TEAM = 'Se vuoi mettere alla prova Filo, il posto giusto è il Red Team: lì provarci è permesso e premiato.';
   const TITOLO = 'Prima che parta, ricontrolla.';
