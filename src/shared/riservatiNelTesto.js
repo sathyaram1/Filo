@@ -51,12 +51,11 @@ const RISPOSTA_MAX = 2000;
 // c'è molto altro: solleciti, seconde domande e altre persone non sciolgono il legame (#1446.4). Nella pagina vera fra
 // i solleciti stanno orari e messaggi senza nome: il tetto regge una decina di messaggi.
 const DOPO_LA_RICHIESTA = 1000;
-const SOPRA_MAX = 1500;
 // «Marco: …» a inizio riga: chi scrive il messaggio.
 const PARLA = /^[^\S\n]*(\p{L}[\p{L}\p{N} ._'’-]{0,30}?)[^\S\n]*:\s/u;
 
 function presenta() {
-  const P = globalThis.SN_URL_EXFIL && globalThis.SN_URL_EXFIL.PRESENTA;
+  const P = exfil() && exfil().PRESENTA;
   return P ? [[new RegExp(P.password, 'gu'), 'password'], [new RegExp(CHIESTA_IN_CHAT, 'gu'), 'password'], [new RegExp(P.codice, 'gu'), 'codice']] : [];
 }
 
