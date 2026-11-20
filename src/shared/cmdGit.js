@@ -176,19 +176,31 @@
     return pos;
   }
 
+  // git legge un'opzione lunga anche accorciata (`--unset-a` è `--unset-all`, `--verb` è `--verbose`), ma un nome
+  // scritto intero vince sugli altri che comincia: `--get` non è `--get-regexp`, `--unset` non è `--unset-all`.
+  const GIT_NOMI_INTERI = new Set(['get', 'unset', 'bool']);
+  function gitOpzione(a, nomi) {
+    return nomi.some((n) => {
+      if (opzioneLunga(a, n, 1) == null) return false;
+      const scritto = a.slice(2).split('=')[0].toLowerCase();
+      return scritto === n || !GIT_NOMI_INTERI.has(scritto);
+    });
+  }
+  const conOpzione = (args, ...nomi) => args.some((a) => gitOpzione(a, nomi));
+
   // `git config` nella forma con le opzioni (`--unset`, `chiave valore`…): gli argomenti dopo il sotto-comando.
   function gitConfigForma(args) {
     const low = args.map((a) => a.toLowerCase());
-    if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
+    if (conOpzione(args, 'unset', 'unset-all', 'remove-section')) return 3;
     // Rinominare una sezione sposta le sue chiavi in un'altra: `color.sshcommand` diventa `core.sshcommand` (#2621).
-    if (low.includes('--rename-section')) return 3;
+    if (conOpzione(args, 'rename-section')) return 3;
     const pos = gitConfigOperandi(args);
     const ops = pos.map((i) => args[i]);
     const chiave = (ops[0] || '').toLowerCase();
     // Le chiavi che decidono dove va il codice al prossimo push: l'indirizzo è `git remote set-url` per un'altra strada
     // (#530), il remoto di un ramo o quello predefinito accettano anche un indirizzo al posto di un nome, e un file
     // incluso può scrivere ognuna di queste (#2623).
-    const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
+    const scrive = ops.length >= 2 || conOpzione(args, 'add', 'replace-all');
     if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$|^branch\..+\.(push)?remote$|^remote\.pushdefault$|^include(if\..+)?\.path$/
       .test(chiave)) return 3;
     // Il valore scritto, tolti gli interruttori senza valore di git config. Un'opzione col valore dopo la chiave resta
@@ -197,11 +209,11 @@
     if (scrive && !low.some((a) => /^--get(-|$)/.test(a))) {
       return gitChiaveScrittaInerte(chiave, args.slice(pos[0] + 1).filter((a, k) => !GIT_CONFIG_INTERRUTTORE.test(low[pos[0] + 1 + k]))) ? 2 : 3;
     }
-    if (low.some((a) => a === '-e' || a === '--edit')) return 2;
+    if (low.includes('-e') || conOpzione(args, 'edit')) return 2;
     // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
     // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
     // conversazione → conferma (#587). Una chiave innocua (`user.email`) resta 1.
-    if (low.some((a) => a === '--list' || a === '-l' || a === '--get-regexp' || a === '--get-urlmatch')) return 2;
+    if (low.includes('-l') || conOpzione(args, 'list', 'get-regexp', 'get-urlmatch')) return 2;
     return /(^|\.)url$|credential|password|token/.test(chiave) ? 2 : 1;
   }
 
