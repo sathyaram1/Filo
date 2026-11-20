@@ -475,7 +475,7 @@ async function eseguiAzioneFilo(action, {
     if (!confirmed) delete action._nomeTrovato;
     const q = C.normalizzaRichiesta(richiestaDiSistema(type, action));
     // Una richiesta che non partirebbe torna al modello subito, senza un popup che chiede di confermarla.
-    if (q.errore) return { executed: false, kept: false, output: { ok: false, cosa: richiestaDiSistema(type, {}).cosa, errore: 'richiesta', frase: q.errore } };
+    if (q.errore) return { executed: false, kept: false, output: { ok: false, cosa: type.toLowerCase(), errore: 'richiesta', frase: q.errore } };
     let nome = q.nome || '';
     // Il dispositivo che la conferma ha nominato, fissato col suo indirizzo: lo scrive solo il main (#2394.1).
     let indirizzo = '';
