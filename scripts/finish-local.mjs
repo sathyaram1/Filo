@@ -82,7 +82,7 @@ import { unitLontane, VAR_LONTANE, specSulPc, cambiatiDelRamo } from './lib/unit
 import { avviaProvaRemota, attendiProvaRemota, provaRemota } from './lib/prova-remota.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
-import { apriCorsa, corsaInterrotta, guastoDellaCorsa } from './lib/corsa-controlli.mjs';
+import { apriCorsa, corsaInterrotta, guastoDellaCorsa, PREFISSO_CORSA } from './lib/corsa-controlli.mjs';
 import { letturaMemoria, testoMemoria } from './lib/memoria-contenitore.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
