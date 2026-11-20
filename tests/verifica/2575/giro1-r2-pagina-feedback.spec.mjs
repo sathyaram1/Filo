@@ -1,4 +1,4 @@
-// Verifica #2575 giro 1, rilievo 1: sulla pagina dei feedback la stessa bocciatura offre «Rimanda in correzione», ma
+// Verifica #2575 giro 1, rilievo 2: sulla pagina dei feedback la stessa bocciatura offre «Rimanda in correzione», ma
 // il tasto manda alla cieca: niente avviso a testo mancante, e il commento vecchio (scritto prima della bocciatura)
 // resta con un'ora nuova, così a chi corregge arriva come se fosse la correzione.
 
