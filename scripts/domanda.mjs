@@ -265,11 +265,11 @@ export function rigaCredenziale(cred) {
 }
 
 /**
- * Il corpo per chiaveDomande: il contratto di ownerDomande con la parola d'ordine in `passphrase`. Biglietto e sessione
- * il server li ignora con la chiave, e un segreto che non serve non viaggia. PURA.
+ * Il corpo per chiaveDomande: il contratto di ownerDomande con la parola d'ordine in `passphrase`. Chi scrive resta la
+ * chiave; il biglietto della sessione serve al server solo a segnarle le letture (#2027.3). PURA.
  */
 export function corpoChiave(data, passphrase) {
-  const { biglietto, sessione, passphrase: _p, ...resto } = data && typeof data === 'object' ? data : {};
+  const { sessione, passphrase: _p, ...resto } = data && typeof data === 'object' ? data : {};
   return Object.assign(resto, { passphrase: String(passphrase || '') });
 }
 
