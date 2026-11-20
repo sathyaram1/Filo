@@ -174,6 +174,19 @@ export function exitCodeForError(err) {
 export { PRIORITA_AMMESSE, parsePriorita };
 
 /**
+ * Cosa il feedback porta del biglietto della sessione `b`. PURA. Uno sporco rimasto solo in locale il server non lo
+ * vede, e `nonFidato` porta scritti di chi non è fidato (SPEC-DOMANDE § 1.3): lì il biglietto va per il solo segno
+ * riservato, che non dà fiducia. Il segno rimasto sul PC si dichiara: il server ancora non ce l'ha (#2027.4).
+ */
+export function campiDelBiglietto(b, { nonFidato = '' } = {}) {
+  if (!b || !b.fp) return {};
+  return Object.assign(
+    b.inAttesa || nonFidato ? { bigliettoDelSegno: b.fp } : { bigliettoLocale: b.fp },
+    b.riservatoInAttesa ? { riservatoDichiarato: true } : {},
+  );
+}
+
+/**
  * Deposita il feedback. Ritorna { ok, id, seq } oppure { ok:false, ... }.
  *
  * `seq` è il numero leggibile (#N): è best-effort già nell'app (se la query di
