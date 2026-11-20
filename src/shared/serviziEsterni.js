@@ -185,7 +185,7 @@
       occasione: 'quando l’agente cerca sul web o cerca immagini da mettere nella risposta (Tavily solo con la chiave), e quando il correttore cerca un dato che hai lasciato in bianco con delle x e non lo trova su Wikipedia (si spegne con «Cerca sul web per i segnaposto»)',
       riceve: 'la ricerca che l’agente, o il correttore, ha formulato',
       frase: 'Tavily, o DuckDuckGo senza chiave',
-      dove: ['src/main/services/webSearch.js', 'src/main/services/immaginiDelleRisposte.js'],
+      dove: ['src/main/services/webSearch.js'],
     },
     {
       id: 'immagini-commons', nome: 'Wikimedia Commons, per le immagini in chat',
