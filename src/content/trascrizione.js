@@ -8,39 +8,38 @@
   const MSG = (global.SN_MSG && global.SN_MSG.MSG) || {};
   const ACTIONS = (global.SN_CONST && global.SN_CONST.ACTIONS) || {};
   const t = (k) => (global.SN_I18N ? global.SN_I18N.t(k) : k);
-  // Quante volte si rimpicciolisce un'immagine che lo strato rifiuta col suo limite, prima di dirlo.
-  const RIDUZIONI = 3;
   // Più piccola di così una porzione non si legge dove sta: si ingrandisce al centro.
   const MINIMO = { w: 160, h: 40 };
   const MARGINE = 16;
   const BARRA_H = 44;
   const INGRANDISCI_MAX = 2;
+  // Il lato dell'immagine in grigi su cui si cercano le parole: oltre, la misura non migliora e costa memoria.
+  const LATO_GRIGI = 2400;
 
   let aperto = null;
 
-  // { dataUrl, rect: {x,y,w,h} in px CSS della vista, o null }. Su un sito chiede lo strato; se lo strato non si può
-  // fare si disegna nel documento, in un'ombra chiusa, come gli altri riquadri.
+  // { dataUrl, rect: {x,y,w,h} in px CSS della vista, o null, fondo: '#rrggbb' sotto l'immagine nella pagina }. Formato,
+  // peso e trasparenza li decide SN_IMMAGINI_CHAT, come per le immagini date all'Aiuto. Su un sito chiede lo strato; se
+  // lo strato non si può fare si disegna nel documento, in un'ombra chiusa, come gli altri riquadri.
   async function apri(opz = {}) {
-    let dataUrl = String(opz.dataUrl || '');
-    if (!/^data:image\//i.test(dataUrl)) return false;
-    const { IMMAGINE } = global.SN_TRASCRIZIONE_RIGHE;
-    if (!IMMAGINE.test(dataUrl)) dataUrl = await inJpeg(dataUrl);
-    if (!IMMAGINE.test(dataUrl)) {
+    const grezza = String(opz.dataUrl || '');
+    if (!/^data:image\//i.test(grezza)) return false;
+    const IC = global.SN_IMMAGINI_CHAT;
+    const blob = IC ? IC.blobDa(grezza) : null;
+    const dataUrl = blob ? await IC.perLaChat(blob, { fondo: opz.fondo }).catch(() => '') : '';
+    if (!dataUrl || !IC.INTERA.test(dataUrl)) {
       global.SN_POPUP?.showToast?.(t('menu_image_unreadable'));
       return false;
     }
     const rect = rettangolo(opz.rect);
-    if (sopra(dataUrl, rect, RIDUZIONI)) return true;
+    if (sopra(dataUrl, rect)) return true;
     disegna({ dataUrl, rect });
     return true;
   }
 
-  // Il limite dello strato lo dice lo strato quando rifiuta: l'immagine si rimpicciolisce sotto quello e si riprova.
-  function sopra(dataUrl, rect, restano) {
+  function sopra(dataUrl, rect) {
     const nelDocumento = () => disegna({ dataUrl, rect });
-    return global.SN_RIQUADRI_SOPRA?.apri('trascrizione', { dataUrl, rect }, nelDocumento, async (limite) => {
-      const ridotta = restano > 0 && limite > 0 ? await inJpeg(dataUrl, limite) : '';
-      if (ridotta && ridotta.length < dataUrl.length && sopra(ridotta, rect, restano - 1)) return;
+    return global.SN_RIQUADRI_SOPRA?.apri('trascrizione', { dataUrl, rect }, nelDocumento, () => {
       global.SN_POPUP?.showToast?.(t('trascrivi_troppo_grande'));
     });
   }
