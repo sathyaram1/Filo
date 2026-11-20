@@ -140,6 +140,16 @@ function permesso(c, percorso) {
   return c.cartella != null && dentro(c.cartella, p) && permessoNellaCartella(c.cartella, p);
 }
 
+// Cosa legge la pagina del file `percorso`: la sua cartella, o in una troppo larga solo lei e i file che nomina.
+function concessioneDi(percorso) {
+  const cartella = path.dirname(percorso);
+  const larga = cartellaTroppoLarga(cartella);
+  return {
+    cartella: larga ? null : chiave(cartella),
+    file: new Set([chiave(percorso), ...(larga ? nominati(percorso, cartella) : [])]),
+  };
+}
+
 // Ogni risposta, di qualunque tipo: un XML o un file senza estensione che Chromium riconosce come HTML eseguono script.
 async function servi(partizione, req) {
   const percorso = percorsoDi(req.url);
