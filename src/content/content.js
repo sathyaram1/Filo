@@ -344,12 +344,15 @@
       self.__snSetContextMenuHandler(onContextMenu);
       if (typeof self.__snSetMenuDelSitoPrima === 'function') self.__snSetMenuDelSitoPrima(menuDelSitoPrima);
     } else {
-      window.addEventListener('contextmenu', (e) => {
+      // L'unica porta del tasto destro qui, anche per quello dato prima che il menu ascoltasse (#2444.1): una
+      // condizione nuova per cedere il passo vale da sola per tutti e due.
+      const alMenuDiFilo = (e) => {
         if (e.defaultPrevented || isBlocked()) return; // la pagina interna ha il SUO menu
         onContextMenu(e);
-      });
+      };
+      window.addEventListener('contextmenu', alMenuDiFilo);
       const datoPrima = self.__snTastoDestroInAttesa?.();
-      if (datoPrima && !isBlocked()) onContextMenu(datoPrima);
+      if (datoPrima) alMenuDiFilo(datoPrima);
     }
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
