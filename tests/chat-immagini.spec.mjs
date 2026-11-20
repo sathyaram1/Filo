@@ -222,13 +222,21 @@ test('tasto destro su una foto trovata: salva il file, copia e cerca l\'indirizz
   await menu.voce('Copia URL immagine').click();
   await expect.poll(() => app.evaluate(async ({ clipboard }) => clipboard.readText()), { timeout: 8000 }).toBe(originale);
 
+  // Si registra la scheda che Filo apre, senza andare in rete: con la rete Google porta Lens altrove e l'indirizzo
+  // della scheda non dice più cosa si è chiesto (#2615).
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    globalThis.__aperte = [];
+    const vera = tm.openTab.bind(tm);
+    tm.openTab = (url, opts) => {
+      if (/^https:\/\/lens\.google\.com\//.test(String(url))) { globalThis.__aperte.push(String(url)); return 'scheda-lens'; }
+      return vera(url, opts);
+    };
+  });
   await imgs.first().click({ button: 'right' });
   await menu.voce('Cerca immagine').click();
-  const lens = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => w.getURL()).find((u) => /lens\.google/.test(u)) || '');
-  // Senza rete la scheda finisce sulla pagina d'errore, che porta l'indirizzo chiesto codificato una volta in più.
-  const chiesto = async () => decodeURIComponent(decodeURIComponent(await lens()));
-  await expect.poll(chiesto, { timeout: 10_000 }).toContain(`uploadbyurl?url=${originale}`);
-  expect(await chiesto()).not.toContain('filo://icone');
+  await expect.poll(() => app.evaluate(() => globalThis.__aperte), { timeout: 10_000, message: 'Google Lens non si è aperto' })
+    .toEqual([`https://lens.google.com/uploadbyurl?url=${encodeURIComponent(originale)}`]);
 
   const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR || '');
   expect(dir).not.toBe('');
