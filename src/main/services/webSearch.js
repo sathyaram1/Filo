@@ -141,5 +141,5 @@
     }
   }
 
-  global.SN_WEB_SEARCH = { search, annota, riservata };
+  global.SN_WEB_SEARCH = { search, annota, riservata, richiestaTavily };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
