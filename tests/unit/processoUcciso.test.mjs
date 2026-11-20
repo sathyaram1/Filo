@@ -144,7 +144,7 @@ describe('il segno della corsa di finish:check', () => {
       assert.equal((await finito).segnale, segnale);
       const testo = testoPerIlWorker(corsaInterrotta(root), null);
       assert.doesNotMatch(testo, /processo ucciso|\(137\)/);
-      assert.match(testo, /^La corsa di finish:check si è interrotta senza finire: fase spec delle aree toccate/);
+      assert.match(testo, /^La corsa di finish:check si è interrotta senza finire \(fase spec delle aree toccate/);
       assert.match(testo, /Se l'hai fermata tu \(lo strumento che ferma i comandi in sottofondo, Ctrl\+C\) non è un guasto/);
       assert.match(testo, /Se l'ha fermata il tempo massimo del comando, rilanciala in sottofondo col tetto più largo/);
     });
