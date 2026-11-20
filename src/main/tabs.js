@@ -3581,7 +3581,7 @@ class TabManager {
       setTimeout(() => {
         try {
           if (!this.tabs.some((t) => t.id === tab.id)) return; // scheda chiusa nel frattempo
-          // Rinata intanto verso un indirizzo chiesto dopo il crollo: quella navigazione vince.
+          // Rinata intanto per un gesto fatto dopo il crollo (_passoDallaCaduta): quella navigazione vince.
           if (tab.view.webContents !== wc) return;
           this._recreateView(tab, current, { loadUrl: NE.buildUrl(current, NE.CRASH_CODE, reason) });
         } catch (_) {}
