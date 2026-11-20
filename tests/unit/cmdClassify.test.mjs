@@ -1835,7 +1835,9 @@ test('#1994.1 — git -C vale come un cd prima del comando, e la sonda guarda qu
   for (const [g, cd] of [['git -C ~/progetto status', 'cd ~/progetto && git status'], ['git -C /etc log', 'cd /etc && git log'],
     ['git -C ~/ostile log', 'cd ~/ostile && git log'], ['git -C a -C b status', 'cd a && cd b && git status'],
     ['git -C ~/p --no-pager log -1', 'cd ~/p && git --no-pager log -1'], ['git -C ~/p push origin main', 'cd ~/p && git push origin main']]) {
-    for (const cc of [undefined, ctx, sonda]) assert.equal(C.classify(g, cc), C.classify(cd, cc), `${g} | ${cd}`);
+    for (const cc of [ctx, sonda]) assert.equal(C.classify(g, cc), C.classify(cd, cc), `${g} | ${cd}`);
+    // Senza sapere la shell `~` può arrivare a git scritto così (PowerShell): lì resta a «conferma».
+    assert.equal(C.classify(g), g.includes('~') ? 3 : C.classify(cd), g);
   }
   assert.equal(C.classify('git -C ~/progetto status', sonda), 1);
   assert.deepEqual(C.classifyDetail('git -C ~/ostile log', sonda).level, 2);
