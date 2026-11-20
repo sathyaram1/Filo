@@ -72,7 +72,7 @@ test('lanciati da soli in una sessione con tutta la sua identità accesa, i file
     writeFileSync(transcript, `${JSON.stringify({ type: 'assistant', message: { id: 'msg_1', model: 'claude-opus-4-8', usage: uso } })}\n`, 'utf8');
     const sessione = {
       FILO_ROUTINE: '1', FILO_ROUTINE_ROLE: 'verifier', FILO_ROUTINE_TICKET: 'biglietto-della-sessione-vera',
-      FILO_TRANSCRIPT: transcript, FILO_SESSION_ID: sid,
+      FILO_TRANSCRIPT: transcript, FILO_SESSION_ID: sid, CLAUDE_PID: String(process.pid), CLAUDE_CODE_WORKER_EPOCH: '1',
     };
     assert.deepEqual(Object.keys(sessione).sort(), [...IDENTITA_SESSIONE].sort(), 'ogni voce dell\'identità della sessione è accesa');
     const r = await rossiDiSessione(file.map((f) => join(QUI, f)), sessione, { casa });
