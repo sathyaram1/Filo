@@ -262,15 +262,15 @@ describe('il guasto di un processo ucciso', () => {
   test('per il worker: cosa è morto, dove, la memoria, e il --guasto già scritto da copiare', () => {
     const adesso = letturaMemoria(leggiDa(contenitore({ oomCmd: 2, oomSis: 2 })));
     const g = guastoDellaCorsa(segno, adesso);
-    assert.match(g, /^guasto: strumento finish-check: processo ucciso \(137\) durante finish:check \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01:00 UTC, partito alle 18:40:00 UTC su abcdef12\): il kernel ha ucciso processi per memoria; memoria: /);
+    assert.match(g, /^guasto: strumento finish-check: finish:check interrotto senza finire \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01:00 UTC, partito alle 18:40:00 UTC su abcdef12\): il kernel ha ucciso processi per memoria; memoria: /);
     assert.match(g, /da allora: 2 nella macchina, 2 fra i comandi\.$/);
     const t = testoPerIlWorker(segno, adesso);
-    assert.match(t, /^La corsa di finish:check è morta senza finire: processo ucciso \(137\)/);
-    assert.match(t, /Rilanciala una volta, in sottofondo/);
+    assert.match(t, /^La corsa di finish:check si è interrotta senza finire: fase spec delle aree toccate \(190\)/);
+    assert.match(t, /Altrimenti rilanciala una volta, in sottofondo/);
     assert.ok(t.includes(`--guasto "${g}"`), t);
     assert.doesNotMatch(g, /["`$]/, 'il guasto sta fra virgolette doppie in una riga di comando');
     const senza = guastoDellaCorsa(segno, segno.memoria);
-    assert.match(senza, /nessun processo ucciso per memoria, quindi un colpo da fuori dei comandi \(la sessione, l'harness o un riavvio del contenitore\)/);
+    assert.match(senza, /nessun processo ucciso per memoria: fermato da chi l'ha lanciato \(a mano, o al tempo massimo del comando\) o da un colpo da fuori dei comandi \(la sessione, l'harness o un riavvio del contenitore\)/);
   });
 
   // L'avvio del contenitore: kernel partito a 1.763.000.000 s, processo 1 dopo `tick` centesimi.
