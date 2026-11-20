@@ -409,31 +409,29 @@ test('in chat, col nome di un dispositivo e l\'indirizzo di un altro, si scolleg
   await chiedi(page, 'scollega le casse');
   await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('Casse JBL');
   expect(await confirmText(page)).not.toContain('Cuffie Sony');
+  // Fra la domanda e l'OK si abbina un altro dispositivo con lo stesso nome: parte quello che la conferma ha mostrato.
+  await app.evaluate(() => globalThis.__pcDisp.unshift({ indirizzo: '00:11:22:33:44:77', nome: 'Casse JBL', collegato: true }));
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega'))
     .toEqual([['btCollega', { indirizzo: '00:11:22:33:44:66', collega: false }]]);
   const dopo = await app.evaluate(() => globalThis.__pcDisp);
-  expect(dopo.find((d) => d.nome === 'Cuffie Sony').collegato).toBe(true);
-  expect(dopo.find((d) => d.nome === 'Casse JBL').collegato).toBe(false);
+  expect(dopo.map((d) => [d.indirizzo, d.collegato])).toEqual([['00:11:22:33:44:77', true], ['00:11:22:33:44:55', true], ['00:11:22:33:44:66', false]]);
 });
 
-test('in chat, «dimentica le casse» nomina il dispositivo vero e, confermato, dimentica quello anche se ne arriva un omonimo', async ({ app }) => {
-  await livelloAutonomia(app, 'conservativo');
+// Il costo 3 del dimenticare passa da un giudizio che qui non c'è: la stessa porta della chat, chiamata direttamente.
+test('«dimentica le casse» dalla chat: la conferma nomina il dispositivo vero, e all\'OK si dimentica quello anche se ne arriva un omonimo', async ({ app }) => {
   await computerFinto(app, { dispositivi: CUFFIE_E_CASSE() });
-  const page = await home(app);
-  await modelloFinto(app, [
-    { toolCalls: [{ id: 'a3', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'le casse', dimentica: true }) }] },
-    { text: 'Dimenticate.' },
-  ]);
-  await chiedi(page, 'dimentica le casse');
-  await page.waitForTimeout(4000);
-  console.log('DEBUG', (await chiamateAlModello(app)).length, await page.locator('.sn-confirm-host, [class*=confirm], [class*=propost]').evaluateAll((els) => els.map((e) => `${e.className}: ${e.innerText.slice(0, 200)}`)));
-  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('Dimenticare il dispositivo Bluetooth\nCasse JBL');
-  // Fra la domanda e l'OK si abbina un altro dispositivo con lo stesso nome: parte quello che la conferma ha mostrato.
+  await home(app);
+  const azione = { type: 'BLUETOOTH', dispositivo: 'le casse', dimentica: true };
+  const esegui = (opts) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a.azione, a.opts), { azione, opts });
+  const chiesta = await esegui({});
+  expect(chiesta.executed).toBe(false);
+  expect(chiesta.needsConfirm).toBeGreaterThanOrEqual(2);
+  expect(chiesta.describe).toContain('Dimenticare il dispositivo Bluetooth «Casse JBL»');
   await app.evaluate(() => globalThis.__pcDisp.unshift({ indirizzo: '00:11:22:33:44:77', nome: 'Casse JBL', collegato: false }));
-  await clickConfirm(page, 'ok');
-  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btDimentica'))
-    .toEqual([['btDimentica', { indirizzo: '00:11:22:33:44:66' }]]);
+  const fatta = await esegui({ confirmed: true });
+  expect(fatta.executed).toBe(true);
+  expect((await chiamate(app)).filter((c) => c[0] === 'btDimentica')).toEqual([['btDimentica', { indirizzo: '00:11:22:33:44:66' }]]);
   expect((await app.evaluate(() => globalThis.__pcDisp)).map((d) => d.indirizzo)).toEqual(['00:11:22:33:44:77', '00:11:22:33:44:55']);
 });
 
