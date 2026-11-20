@@ -2,9 +2,14 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-**Regola.** Un file locale si apre in una scheda solo nella sessione `file-del-computer`, dove Filo serve da sé ogni
-richiesta `file:` (`protocol.handle`): passa solo ciò che sta nella cartella di un file che l'utente ha aperto, e ai
-documenti va una CSP che toglie `file:` a fetch, XHR, riquadri e worker. Mai un `file://` in un'altra sessione.
+**Regola.** Un file locale si apre in una scheda solo in una sessione `file-del-computer:<n>` tutta sua, dove Filo
+serve da sé ogni richiesta `file:` (`protocol.handle`): passa solo ciò che la scheda ha avuto in concessione, e a ogni
+risposta, di qualunque tipo, va una CSP che toglie `file:` a fetch, XHR, riquadri e worker. La concessione è della
+scheda e si toglie quando si chiude. Mai un `file://` in un'altra sessione, nemmeno in quella del proxy.
+
+Cosa si concede: la cartella del file, con le sottocartelle, senza file o cartelle nascoste e solo tipi da pagina
+(immagini, stili, script, caratteri, media). Se quella cartella è la casa, una che la contiene o la radice di un
+disco, solo il file e i file che nomina.
 
 ## Perché
 
