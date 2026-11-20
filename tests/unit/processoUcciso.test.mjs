@@ -293,7 +293,7 @@ describe('il guasto di un processo ucciso', () => {
 
     // Niente ripartenze, nessuna uccisione: il colpo è da fuori, e il riavvio è escluso.
     const fermo = letturaMemoria(leggiDa(conAvvio(contenitore({ oomCmd: 3, oomSis: 2 }), 5000)));
-    assert.match(guastoDellaCorsa({ ...segno, memoria: prima }, fermo), /nessun processo ucciso per memoria e il contenitore non è ripartito, quindi un colpo da fuori dei comandi \(la sessione o l'harness\)/);
+    assert.match(guastoDellaCorsa({ ...segno, memoria: prima }, fermo), /nessun processo ucciso per memoria e il contenitore non è ripartito: fermato da chi l'ha lanciato \(a mano, o al tempo massimo del comando\) o da un colpo da fuori dei comandi \(la sessione o l'harness\)/);
 
     // Senza la lettura di allora vale l'ora dello strumento: il contenitore partito dopo vuol dire ripartito.
     const dopoLoStrumento = testoUcciso({ programma: 'node', codice: 137, cosa: 'x', memoria: ripartito, daMs: Date.parse('2025-11-13T02:00:00Z') });
