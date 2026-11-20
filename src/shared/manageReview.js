@@ -2247,7 +2247,16 @@
     };
   }
 
+  // «Rimanda in correzione» (#2575) ha la stessa forma in Gestione e nella pagina dei feedback: senza testo il primo
+  // gesto arma l'avviso, il secondo manda lo stesso. Prova: tests/manage-rimanda-correzione.spec.mjs.
+  const CORREZIONE = Object.freeze({
+    segnaposto: 'Cosa correggere: il testo arriva a chi corregge…',
+    avviso: 'Senza testo chi riprende non saprà cosa correggere: scrivilo qui, o premi di nuovo per mandarlo così.',
+    etichettaSenzaTesto: 'Manda lo stesso',
+  });
+
   global.SN_MANAGE_REVIEW = {
+    CORREZIONE,
     normalizeStatus,
     tastoFrase,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi
