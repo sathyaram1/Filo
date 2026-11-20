@@ -853,6 +853,8 @@
         authRefused = res.status;
         delete doc.fields.senderProof;
         delete doc.fields.bigliettoLocale;
+        delete doc.fields.bigliettoDelSegno;
+        delete doc.fields.riservatoDichiarato;
         delete doc.fields.priority;
         delete doc.fields.priorityManual;
         res = null;
