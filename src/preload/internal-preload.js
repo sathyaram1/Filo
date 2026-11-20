@@ -153,6 +153,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'qr.js'), 'SN_QR');
   safe(path.join(SHARED, 'calcMarkers.js'), 'SN_CALC'); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   safe(path.join(SHARED, 'overlayPlacement.js'), 'SN_PLACE'); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
+  safe(path.join(SHARED, 'guardianoStatico.js'), 'SN_GUARDIANO_STATICO'); // #810.7 — la forma di un numero di carta: PRIMA di extractContext
   safe(path.join(SHARED, 'campiSegreti.js'), 'SN_CAMPI_SEGRETI'); // #810.7 — campi che non vanno al modello: PRIMA di extractContext
   safe(path.join(CONTENT, 'extractContext.js'));
   safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
