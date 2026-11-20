@@ -93,11 +93,10 @@ async function chiamaOwner(data) {
   return body.result || {};
 }
 
-/** Il segreto del biglietto della sessione (il più sporco se più d'uno), '' senza: il server allora lo fa non fidato. */
+/** Il segreto del biglietto della sessione, '' senza: il server allora lo fa non fidato e riservato. */
 async function segretoLocale() {
-  const { trovaBiglietto } = await import('./lib/biglietto-locale.mjs');
-  const b = await trovaBiglietto().catch(() => null);
-  return b && typeof b.ticket === 'string' ? b.ticket : '';
+  const { segretoPerScrivere } = await import('./lib/biglietto-locale.mjs');
+  return segretoPerScrivere();
 }
 
 async function sporcaSessione(cosa, motivi) {
