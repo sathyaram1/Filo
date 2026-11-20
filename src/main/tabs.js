@@ -3977,7 +3977,10 @@ class TabManager {
           createWindow: (options) => {
             // Un collegamento (Maiuscolo+clic, target=_blank) non dà una finestra da tenere: la scheda carica da sé.
             if (!options.webContents) { daLei(this.openTab(url, opzioni)); return undefined; }
-            daLei(this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } }));
+            const id = this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } });
+            daLei(id);
+            const tenuta = this.tabs.find((t) => t.id === id);
+            if (tenuta) Object.assign(tenuta, { _nomeFinestra: details.frameName || '', _chiestaDa: wc, _adottataAlle: Date.now() });
             return options.webContents;
           },
         };
