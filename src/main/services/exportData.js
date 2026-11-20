@@ -721,7 +721,8 @@ function tettoSpesa(qui, backup) {
 function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
   const prima = require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {});
-  const imp = senzaSegretiVuoti(require('./correttoreMigrazione').perImportazione(prima), cur);
+  const conLivello = require('./privacyMigrazione').perImportazione(prima);
+  const imp = senzaSegretiVuoti(require('./correttoreMigrazione').perImportazione(conLivello), cur);
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
   const stats = {
