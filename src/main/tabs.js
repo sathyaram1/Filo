@@ -4045,7 +4045,7 @@ class TabManager {
     const attiva = this.tabs.find((t) => t.id === this.activeId);
     if (!attiva || attiva.view.webContents !== da) return;
     const t = Permessi.gestoPerRichiamare(da, chiede, entro);
-    if (!t || (tab._adottataAlle || 0) >= t) return;
+    if (!t) return;
     this.activate(tab.id);
   }
 
