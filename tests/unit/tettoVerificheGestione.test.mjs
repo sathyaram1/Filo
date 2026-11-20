@@ -68,6 +68,26 @@ test('il tetto salvato da Gestione arriva in config/routines, solo lui, e si ril
   });
 });
 
+test('l’intervallo del tetto è uno: quello che il server incorpora, ripetuto in Gestione, nel campo e nel ruolo', async () => {
+  const fs = await import('node:fs');
+  require(join(ROOT, 'src', 'shared', 'verifierRound.js'));
+  const R = globalThis.SN_VERIFIER_ROUND;
+  const A = globalThis.SN_CONST.AUTOMATION;
+  assert.deepEqual([A.TETTO_VERIFICHE_MIN, A.TETTO_VERIFICHE_MAX], [R.TETTO_MIN, R.TETTO_MAX]);
+  const html = fs.readFileSync(join(ROOT, 'src', 'pages', 'manage', 'manage.html'), 'utf8');
+  const campo = html.match(/id="mgTettoVerifiche"[^>]*>/s);
+  assert.ok(campo, 'il campo del tetto in Gestione');
+  assert.match(campo[0], new RegExp(`min="${R.TETTO_MIN}" max="${R.TETTO_MAX}"`));
+  const ruolo = fs.readFileSync(join(ROOT, 'routines', 'roles', 'manutentore.md'), 'utf8');
+  assert.match(ruolo, new RegExp(`il tetto da ${R.TETTO_MIN} a ${R.TETTO_MAX}`));
+  assert.match(ruolo, new RegExp(`da un tetto di ${R.TETTO_PARTENZA} verifiche`));
+  // Fuori intervallo il salvataggio lo riporta dentro, coi limiti della fonte.
+  await conFirestore({ cap3: { integerValue: '3' } }, async () => {
+    const r = await chiama({ type: MSG.AUTOMATION_CAPS_SET, tettoVerifiche: R.TETTO_MAX + 7 });
+    assert.equal(r.tettoVerifiche, R.TETTO_MAX, JSON.stringify(r));
+  });
+});
+
 test('un documento senza il tetto lo dà vuoto, e un tetto non numerico non si scrive', async () => {
   await conFirestore({ cap3: { integerValue: '3' } }, async () => {
     assert.equal((await chiama({ type: MSG.AUTOMATION_CAPS_GET })).tettoVerifiche, null);
