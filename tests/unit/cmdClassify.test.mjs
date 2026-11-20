@@ -1560,7 +1560,7 @@ test('#1994 — git con un\'uscita su file vale 3, qualunque sia il sotto-comand
 test('#1994 — le opzioni di git prima del sotto-comando che cambiano configurazione o repository valgono 3', () => {
   for (const cmd of [
     'git --config-env=core.pager=SHELL log', 'git --config-env core.pager=SHELL log', 'git --exec-path=/tmp log',
-    'git -c core.pager=sh log', 'git -C /etc log', 'git --no-pager --config-env=core.pager=SHELL log',
+    'git -c core.pager=sh log', 'git -C /etc -c core.pager=sh log', 'git --no-pager --config-env=core.pager=SHELL log',
   ]) assert.equal(lvl(cmd), 3, cmd);
   // Un repository scelto da fuori porta git dove la sonda delle impostazioni non ha guardato (#2292): chiede sempre.
   const casa = { cwd: '/home/u', home: '/home/u', win: false };
