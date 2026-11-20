@@ -108,7 +108,7 @@ async function main() {
   }
   if (args.cmd === 'stato') {
     const trovati = B.trovaBiglietti();
-    if (!trovati.length) { console.log('Nessun biglietto trovato da qui: ciò che la sessione scrive da questo repo vale non fidato.'); return 0; }
+    if (!trovati.length) { console.log('Nessun biglietto trovato da qui: ciò che la sessione scrive da questo repo vale non fidato, e i compiti e le domande riservati.'); return 0; }
     const b = await B.trovaBiglietto();
     console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}`);
     if (b.errore) console.log(`Stato non letto: ${b.errore}`);
