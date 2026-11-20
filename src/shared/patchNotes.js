@@ -14,6 +14,7 @@
         { testo: 'Nella chat della home Filo ti mostra le immagini dentro la risposta, fra un pezzo di testo e l\'altro: una sola o una fila che scorri di lato, col sito da cui viene ognuna. Clic per ingrandirla. Con un modello che disegna, scelto in Impostazioni alla voce «Immagini create in chat», crea anche le immagini che gli chiedi, segnate come fatte con l\'AI.', segnalazione: 2272 },
       ],
       fixes: [
+        { testo: 'In modalità terminale, un comando git che fa partire un programma scritto nel comando stesso, come un rebase con -x o un clone con -c, ti chiede di digitare «conferma», come gli altri comandi che eseguono codice. Prima bastava un OK.', segnalazione: 2618 },
         { testo: 'Se Filo risponde coi suoi crediti perché la tua chiave OpenRouter è stata rifiutata mentre sei in un\'altra applicazione, l\'avviso che lo dice ti aspetta e compare quando torni su Filo.', segnalazione: 662 },
         'Un avviso che Filo manda mentre la finestra finisce di aprirsi compare sempre, invece di perdersi.',
         { testo: 'Nel calcolatore di probabilità dei mazzi, «faccio mulligan delle mani con meno di 3 terre» detto in chat conta un mulligan e lo scrive nella risposta; nel riquadro, un mulligan senza la mano da tenere ti avvisa che non è contato.', segnalazione: 791 },
