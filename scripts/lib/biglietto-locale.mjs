@@ -92,28 +92,83 @@ export function cartellaSporchi(b) {
   return join(dirname(b.path), 'sporchi', b.fp);
 }
 
-/** Annota in locale una lettura esterna del biglietto `b`. Lancia se non riesce a scrivere. */
-export function annotaSporco(b, motivo, nowMs = Date.now()) {
-  const dir = cartellaSporchi(b);
+// Il segno riservato che il server non ha ancora ricevuto (#2027.3) ha la stessa coda dello sporco, dentro la sua
+// cartella, così chiusura e scadenza lo tolgono con lui. Finché c'è, il biglietto non parte con le scritture (segretoPerScrivere).
+export function cartellaRiservati(b) {
+  return join(cartellaSporchi(b), 'riservati');
+}
+
+// Le due code (sporco e segno riservato) sono una sola meccanica: annotare, rileggere, consegnare e togliere vivono qui.
+const CODE = Object.freeze({
+  sporco: { cartella: cartellaSporchi, op: 'sporca', predefinito: 'lettura esterna' },
+  riservato: { cartella: cartellaRiservati, op: 'riservato', predefinito: 'dati privati' },
+});
+
+function annotaInCoda(coda, b, motivo, nowMs) {
+  const dir = coda.cartella(b);
   mkdirSync(dir, { recursive: true });
   const nome = `${String(Math.round(Number(nowMs) || Date.now())).padStart(14, '0')}-${process.pid}-${randomBytes(4).toString('hex')}.json`;
   writeFileSync(join(dir, nome), `${JSON.stringify({ motivo: String(motivo || ''), at: Number(nowMs) || Date.now() })}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
-/** Le letture annotate e non ancora consegnate, dalla più vecchia. Una voce illeggibile conta lo stesso. */
-export function sporchiInAttesa(b) {
-  const dir = cartellaSporchi(b);
+function vociInCoda(coda, b) {
+  const dir = coda.cartella(b);
   let nomi = [];
   try { nomi = readdirSync(dir).filter((n) => n.endsWith('.json')).sort(); } catch (_) { return []; }
   return nomi.map((n) => {
     const file = join(dir, n);
     try {
       const d = JSON.parse(readFileSync(file, 'utf8'));
-      return { file, motivo: String((d && d.motivo) || '').trim() || 'lettura esterna', at: Number(d && d.at) || 0 };
+      return { file, motivo: String((d && d.motivo) || '').trim() || coda.predefinito, at: Number(d && d.at) || 0 };
     } catch (_) {
-      return { file, motivo: 'lettura esterna (annotazione illeggibile)', at: 0 };
+      return { file, motivo: `${coda.predefinito} (annotazione illeggibile)`, at: 0 };
     }
   });
+}
+
+/** Consegna al server la coda di `b`, più `aggiunta` (una lettura non annotata). Mai un'eccezione. */
+async function consegnaCoda(coda, b, { deps = {}, nowMs = Date.now(), aggiunta = '' } = {}) {
+  const voci = vociInCoda(coda, b);
+  const tutte = aggiunta ? voci.concat([{ motivo: aggiunta, at: nowMs }]) : voci;
+  if (!tutte.length) return { consegnati: 0, restano: 0 };
+  try {
+    await chiama(coda.op, { ticket: b.ticket, motivo: motivoDaConsegnare(tutte, nowMs) }, deps);
+  } catch (e) {
+    return { consegnati: 0, restano: voci.length, errore: String((e && e.message) || e).slice(0, 200) };
+  }
+  for (const v of voci) { try { rmSync(v.file, { force: true }); } catch (_) { /* si riconsegna: un doppione non cambia niente */ } }
+  return { consegnati: tutte.length, restano: vociInCoda(coda, b).length };
+}
+
+/** Annota la lettura su ogni biglietto della sessione e la consegna. → { fatti, inAttesa?, senzaBiglietto?, errori } */
+async function segnaInCoda(coda, consegna, motivo, { env, cwd, deps = {}, nowMs = Date.now() } = {}) {
+  const m = String(motivo || '').trim().slice(0, 300);
+  const out = { fatti: 0, errori: [] };
+  if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
+  const trovati = trovaBiglietti({ env, cwd });
+  if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
+  let inAttesa = 0;
+  for (const b of trovati) {
+    let aggiunta = '';
+    try { annotaInCoda(coda, b, m, nowMs); } catch (_) { aggiunta = m; }
+    const r = await consegna(b, { deps, nowMs, aggiunta });
+    if (!r.errore) out.fatti += 1;
+    else {
+      out.errori.push(r.errore);
+      if (r.restano) inAttesa += 1;
+    }
+  }
+  return inAttesa ? Object.assign(out, { inAttesa }) : out;
+}
+
+/** Annota in locale una lettura esterna del biglietto `b`. Lancia se non riesce a scrivere. */
+export function annotaSporco(b, motivo, nowMs = Date.now()) {
+  annotaInCoda(CODE.sporco, b, motivo, nowMs);
+}
+
+/** Le letture annotate e non ancora consegnate, dalla più vecchia. Una voce illeggibile conta lo stesso. */
+export function sporchiInAttesa(b) {
+  return vociInCoda(CODE.sporco, b);
 }
 
 export function sporcoSulServer(b) {
