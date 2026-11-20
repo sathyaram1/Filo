@@ -1134,5 +1134,7 @@
     AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano, applicaAvvisiOwner,
     // La riconciliazione col consumo che il router dichiara per chiave (#1520)
     MOTIVI_SCARTO, VIOLAZIONI_USO, motiviScarto, usiFuoriPolitica, consumoRouter,
+    // Chi ha servito le ultime richieste dei crediti (#542)
+    SERVITO_ULTIME, SERVITO_CAMPI, contaServito, chiHaServito,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
