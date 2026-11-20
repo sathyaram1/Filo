@@ -10,8 +10,10 @@ import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
 const require = createRequire(import.meta.url);
 require('../../../src/shared/cmdClassify.js');
 const C = globalThis.SN_CMD_CLASSIFY;
+const T = require('../../../src/main/services/terminal.js');
 
-// Come il main risponde al classificatore: lo stato sul disco e la sonda di git.
+// Il contesto che il main dà al classificatore (lo stato sul disco, la sonda di git): una sonda nuova data dal main
+// va aggiunta anche qui, come la dà lui.
 const esiste = (p) => {
   try { return statSync(p).isDirectory() ? 'cartella' : 'file'; } catch (e) {
     return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? null : 'ignoto';
