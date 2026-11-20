@@ -216,7 +216,7 @@ test('ogni scheda legge solo la cartella del suo file, e chiusa la scheda la car
   expect(await leggeLaScheda(app, '', foto), 'chiusa la scheda, la sua sessione non legge più niente').toBe(403);
 });
 
-test('una scheda della sessione salvata su una cartella di rete non torna, e non tocca l\'altro computer', { tag: '@linux-mac' }, async ({ app }) => {
+test('una scheda della sessione salvata su una cartella di rete non torna, e non tocca l\'altro computer', async ({ app }) => {
   test.skip(process.platform === 'win32', 'le cartelle /net/<host> sono di Mac e Linux');
   const { file } = preparaReport();
   await home(app);
