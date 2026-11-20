@@ -2866,11 +2866,27 @@ class TabManager {
     } catch (_) { return ''; }
   }
 
+  // Sulla vista caduta ogni gesto la fa rinascere verso dove chiede, e la rimessa in piedi, che parte solo se la vista è
+  // ancora quella caduta, lo lascia stare (#1868). Indirizzo, Ricarica, Indietro, Avanti ed elenco passano di qui.
+  _caduta(tab) {
+    try { return tab.view.webContents.isCrashed(); } catch (_) { return false; }
+  }
+
+  _passoDallaCaduta(tab, passo) {
+    const salto = Storia.daCaduta(tab.storia, this._vociDellaVista(tab), passo);
+    if (!salto) return false;
+    if (passo && this._maybeBlockNavigation(tab, salto.meta.url)) return true;
+    tab.storia = salto.storia;
+    this._recreateView(tab, salto.meta.url, { storia: true, titolo: salto.meta.titolo });
+    return true;
+  }
+
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     tab._gestoFiloAt = Date.now();
     if (!canGoBack(tab.view.webContents)) { this._vaiFuori(tab, 'indietro', 0); return; }
+    if (this._caduta(tab) && this._passoDallaCaduta(tab, -1)) return;
     const meta = this._vocePassoStoria(tab, -1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
     tab._passoStoria = true;
