@@ -299,6 +299,9 @@
     //   scheda, e la persona torna segnata solo per un uso nuovo. { pseudonym, shown } → { ok, result: { ok, reconcile } };
     //   `shown` è `reconcile.offPolicy` come la scheda lo mostrava: un uso arrivato dopo resta segnato.
     WALLET_OWNER_OFF_POLICY_SEEN: 'wallet_owner_off_policy_seen',
+    // WALLET_OWNER_SERVED_BY (#542): chi ha servito le ultime richieste pagate coi crediti, dal registro d'uso.
+    //   { } → { ok, servito: { limite, letti, dal, al, conti: [{ host, modello, n }] } }; lo raggruppa chiHaServito in wallet.js.
+    WALLET_OWNER_SERVED_BY: 'wallet_owner_served_by',
     // Le due foto (pagina e barra) vanno solo alla pagina in vista, che inquadra sé stessa: services/fotoDellaPagina.js.
     // { leggera? } → { ok, dataUrl? } (leggera: JPEG ai pixel che si vedono); { perModello } → JPEG leggero coperto, o
     // { code: 'coperture', motivo }; { copiaPerModello } → { dataUrl, perModello: PNG coperta o null }.
