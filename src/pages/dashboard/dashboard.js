@@ -1233,6 +1233,7 @@
           pending.working(progressLabelFor(data.type, data.fatti, data.totali, data.dettaglio));
         } else if (data.kind === 'done') {
           const a = data.action;
+          if (a && a._output && data.kept !== false) azioniDelTurno.push(a);
           if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
           if (a && data.kept !== false) {
             if (Att.tellActionInActivity(pending, a) && a._callId) shown.add(a._callId);
