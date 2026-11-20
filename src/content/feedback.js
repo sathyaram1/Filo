@@ -304,9 +304,10 @@
     const files = [];
     const MAX_FILES = LIMITI.file;
     const MAX_ATTACH_BYTES = LIMITI.byte;
-    // Quello che L0 ha segnato: i pezzi di testo da evidenziare e le immagini da ricontrollare.
+    // Quello che L0 ha segnato: i pezzi di testo da evidenziare, le immagini e i file da ricontrollare.
     let pezziSegnati = [];
     const immaginiSegnate = new Set();
+    const fileSegnati = new Set();
 
     // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
     // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
