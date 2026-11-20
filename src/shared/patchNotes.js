@@ -22,6 +22,7 @@
         { testo: 'Sui siti che aprono collegamenti, aiuto o anteprime sempre nella stessa finestra, come tanti siti vecchi e intranet, ogni clic ti porta davanti quella scheda, invece di aggiornarla dietro.', segnalazione: 737 },
         { testo: 'Prima di mandare un feedback Filo ricontrolla anche i file di testo allegati, come un log, e la segnalazione che scrive per te in chat: se ci vede una password o una chiave te lo dice, e scegli tu se mandarla così.', segnalazione: 1403 },
         { testo: 'Dal terminale, un comando git che imposta un programma da far partire più avanti ti chiede di scrivere «conferma», come lo stesso programma dato a un comando solo. Scegliere l\'editor, il pager o il gestore delle password più comuni, o la chiave ssh, resta a un OK.', segnalazione: 2619 },
+        { testo: 'In modalità terminale, copiare o spostare un file sopra le impostazioni o gli hook di git, o scegliere con git config il programma che git fa partire, ti chiede di digitare «conferma», come scriverci con una redirezione. Prima bastava un OK.', segnalazione: 2619 },
       ],
     },
     {
