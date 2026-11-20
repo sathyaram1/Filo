@@ -534,7 +534,26 @@
     for (const m of s.matchAll(JWT)) out.push({ valore: m[0], regola: 'token' });
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
+    scritteAMano(s, out);
     return out.filter((x) => x.valore && String(x.valore).length >= 3);
+  }
+
+  // Le password scritte a mano (la risposta sotto chi la chiede, «Utente / Password: mario / …», dopo il nome della rete):
+  // le forme del correttore, da un posto solo (riservatiNelTesto.js). Qui solo i valori con una cifra o un simbolo: una
+  // parola qualunque sotto una domanda è spesso il resto della frase, e resta (tests/unit/pavimento.test.mjs).
+  function scritteAMano(s, out) {
+    if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
+    const R = global.SN_RISERVATI_TESTO;
+    if (!R) return;
+    const basso = s.toLowerCase();
+    const stesso = basso.length === s.length;
+    for (const v of R.trova(s)) {
+      if (!/[^\p{L}'’]/u.test(v)) continue;
+      // Il valore torna minuscolo: si toglie com'è scritto, in ogni punto del testo.
+      let i = stesso ? basso.indexOf(v) : -1;
+      if (i < 0) { out.push({ valore: v, regola: 'password' }); continue; }
+      for (; i >= 0; i = basso.indexOf(v, i + v.length)) out.push({ valore: s.slice(i, i + v.length), regola: 'password' });
+    }
   }
 
   const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
