@@ -286,9 +286,9 @@ test('pagina cambiata durante la rilettura che trova qualcosa: non parte, resta 
   await scriviEInvia(page, TESTO);
   await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 1_000 });
   await page.evaluate(() => { location.href = 'filo://newtab/?altra=1'; });
-  await expect(shell.getByText('Il tuo feedback non è partito', { exact: false })).toBeVisible({ timeout: 12_000 });
-  const mie = await app.evaluate(async () => (await globalThis.SN_SEGNALAZIONI_MIE.elenco()).map((v) => ({ testo: v.testo, stato: v.stato })));
-  expect(mie).toEqual([{ testo: TESTO, stato: 'non_partita' }]);
+  const mie = () => app.evaluate(async () => (await globalThis.SN_SEGNALAZIONI_MIE.elenco()).map((v) => ({ testo: v.testo, stato: v.stato })));
+  await expect.poll(mie, { timeout: 12_000 }).toEqual([{ testo: TESTO, stato: 'non_partita' }]);
+  await expect(shell.locator('.shell-notif-msg', { hasText: 'Il tuo feedback non è partito' })).toHaveCount(1);
   expect(await invii(app)).toEqual([]);
   expect(await app.evaluate(() => globalThis.SN_FEEDBACK_OUTBOX.size())).toBe(0);
 });
