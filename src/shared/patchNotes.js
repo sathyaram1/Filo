@@ -16,6 +16,7 @@
       fixes: [
         { testo: 'Se Filo risponde coi suoi crediti perché la tua chiave OpenRouter è stata rifiutata mentre sei in un\'altra applicazione, l\'avviso che lo dice ti aspetta e compare quando torni su Filo.', segnalazione: 662 },
         { testo: 'Nel calcolatore di probabilità dei mazzi, «faccio mulligan delle mani con meno di 3 terre» detto in chat conta un mulligan e lo scrive nella risposta; nel riquadro, un mulligan senza la mano da tenere ti avvisa che non è contato.', segnalazione: 791 },
+        { testo: 'Prima di mandare un feedback Filo ricontrolla anche i file di testo allegati, come un log, e la segnalazione che scrive per te in chat: se ci vede una password o una chiave te lo dice, e scegli tu se mandarla così.', segnalazione: 1403 },
       ],
     },
     {
