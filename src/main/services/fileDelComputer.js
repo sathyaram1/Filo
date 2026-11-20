@@ -124,11 +124,12 @@ function nominati(percorso, cartella) {
   return fuori;
 }
 
-// Sotto la cartella concessa: niente cartelle e file nascosti (.git, .ssh, .env), e solo tipi da pagina.
+// Sotto la cartella concessa: niente cartelle e file nascosti (.git, .ssh, .env), e solo tipi da pagina, così un file
+// senza estensione con dentro HTML non si apre come pagina.
 function permessoNellaCartella(cartella, p) {
   const rel = path.relative(cartella, p);
   if (rel.split(/[\\/]/).some((s) => s.startsWith('.'))) return false;
-  return RISORSE.has(path.extname(p).slice(1).toLowerCase()) || !path.extname(p);
+  return RISORSE.has(path.extname(p).slice(1).toLowerCase());
 }
 
 function permesso(c, percorso) {
