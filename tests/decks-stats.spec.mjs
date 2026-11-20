@@ -73,6 +73,9 @@ async function mockProvider(app) {
       if (/budget/i.test(last)) text = JSON.stringify({ reply: '', budget: 40 });
       else if (/\bramp\b/i.test(last)) {
         text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, mulligans: 1, keep: { ramp: 1 } } });
+      } else if (/mulligan delle mani/i.test(last)) {
+        // #791.1: la mano da tenere detta, il numero di mulligan no.
+        text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, keep: { terre: 3 } } });
       } else if (/due mulligan/i.test(last)) {
         // #791: mulligan detti senza la mano da tenere.
         text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, mulligans: 2 } });
@@ -473,6 +476,69 @@ test('in chat un mulligan detto senza la mano da tenere parte da 2 terre, come n
   await page.fill('#probMull', '2');
   await expect(page.locator('#probNeeds input[data-keep="terre"]')).toHaveValue('2');
   expect(Math.abs(chat - await settledPct(page))).toBeLessThan(0.6);
+});
+
+test('in chat una mano da tenere detta senza il numero di mulligan conta un mulligan e lo scrive, come il riquadro (#791.1)', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedBigDeck(page, await seedDeck(page));
+
+  await page.fill('#probTurn', '3');
+  await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
+  const senza = await settledPct(page);
+
+  await page.fill('#chatInput', 'che probabilità ho di avere 3 terre al turno 3 se faccio mulligan delle mani con meno di 3 terre?');
+  await page.press('#chatInput', 'Enter');
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla).toContainText('Probabilità di avere 3 terre al turno 3 (partita a più giocatori; fino a 1 mulligan se la mano non ha almeno 3 terre): ≈ ');
+  const chat = pctOf(/≈ ([\d,]+)%/.exec(await bolla.textContent())[1]);
+  expect(chat).toBeGreaterThan(senza + 3);
+
+  await page.fill('#probMull', '1');
+  await page.locator('#probNeeds input[data-keep="terre"]').fill('3');
+  expect(Math.abs(chat - await settledPct(page))).toBeLessThan(0.6);
+});
+
+test('nel riquadro un mulligan senza mano da tenere lo dice, invece di dare in silenzio il numero senza mulligan (#791.1)', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedBigDeck(page, await seedDeck(page));
+
+  await page.fill('#probTurn', '3');
+  await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
+  const note = page.locator('#probMullNote');
+  await settledPct(page);
+  await expect(note).toBeHidden();
+
+  // Mulligan a 1 con la mano da tenere già pronta: contato, nessun avviso.
+  await page.fill('#probMull', '1');
+  const keepTerre = page.locator('#probNeeds input[data-keep="terre"]');
+  await expect(keepTerre).toHaveValue('2');
+  await settledPct(page);
+  await expect(note).toBeHidden();
+
+  // Tutte le caselle «per tenere» a zero: il mulligan non conta, e si legge.
+  await keepTerre.fill('0');
+  await settledPct(page);
+  await expect(note).toBeVisible();
+  await expect(note).toHaveText('Mulligan non contati: scegli nella colonna «per tenere» che mano terresti.');
+  await page.locator('#probCard').scrollIntoViewIfNeeded();
+  await page.locator('#probCard').screenshot({ path: 'tests/.shots/decks-prob-791-1.png' });
+
+  // Rimessa una mano da tenere, o tolto il mulligan, l'avviso sparisce.
+  await keepTerre.fill('2');
+  await settledPct(page);
+  await expect(note).toBeHidden();
+  await keepTerre.fill('0');
+  await expect(note).toBeVisible();
+  await page.fill('#probMull', '0');
+  await settledPct(page);
+  await expect(note).toBeHidden();
 });
 
 test('il riquadro resta compatto: senza mulligan nessuna colonna in più, con il mulligan le categorie restano leggibili (#791)', async ({ app, openTab }) => {
