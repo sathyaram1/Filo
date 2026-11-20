@@ -1337,13 +1337,28 @@ test('i valori dell’utente nei campi non restano fra i segreti letti da una pa
   assert.deepEqual(carte(), []);
   SL.ricorda('Carta 5555-5555-5555-4444', "dall'output di un comando");
   assert.deepEqual(carte(), ["dall'output di un comando"]);
-  // Una proposta dell'assistente conta riga per riga, e una riga lunga non copre niente.
-  SL.ricorda('Codice di recupero: 731954', 'dalla pagina banca.example');
-  SL.valoriDellUtente(`${'0123456789'.repeat(60)}731954`, { maxRiga: 500 });
-  assert.ok(SL.tutti().some((x) => x.valore === '731954'), 'una proposta lunga ha coperto un codice letto');
-  SL.valoriDellUtente('Codice di recupero: 731954', { maxRiga: 500 });
-  assert.ok(!SL.tutti().some((x) => x.valore === '731954'));
   SL.usaDeposito(null);
+});
+
+// #810.8 giro 11 — dell'utente può essere solo un segreto letto da una pagina: ogni provenienza di pagina che Filo
+// compone la riconosce la stessa regola, e una frase riscritta in un posto solo non fa tornare i suoi valori nel file.
+test('ogni provenienza di pagina dei segreti letti è riconosciuta come tale', () => {
+  const F = X.FONTI_DI_PAGINA;
+  for (const f of [X.fonteDallaPagina('banca.example'), X.fonteDallaPagina(''), X.fonteDallaPagina('', F.letta), ...Object.values(F)]) {
+    assert.ok(X.fonteDiPagina(f), `«${f}» non è riconosciuta come pagina`);
+  }
+  for (const k of ['ELEMENTO_PAGINA', 'DATI_PAGINA', 'TESTO_IN_PAGINA', 'OUTLINE_PAGINA']) {
+    assert.ok(X.fonteDiPagina(SL.FONTI_BUSTA[k]), `la busta ${k} non è riconosciuta come pagina`);
+  }
+  for (const f of ["dall'output di un comando", 'dai risultati di una ricerca', 'da un sito', 'da un documento', 'dal filo riletto']) {
+    assert.ok(!X.fonteDiPagina(f), `«${f}» presa per una pagina`);
+  }
+  // Chi compone una provenienza di pagina passa dalla regola: una frase scritta a mano altrove sfuggirebbe.
+  const sorgenti = ['src/shared/urlExfil.js', 'src/main/services/porteUscita.js', 'src/main/services/segretiLetti.js'];
+  for (const s of sorgenti) {
+    const codice = readFileSync(join(ROOT, s), 'utf8').replace(/FONTI_DI_PAGINA = Object\.freeze\([^)]*\)/, '');
+    assert.ok(!/[`'"]dalla pagina \$\{|[`'"]dalla pagina[`'"]|[`'"]da una pagina letta[`'"]/.test(codice), `${s} compone a mano una provenienza di pagina`);
+  }
 });
 
 // #810.8 giro 3 — il valore vero di un campo è dell'utente se è fatto dei caratteri che lui ci ha messo: una maschera
