@@ -2,6 +2,7 @@
 // fatte in modi diversi (turni in <article>, casella in un componente con shadow root, popup di chat, chat di casa).
 import { test, expect } from '../../fixtures/electron.mjs';
 import { batti } from '../../helpers/tastiera.mjs';
+import { statoDi, clicca } from '../../helpers/riquadri.mjs';
 
 async function prepara(app) {
   await app.evaluate(async () => {
