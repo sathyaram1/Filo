@@ -319,4 +319,4 @@ function crea({ webFrame, riserva = () => {}, finestra = globalThis.window, nome
   };
 }
 
-module.exports = { crea, copiaDelClic, sorgenteSonda, VICINO_PX, ATTESA_MS, RIGIOCO_MS };
+module.exports = { crea, copiaDelClic, tastoDestroInAttesa, sorgenteSonda, VICINO_PX, ATTESA_MS, RIGIOCO_MS };
