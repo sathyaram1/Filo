@@ -7,7 +7,7 @@ const { getEffectiveSettings, Gate } = require('../impostazioniEffettive');
 const testoDi = (action, ...campi) => String(campi.map((c) => action[c]).find((v) => v != null && String(v).trim()) ?? '').trim();
 
 async function azioneImmaginiWeb(action) {
-  const query = testoDi(action, 'query', 'cerca', 'testo', 'q');
+  const query = globalThis.SN_ACTION_LEVELS.ricercaImmaginiDi(action);
   if (!query) return { executed: false, kept: true, output: { cerca: '', immagini: [], error: 'ricerca vuota' } };
   try {
     const settings = await getEffectiveSettings();
