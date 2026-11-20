@@ -658,6 +658,9 @@ test('accanto agli esclusi: chi ha servito le ultime richieste, in che proporzio
   const sent = await page.evaluate(() => window.__sent.filter((m) => m.type === 'wallet_owner_served_by').length);
   expect(sent).toBe(1);
   await page.locator('#sec-excluded').screenshot({ path: 'tests/.shots/admin-defaults-servito.png' }).catch(() => {});
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('dark'));
+  await page.locator('#sec-excluded').screenshot({ path: 'tests/.shots/admin-defaults-servito-scuro.png' }).catch(() => {});
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('light'));
 
   // La lista cambiata e non ancora salvata cambia il giudizio subito: DeepInfra escluso, Novita rimessa.
   await page.click('#addExcludedRow');
