@@ -1449,7 +1449,7 @@ test('cancellaPerSempre: il comando che cancella si trova dopo opzioni con un va
     `perl -e 'unlink "${f}"'`, `perl -e 'unlink"${f}"'`, `perl -MFile::Path -e 'File::Path::rmtree "d"'`,
     `ruby -e 'File.delete "${f}"'`, `ruby -rfileutils -e 'FileUtils.rm_rf "d"'`, 'sudo -u root -g wheel rm x',
     'chroot /mnt /bin/rm x', 'nice -n 10 ionice -c 3 rm -rf d', 'su -c "rm x" root', 'wsl -d Ubuntu rm x',
-    'pwsh -EncodedCommand UgBlAG0AbwB2AGUA', 'powershell -enc UgBlAG0AbwB2AGUA', 'C:\\tools\\echo.exe x & rm y',
+    'pwsh -EncodedCommand UgBlAG0AbwB2AGUA', 'powershell -enc UgBlAG0AbwB2AGUA', 'C:\\tools\\echo.exe rm x',
   ]) assert.equal(C.cancellaPerSempre(cmd), true, cmd);
   // Dopo un programma che non lancia niente, le parole restano dati.
   for (const cmd of ['echo unlink this', 'grep -r "File.delete" src', 'git log --grep=unlink', 'Write-Output rm',
