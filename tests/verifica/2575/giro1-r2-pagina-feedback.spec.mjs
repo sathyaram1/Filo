@@ -31,7 +31,7 @@ async function setupAdmin(page, items) {
   await page.waitForFunction(() => document.querySelectorAll('.fb-card').length > 0, null, { timeout: 10_000 });
 }
 
-test('r1 il primo clic su «Rimanda in correzione» senza testo non manda alla cieca, come in Gestione', async ({ openTab }) => {
+test('r2 il primo clic su «Rimanda in correzione» senza testo non manda alla cieca, come in Gestione', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(page, [BOCCIATA]);
   const tasto = page.locator('.fb-act[data-id="fb-2338"][data-to="todo"]');
