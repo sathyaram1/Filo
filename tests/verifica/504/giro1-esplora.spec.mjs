@@ -255,6 +255,23 @@ test('Aiuto sulla pagina: «traducimi questa pagina»', async ({ app, shell, ope
   await pannello.screenshot({ path: 'tests/.shots/v504-aiuto.png' });
 });
 
+test('sonda: azione con mittente la pagina del sito e assistente', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await fornitore(app);
+  const page = await testServer.openReady(openTab, ARTICLE);
+  const url = await page.evaluate(() => location.href);
+  const r = await app.evaluate(async ({ BrowserWindow, webContents }, u) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const wc = webContents.getAllWebContents().find((w) => { try { return w.getURL() === u; } catch (_) { return false; } });
+    const out = {};
+    out.sito = await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'TRADUCI_PAGINA' }, { sender: { win, wc, url: u }, assistente: true });
+    return JSON.stringify(out);
+  }, url);
+  console.log('SONDA', r);
+  await page.waitForTimeout(3000);
+  console.log('SONDA-TITOLO', await page.locator('#title').innerText());
+});
+
 test('Alt+T senza selezione sulla pagina', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await fornitore(app);
