@@ -624,11 +624,11 @@
     IMMAGINI_WEB: {
       costo: (a) => (a && a._exfil ? 2 : 0),
       campo: 'web',
-      uscita: (a) => String((a && (a.query ?? a.cerca ?? a.testo ?? a.q)) || ''),
+      uscita: (a) => ricercaImmaginiDi(a),
       fonte: (a, out) => (Array.isArray(out.immagini) && out.immagini.length
         ? { classe: 5, campo: 'web', chiave: 'web:immagini', motivo: 'ho cercato immagini sul web' } : null),
       describe: (a) => {
-        const q = a.query || a.cerca || a.testo || a.q || '';
+        const q = ricercaImmaginiDi(a);
         if (a && a._exfil) {
           const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
           return [`Cercare immagini sul web con un testo${why}:\n`, cit(q),
