@@ -43,6 +43,10 @@
     credits: 'Crediti',
   };
 
+  // I tetti per richiesta li tiene il registro delle azioni: qui si leggono, così il manifesto non dice un numero vecchio.
+  if (!global.SN_ACTION_LEVELS && typeof require === 'function') require('./actionLevels.js');
+  const { LOTTO_ELIMINA, LOTTO_RINOMINA } = global.SN_ACTION_LEVELS;
+
   const CAPABILITIES = [
     {
       id: 'new-tab', title: 'Apri una nuova scheda', category: 'navigation',
