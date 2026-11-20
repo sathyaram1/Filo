@@ -1212,8 +1212,8 @@
       restoreOriginal();
       return { stato: fermata ? 'fermata' : 'originale' };
     }
-    if (pageTranslating) return { stato: 'in_corso' };
-    if (pageHasTranslation && !canContinue()) return { stato: 'gia_tradotta' };
+    // Dove l'icona offrirebbe «Mostra originale» a parole non c'è niente da tradurre: la regola è una, showsRestore.
+    if (showsRestore()) return { stato: pageTranslating ? 'in_corso' : 'gia_tradotta' };
     const esito = isPartial()
       ? { stato: 'partita', come: 'ripresa', mancanti: missingCount, di: totalCount }
       : { stato: 'partita', come: pageHasTranslation ? 'nuovo' : 'pagina' };
@@ -1221,8 +1221,17 @@
     return esito;
   }
 
+  // Alt+T senza selezione (#504): esattamente l'icona Traduci, che traduce, continua o torna all'originale.
+  function dalTasto() {
+    if (!isTopFrame()) return false;
+    ricontrolla();
+    if (showsRestore()) restoreOriginal();
+    else Promise.resolve(translatePage()).catch((e) => console.warn('[Filo] traduzione dal tasto', e));
+    return true;
+  }
+
   global.SN_TRANSLATE_PAGE = {
     translatePage, restoreOriginal, hasTranslation,
-    isPartial, hasNewContent, canContinue, ricontrolla, showsRestore, missing, total, buildRestoreOriginalItem, daChat,
+    isPartial, hasNewContent, canContinue, ricontrolla, showsRestore, missing, total, buildRestoreOriginalItem, daChat, dalTasto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
