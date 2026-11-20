@@ -1434,12 +1434,18 @@ test('git vero: dopo una di quelle chiavi, il `git push` nudo manda il codice al
     git(lavoro, 'remote', 'add', 'origin', origine);
     git(lavoro, 'commit', '-q', '--allow-empty', '-m', 'primo');
     git(lavoro, 'push', '-q', '-u', 'origin', 'main');
-    for (const chiave of CHIAVI_DEL_PUSH) {
+    for (const chiave of [...CHIAVI_DEL_PUSH, 'include.path']) {
       const altrove = join(base, `altrove-${chiave}.git`);
       git(base, 'init', '-q', '--bare', altrove);
       git(lavoro, 'commit', '-q', '--allow-empty', '-m', chiave);
-      git(lavoro, 'config', chiave, altrove);
-      assert.equal(lvl(`git config ${chiave} ${altrove}`), 3, `"git config ${chiave} <indirizzo>" dovrebbe chiedere "conferma"`);
+      // Il file incluso arriva con quello che il comando trova già su disco, per esempio dentro un repository clonato.
+      let valore = altrove;
+      if (chiave === 'include.path') {
+        valore = join(base, 'incluso.gitconfig');
+        writeFileSync(valore, `[remote "origin"]\n\tpushurl = ${altrove.replace(/\\/g, '/')}\n`);
+      }
+      git(lavoro, 'config', chiave, valore);
+      assert.equal(lvl(`git config ${chiave} ${valore}`), 3, `"git config ${chiave} <indirizzo>" dovrebbe chiedere "conferma"`);
       assert.equal(lvl('git push'), 2);
       git(lavoro, 'push', '-q');
       assert.equal(git(altrove, 'rev-parse', 'main'), git(lavoro, 'rev-parse', 'HEAD'), `con ${chiave} il push è arrivato all'indirizzo scritto`);
