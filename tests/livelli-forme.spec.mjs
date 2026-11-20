@@ -891,7 +891,8 @@ test('salto col ramo mosso dopo i controlli: lo dice, non ripropone il salto e l
   await expect(page.locator('#mgToast')).toContainText('commit che nessuno ha letto');
   await expect(page.locator('#mgSideBody')).toContainText('scrive nelle regole del database');
   const rimanda = page.locator('#mgL4RimandaBtn');
-  await expect(rimanda).toHaveText('Rimanda in lavorazione');
+  // Una bocciatura del controllo torna a chi corregge (#2575): la strada porta il nome della correzione.
+  await expect(rimanda).toHaveText('Rimanda in correzione');
   await expect(salta).toHaveCount(0);
   // Un clic in più dove stava il salto non rimanda la pratica.
   expect((await rimanda.boundingBox()).y).toBeGreaterThanOrEqual(dovEra.y + dovEra.height);
