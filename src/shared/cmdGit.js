@@ -177,7 +177,8 @@
       const resto = args.filter((_, k) => k !== i);
       const low = resto.map((a) => a.toLowerCase());
       if (verbo === 'unset' || verbo === 'remove-section') return 3;
-      if (verbo === 'list' || verbo === 'edit' || verbo === 'rename-section') return 2;
+      if (verbo === 'rename-section') return 3;
+      if (verbo === 'list' || verbo === 'edit') return 2;
       if (verbo === 'set') return Math.max(2, gitConfigForma(low.includes('--append') ? resto.concat('--add') : resto));
       if (low.some((a) => /^--(regexp|url)(=|$)/.test(a))) return 2;
       return gitConfigForma(resto);
