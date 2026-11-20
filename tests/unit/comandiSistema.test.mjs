@@ -529,8 +529,9 @@ test('prima della conferma si sa se rete o dispositivo sono già come li si chie
   try {
     assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'la rete di casa' }), { nome: 'Casa', gia: true });
     assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'ufficio' }), { nome: 'Ufficio', gia: false });
-    assert.deepEqual(await C.risolviNome({ cosa: 'bluetooth', dispositivo: 'le cuffie', collega: false }), { nome: 'Cuffie', gia: true });
-    assert.deepEqual(await C.risolviNome({ cosa: 'bluetooth', dispositivo: 'tastiera', collega: false }), { nome: 'Tastiera', gia: false });
+    // Il dispositivo trovato porta il suo indirizzo, che la conferma fissa (#2394.1).
+    assert.deepEqual(await C.risolviNome({ cosa: 'bluetooth', dispositivo: 'le cuffie', collega: false }), { nome: 'Cuffie', gia: true, indirizzo: '00:11:22:33:44:55' });
+    assert.deepEqual(await C.risolviNome({ cosa: 'bluetooth', dispositivo: 'tastiera', collega: false }), { nome: 'Tastiera', gia: false, indirizzo: '00:11:22:33:44:66' });
     // Dimenticare non è mai già fatto, nemmeno la rete a cui si è collegati: la conferma la chiede sempre.
     assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'casa', dimentica: true }), { nome: 'Casa', gia: false });
   } finally { C._perProve.usaComputer(null); }
