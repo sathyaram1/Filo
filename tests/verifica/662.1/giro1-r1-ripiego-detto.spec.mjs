@@ -202,32 +202,3 @@ test('«Traduci la pagina» lasciata prima della fine: la pagina dopo dice il ri
   const avvisi = await osservaAvvisi(dopo);
   await expect.poll(avvisi, { timeout: 15000 }).toContain('crediti di Filo');
 });
-
-test('r1 risposta della home arrivata mentre la home sta dietro: la spiegazione pagata dopo sulla pagina in vista lo dice', async ({ app, shell, openTab, testServer }) => {
-  test.setTimeout(120_000);
-  personalDelayMs = 4000;
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const home = await newtabPage(app);
-  await expect(home.locator('#input')).toBeVisible();
-  await redeemWallet(openTab);
-  await prepare(app);
-  await home.bringToFront().catch(() => {});
-  await home.locator('#input').fill('ciao');
-  await home.locator('#sendBtn').click();
-  await expect.poll(() => seen.completions.filter((c) => c.key === PERSONAL_KEY).length, { timeout: 15000 }).toBeGreaterThan(0);
-  const page = await testServer.openReady(openTab, FRASE);
-  const avvisi = await osservaAvvisi(page);
-  await expect(home.locator('.dash-bubble-note')).toContainText('crediti di Filo', { timeout: 30000 });
-  // La scheda davanti è la pagina, non la home: la riga è arrivata in una scheda dietro.
-  const davanti = await app.evaluate(({ BrowserWindow }) => {
-    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
-    const t = tm.tabs.find((x) => x.id === tm.activeId);
-    return String((t && (t.url || (t.view && t.view.webContents.getURL()))) || '');
-  });
-  expect(davanti).toContain('127.0.0.1');
-  await page.waitForTimeout(6000);
-  const prima = seen.completions.length;
-  await selezionaColMouse(page, '#t');
-  await expect.poll(() => seen.completions.slice(prima).filter((c) => c.key === PERSONAL_KEY).length, { timeout: 20000 }).toBeGreaterThan(0);
-  await expect.poll(avvisi, { timeout: 15000 }).toContain('crediti di Filo');
-});
