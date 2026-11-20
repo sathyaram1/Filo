@@ -33,7 +33,7 @@ test('tasto destro: copia immagine e indirizzo', async ({ app, openTab }) => {
   if (await url.count()) {
     await url.click();
     await page.waitForTimeout(800);
-    console.log('URL', JSON.stringify(await app.evaluate(({ clipboard }) => clipboard.readText())));
+    console.log('URL', JSON.stringify(await app.evaluate(async ({ clipboard }) => clipboard.readText())));
   } else console.log('URL nessuna voce');
   await page.keyboard.press('Escape');
 
