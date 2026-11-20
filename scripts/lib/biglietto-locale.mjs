@@ -349,6 +349,15 @@ export async function trovaBiglietto({ env, cwd, deps = {} } = {}) {
 }
 
 /**
+ * Il segreto con cui la sessione scrive compiti e domande: '' senza biglietto, o col segno riservato rimasto solo in
+ * locale, perché il server fa riservato quello che una sessione scrive senza biglietto (#2027.3). Mai un'eccezione.
+ */
+export async function segretoPerScrivere(opts = {}) {
+  const b = await trovaBiglietto(opts).catch(() => null);
+  return b && typeof b.ticket === 'string' && !b.riservatoInAttesa ? b.ticket : '';
+}
+
+/**
  * Per gli strumenti che stampano testo esterno: sporca la sessione col motivo e dice in una riga com'è andata. Va
  * chiamata PRIMA di stampare. `cosa` = cosa si sta leggendo («letto #813»), `motivi` = motiviDiLettura.
  */
