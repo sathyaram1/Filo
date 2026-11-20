@@ -104,7 +104,7 @@ function richieste(l, tutte = false) {
 // quelle con cifre o simboli fino alla frase che porta il dato; quelle di sole lettere, per una password chiesta, nelle
 // prime PAROLE_RISPOSTA o dopo PRESENTA_DATO.
 function valoriRisposta(risposta, tipo, chiesta = true) {
-  const X = globalThis.SN_URL_EXFIL;
+  const X = exfil();
   if (!X || !X.segretiDetti) return [];
   const presentata = presenta().map(([re]) => new RegExp(`^(?:${re.source})$`, 'u'));
   const out = [];
