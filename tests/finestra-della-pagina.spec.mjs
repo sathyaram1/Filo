@@ -116,6 +116,15 @@ test('anche dal riquadro di un altro sito la finestra chiesta per nome col clic 
   await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'SECONDA DEST')?.attiva, { timeout: 8000 }).toBe(true);
 });
 
+test('Ctrl+clic su un collegamento che apre per nome apre dietro, e la pagina che si legge resta davanti', async ({ app, openTab, testServer }) => {
+  const dest = testServer.html('<title>DIETRO</title>');
+  const page = await openTab(testServer.html(`<title>ELENCO</title><a id="a" href="${dest}" target="_new" style="display:block;width:200px;height:60px">vai</a>`));
+  await page.click('#a', { modifiers: ['Control'] });
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'DIETRO'), { timeout: 8000 }).toBe(true);
+  await page.waitForTimeout(800);
+  expect((await schede(app)).find((s) => s.titolo === 'ELENCO')?.attiva).toBe(true);
+});
+
 test('la finestra con nome che la pagina riempie da sola, senza clic, resta dietro', async ({ app, openTab, testServer }) => {
   const prima = testServer.html('<title>PRIMA DEST</title>');
   const seconda = testServer.html('<title>SECONDA DEST</title>');
