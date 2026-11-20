@@ -224,8 +224,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
       ...(Array.isArray(attese) && attese.length ? { waitsFor: attese } : {}),
-      // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato.
-      ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
+      ...campiDelBiglietto(b),
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
