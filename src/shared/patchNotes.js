@@ -26,6 +26,7 @@
         { testo: 'In modalità terminale, copiare o spostare un file sopra le impostazioni o gli hook di git, o scegliere con git config il programma che git fa partire, ti chiede di digitare «conferma», come scriverci con una redirezione. Prima bastava un OK.', segnalazione: 2619 },
         { testo: 'Un comando git che fa partire un altro programma, come un rebase con -x o un submodule foreach, ti chiede di scrivere «conferma», come se quel programma lo lanciassi da solo.', segnalazione: 2619 },
         { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
+        { testo: 'Se il computer risponde lento una volta, la home torna da sola a leggere subito Bluetooth e Wi-Fi, senza riavviare Filo, e dopo una pausa del computer non ti mostra come attuale lo stato di prima.', segnalazione: 2394 },
       ],
     },
     {
