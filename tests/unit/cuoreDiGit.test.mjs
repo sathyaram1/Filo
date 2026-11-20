@@ -53,10 +53,11 @@ test('ogni strada verso gli stessi file: programmi, opzioni, cartella di lavoro,
     'tar -C .git/hooks -xf a.tar', 'unzip a.zip -d .git', 'mv evilrepo .git', 'cp evil.cfg ~/.config/git/config',
     'cp evil /etc/gitconfig', 'cp x ../server/repo.git/hooks/post-receive', 'cp evil .gi?/config', 'cp evil .git/{config,x}',
     'cp evil "$HOME/.gitconfig"', 'cp x .GIT/CONFIG', 'cd .git && cp evil config', 'cd .git/hooks; cp evil pre-commit',
-    'mkdir -p .git/hooks && cp evil .git/hooks/post-checkout', "cp evil $'\\x2egit/config'"];
+    'mkdir -p .git/hooks && cp evil .git/hooks/post-checkout'];
   for (const [nome, ctx] of CONTESTI) {
     for (const cmd of casi) assert.equal(C.classify(cmd, ctx), 3, `${nome}: «${cmd}»`);
   }
+  for (const ctx of [undefined, LINUX, MAC]) assert.equal(C.classify("cp evil $'\\x2egit/config'", ctx), 3, 'bash decodifica il nome');
   for (const cmd of ['copy evil GIT~1\\config', 'robocopy evil .git\\hooks pre-commit', 'xcopy evil .git\\hooks\\ /Y',
     'copy evil "C:\\Program Files\\Git\\etc\\gitconfig"', 'cd .git\\hooks & copy evil.sh', 'copy evil .git\\config::$DATA']) {
     assert.equal(C.classify(cmd, CMD), 3, `cmd: «${cmd}»`);
