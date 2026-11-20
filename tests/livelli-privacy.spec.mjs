@@ -57,6 +57,15 @@ async function tastoDestroSullaFoto(page) {
   await expect(sezione).toBeVisible({ timeout: 10_000 });
   return sezione;
 }
+// Su un sito il pannello dell'Aiuto sta nello strato sopra la scheda (#1509.3).
+async function apriAiuto(app, shell, page) {
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const aiuto = await paginaDellAiuto(app, page);
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  return aiuto;
+}
 
 test.describe('nel sito', () => {
   test.use({ hostInPiu: [SANITA, POSTA] });
