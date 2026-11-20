@@ -265,7 +265,7 @@ describe('il guasto di un processo ucciso', () => {
     assert.match(g, /^guasto: strumento finish-check: finish:check interrotto senza finire \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01:00 UTC, partito alle 18:40:00 UTC su abcdef12\): il kernel ha ucciso processi per memoria; memoria: /);
     assert.match(g, /da allora: 2 nella macchina, 2 fra i comandi\.$/);
     const t = testoPerIlWorker(segno, adesso);
-    assert.match(t, /^La corsa di finish:check si è interrotta senza finire: fase spec delle aree toccate \(190\)/);
+    assert.match(t, /^La corsa di finish:check si è interrotta senza finire \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01:00 UTC, partito alle 18:40:00 UTC su abcdef12\): il kernel ha ucciso/);
     assert.match(t, /Altrimenti rilanciala una volta, in sottofondo/);
     assert.ok(t.includes(`--guasto "${g}"`), t);
     assert.doesNotMatch(g, /["`$]/, 'il guasto sta fra virgolette doppie in una riga di comando');
