@@ -193,9 +193,16 @@
     };
   }
 
+  // Prima dei livelli c'era un interruttore solo: accese, le pagine delicate non mandavano niente da sole, cioè «Chiedi
+  // sulle delicate». Il livello da cui riparte chi aggiorna, o null se l'interruttore non c'era o era spento.
+  function livelloDiPrima(pagineDelicate) {
+    const p = pagineDelicate && typeof pagineDelicate === 'object' ? pagineDelicate : {};
+    return 'enabled' in p && p.enabled !== false ? 'delicate' : null;
+  }
+
   global.SN_LIVELLI_PRIVACY = {
-    LIVELLI, ORDINE, CATEGORIE, PREDEFINITA, regola, chiede, alza, alzaTutto, piuStretta, delicateStrette, frase, confermaAlzata,
-    confermaSitiTolti, confermaAnnullo, nomeLivello, nomeCategoria,
+    LIVELLI, ORDINE, CATEGORIE, PREDEFINITA, regola, chiede, alza, alzaTutto, piuStretta, delicateStrette, sitiTolti, frase,
+    confermaAlzata, confermaSitiTolti, confermaAnnullo, nomeLivello, nomeCategoria, livelloDiPrima,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_LIVELLI_PRIVACY;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
