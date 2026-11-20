@@ -1152,8 +1152,8 @@ function contenutiPronti() {
   return globalThis.__snFiloSpento === true;
 }
 
-function waitForContentScripts(fn) {
-  const deadline = Date.now() + 3000;
+function waitForContentScripts(fn, entroMs = 3000) {
+  const deadline = Date.now() + entroMs;
   const tick = () => {
     if (contenutiPronti() || Date.now() > deadline) { try { fn(); } catch (_) {} return; }
     setTimeout(tick, 16);
