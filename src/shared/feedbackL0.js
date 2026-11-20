@@ -248,12 +248,14 @@
       if (!pezzi.some((p) => p.testo === x.pezzo)) pezzi.push({ tipo: x.tipo, testo: x.pezzo, frase: FRASI_TESTO[x.tipo] });
     }
     const immagini = [...new Set(lista.filter((x) => x.dove === 'immagine').map((x) => x.immagine))];
-    return { ...avviso(lista, opz), pezzi, immagini };
+    const allegati = [...new Set(lista.filter((x) => x.dove === 'allegato').map((x) => x.allegato))];
+    return { ...avviso(lista, opz), pezzi, immagini, allegati };
   }
 
   global.SN_FEEDBACK_L0 = {
-    TIPI_TESTO, TIPI_IMMAGINE, MAX_TESTO, FRASI_TESTO, FRASI_IMMAGINE, FRASE_RED_TEAM, TITOLO,
+    TIPI_TESTO, TIPI_IMMAGINE, MAX_TESTO, FRASI_TESTO, FRASI_IMMAGINE, FRASI_ALLEGATO, FRASE_RED_TEAM, TITOLO,
     ISTRUZIONI_TESTO, ISTRUZIONI_IMMAGINI,
-    richiestaTesto, richiestaImmagini, troppoLungo, trovaPezzo, leggiTesto, leggiImmagini, daValori, avviso, esito,
+    richiestaTesto, richiestaImmagini, troppoLungo, trovaPezzo, leggiTesto, leggiImmagini, daValori, daTratti, daAllegato,
+    avviso, esito,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
