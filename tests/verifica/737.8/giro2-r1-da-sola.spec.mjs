@@ -17,7 +17,7 @@ const torna = async (app, shell, page) => {
   await page.waitForTimeout(400);
 };
 
-test('r2 la chat che si riporta davanti da sola non porta via dalla pagina quando ci si clicca sopra il testo', async ({ app, shell, openTab, testServer }) => {
+test('r1 la chat che si riporta davanti da sola non porta via dalla pagina quando ci si clicca sopra il testo', async ({ app, shell, openTab, testServer }) => {
   const chat = testServer.html('<title>CHAT</title><script>setTimeout(function(){setInterval(function(){window.focus()},150)},4000)</script>');
   const page = await openTab(testServer.html(`<button id="a" style="height:40px" onclick="window.open(${JSON.stringify(chat).replace(/"/g, '&quot;')},'chat')">chat</button>
     <p id="testo" style="height:200px">Un articolo da leggere, con del testo su cui si clicca.</p>`));
