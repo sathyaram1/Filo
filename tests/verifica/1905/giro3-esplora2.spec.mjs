@@ -22,7 +22,7 @@ const schede = (app) => app.evaluate(({ BrowserWindow }) => {
 const pausa = (app, ms) => app.evaluate((_e, ms) => new Promise((r) => setTimeout(r, ms)), ms);
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
-test.beforeEach(async ({ app }) => {
+test.beforeEach(async ({ app, shell }) => {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoPronta);
 });
 
