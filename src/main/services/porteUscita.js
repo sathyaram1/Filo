@@ -708,9 +708,17 @@ function idDelCambio(action) {
   return id || null;
 }
 
+// I file che il modello nomina per cancellarli o rinominarli: una lettura sola, o con due campi le due azioni ne
+// prenderebbero uno diverso (#1909.3).
+function percorsiDellAzione(action) {
+  return [].concat(action.percorsi ?? action.percorso ?? action.path ?? action.file ?? action.files ?? [])
+    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
+    .filter((x) => typeof x === 'string' && x.trim());
+}
+
 // #1909 — cosa finisce nel cestino lo trova il main prima del gate: il popup nomina gli elementi veri, e all'OK si
 // tocca solo quello che ha mostrato. Fuori dal perimetro, su un altro computer o la cartella personale intera: mai.
-const LOTTO_ELIMINA = 200;
+const { LOTTO_ELIMINA, LOTTO_RINOMINA } = globalThis.SN_ACTION_LEVELS;
 // Perché un file resta dov'è, detto all'utente: la stessa frase per chi cancella e chi rinomina.
 function fraseFuori(m) {
   if (/rete/.test(m)) return 'sta su un altro computer della rete';
