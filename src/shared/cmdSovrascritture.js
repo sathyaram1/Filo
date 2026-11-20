@@ -6,7 +6,8 @@
   const P = global.SN_CMD_PARTI;
   const {
     dove, assolutoDi, pezzi, JOLLY, shellPosix, opzioneLunga, valoreDuePunti, parametro, programOf, dequote, argomenti,
-    uniqUscita, treeUscita, gitUscita, forsePowerShell, graffe, gitScriveFile, perimetroDi, cartellaDa, nomeNorm,
+    uniqUscita, treeUscita, gitUscita, forsePowerShell, graffe, gitScriveFile, perimetroDi, cartellaDa, nomeNorm, peggiore,
+    GIT_GLOBALI_INNOCUE,
   } = P;
   // Da una parte caricata dopo: si cerca alla chiamata, perché classifyOne e segmentIsRead si chiamano a vicenda.
   const classifyOne = (raw, shell) => P.classifyOne(raw, shell);
