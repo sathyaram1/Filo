@@ -53,7 +53,7 @@ test('ogni strada verso gli stessi file: programmi, opzioni, cartella di lavoro,
     'tar -C .git/hooks -xf a.tar', 'unzip a.zip -d .git', 'mv evilrepo .git', 'cp evil.cfg ~/.config/git/config',
     'cp evil /etc/gitconfig', 'cp x ../server/repo.git/hooks/post-receive', 'cp evil .gi?/config', 'cp evil .git/{config,x}',
     'cp evil "$HOME/.gitconfig"', 'cp x .GIT/CONFIG', 'cd .git && cp evil config', 'cd .git/hooks; cp evil pre-commit',
-    'mkdir -p .git/hooks && cp evil .git/hooks/post-checkout'];
+    'mkdir -p .git/hooks && cp evil .git/hooks/post-checkout', "cp evil $'\\x2egit/config'"];
   for (const [nome, ctx] of CONTESTI) {
     for (const cmd of casi) assert.equal(C.classify(cmd, ctx), 3, `${nome}: «${cmd}»`);
   }
