@@ -87,6 +87,7 @@
     CURL_ACCESSORY_WRITE_RE, CURL_WRITE_OUT_FILE_RE, CURL_CONFIG_RE, curlCambiaIlServer, ROBOCOPY_DESTRUCTIVE_RE,
     DANGEROUS_FLAG_RE, lungaPericolosa, LUNGHE_PERICOLOSE, PS_READ, classifyDetail, fuoriDa, contesto, dove, MOTIVI,
     dentroCasa, PROFILO_APERTE, nomeNorm, CANCELLANO, GIT_READ, segniInterni, PROGRAMMI_RETE, subcommandOf, comeCmd,
+    gitChiaveInerte,
   } = P;
 
   // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
