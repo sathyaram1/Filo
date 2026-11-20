@@ -9,7 +9,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import * as B from '../../scripts/lib/biglietto-locale.mjs';
 import { leggiArgomenti } from '../../scripts/biglietto.mjs';
 import { dichiaraLettura } from '../../scripts/leggi-feedback.mjs';
-import { esegui as domanda } from '../../scripts/domanda.mjs';
+import { esegui as domanda, registroConChiave } from '../../scripts/domanda.mjs';
 import { esegui as compito } from '../../scripts/compito.mjs';
 import * as manutentore from '../../scripts/manutentore.mjs';
 import { leggiRisposte } from '../../scripts/routine-domanda.mjs';
