@@ -531,7 +531,11 @@
       if (u && i <= u[1]) u[1] = i + FINESTRA; else tratti.push([i, i + FINESTRA]);
     }
     let out = t;
-    for (let k = tratti.length - 1; k >= 0; k--) out = out.slice(0, pos[tratti[k][0]]) + OSCURATO + out.slice(pos[tratti[k][1] - 1] + 1);
+    for (let k = tratti.length - 1; k >= 0; k--) {
+      const a = pos[tratti[k][0]];
+      const b = pos[tratti[k][1] - 1] + 1;
+      out = out.slice(0, a) + segno(out.slice(a, b)) + out.slice(b);
+    }
     return out;
   }
 
