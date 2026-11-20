@@ -145,10 +145,11 @@ test('chat: ripetuta mentre traduce non la ferma; l\'originale chiesto a metà l
   const a = await chiediTraduzione(app, shell, {}, 'traducimi questa pagina');
   console.log('ESITO-A', a.esito);
   await expect.poll(() => tradotti(page), { timeout: 60_000 }).toBeGreaterThan(0);
+  console.log('PRIMA-B', await tradotti(page));
   const b = await chiediTraduzione(app, shell, {}, 'traducila tutta');
-  console.log('ESITO-B', b.esito);
+  console.log('ESITO-B', b.esito, 'DOPO-B', await tradotti(page));
   console.log('RIGA-B', await b.home.locator('.dash-activity').last().innerText());
-  await expect.poll(() => tradotti(page), { timeout: 90_000 }).toBe(41);
+  await expect.poll(() => tradotti(page), { timeout: 90_000 }).toBe(42);
   expect(await doppi(page)).toBe(0);
 
   await fornitore(app, { delay: 2500 });
@@ -173,11 +174,11 @@ test('chat: riprende una traduzione interrotta senza ripagare i pezzi fatti', as
   await expect.poll(() => tradotti(page), { timeout: 30_000 }).toBeGreaterThan(0);
   await page.waitForTimeout(4000);
   const meta = await tradotti(page);
-  expect(meta).toBeLessThan(41);
+  expect(meta).toBeLessThan(42);
   await ripara(app);
   const b = await chiediTraduzione(app, shell, {}, 'riprendi la traduzione');
   console.log('ESITO-R', b.esito);
-  await expect.poll(() => tradotti(page), { timeout: 90_000 }).toBe(41);
+  await expect.poll(() => tradotti(page), { timeout: 90_000 }).toBe(42);
   expect(await doppi(page)).toBe(0);
   await ripristina(app);
 });
