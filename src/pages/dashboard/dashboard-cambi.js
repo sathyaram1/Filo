@@ -105,8 +105,22 @@
 
   // Annulla (o rifà) e ridisegna: la stessa cosa dal bottone della pastiglia e dal tasto destro.
   async function esegui(s, id) {
-    const r = await send({ type: MSG.CAMBI_ANNULLA, id });
+    const r = await annulla(id);
     if (r && r.ok) await aggiorna([s]);
+    return r;
+  }
+
+  // L'unico annullo delle pagine: rimettere com'era un cambio che stringeva quanto esce verso i modelli lo riallarga
+  // (#1589), e il main lo rifiuta finché non c'è la parola scritta. Detto no: `{ ok: false, rinuncia: true }`.
+  async function annulla(id) {
+    let r = null;
+    try { r = await send({ type: MSG.CAMBI_ANNULLA, id }); } catch (_) { r = null; }
+    if (r && r.error === 'conferma' && r.conferma) {
+      const C = global.SN_CONFIRM_UI;
+      const ok = C ? await C.confirmTyped(r.conferma).catch(() => false) : false;
+      if (!ok) return { ok: false, rinuncia: true };
+      try { r = await send({ type: MSG.CAMBI_ANNULLA, id, confermato: true }); } catch (_) { r = null; }
+    }
     return r;
   }
 
