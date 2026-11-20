@@ -812,9 +812,7 @@ async function preparaRinomina(action, sender, avanzamento = null) {
     return '';
   };
   const saltaFuori = (p, m) => ({ nome: nodePath.basename(p) || p, perche: fraseFuori(m) });
-  const elenco = [].concat(action.percorsi ?? action.file ?? action.files ?? action.percorso ?? action.path ?? [])
-    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
-    .filter((x) => typeof x === 'string' && x.trim());
+  const elenco = percorsiDellAzione(action);
   let candidati = [];
   for (const x of elenco) {
     let full = DR.normalizePath(x, cwd);
