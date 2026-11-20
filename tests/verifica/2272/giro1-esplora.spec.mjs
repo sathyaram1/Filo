@@ -85,6 +85,38 @@ test('trascinata nel campo della chat, una foto della risposta diventa un allega
   expect(stato.anteprime).toBeGreaterThan(0);
 });
 
+test('col gesto vero, trascinata nel campo della chat, una foto della risposta diventa un allegato', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  const Gesti = await import('../../helpers/gestiVeri.mjs');
+  test.skip(!Gesti.disponibili(), 'servono i gesti veri');
+  await preparaImmagini(app, 3);
+  await stubModello(app, { chiamate: [{ azione: 'immagini', query: 'antilope' }], finali: ['Ecco le antilopi.\n\n[[immagini: $ID0, $ID1, $ID2]]'] });
+  const page = await openTab(NEWTAB);
+  await Gesti.finestraASchermo(app);
+  await chiedi(page, 'antilope immagine');
+  const bolla = page.locator('.dash-bubble-filo', { hasText: 'Ecco le antilopi.' });
+  await expect(bolla).toBeVisible({ timeout: 30_000 });
+  const img = bolla.locator('.filo-galleria-img').first();
+  await expect.poll(() => img.evaluate((e) => e.complete && e.naturalWidth > 0), { timeout: 15_000 }).toBe(true);
+  await page.evaluate(() => {
+    window.__rilasci = [];
+    document.addEventListener('drop', (e) => {
+      window.__rilasci.push({ tipi: [...e.dataTransfer.types], file: e.dataTransfer.files.length, testo: e.dataTransfer.getData('text/plain'), uri: e.dataTransfer.getData('text/uri-list') });
+    }, true);
+  });
+  const da = await Gesti.sulloSchermo(app, page, page, '.dash-bubble-filo .filo-galleria-img');
+  const a = await Gesti.sulloSchermo(app, page, page, '#input');
+  Gesti.trascina(da, { x: da.x + 30, y: da.y + 20 }, a);
+  await page.waitForTimeout(2000);
+  const stato = await page.evaluate(() => ({
+    rilasci: window.__rilasci,
+    campo: document.querySelector('#input').value,
+    anteprime: document.querySelectorAll('#imgPreviews img, .dash-img-preview img, [class*="preview"] img').length,
+  }));
+  console.log('GESTO VERO', JSON.stringify(stato));
+  expect(stato.anteprime).toBeGreaterThan(0);
+});
+
 test('una risposta fatta di sole immagini le mostra, anche riaperta', async ({ app, openTab }) => {
   test.setTimeout(150_000);
   await preparaImmagini(app, 2);
