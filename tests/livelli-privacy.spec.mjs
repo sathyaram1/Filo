@@ -5,7 +5,9 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { home } from './helpers/chatFinta.mjs';
+import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { createServer } from 'node:http';
 
 const SANITA = 'sanita-di-prova.test';
 const POSTA = 'posta-di-prova.test';
