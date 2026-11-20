@@ -186,7 +186,7 @@
   }
 
   // Cancellare senza cestino (#1909): un comando che lo fa vuole la parola «conferma» a ogni livello, come ogni «per
-  // sempre». Si guarda il programma di ogni pezzo (anche dopo sudo, xargs, `cmd /c`, `find -exec` e negli scriptblock):
+  // sempre». Si guarda il programma di ogni pezzo (anche dopo sudo, xargs, `cmd /c`, `find -exec`, `git rebase -x` e negli scriptblock):
   // sbagliare per eccesso costa una parola da scrivere, per difetto il comando resta comunque al costo più alto.
   // Dopo un programma che non si sa se lancia altro (sudo, `pwsh -ExecutionPolicy Bypass -Command`, timeout, busybox,
   // `for …; do`) ogni parola può essere il comando lanciato: le opzioni coi loro valori non si sanno contare (#1909.3).
