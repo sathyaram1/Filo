@@ -48,6 +48,29 @@ test('tasto destro: copia immagine e indirizzo', async ({ app, openTab }) => {
   await page.keyboard.press('Escape');
 });
 
+test('salva immagine come', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const os = await import('node:os');
+  const dest = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'g2salva-')), 'foto.png');
+  await preparaImmagini(app, 2);
+  await stubModello(app, [{ strumento: { azione: 'immagini', query: 'antilope' } }, { testo: 'Ecco.\n\n[[immagini: $ID0, $ID1]]' }]);
+  await app.evaluate(({ dialog }, dest) => {
+    const f = async () => ({ canceled: false, filePath: dest });
+    try { dialog.showSaveDialog = f; } catch (e) { console.log('no stub', e.message); }
+  }, dest);
+  const page = await openTab(NEWTAB);
+  await chiedi(page, 'antilope immagine');
+  const img = page.locator('.dash-bubble-filo .filo-galleria-img').first();
+  await expect.poll(() => img.evaluate((e) => e.complete && e.naturalWidth > 0), { timeout: 30_000 }).toBe(true);
+  await img.click({ button: 'right' });
+  await menuDi(page).voce('Salva immagine come').click();
+  await page.waitForTimeout(4000);
+  console.log('SALVA', dest, fs.existsSync(dest) ? fs.statSync(dest).size : 'manca', fs.readdirSync(path.dirname(dest)));
+  console.log('TOAST', await page.locator('.sn-toast, [class*=toast]').allTextContents().catch(() => []));
+});
+
 test('risposta di sole immagini, marcatore dentro un elenco, finestra stretta', async ({ app, openTab }) => {
   test.setTimeout(150_000);
   await preparaImmagini(app, 4);
