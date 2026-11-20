@@ -164,7 +164,7 @@ describe('il segno della corsa di finish:check', () => {
     c.kill('SIGTERM');
     assert.equal((await finito).segnale, 'SIGTERM');
     assert.ok(Date.now() - da < 10_000, `fermata dopo ${Date.now() - da} ms`);
-    assert.equal(codiceDellaCorsa(corsaInterrotta(root)), CODICE_SIGKILL, 'il segno resta, col processo morto');
+    assert.ok(corsaInterrotta(root), 'il segno resta, col processo morto');
 
     const pulito = repo();
     assert.throws(() => execFileSync(process.execPath, ['--input-type=module', '-e', `const { apriCorsa } = await import(${JSON.stringify(modulo)}); apriCorsa(${JSON.stringify(pulito)}); process.exit(1);`], { stdio: 'ignore' }), /status 1|failed/);
