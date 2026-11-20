@@ -118,3 +118,63 @@ test('un\'immagine creata torna come copia segnata «generata», e la chiamata c
   assert.match(r.immagini[0].id, /^g\d+$/);
   assert.match(r.immagini[0].src, /^filo:\/\/icone\//);
 });
+
+async function conRete(risposta, fn) {
+  const chieste = [];
+  const orig = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    chieste.push({ url: String(url), opts });
+    return new Response(JSON.stringify(risposta), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try { return { r: await fn(), chieste }; } finally { globalThis.fetch = orig; }
+}
+
+test('Wikimedia Commons: la domanda cerca file d\'immagine col testo dato, e la risposta diventa foto in ordine di pertinenza', async () => {
+  const { r, chieste } = await conRete({
+    batchcomplete: true,
+    query: {
+      pages: [
+        { pageid: 2, ns: 6, title: 'File:Impala_male_(Aepyceros_melampus).jpg', index: 2, imageinfo: [{ size: 900000, width: 3000, height: 2000, thumburl: 'https://upload.wikimedia.org/thumb/impala.jpg', thumbwidth: 800, thumbheight: 533, url: 'https://upload.wikimedia.org/impala.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Impala_male_(Aepyceros_melampus).jpg', mime: 'image/jpeg' }] },
+        { pageid: 1, ns: 6, title: 'File:Antilope cervicapra.png', index: 1, imageinfo: [{ thumburl: 'https://upload.wikimedia.org/thumb/cervicapra.png', thumbwidth: 800, thumbheight: 600, url: 'https://upload.wikimedia.org/cervicapra.png', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Antilope_cervicapra.png', mime: 'image/png' }] },
+        { pageid: 3, ns: 6, title: 'File:Senza indirizzo sicuro.jpg', index: 3, imageinfo: [{ url: 'http://esempio.example/x.jpg' }] },
+      ],
+    },
+  }, () => MOTORI.commons('antilope'));
+  assert.equal(chieste.length, 1);
+  const u = new URL(chieste[0].url);
+  assert.equal(u.origin + u.pathname, 'https://commons.wikimedia.org/w/api.php');
+  assert.equal(u.searchParams.get('generator'), 'search');
+  assert.equal(u.searchParams.get('gsrsearch'), 'antilope filetype:bitmap');
+  assert.equal(u.searchParams.get('gsrnamespace'), '6');
+  assert.equal(u.searchParams.get('prop'), 'imageinfo');
+  assert.match(u.searchParams.get('iiprop'), /url/);
+  assert.equal(u.searchParams.get('iiurlwidth'), '800');
+  assert.deepEqual(r.map((v) => v.titolo), ['Antilope cervicapra', 'Impala male (Aepyceros melampus)']);
+  assert.deepEqual(r[0], {
+    immagine: 'https://upload.wikimedia.org/thumb/cervicapra.png', titolo: 'Antilope cervicapra', sito: 'commons.wikimedia.org',
+    pagina: 'https://commons.wikimedia.org/wiki/File:Antilope_cervicapra.png', larghezza: 800, altezza: 600,
+  });
+});
+
+test('Tavily: la stessa domanda della ricerca sul web, con le immagini; la risposta diventa foto col sito', async () => {
+  const { r, chieste } = await conRete({
+    query: 'antilope', results: [],
+    images: [{ url: 'https://foto.example/a.jpg', description: 'Un impala al tramonto' }, 'https://altro.example/b.png', { url: 'ftp://no.example/c.jpg' }],
+  }, () => MOTORI.tavily('antilope', 'chiave-tavily'));
+  assert.equal(chieste.length, 1);
+  assert.equal(chieste[0].url, 'https://api.tavily.com/search');
+  const corpo = JSON.parse(chieste[0].opts.body);
+  assert.equal(corpo.api_key, 'chiave-tavily');
+  assert.equal(corpo.query, 'antilope');
+  assert.equal(corpo.include_images, true);
+  assert.deepEqual(r, [
+    { immagine: 'https://foto.example/a.jpg', titolo: 'Un impala al tramonto', sito: 'foto.example' },
+    { immagine: 'https://altro.example/b.png', titolo: '', sito: 'altro.example' },
+  ]);
+  // Una sola domanda a Tavily: quella della ricerca sul web, senza le immagini, parte uguale.
+  const web = await conRete({ results: [{ title: 'T', url: 'https://x.example/', content: 'c' }] },
+    () => globalThis.SN_WEB_SEARCH.search({ query: 'antilope', tavilyKey: 'chiave-tavily' }));
+  const corpoWeb = JSON.parse(web.chieste[0].opts.body);
+  assert.equal(web.chieste[0].url, chieste[0].url);
+  assert.deepEqual(Object.keys(corpoWeb).filter((k) => !/^include_image/.test(k)).sort(), Object.keys(corpo).filter((k) => !/^include_image/.test(k)).sort());
+});
