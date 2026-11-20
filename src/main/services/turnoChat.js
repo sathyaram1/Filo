@@ -1070,8 +1070,6 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Anche la parte già scritta porta le sue fonti e immagini controllate, mai i marcatori grezzi (#2383, #2272).
     const citate = globalThis.SN_IMMAGINI_RISPOSTA.controllaConFonti(unisciTesti(risposta), renderedActions);
     const giaScritta = citate.text;
-    // La bolla a schermo ridisegna la stessa parte coi suoi posti (#2272): senza, le foto compaiono solo riaperta.
-    giaScrittaControllata = { testo: giaScritta, fonti: citate.fonti, immagini: citate.immagini };
     if (!chatId || (!successe.length && !giaScritta && !citate.immagini.length)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
