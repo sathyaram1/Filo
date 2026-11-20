@@ -107,7 +107,7 @@ class StratoDelMenu {
       shell.on('before-input-event', (e, input) => { if (this.tasto(input)) e.preventDefault(); });
     }
     // Dopo la shell: all'avvio non le contende il caricamento.
-    if (shell && typeof shell.once === 'function' && shell.isLoading()) shell.once('did-finish-load', () => this._vista());
+    if (shell && typeof shell.once === 'function' && shell.isLoading()) shell.once('did-stop-loading', () => this._vista());
     else setImmediate(() => this._vista());
   }
 
