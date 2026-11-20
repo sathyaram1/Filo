@@ -234,9 +234,10 @@ test('Aiuto sulla pagina: «traducimi questa pagina»', async ({ app, shell, ope
   const page = await testServer.openReady(openTab, ARTICLE);
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
-  await page.fill('.sn-sidebar-input textarea', 'traducimi questa pagina');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  const pannello = await paginaDellAiuto(app, page);
+  await pannello.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await pannello.fill('.sn-sidebar-input textarea', 'traducimi questa pagina');
+  await pannello.press('.sn-sidebar-input textarea', 'Enter');
   await expect.poll(() => app.evaluate(() => globalThis.__aiuto.length), { timeout: 20_000 }).toBeGreaterThan(0);
   const prompt = JSON.stringify(await app.evaluate(() => globalThis.__aiuto[0]));
   console.log('AIUTO-PROMPT-HA-TRADUCI', prompt.includes('TRADUCI_PAGINA'), /tradu[a-z]* (la|questa|l'intera) pagina/i.test(prompt));
