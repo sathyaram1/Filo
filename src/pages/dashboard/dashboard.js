@@ -1205,6 +1205,7 @@
     // Il testo di un giro di soli bottoni resta nella bolla; quello degli altri giri va nel blocco.
     const chiudiGiro = (data) => {
       if (data.risposta) {
+        rispostaPrimaGrezza = unisci(rispostaPrimaGrezza, data.text || testoGrezzoDelGiro());
         rispostaPrima = unisci(rispostaPrima, data.text ? senzaMarcatori(data.text) : testoDelGiro());
         scriviInDiretta(bollaDellaRisposta(), rispostaPrima);
       } else if (streamBubble && rispostaPrima) {
