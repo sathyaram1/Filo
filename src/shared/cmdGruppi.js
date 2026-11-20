@@ -314,17 +314,22 @@
     if (seq && seq.length) {
       let cands = [c];
       let det = UNO;
-      const ultimi = [];
+      // I valori si raccolgono man mano: rifare l'elenco a ogni `$_` costava il quadrato dei comandi (#1994.1).
+      const valori = new Set();
+      let ultimoIgnoto = true;
       for (const part of seq) {
         let forme = [part];
         if (usaUltimoArg(part, c)) {
-          const valori = [...new Set(ultimi.flat())];
-          if (!ultimi.length || ultimi.includes(null) || valori.length > ULTIMI_MAX) return TRE;
-          forme = valori.map((v) => part.replace(ULTIMO_ARG_RE, () => comeParola(v)));
+          if (ultimoIgnoto || valori.size > ULTIMI_MAX) return TRE;
+          forme = [...valori].map((v) => part.replace(ULTIMO_ARG_RE, () => comeParola(v)));
         }
         for (const f of forme) {
           for (const cc of cands) det = peggiore(det, classifyOneDet(f, cc));
-          ultimi.push(ultimiArgomenti(f, c));
+          if (det.level === 3) return det;
+          if (ultimoIgnoto && valori.size) continue;
+          const u = ultimiArgomenti(f, c);
+          if (u) u.forEach((v) => valori.add(v));
+          ultimoIgnoto = !u;
         }
         if (!SPOSTAMENTI.has(programOf(dequote(part)))) continue;
         const visti = new Map();
