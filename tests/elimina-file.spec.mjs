@@ -159,6 +159,83 @@ test('un comando del terminale che cancella senza cestino vuole la parola «conf
   expect(existsSync(file)).toBe(true);
 });
 
+// #1909.3: lanciato da un altro programma, con opzioni che hanno un valore o da un lanciatore che Filo non conosce, il
+// comando che cancella senza cestino vuole lo stesso la parola.
+test('a Normale un comando che cancella senza cestino vuole la parola anche lanciato con opzioni o da un altro programma', async ({ app }) => {
+  const dir = cartellaInCasa('filo-rm-lanciato-');
+  const file = join(dir, 'a.txt');
+  writeFileSync(file, 'x');
+  await livelloAutonomia(app, 'default');
+  const comandi = [
+    `pwsh -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item '${file}'"`,
+    `powershell.exe -ExecutionPolicy Bypass -c "del '${file}'"`,
+    `timeout 5 rm "${file}"`,
+    `busybox rm "${file}"`,
+    `perl -e 'unlink "${file}"'`,
+  ];
+  const senzaParola = [];
+  for (const comando of comandi) {
+    const c = await execAction(app, { type: 'ESEGUI_COMANDO', comando, spiegazione: 'Cancello il file' }, {});
+    if (c.executed || c.needsConfirm !== 3) senzaParola.push(comando);
+  }
+  expect(senzaParola).toEqual([]);
+  expect(existsSync(file)).toBe(true);
+  // Un comando che legge soltanto, lanciato allo stesso modo, resta al riquadro leggero.
+  const legge = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `timeout 5 ls "${dir}"`, spiegazione: 'Guardo la cartella' }, {});
+  expect(legge.describe || '').not.toContain('cancella per sempre');
+});
+
+// Un nome scritto quasi giusto (maiuscole e accento) ritrova il file vero, e il popup nomina quello; il file trovato si
+// ricontrolla: se è nascosto resta dov'è.
+test('«cancella la bolletta» con il nome scritto quasi giusto sposta nel cestino il file vero; uno nascosto ritrovato così resta', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaInCasa('filo-cestino-simile-');
+  const vero = `bolletta caffè ${Date.now()}.pdf`;
+  const file = join(dir, vero);
+  writeFileSync(file, '%PDF-1.4 bolletta');
+  const scritto = join(dir, vero.replace('bolletta caffè', 'Bolletta Caffe'));
+  const page = await home(app);
+  try {
+    await modelloFinto(app, [elimina('e1', { percorsi: [scritto] }), { text: 'Fatto.' }]);
+    await chiedi(page, 'cancella la bolletta del caffè in Download');
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
+    const s = await confirmState(page);
+    expect(s.text).toContain(vero);
+    expect(s.text).not.toContain(basename(scritto));
+    await clickConfirm(page, 'ok');
+    await expect.poll(() => existsSync(file), { timeout: 15_000 }).toBe(false);
+    if (process.platform === 'linux') expect(nelCestino(vero), 'il file vero si ritrova nel cestino').toBe(true);
+  } finally {
+    await ripristina(app);
+    togliDalCestino(vero);
+  }
+
+  const nascosto = join(dir, '.nascosto.txt');
+  writeFileSync(nascosto, 'x');
+  const r = await execAction(app, { type: 'ELIMINA_FILE', percorsi: [join(dir, '�nascosto.txt')] });
+  expect(r.executed).toBe(false);
+  expect(r.needsConfirm).toBeFalsy();
+  expect(r.output.saltati.map((x) => x.perche)).toEqual(['non c\'è']);
+  expect(existsSync(nascosto)).toBe(true);
+});
+
+// Cancellare e rinominare leggono i file chiesti allo stesso modo: con due campi diversi prendono lo stesso.
+test('con un «percorso» e un «file» diversi, cancellare e rinominare prendono lo stesso file', async ({ app }) => {
+  const dir = cartellaInCasa('filo-due-campi-');
+  const a = join(dir, 'primo.txt');
+  const b = join(dir, 'secondo.txt');
+  for (const f of [a, b]) writeFileSync(f, 'x');
+  const el = await execAction(app, { type: 'ELIMINA_FILE', percorso: a, file: b });
+  expect(el.needsConfirm).toBe(2);
+  const rin = await execAction(app, { type: 'RINOMINA_FILE', percorso: a, file: b, nome: 'nuovo' });
+  expect(rin.needsConfirm).toBeTruthy();
+  expect(el.describe).toContain('«primo.txt»');
+  expect(el.describe).not.toContain('secondo.txt');
+  expect(rin.describe).toContain('«primo.txt» → «nuovo.txt»');
+  expect(rin.describe).not.toContain('secondo.txt');
+  expect(existsSync(a) && existsSync(b)).toBe(true);
+});
+
 // All'OK si sposta solo quello che il riquadro ha mostrato, e ogni percorso si ricontrolla: un elenco cambiato dopo la
 // domanda non porta via un file fuori dalla cartella personale, nascosto o mai mostrato.
 test('all\'OK vale l\'elenco mostrato, ricontrollato: un percorso fuori, nascosto o cambiato dopo la domanda resta dov\'è', async ({ app }) => {
