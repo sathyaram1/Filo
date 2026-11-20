@@ -92,13 +92,16 @@
     return { motivi, sblocchi, cause, atMs: Number(r.atMs) || 0 };
   }
   // Nessun motivo del fermo che resta passa da solo (#2036.1): uno sporco non torna pulito, la fiducia la dà l'owner, e
-  // il buco che la sanatoria toglie la coda lo toglie prima di segnare il fermo (#2565). Ogni motivo dice il gesto che
-  // lo toglie; uno sconosciuto non promette niente.
-  function sbloccoFermo(motivo) {
+  // il buco che la sanatoria toglie la coda lo toglie prima di segnare il fermo (#2565), ma solo su un feedback fidato.
+  // Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
+  function sbloccoFermo(motivo, motivi = []) {
     const m = String(motivo || '').toLowerCase();
     if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.';
     if (/ramo|registro/.test(m)) {
-      return `Il ramo${/server/.test(m) ? ' del server' : ''} non risulta pulito e la sanatoria non lo copre: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.`;
+      const ramo = `Il ramo${/server/.test(m) ? ' del server' : ''} non risulta pulito`;
+      const feedbackNonFidato = (motivi || []).some((x) => String(x || '').trim().toLowerCase() === 'feedback non fidato');
+      if (feedbackNonFidato) return `${ramo}: un buco che la sanatoria toglie lo toglie la coda da sé quando segni fidato il feedback; per il resto, se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.`;
+      return `${ramo} e la sanatoria non lo copre: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.`;
     }
     if (/domand/.test(m) && /fidat/.test(m)) return 'Una domanda di questo feedback non è fidata: riparte quando la segni fidata in Domande, dopo averla letta.';
     if (/fidat/.test(m)) return 'Il feedback non è fidato: riparte quando lo segni fidato, dopo averlo letto.';
