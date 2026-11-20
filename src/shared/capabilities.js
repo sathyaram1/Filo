@@ -513,7 +513,7 @@
       id: 'delete-files', title: 'Cancella file e cartelle nel cestino', category: 'assistant',
       desc: 'Chiedi a Filo di cancellare un file o una cartella del computer («cancella il file della bolletta in Download», «elimina queste foto») e lui lo sposta nel cestino del sistema, da dove lo rimetti al suo posto. Prima ti mostra cosa sta per spostare, col nome vero e la cartella (di una cartella dice quanti elementi contiene), e parte con un clic, a ogni livello di autonomia. Se dici «per sempre» o «definitivamente» lo cancella senza passare dal cestino, dopo che hai scritto «conferma».',
       invoke: 'Chiedilo a parole all’assistente (nuova scheda), anche per più file insieme.',
-      doesNot: 'Non tocca file fuori dalla tua cartella personale, file nascosti o dei programmi, file su un altro computer della rete, né la cartella personale intera: te lo dice e lascia tutto com’è. In una richiesta ne sposta al massimo 200, e ti dice quanti ne restano. Dal cestino i file li rimetti tu, dal cestino del sistema. Per cancellare non usa il terminale: un comando che cancella senza cestino vuole sempre la parola «conferma».',
+      doesNot: `Non tocca file fuori dalla tua cartella personale, file nascosti o dei programmi, file su un altro computer della rete, né la cartella personale intera: te lo dice e lascia tutto com’è. In una richiesta ne sposta al massimo ${LOTTO_ELIMINA}, e ti dice quanti ne restano. Dal cestino i file li rimetti tu, dal cestino del sistema. Per cancellare non usa il terminale: un comando che cancella senza cestino vuole sempre la parola «conferma».`,
     },
     {
       id: 'terminal-mode', title: 'Filo usa il terminale del computer', category: 'assistant',
