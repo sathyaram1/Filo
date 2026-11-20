@@ -1425,6 +1425,7 @@ class TabManager {
     // distruggere la vista, o non c'è più niente da leggere.
     this._archiveClosedTab(tab, 'manual', { daSola, motivo, voce: this._ricordaChiusa(tab) });
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+    FileDelComputer.revoca(tab._fileConcesso);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
   }
