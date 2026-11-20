@@ -225,7 +225,10 @@ test('tasto destro su una foto trovata: salva il file, copia e cerca l\'indirizz
   await imgs.first().click({ button: 'right' });
   await menu.voce('Cerca immagine').click();
   const lens = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => w.getURL()).find((u) => /lens\.google/.test(u)) || '');
-  await expect.poll(async () => decodeURIComponent(await lens()), { timeout: 10_000 }).toContain(`url=${originale}`);
+  // Senza rete la scheda finisce sulla pagina d'errore, che porta l'indirizzo chiesto codificato una volta in più.
+  const chiesto = async () => decodeURIComponent(decodeURIComponent(await lens()));
+  await expect.poll(chiesto, { timeout: 10_000 }).toContain(`uploadbyurl?url=${originale}`);
+  expect(await chiesto()).not.toContain('filo://icone');
 
   const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR || '');
   expect(dir).not.toBe('');
