@@ -208,8 +208,8 @@ const PRESENTATA = new RegExp(`^\\s*(?:(?:del(?:la)?|dell['’]|di)\\s+[\\p{L}\\
 const ACCANTO = /^\s*$/u;
 
 function formeLibere(testo) {
-  const X = globalThis.SN_URL_EXFIL;
-  const G = globalThis.SN_GUARDIANO_STATICO;
+  const X = exfil();
+  const G = guardiano();
   if (!X || !X.segretiDetti) return [];
   const l = String(testo || '').toLowerCase();
   const pulito = (v) => String(v || '').replace(/[.,;:!?)\]»”"']+$/u, '');
