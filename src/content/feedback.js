@@ -622,7 +622,7 @@
           const p = pezziSegnati.find((x) => v.indexOf(x.testo) === primo);
           try { textEl.setSelectionRange(primo, primo + p.testo.length); } catch (_) {}
         } else {
-          thumbsEl.querySelector('.sn-fb-thumb--l0')?.scrollIntoView?.({ block: 'nearest' });
+          thumbsEl.querySelector('.sn-fb-thumb--l0, .sn-fb-file-chip--l0')?.scrollIntoView?.({ block: 'nearest' });
         }
       });
       const manda = document.createElement('button');
