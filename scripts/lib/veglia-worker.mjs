@@ -9,7 +9,7 @@ import { gitIn, lavoroVivo, timbroFile, comandoLeggibile, cartelleDelLavoro } fr
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
 import { attesaDichiarata, codiceUscita, leggiMeta, rigaSintetica } from '../session-report.mjs';
-import { corsaInterrotta, guastoDellaCorsa, oraUtc as ora, pulito, testoUcciso } from './corsa-controlli.mjs';
+import { corsaInterrotta, guastoDellaCorsa, oraUtc as ora, PREFISSO_CORSA, pulito, sessioneDellaCorsa, testoUcciso } from './corsa-controlli.mjs';
 import { letturaMemoria } from './memoria-contenitore.mjs';
 
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
