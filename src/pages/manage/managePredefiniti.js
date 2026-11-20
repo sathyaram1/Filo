@@ -700,8 +700,9 @@
   }
 
   function renderExcludedDrift() {
-    // Ogni cambio della lista passa di qui: l'avviso di voce e dettatura nella griglia la segue.
+    // Ogni cambio della lista passa di qui: l'avviso di voce e dettatura nella griglia la segue, e chi ha servito.
     ricontrollaAvvisi();
+    renderServito();
     const box = $('excludedDrift');
     if (!box) return;
     const missing = excludedMissingFromBuild();
