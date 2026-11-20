@@ -687,7 +687,7 @@ export async function esegui(argv, io = {}) {
       }
       if (!(await conCredenziale())) return 1;
       const segreto = await bigliettoLocale();
-      const r = await chiama(Object.assign({ op: 'chiedi', domanda: letta.domanda }, segreto ? { biglietto: segreto } : {}));
+      const r = await chiama(Object.assign({ op: 'chiedi', domanda: letta.domanda, sessione: true }, segreto ? { biglietto: segreto } : {}));
       scrivi(`OK: domanda ${visibile(r.id || '')} aperta (${fiduciaDetta(r.fiducia)})${inSmistamento(r)}.`);
       return 0;
     }
