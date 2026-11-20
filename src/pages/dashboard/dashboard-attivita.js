@@ -814,9 +814,11 @@
     btn.addEventListener('click', async () => {
       if (btn.disabled || !cambio) return;
       btn.disabled = true;
+      const C = global.SN_DASH_CAMBI;
       let r = null;
-      try { r = await send({ type: MSG.CAMBI_ANNULLA, id: cambio.id }); } catch (_) { r = null; }
+      try { r = C ? await C.annulla(cambio.id) : await send({ type: MSG.CAMBI_ANNULLA, id: cambio.id }); } catch (_) { r = null; }
       btn.disabled = false;
+      if (r && r.rinuncia) return;
       // Già annullato dal segno sul messaggio: il risultato è quello voluto.
       if (r && (r.ok || r.error === 'già annullato')) { o.annullato = true; mostra(); return; }
       btn.textContent = 'Annulla non riuscito: riprova';
