@@ -134,10 +134,11 @@ export function testoUcciso({ programma = 'worker', cosa = '', codice = NaN, mem
 
 const doveDellaCorsa = (segno) => `fase ${pulito(segno.fase) || 'ignota'} dalle ${oraUtc(segno.faseDa)}, partito alle ${oraUtc(segno.inizio)} su ${String(segno.sha || '').slice(0, 8) || 'commit ignoto'}`;
 export const PREFISSO_CORSA = 'guasto: strumento finish-check: ';
+const TITOLO_CORSA = 'finish:check interrotto senza finire ';
 
-/** Il guasto di una corsa di finish:check finita senza finire: interrotta, mai un numero che il segno non sa. PURA. */
+/** Il guasto di una corsa di finish:check rimasta a metà: interrotta, mai un numero che il segno non sa. PURA. */
 export function guastoDellaCorsa(segno, memoria, coda = '') {
-  return guasto('finish-check', `finish:check interrotto senza finire (${doveDellaCorsa(segno)})`, {
+  return guasto('finish-check', `${TITOLO_CORSA}(${doveDellaCorsa(segno)})`, {
     memoria, prima: segno.memoria || null, daMs: Date.parse(String(segno.inizio || '')), coda,
   });
 }
