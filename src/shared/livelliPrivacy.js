@@ -58,8 +58,6 @@
     };
   }
 
-  const dentro = (h, lista) => Boolean(h) && lista.some((d) => h === d || h.endsWith(`.${d}`));
-
   // Il motivo per cui da questa pagina non parte niente da solo (e Filo chiede), o null se parte. `motivo` è quello che la
   // pagina è (pagineDelicate.classifica: 'utente', una categoria, 'campi'), `campi` se la pagina mostra un campo password
   // o carta, `tipo` 'testo' o 'immagine'. Solo pagine web: `host` vuoto (pagine di Filo, file locali) non chiede.
