@@ -484,6 +484,59 @@ test('annullare dalla home un livello abbassato vuole «conferma»; il ripristin
   await expect.poll(async () => (await privacy(app)).sitiChiedi, { timeout: 4000 }).toContain('studio-medico.it');
 });
 
+// #1589.8 — le strade che annullano dalla chat chiedono la parola come l'elenco della home, e poi rimettono com'era.
+test('«annulla» sul segno del messaggio e dal tasto destro sulla bolla rimette un livello più largo dopo «conferma»', async ({ app }) => {
+  test.setTimeout(90_000);
+  const casa = await home(app);
+  await modelloFinto(app, [
+    { text: 'Fatto.', toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"livello_privacy","valore":"meno"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  try {
+    await chiedi(casa, 'manda meno roba ai modelli');
+    await expect.poll(async () => (await privacy(app)).livello, { timeout: 15_000 }).toBe('delicate');
+    const bolla = casa.locator('.dash-bubble-user', { hasText: 'manda meno roba ai modelli' });
+    const segno = bolla.locator('.dash-cambi-segno');
+    const bottone = bolla.locator('.dash-cambi-annulla');
+    await expect(segno).toBeVisible({ timeout: 10_000 });
+
+    await segno.hover();
+    await bottone.click();
+    await expect(casa.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5000 });
+    expect((await confirmState(casa)).hasInput, 'rialzare quanto esce vuole la parola scritta').toBe(true);
+    await clickConfirm(casa, 'cancel');
+    await casa.waitForTimeout(400);
+    expect((await privacy(app)).livello, 'detto no, resta stretto').toBe('delicate');
+    await segno.hover();
+    await expect(bottone, 'detto no non è un errore').toHaveText('annulla');
+    await bottone.click();
+    await fillConfirmInput(casa, 'conferma');
+    await scrollConfirmToEnd(casa);
+    await clickConfirm(casa, 'danger');
+    await expect.poll(async () => (await privacy(app)).livello, { timeout: 5000 }).toBe('anticipo');
+    await segno.hover();
+    await expect(bottone).toHaveText('rifai');
+    // Rifare stringe di nuovo: parte senza la parola.
+    await bottone.click();
+    await expect.poll(async () => (await privacy(app)).livello, { timeout: 5000 }).toBe('delicate');
+    await expect(casa.locator(CONFIRM_HOST)).toHaveCount(0);
+
+    await casa.mouse.move(5, 400);
+    const menu = menuDi(casa).locator('.sn-menu');
+    await bolla.click({ button: 'right', position: { x: 20, y: 10 } });
+    await expect(menu).toBeVisible();
+    await menu.getByText(/^Annulla · .*livello di privacy/).click();
+    await expect(casa.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5000 });
+    await fillConfirmInput(casa, 'conferma');
+    await scrollConfirmToEnd(casa);
+    await clickConfirm(casa, 'danger');
+    await expect.poll(async () => (await privacy(app)).livello, { timeout: 5000 }).toBe('anticipo');
+    await casa.screenshot({ path: 'tests/.shots/1589-8-annulla-dal-segno.png' });
+  } finally {
+    await ripristina(app);
+  }
+});
+
 test.describe('nell\'intervista di benvenuto', () => {
   test.use({ accoglienzaFatta: false });
 
