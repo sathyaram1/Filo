@@ -189,6 +189,12 @@
       const s = String((v && typeof v === 'object' ? v.valore : v) ?? '');
       if (!s) continue;
       const tipo = tipoDi(v);
+      // Una password senza forma («gattino») è un segreto solo dove sta, come per il pavimento: altrove è una parola.
+      const at = v && typeof v === 'object' && v.regola === 'password' ? v.inizio : undefined;
+      if (Number.isInteger(at) && t.slice(at, at + s.length) === s) {
+        if (!out.some((y) => y.inizio === at && y.fine === at + s.length)) out.push({ tipo, dove: 'testo', inizio: at, fine: at + s.length, pezzo: s });
+        continue;
+      }
       let i = t.indexOf(s);
       let guardia = 0;
       while (i >= 0 && guardia++ < 50) {
