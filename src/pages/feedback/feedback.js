@@ -777,8 +777,9 @@
       }
       // #913: «Lavoro locale» scrive anche il segno e il sì dell'owner, come nella gemella.
       const locale = a.locale ? ` data-local="1" title="${escapeHtml(TITOLO_LAVORO_LOCALE)}"` : '';
+      const correzione = a.correzione ? ' data-correzione="1" title="Torna a chi corregge, col testo che scrivi qui"' : '';
       return `<button class="sn-btn${a.primary ? '' : ' sn-btn-secondary'} fb-act"`
-        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}${locale}>${escapeHtml(a.label)}</button>`;
+        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}${locale}${correzione}>${escapeHtml(a.label)}</button>`;
     }).join('\n');
   }
 
