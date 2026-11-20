@@ -243,7 +243,7 @@ export function testoGuasto({
   const ripartita = sessioneDellaCorsa(memoria, corsa && corsa.memoria, ultimoMs) === 'ripartita';
   const ucciso = !attesa && ultimo && ultimo.risposta && ultimo.uscita >= UCCISO_DA;
   if (ripartita || ucciso) {
-    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}): ${ripartita ? 'la sua sessione non è tornata' : 'col comando si è fermata anche la sua sessione'}. ${coda}`;
+    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}): ${ripartita ? 'la sua sessione non è tornata' : 'col comando si è fermato anche il worker, il sotto-agente che girava nella sessione'}. ${coda}`;
     if (corsa) return guastoDellaCorsa(corsa, memoria, dopo);
     const quale = attesa || ultimo;
     const programma = attesa ? (attesa.nome === 'Bash' ? programmaDi(attesa.comando) : attesa.nome) : ultimo.programma || ultimo.nome;
