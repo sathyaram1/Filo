@@ -607,9 +607,8 @@ function capsVuoti() {
 
 /** Il tetto totale delle verifiche nel suo intervallo, o null se non è un numero (#2338). */
 function clampTetto(n) {
-  const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
-  const min = Number.isFinite(A.TETTO_VERIFICHE_MIN) ? A.TETTO_VERIFICHE_MIN : 1;
-  const max = Number.isFinite(A.TETTO_VERIFICHE_MAX) ? A.TETTO_VERIFICHE_MAX : 50;
+  // L'intervallo è quello che il server incorpora (verifierRound.js): un posto solo.
+  const { TETTO_MIN: min, TETTO_MAX: max } = globalThis.SN_VERIFIER_ROUND;
   const v = Math.round(Number(n));
   if (n === '' || n === null || n === undefined || !Number.isFinite(v)) return null;
   return Math.min(max, Math.max(min, v));
