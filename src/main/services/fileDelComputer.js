@@ -93,7 +93,8 @@ function cartellaTroppoLarga(cartella) {
 }
 
 // Quello che una pagina si porta dietro: immagini, stili, script, caratteri, media, altre pagine.
-const RISORSE = new Set([...VISIBILI, 'css', 'js', 'mjs', 'woff', 'woff2', 'ttf', 'otf', 'eot', 'map', 'vtt', 'srt']);
+const RISORSE = new Set([...VISIBILI, 'css', 'js', 'mjs', 'wasm', 'webmanifest', 'woff', 'woff2', 'ttf', 'otf', 'eot', 'map',
+  'vtt', 'srt', 'jfif', 'tif', 'tiff']);
 const NOMINA = /\b(?:src|href|data|poster|background|srcset|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))|url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|@import\s+(?:"([^"]*)"|'([^']*)')/gi;
 const LETTURA_MAX = 16 * 1024 * 1024;
 
