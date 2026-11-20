@@ -293,7 +293,10 @@
       if (img && root.contains(img) && typeof ingrandisci === 'function') {
         e.preventDefault();
         e.stopPropagation();
-        ingrandisci(img.currentSrc || img.src, img);
+        // Con la fila del suo carosello: ingrandita, le frecce passano alle altre foto.
+        const gal = img.closest('.filo-galleria');
+        const fila = gal ? [...gal.querySelectorAll('.filo-galleria-img')].map((x) => x.currentSrc || x.src) : [];
+        ingrandisci(img.currentSrc || img.src, img, fila);
       }
     };
     const allaRotella = (e) => {
