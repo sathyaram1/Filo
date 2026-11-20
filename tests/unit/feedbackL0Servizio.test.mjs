@@ -178,7 +178,7 @@ test('le password scritte come nei log e nelle configurazioni si segnano, negli 
 
 test('una password senza forma si segna solo dove sta, non in ogni parola uguale', async () => {
   const { L0 } = servizio();
-  const testo = 'La password: gattino. Ho anche un gattino vero.';
+  const testo = 'Password\ngattino\nHo anche un gattino vero.';
   const r = await L0.controlla({ testo });
   assert.equal(r.stato, 'trovato');
   assert.deepEqual(r.esito.pezzi.map((p) => p.testo), ['gattino']);
