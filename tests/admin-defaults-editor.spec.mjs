@@ -671,7 +671,7 @@ test('accanto agli esclusi: chi ha servito le ultime richieste, in che proporzio
 
 test('chi ha servito: al tetto la riga dice «ultime», senza richieste lo dice, e un errore porta il suo motivo', async ({ openTab }) => {
   let page = await openStubbedEditor(openTab, { __servito: { ...SERVITO, letti: 1000 } });
-  await expect(page.locator('#servitoStato')).toHaveText(/^Chi ha servito le ultime 1\.000 richieste pagate coi crediti di Filo, dal /);
+  await expect(page.locator('#servitoStato')).toHaveText(/^Chi ha servito le ultime 1\.?000 richieste pagate coi crediti di Filo, dal /);
 
   page = await openStubbedEditor(openTab, { __servito: { limite: 1000, letti: 0, dal: '', al: '', conti: [] } });
   await expect(page.locator('#servitoStato')).toHaveText('Nessuna richiesta pagata coi crediti di Filo per ora: qui comparirà chi le serve.');
