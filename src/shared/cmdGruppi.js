@@ -318,10 +318,12 @@
       const valori = new Set();
       let primo = true;
       let ignoto = false;
+      let misure = 0;
       for (const part of seq) {
         let forme = [part];
         if (usaUltimoArg(part, c)) {
-          if (primo || ignoto || valori.size > ULTIMI_MAX) return TRE;
+          misure += valori.size;
+          if (primo || ignoto || valori.size > ULTIMI_MAX || misure > MISURE_MAX) return TRE;
           forme = [...valori].map((v) => part.replace(ULTIMO_ARG_RE, () => comeParola(v)));
         }
         for (const f of forme) {
