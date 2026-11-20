@@ -94,3 +94,54 @@ test('un segreto che Filo custodisce si segna anche se il modello non lo vede', 
   assert.equal(r.stato, 'trovato');
   assert.deepEqual(r.esito.pezzi.map((p) => p.testo), ['sk-or-v1-abcdef1234567890']);
 });
+
+// #1403.1 — la chiave custodita si riconosce come la riconosce il passaggio verso i modelli, che la nasconde travestita.
+// Composta a runtime: scritta intera nel sorgente, la protezione dei push di GitHub la prende per una chiave vera.
+const CORPO = ['4f9c2a7e', '1b8d3065', 'c4a9e2f7', '1d0b6c3a', '8e5f2d9a', '1c7b4e0f', '6a3d8c2b', '9e1f5a07'].join('');
+const CHIAVE = ['sk', 'or', 'v1', CORPO].join('-');
+
+test('una chiave custodita incollata senza prefisso si segna, anche se il modello non la vede', async () => {
+  const { L0, chiamate } = servizio({ segreti: [{ valore: CHIAVE, tipo: 'chiave' }] });
+  const r = await L0.controlla({ testo: `Non va, uso la chiave ${CORPO} da ieri.` });
+  assert.equal(r.stato, 'trovato');
+  assert.deepEqual(r.esito.pezzi.map((p) => p.testo), [CORPO]);
+  assert.ok(!JSON.stringify(chiamate[0].messages).includes(CORPO.slice(0, 20)), 'al modello la chiave arriva nascosta');
+});
+
+test('una chiave custodita con spazi in mezzo si segna intera, spazi compresi', async () => {
+  const { L0 } = servizio({ segreti: [{ valore: CHIAVE, tipo: 'chiave' }] });
+  const spezzata = CORPO.match(/.{1,8}/g).join(' ');
+  const r = await L0.controlla({ testo: `Ecco la chiave: ${spezzata}. Grazie.` });
+  assert.equal(r.stato, 'trovato');
+  assert.deepEqual(r.esito.pezzi.map((p) => p.testo), [spezzata]);
+});
+
+const dataUrl = (testo, type = 'text/plain') => `data:${type};base64,${Buffer.from(testo).toString('base64')}`;
+
+test('un log allegato con una password: avviso sull\'allegato, senza mandarlo al modello', async () => {
+  const { L0, chiamate } = servizio();
+  const log = 'avvio...\nutente = mario.rossi\npassword = hunter22\nerrore 401\n';
+  const r = await L0.controlla({
+    testo: 'Allego il log: il login fallisce sempre',
+    allegati: [{ name: 'foto.pdf', type: 'application/pdf', dataUrl: dataUrl('password = hunter22', 'application/pdf') }, { name: 'filo.log', type: '', dataUrl: dataUrl(log) }],
+  });
+  assert.equal(r.stato, 'trovato');
+  assert.deepEqual(r.esito.allegati, [1], 'segnato il log, non il PDF');
+  assert.deepEqual(r.esito.frasi, [globalThis.SN_FEEDBACK_L0.FRASI_ALLEGATO.segreto]);
+  assert.deepEqual(r.esito.pezzi, []);
+  assert.ok(!JSON.stringify(chiamate).includes('hunter22'), 'il log non va al modello');
+});
+
+test('allegati di testo: tutti i tipi del riquadro, carte e conti col loro nome, chiavi custodite travestite', async () => {
+  const { L0 } = servizio({ segreti: [{ valore: CHIAVE, tipo: 'chiave' }] });
+  for (const [name, type] of [['a.txt', 'text/plain'], ['a.json', 'application/json'], ['a.csv', 'text/csv'], ['a.md', 'text/markdown'], ['a.yaml', '']]) {
+    const r = await L0.controlla({ testo: 'vedi allegato', allegati: [{ name, type, dataUrl: dataUrl('{"password": "Tr7#kq29Lm"}\npassword: Tr7#kq29Lm') }] });
+    assert.equal(r.stato, 'trovato', name);
+  }
+  const iban = await L0.controlla({ testo: 'vedi allegato', allegati: [{ name: 'c.txt', type: 'text/plain', dataUrl: dataUrl('conto IT60 X054 2811 1010 0000 0123 456') }] });
+  assert.deepEqual(iban.esito.frasi, [globalThis.SN_FEEDBACK_L0.FRASI_ALLEGATO.documento]);
+  const chiave = await L0.controlla({ testo: 'vedi allegato', allegati: [{ name: 'env.txt', type: 'text/plain', dataUrl: dataUrl(`KEY=${CORPO.toUpperCase()}`) }] });
+  assert.deepEqual(chiave.esito.allegati, [0]);
+  const pulito = await L0.controlla({ testo: 'vedi allegato', allegati: [{ name: 'ok.log', type: 'text/plain', dataUrl: dataUrl('tutto normale, errore 500 alle 12:30') }] });
+  assert.equal(pulito.stato, 'pulito');
+});
