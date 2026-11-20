@@ -154,7 +154,7 @@ module.exports = function register(on, ctx) {
       const date = (Array.isArray(msg.payload.date) ? msg.payload.date : [])
         .map((d) => (d && typeof d === 'object' ? { ...d, anni: (Array.isArray(d.anni) ? d.anni : []).filter((a) => a && a.dove === 'campo') } : null))
         .filter((d) => d && d.anni.length);
-      msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {}, date };
+      msg.payload = { ...msg.payload, contesto: { nonArriva: true }, luogo: sito ? { sito } : {}, date };
     }
     return delicata;
   }

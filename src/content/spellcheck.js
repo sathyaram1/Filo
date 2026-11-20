@@ -3405,7 +3405,7 @@
       return { prima: testoPrima, dopo: testoDopo, troncato: prima.pieno || dopo.pieno };
     } catch (e) {
       console.warn('[SN] coerenza — contesto non letto:', e);
-      return vuoto;
+      return { ...vuoto, nonArriva: true };
     }
   }
 

@@ -298,6 +298,19 @@ test('il prompt del ragionato: regole fisse nel system, data di oggi e pagina PR
   assert.ok(!PROMPTS.spellcheckSuggerimentiSistema({ ripetizioni: false }).includes('ripetizione di una parola piena'));
 });
 
+// #2132 — un «ha poteri limitati» che risponde a un messaggio sul token veniva segnato come frase senza soggetto.
+test('il ragionato legge il campo come risposta alla conversazione, anche quando la pagina non gli arriva', () => {
+  const sistema = PROMPTS.spellcheckSuggerimentiSistema({});
+  assert.match(sistema, /frase poco chiara[^\n]*soggetto sottinteso[^\n]*sopra il campo[^\n]*anche quando la pagina non ti arriva/);
+  const conPagina = PROMPTS.spellcheckSuggerimenti({ nuovo: 'ha poteri limitati', contesto: CONTESTO, oggi: OGGI });
+  assert.match(conPagina, /In una chat sono i messaggi, i più recenti in fondo, vicino al campo: il campo risponde a loro\./);
+  const trattenuta = PROMPTS.spellcheckSuggerimenti({ nuovo: 'ha poteri limitati', contesto: { nonArriva: true }, oggi: OGGI });
+  assert.match(trattenuta, /Il testo della pagina intorno al campo non ti arriva/);
+  assert.doesNotMatch(trattenuta, /non ha altro testo/, 'una pagina trattenuta non si dice vuota');
+  assert.ok(!trattenuta.includes(E.marcature('DATI_PAGINA').inizio));
+  assert.match(PROMPTS.spellcheckSuggerimenti({ nuovo: 'ciao', contesto: {}, oggi: OGGI }), /La pagina intorno al campo non ha altro testo/);
+});
+
 test('il prompt del controllo rapido: il testo del banco nel system, prima, nuovo e candidati nei loro tag', () => {
   const uno = PROMPTS.spellcheckErrori({ prima: 'Caro Marco,', nuovo: 'oggi sonno andato', candidati: [{ pezzo: 'sonno', perche: 'x' }] });
   const due = PROMPTS.spellcheckErrori({ prima: 'Caro Marco,', nuovo: 'oggi sono andato al mare' });
