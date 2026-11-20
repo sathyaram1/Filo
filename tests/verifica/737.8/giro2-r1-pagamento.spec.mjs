@@ -17,7 +17,7 @@ const torna = async (app, shell, page) => {
   await page.waitForTimeout(400);
 };
 
-for (const [forma, nome] of [['il pagamento', 'pagamento'], ["l'aiuto", 'aiuto']]) {
+for (const [forma, nome, misure] of [['il pagamento in una finestrella', 'pagamento', 'width=500,height=600'], ["l'aiuto in una scheda", 'aiuto', '']]) {
   test(`r1 ${forma} su un altro sito, già aperto e riportato davanti dalla pagina col secondo clic, torna davanti`, async ({ app, shell, openTab, testServer }) => {
     const altrove = testServer.html('<title>ALTROVE</title>', { pubblico: true });
     const page = await openTab(testServer.html(`<script>var w=null;function apri(){if(w&&!w.closed){w.focus();}else{w=window.open(${JSON.stringify(altrove)},${JSON.stringify(nome)},'width=500,height=600');}}</script>
