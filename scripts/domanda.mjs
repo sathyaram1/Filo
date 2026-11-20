@@ -613,11 +613,10 @@ async function consegnaRegistro(biglietto, data) {
   return deliver(biglietto, 'registro', data);
 }
 
-/** Il segreto del biglietto della sessione (il più sporco se più d'uno), '' senza: il server allora la fa non fidata. */
+/** Il segreto del biglietto della sessione, '' senza: il server allora la fa non fidata e riservata. */
 async function segretoLocale() {
-  const { trovaBiglietto } = await import('./lib/biglietto-locale.mjs');
-  const b = await trovaBiglietto().catch(() => null);
-  return b && typeof b.ticket === 'string' ? b.ticket : '';
+  const { segretoPerScrivere } = await import('./lib/biglietto-locale.mjs');
+  return segretoPerScrivere();
 }
 
 async function sporcaSessione(cosa, motivi) {
