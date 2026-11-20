@@ -286,6 +286,16 @@ function gestoPer(wc, chiede) {
   return Boolean(chi && wc._filoGestoOrigini && wc._filoGestoOrigini.has(chi));
 }
 
+// Una finestra che la pagina tiene già torna davanti con lo stesso clic che le aprirebbe una finestra nuova (quello
+// segnalato dal preload), senza spenderlo (#737.8). Torna l'istante del clic, o 0.
+function gestoPerRichiamare(wc, chiede, entro = GESTO_MS) {
+  const t = (wc && wc._filoGestoFinestraAlle) || 0;
+  if (!t || Date.now() - t >= entro || t <= (wc._filoGestoUsatoAlle || 0)) return 0;
+  const chi = origineWeb(chiede);
+  if (chi && wc._filoGestoOrigini && wc._filoGestoOrigini.size && !wc._filoGestoOrigini.has(chi)) return 0;
+  return t;
+}
+
 // Il gesto per le finestre lo dice solo il preload del frame toccato, prima della pagina: il main vede
 // l'input prima di sapere se è caduto sull'interfaccia di Filo, e una pagina che chiede di continuo passerebbe in
 // mezzo (#737.1 giro 7). Un tasto che Filo si tiene non arriva al preload; uno riservato che ci arriva non conta.
