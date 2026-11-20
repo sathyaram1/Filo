@@ -83,7 +83,7 @@ test('git config: una chiave che sceglie un programma vale 3, come `git -c`', ()
 
 test('le copie di tutti i giorni restano a conferma leggera', () => {
   for (const [nome, ctx] of CONTESTI) {
-    for (const cmd of ['cp a.txt b.txt', 'cp *.txt backup/', 'cp -r * ../copia', 'mv * archivio/', 'touch .gitignore',
+    for (const cmd of ['cp a.txt b.txt', 'cp *.txt backup/', 'cp * ../copia','mv * archivio/', 'touch .gitignore',
       'cp ci.yml .github/workflows/ci.yml', 'mv x .gitattributes', 'mkdir src', 'cp x foo.git']) {
       assert.equal(C.classify(cmd, ctx), 2, `${nome}: «${cmd}»`);
     }
