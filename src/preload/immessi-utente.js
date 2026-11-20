@@ -221,6 +221,11 @@ function ascoltaIn(w, invia) {
   w.addEventListener('compositionend', (e) => {
     if (e.isTrusted && e.data) aggiorna(bersaglio(e), (s) => s + e.data, e.data);
   }, true);
+  // Ogni cambio vero del campo (annulla, ripeti, quello che il browser rimette) si riconfronta con quanto l'utente ci ha
+  // messo: non aggiunge caratteri suoi, quindi un sito non ci guadagna niente.
+  w.addEventListener('input', (e) => {
+    if (e.isTrusted && !e.isComposing && scrivibile(bersaglio(e))) aggiorna(bersaglio(e), null);
+  }, true);
   // Un tasto conta anche se la pagina lo trattiene e scrive da sé il campo (le maschere di carte e telefoni).
   w.addEventListener('keydown', (e) => {
     if (!e.isTrusted) return;
