@@ -2,7 +2,7 @@
 // la barra della shell. Qui vivono il loro ciclo di vita, il layout, lo schermo
 // intero, il proxy per scheda e le guardie sulle navigazioni.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen, webFrameMain } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen, webFrameMain, webContents } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
