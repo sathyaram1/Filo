@@ -154,7 +154,8 @@ test('#2036: un lavoro server che nessuna routine prende sta fermo sulla scheda,
   await stubAutomazioni(page, { lavoriServer: true });
   await page.evaluate(() => window.__mgTest.loadAutoMode());
   const fermo = fb({ _id: 'srv-6', seq: 1903, status: 'revision_security', branch: 'worker/srv-6-20261101T090000Z',
-    restaLocale: { motivi: ['ramo non pulito', '<b>ramo del server non pulito</b>'], ruolo: 'secaudit', atMs: Date.parse('2026-11-01T12:00:00Z') } });
+    restaLocale: { motivi: ['ramo non pulito', '<b>ramo del server non pulito</b>'], ruolo: 'secaudit', atMs: Date.parse('2026-11-01T12:00:00Z'),
+      cause: ['ramo dell’app: il commit 1234abcd non l’ha dichiarato nessun biglietto pulito', 'la sanatoria della coda non lo toglie: <i>il commit 1234abcd è nato quando nessuna sessione pulita registrata sul ramo era viva</i>'] } });
   const sanato = fb({ _id: 'srv-7', seq: 1904, status: 'revision_security', branch: 'worker/srv-7-20261101T090000Z', restaLocale: null });
   const sporco = fb({ _id: 'srv-8', seq: 1905, status: 'revision_capability', branch: 'worker/srv-8-20261101T090000Z',
     restaLocale: { motivi: ['contenuto scritto da un biglietto sporco'], ruolo: 'new-work', atMs: Date.parse('2026-11-01T12:00:00Z') } });
