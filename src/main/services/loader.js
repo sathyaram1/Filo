@@ -120,6 +120,7 @@ require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normali
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
 require(path.join(SHARED, 'campiSegreti.js')); // #810.7 — campi che non vanno al modello: il main li cerca anche nei riquadri
 require(path.join(SHARED, 'urlExfil.js'));
+require(path.join(SHARED, 'riservatiNelTesto.js')); // #1589.8 — le password scritte a mano: correttore e pavimento
 require(path.join(SHARED, 'pavimento.js')); // #1589 — cosa non esce mai verso un modello, a nessun livello (dopo guardianoStatico)
 require(path.join(SHARED, 'sitiComuni.js')); // #553 — gli indirizzi che il modello può scrivere a memoria
 require(path.join(SHARED, 'fontiCitate.js')); // #2383 — le fonti citate nelle risposte, controllate (dopo sitiComuni)
