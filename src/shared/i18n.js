@@ -569,6 +569,14 @@
     admin_defaults_excluded_kind_producer: 'Produce i modelli',
     admin_defaults_excluded_kind_unreliable: 'Serve male',
     admin_defaults_excluded_note: 'Nota (quando, cosa è successo)',
+    // Chi ha servito le ultime richieste dei crediti (#542)
+    admin_defaults_servito_attesa: 'Leggo chi ha servito le ultime richieste…',
+    admin_defaults_servito_ultime: 'Chi ha servito le ultime %s richieste pagate coi crediti di Filo, dal %s:',
+    admin_defaults_servito_tutte: 'Chi ha servito le %s richieste pagate coi crediti di Filo, dal %s:',
+    admin_defaults_servito_vuoto: 'Nessuna richiesta pagata coi crediti di Filo per ora: qui comparirà chi le serve.',
+    admin_defaults_servito_errore: 'Non riesco a leggere chi ha servito le ultime richieste (%s).',
+    admin_defaults_servito_nessuna_risposta: 'nessuna risposta',
+    admin_defaults_servito_non_detto: 'non detto',
     // Pagine delicate (#1004)
     admin_defaults_delicate: 'Pagine delicate',
     admin_defaults_delicate_desc:
