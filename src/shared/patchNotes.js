@@ -21,6 +21,7 @@
         { testo: 'Nel calcolatore di probabilità dei mazzi, «faccio mulligan delle mani con meno di 3 terre» detto in chat conta un mulligan e lo scrive nella risposta; nel riquadro, un mulligan senza la mano da tenere ti avvisa che non è contato.', segnalazione: 791 },
         { testo: 'Sui siti che aprono collegamenti, aiuto o anteprime sempre nella stessa finestra, come tanti siti vecchi e intranet, ogni clic ti porta davanti quella scheda, invece di aggiornarla dietro.', segnalazione: 737 },
         { testo: 'Prima di mandare un feedback Filo ricontrolla anche i file di testo allegati, come un log, e la segnalazione che scrive per te in chat: se ci vede una password o una chiave te lo dice, e scegli tu se mandarla così.', segnalazione: 1403 },
+        { testo: 'Dal terminale, un comando git che imposta un programma da far partire più avanti ti chiede di scrivere «conferma», come lo stesso programma dato a un comando solo. Scegliere l\'editor, il pager o il gestore delle password più comuni, o la chiave ssh, resta a un OK.', segnalazione: 2619 },
       ],
     },
     {
