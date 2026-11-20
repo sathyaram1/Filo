@@ -356,6 +356,8 @@
   transition: transform calc(140ms * var(--sn-motion, 1)) ease, box-shadow calc(140ms * var(--sn-motion, 1)) ease;
 }
 .filo-galleria-img:hover { transform: translateY(-1px); box-shadow: 0 4px 12px color-mix(in srgb, var(--sn-fg) 18%, transparent); }
+/* Una foto sola si stringe dentro la risposta: non ha frecce per mostrare la parte che uscirebbe. */
+.filo-galleria-una .filo-galleria-voce { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .filo-galleria-una .filo-galleria-img { height: auto; max-height: var(--sn-galleria-una-altezza, 340px); max-width: 100%; object-fit: contain; }
 .filo-galleria-voce figcaption {
   max-width: 220px;
