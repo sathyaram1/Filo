@@ -68,15 +68,69 @@
     return false;
   }
 
+  // Le chiavi di un repository che a una lettura non avviano niente; ogni altra chiave locale fa chiedere (#2292).
+  const GIT_CHIAVI_INERTI = [
+    // core.hooksPath sposta solo la cartella degli hook, che la sonda segue già da sé (husky la imposta).
+    /^core\.(repositoryformatversion|filemode|bare|worktree|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles|hookspath|commentchar|commentstring)$/,
+    // Di un remoto avviano un programma solo i comandi di rete (uploadpack, receivepack, vcs), e una lettura va in
+    // rete solo da un remoto promettente: quelle chiavi chiedono. Le altre le scrivono anche VS Code e GitHub CLI
+    // (gh-resolved). I rami non avviano niente.
+    /^remote\.[^=]+\.(?!(uploadpack|receivepack|vcs|promisor|partialclonefilter)$)[^.=]+$/,
+    /^branch\.[^=]+\.[^.=]+$/,
+    /^submodule\.[^=]+\.(url|active|branch)$/,
+    /^user\.(name|email|signingkey)$/,
+    /^(pull\.(rebase|ff)|push\.(default|autosetupremote)|fetch\.prune|init\.defaultbranch|merge\.(ff|conflictstyle)|rebase\.(autosquash|autostash))$/,
+    /^(extensions\.(objectformat|refstorage|worktreeconfig)|lfs\.repositoryformatversion|gui\.[^=]+|color\.[^=]+)$/,
+    // Sezioni intere che una lettura non usa per avviare niente: valgono per comandi che non sono letture (commit,
+    // merge, gc, maintenance…), o sono dati (alias di un nome che una lettura non usa, git-flow, blame, status).
+    /^(commit|tag|merge|rebase|pull|push|fetch|gc|maintenance|rerere|init|gitflow|alias|blame|status|index|feature|advice|format|pretty|i18n|column|checkout|clone)\.[^=]+$/,
+    /^(remote|branch|submodule)\.[^.=]+$/,
+    // diff.external avvia un programma; i driver (`diff.<nome>.*`) restano fuori.
+    /^diff\.(?!external$)[^.=]+$/,
+    // log.showSignature fa partire gpg a ogni git log.
+    /^log\.(?!showsignature$)[^.=]+$/,
+    // git-lfs, per indirizzo: come si autentica e il controllo dei lucchetti. Le estensioni di lfs avviano programmi.
+    /^lfs\.[^=]+\.(access|locksverify)$/,
+    /^core\.(splitindex|multipackindex|commitgraph|fsyncmethod|packedgitlimit|packedgitwindowsize|deltabasecachelimit|bigfilethreshold)$/,
+  ];
+  // Inerti a una lettura, non ai comandi che scrivono (#2621): gli hook partono a commit, init e clone, un driver di
+  // merge a merge, un alias `!` a un nome che il classificatore crede di git (`git pop`).
+  const GIT_CHIAVI_LANCIANO_SCRIVENDO = /^(core\.hookspath|init\.templatedir|alias\.[^=]+|merge\.[^=]+\.[^.=]+)$/;
+  // `scrivendo`: la chiave la scrive `git config`, e il programma partirebbe a un comando di git che scrive.
+  // safe.directory sta solo nelle impostazioni dell'utente e non avvia niente: ai repository che rende leggibili
+  // la sonda guarda prima di ogni lettura.
+  function gitChiaveInerte(chiave, valore, scrivendo) {
+    const k = String(chiave).toLowerCase();
+    // `core.fsmonitor` con un valore sì/no accende il demone di git, non un programma scelto dal repository.
+    if (k === 'core.fsmonitor') return /^(true|false|yes|no|on|off|1|0)?$/i.test(String(valore || '').trim());
+    if (scrivendo && k === 'safe.directory') return true;
+    if (scrivendo && GIT_CHIAVI_LANCIANO_SCRIVENDO.test(k)) return false;
+    return GIT_CHIAVI_INERTI.some((re) => re.test(k));
+  }
+  // La forma di una chiave come la accetta git: sezione, sotto-sezione libera, nome che comincia con una lettera.
+  const FORMA_CHIAVE = /^[a-z0-9-]*\.(?:[^\n]*\.)?[a-z][a-z0-9-]*$/i;
+  // La chiave è il primo operando, ma un'opzione col valore staccato (`--comment x`, `--type bool`) la sposta: conta
+  // ogni operando con la forma di una chiave, tranne il valore in fondo.
+  function gitConfigScriveLancia(ops) {
+    return ops.slice(0, Math.max(1, ops.length - 1)).some((op, i) =>
+      argVariants(op).some((k) => FORMA_CHIAVE.test(k) && !gitChiaveInerte(k, ops[i + 1], true)));
+  }
+
   // `git config` nella forma con le opzioni (`--unset`, `chiave valore`…): gli argomenti dopo il sotto-comando.
   function gitConfigForma(args) {
     const low = args.map((a) => a.toLowerCase());
     if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
+    // Rinominare una sezione sposta le sue chiavi in un'altra: `color.sshcommand` diventa `core.sshcommand` (#2621).
+    if (low.includes('--rename-section')) return 3;
     const ops = args.filter((a) => !a.startsWith('-'));
     // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
     const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
     if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test((ops[0] || '').toLowerCase())) return 3;
-    if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
+    // Una chiave che avvia un programma, scritta, lo fa partire al prossimo comando di git che resta a 2: `core.editor`
+    // a commit, `core.sshCommand` a fetch. Il programma scritto nel comando chiede come se lo si lanciasse (#2621).
+    // `--get chiave modello` legge: git rifiuta due azioni insieme.
+    if (scrive && !low.some((a) => /^--get(-|$)/.test(a)) && gitConfigScriveLancia(ops)) return 3;
+    if (low.some((a) => a === '--add' || a === '--replace-all' || a === '-e' || a === '--edit')) return 2;
     if (ops.length >= 2) return 2; // `chiave valore` imposta
     // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
     // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
@@ -124,7 +178,8 @@
       const resto = args.filter((_, k) => k !== i);
       const low = resto.map((a) => a.toLowerCase());
       if (verbo === 'unset' || verbo === 'remove-section') return 3;
-      if (verbo === 'list' || verbo === 'edit' || verbo === 'rename-section') return 2;
+      if (verbo === 'rename-section') return 3;
+      if (verbo === 'list' || verbo === 'edit') return 2;
       if (verbo === 'set') return Math.max(2, gitConfigForma(low.includes('--append') ? resto.concat('--add') : resto));
       if (low.some((a) => /^--(regexp|url)(=|$)/.test(a))) return 2;
       return gitConfigForma(resto);
@@ -259,5 +314,5 @@
     return 3; // run/exec/start/test/publish/sconosciuti → 3
   }
 
-  Object.assign(P, { GIT_READ, GIT_GLOBALE_CARTELLA, gitScriveFile, gitUscita, classifyGit, classifyNpm });
+  Object.assign(P, { GIT_READ, GIT_GLOBALE_CARTELLA, gitChiaveInerte, gitScriveFile, gitUscita, classifyGit, classifyNpm });
 })(typeof globalThis !== 'undefined' ? globalThis : self);

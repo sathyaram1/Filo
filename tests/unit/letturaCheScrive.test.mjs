@@ -494,7 +494,7 @@ test('git config coi verbi di git 2.46: set, unset, list e get valgono come le f
     ['git config set --append url.https://x.insteadof y', 3], ['git config unset user.email', 3],
     ['git config remove-section alias', 3], ['git config set user.email a@b', 2], ['git config list', 2],
     ['git config list --show-origin', 2], ['git config get remote.origin.url', 2], ['git config get --regexp user', 2],
-    ['git config edit', 2], ['git config rename-section a b', 2], ['git config get user.email', 1], ['git config user.email', 1]]) {
+    ['git config edit', 2], ['git config rename-section a b', 3], ['git config get user.email', 1], ['git config user.email', 1]]) {
     assert.equal(C.classify(cmd, pulito), livello, cmd);
   }
 });

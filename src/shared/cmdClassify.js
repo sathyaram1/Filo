@@ -87,6 +87,7 @@
     CURL_ACCESSORY_WRITE_RE, CURL_WRITE_OUT_FILE_RE, CURL_CONFIG_RE, curlCambiaIlServer, ROBOCOPY_DESTRUCTIVE_RE,
     DANGEROUS_FLAG_RE, lungaPericolosa, LUNGHE_PERICOLOSE, PS_READ, classifyDetail, fuoriDa, contesto, dove, MOTIVI,
     dentroCasa, PROFILO_APERTE, nomeNorm, CANCELLANO, GIT_READ, segniInterni, PROGRAMMI_RETE, subcommandOf, comeCmd,
+    gitChiaveInerte,
   } = P;
 
   // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
@@ -229,33 +230,8 @@
     return false;
   }
 
-  // Le chiavi di un repository che a una lettura non avviano niente; ogni altra chiave locale fa chiedere (#2292).
-  const GIT_CHIAVI_INERTI = [
-    // core.hooksPath sposta solo la cartella degli hook, che la sonda segue già da sé (husky la imposta).
-    /^core\.(repositoryformatversion|filemode|bare|worktree|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles|hookspath|commentchar|commentstring)$/,
-    // Di un remoto avviano un programma solo i comandi di rete (uploadpack, receivepack, vcs), e una lettura va in
-    // rete solo da un remoto promettente: quelle chiavi chiedono. Le altre le scrivono anche VS Code e GitHub CLI
-    // (gh-resolved). I rami non avviano niente.
-    /^remote\.[^=]+\.(?!(uploadpack|receivepack|vcs|promisor|partialclonefilter)$)[^.=]+$/,
-    /^branch\.[^=]+\.[^.=]+$/,
-    /^submodule\.[^=]+\.(url|active|branch)$/,
-    /^user\.(name|email|signingkey)$/,
-    /^(pull\.(rebase|ff)|push\.(default|autosetupremote)|fetch\.prune|init\.defaultbranch|merge\.(ff|conflictstyle)|rebase\.(autosquash|autostash))$/,
-    /^(extensions\.(objectformat|refstorage|worktreeconfig)|lfs\.repositoryformatversion|gui\.[^=]+|color\.[^=]+)$/,
-    // Sezioni intere che una lettura non usa per avviare niente: valgono per comandi che non sono letture (commit,
-    // merge, gc, maintenance…), o sono dati (alias di un nome che una lettura non usa, git-flow, blame, status).
-    /^(commit|tag|merge|rebase|pull|push|fetch|gc|maintenance|rerere|init|gitflow|alias|blame|status|index|feature|advice|format|pretty|i18n|column|checkout|clone)\.[^=]+$/,
-    /^(remote|branch|submodule)\.[^.=]+$/,
-    // diff.external avvia un programma; i driver (`diff.<nome>.*`) restano fuori.
-    /^diff\.(?!external$)[^.=]+$/,
-    // log.showSignature fa partire gpg a ogni git log.
-    /^log\.(?!showsignature$)[^.=]+$/,
-    // git-lfs, per indirizzo: come si autentica e il controllo dei lucchetti. Le estensioni di lfs avviano programmi.
-    /^lfs\.[^=]+\.(access|locksverify)$/,
-    /^core\.(splitindex|multipackindex|commitgraph|fsyncmethod|packedgitlimit|packedgitwindowsize|deltabasecachelimit|bigfilethreshold)$/,
-  ];
-  // Le righe di `git config --list --show-scope --includes`: true se una chiave locale o del worktree non è inerte.
-  // `core.fsmonitor` con un valore sì/no accende il demone di git, non un programma scelto dal repository.
+  // Le righe di `git config --list --show-scope --includes`: true se una chiave locale o del worktree non è inerte
+  // (l'elenco sta in cmdGit.js, con la regola di chi le scrive).
   // Con `-z` (la forma della sonda) i campi sono separati da NUL e la chiave finisce al ritorno a capo: senza, un «=»
   // nel nome di un remoto (`[remote "a.url=x"]`) spostava il confine e la chiave passava per un'altra.
   function gitConfigLancia(righe) {
@@ -275,9 +251,7 @@
     }
     return voci.some(([ambito, k, valore]) => {
       if (ambito !== 'local' && ambito !== 'worktree') return false;
-      const chiave = k.toLowerCase();
-      if (chiave === 'core.fsmonitor') return !/^(true|false|yes|no|on|off|1|0)?$/i.test(valore.trim());
-      return !GIT_CHIAVI_INERTI.some((re) => re.test(chiave));
+      return !gitChiaveInerte(k, valore, false);
     });
   }
 
