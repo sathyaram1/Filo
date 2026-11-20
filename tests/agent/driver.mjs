@@ -22,12 +22,15 @@ import { mkdirSync, rmSync, statSync, writeFileSync, unlinkSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
 import { paginaDellaScheda, bersaglioDi } from '../helpers/schede.mjs';
+import { leggiTasto } from './combinazioni.mjs';
 
+const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
 export const SHELL_HEIGHT = 88;
@@ -50,6 +53,9 @@ export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {}
   const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   await sleep(1200); // attendi prima tab + paint
+  // Davanti, come per chi la usa: senza, uno schermo virtuale non dà il fuoco a nessuna finestra, e Filo non sposta la
+  // tastiera (una home nuova, una scheda aperta) che chi pilota deve seguire (destinatario).
+  await bringToFront(app);
   app._filoUserData = userData;
   return { app, shell };
 }
@@ -354,9 +360,10 @@ export async function activeView(app, shell) {
 }
 
 // Gli interagibili visibili, anche negli shadow root chiusi di Filo (la sua conferma): visti, devono avere un segno.
+// Le schede della barra e la loro crocetta sono div e span: senza segno chi pilota non cambiava né chiudeva una scheda.
 // `soloFilo`: solo quelli nelle radici di Filo, per il mondo isolato dei siti.
 function COLLECT_FN(soloFilo = false) {
-  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
+  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [role="tab"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item, #tabs .tab, #tabs .tab > .close';
   const UI = globalThis.SN_FILO_UI;
   const radici = [];
   const giu = (radice, diFilo) => {
@@ -377,7 +384,8 @@ function COLLECT_FN(soloFilo = false) {
     if (r.bottom < 0 || r.right < 0 || r.top > innerHeight || r.left > innerWidth) continue;
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0') continue;
-    const label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.textContent || '').trim().slice(0, 40);
+    // data-tip è l'hover di Filo: l'unico nome di un'icona senza testo, come la crocetta della scheda.
+    const label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.textContent.trim() || el.getAttribute('data-tip') || '').trim().slice(0, 40);
     out.push({ x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, tag: el.tagName.toLowerCase(), label });
   }
   return out;
@@ -420,8 +428,8 @@ async function superficiVisibili(app, shell, view) {
 }
 
 // Sui siti i pezzi di Filo (la conferma, i riquadri) stanno in radici chiuse che vede solo il mondo dei suoi content
-// script (lo stesso di tests/helpers/riquadri.mjs).
-const MONDO_CONTENT_SCRIPT = 999;
+// script: il numero lo dà Filo (tests/unit/mondoContentScript.test.mjs).
+const { MONDO: MONDO_CONTENT_SCRIPT } = require('../../src/preload/mondo-esente.js');
 async function segniNelMondoDiFilo(app, id) {
   const code = `(${COLLECT_FN.toString()})(true)`;
   try {
@@ -495,9 +503,35 @@ export async function clickMark(app, shell, map, index, opzioni = {}) {
   if (!m) throw new Error('mark ' + index + ' inesistente');
   await clearMarks(app, shell);
   const page = m.pagina && !m.pagina.isClosed() ? m.pagina : (m.page === 'shell' ? shell : await activeView(app, shell));
+  fuocoPrimaDelClic.set(app, await bersaglioColFuoco(app));
   await page.mouse.click(m.x, m.y, opzioni);
   await sleep(400);
   return page;
+}
+
+// Il clic di Playwright non sposta il fuoco di Electron: se dopo l'ultimo clic è cambiato, l'ha spostato Filo (una home
+// nuova, una scheda aperta da un collegamento) e la tastiera va lì, come per una persona. Per Filo aperto, dal primo clic.
+const fuocoPrimaDelClic = new WeakMap();
+
+async function bersaglioColFuoco(app) {
+  try {
+    return await app.evaluate(({ webContents }) => {
+      const w = webContents.getFocusedWebContents();
+      return w && !w.isDestroyed() ? w.getOrCreateDevToolsTargetId() : null;
+    });
+  } catch (_) { return null; }
+}
+
+// La Page che riceve i tasti: quella a cui Filo ha dato il fuoco dopo l'ultimo clic, se c'è; altrimenti `dove` (la
+// superficie cliccata), altrimenti la scheda attiva. Prove: tests/prova-da-utente-filo.spec.mjs.
+async function destinatario(app, shell, dove) {
+  if (fuocoPrimaDelClic.has(app)) {
+    const ora = await bersaglioColFuoco(app);
+    if (ora && ora !== fuocoPrimaDelClic.get(app)) {
+      for (const p of app.windows()) if (!p.isClosed() && (await bersaglioDi(p)) === ora) return p;
+    }
+  }
+  return (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
 }
 
 // Click libero in coordinate composite.
@@ -512,17 +546,39 @@ export async function clickComposite(app, shell, cx, cy) {
   await sleep(400);
 }
 
-// `dove`: la Page che ha il fuoco (quella dell'ultimo clic, per esempio la barra indirizzi nella shell); senza, la scheda.
+// `dove`: la superficie dell'ultimo clic; chi riceve davvero lo decide destinatario.
 export async function typeText(app, shell, text, dove = null) {
-  const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
+  const page = await destinatario(app, shell, dove);
   await page.keyboard.type(text, { delay: 10 });
   await sleep(200);
 }
 
+// I tasti di Playwright arrivano alla pagina saltando il browser, e before-input-event non li vede: le scorciatoie della
+// finestra (Ctrl+T, Ctrl+W, Alt+cifra…) restavano morte per chi pilota. Passano prima da lì, come quelli di una
+// persona, e la pagina li riceve solo se Filo non li prende. Ritorna true se li ha presi Filo.
 export async function pressKey(app, shell, key, dove = null) {
-  const page = (dove && !dove.isClosed() && dove) || (await activeView(app, shell)) || shell;
-  await page.keyboard.press(key);
+  const page = await destinatario(app, shell, dove);
+  const t = leggiTasto(key);
+  if (!t.ok) throw new Error(t.errore);
+  const preso = await primaAlBrowser(app, page, { ...t.input, type: 'keyDown' });
+  if (!preso) await page.keyboard.press(t.playwright);
+  await primaAlBrowser(app, page, { ...t.input, type: 'keyUp' });
   await sleep(200);
+  return preso;
+}
+
+// Lo stesso evento che riceve la vista di `page` quando una persona preme il tasto; true se un ascoltatore l'ha fermato.
+async function primaAlBrowser(app, page, input) {
+  const bersaglio = await bersaglioDi(page);
+  if (!bersaglio) return false;
+  return app.evaluate(({ webContents }, { bersaglio, input }) => {
+    const wc = webContents.getAllWebContents().find((w) => !w.isDestroyed() && w.getOrCreateDevToolsTargetId() === bersaglio);
+    if (!wc) return false;
+    let fermato = false;
+    const modifiers = ['shift', 'control', 'alt', 'meta'].filter((m) => input[m]);
+    wc.emit('before-input-event', { sender: wc, preventDefault() { fermato = true; } }, { isAutoRepeat: false, isComposing: false, location: 0, modifiers, ...input });
+    return fermato;
+  }, { bersaglio, input });
 }
 
 export async function scrollBy(app, shell, dy) {

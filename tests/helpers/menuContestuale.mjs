@@ -2,7 +2,9 @@
 // con un selettore sulla pagina, perché il menu uscirà dalla pagina del sito in uno strato di Filo sopra la scheda.
 // Sentinella: tests/unit/menuSoloDallAiuto.test.mjs (il marcatore per lo script del sito che cerca il menu sta lì).
 
-const MONDO_CONTENT_SCRIPT = 999;
+import { createRequire } from 'node:module';
+
+const { MONDO: MONDO_CONTENT_SCRIPT } = createRequire(import.meta.url)('../../src/preload/mondo-esente.js');
 
 function paginaDi(scheda) {
   if (typeof scheda.context === 'function') return scheda;
