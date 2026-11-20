@@ -324,11 +324,6 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
   }
 }
 
-// Il testo che l'assistente propone per un campo e che la porta delle uscite lascia passare non conteneva niente di
-// letto: è suo, e nel campo lo mette l'utente accettandolo. Dove la pagina lo mostra poi, non è letto da fuori (#810.8).
-function ricordaPropostaDellAiuto(_sender, testo) {
-  SegretiLetti.valoriDellUtente(String(testo || ''), { maxRiga: 500 });
-}
 
 function ricordaLettoInChat(azioni, storia = []) {
   const Exfil = globalThis.SN_URL_EXFIL;
