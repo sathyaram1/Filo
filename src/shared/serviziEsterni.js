@@ -148,7 +148,8 @@
       occasione: 'solo per l’owner, nella Gestione: feedback, modelli di serie, automazioni, crediti degli utenti',
       riceve: 'le decisioni dell’owner; degli altri utenti niente',
       frase: 'Filo ha un server, su Firebase',
-      dove: ['src/main/services/handlers/auth.js', 'src/main/services/supportModelsStore.js', 'src/main/services/handlers/wallet.js'],
+      dove: ['src/main/services/handlers/auth.js', 'src/main/services/supportModelsStore.js', 'src/main/services/handlers/wallet.js',
+        'src/main/services/chiHaServito.js'],
       prova: ['{ asOwner: true }'],
     },
     {
