@@ -64,6 +64,41 @@ test('carta rimessa con Ctrl+Y', async ({ app, shell, openTab, testServer }) => 
   expect(await dopoUnRiavvio(app)).not.toContain(compatta(CARTA));
 });
 
+test('IBAN scritto in un campo senza nome: cosa vede il modello', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const IBAN = 'IT60X0542811101000000123456';
+  const page = await testServer.openReady(openTab, PAGAMENTO('<div>Bonifico</div><input id="x" style="width:400px;font-size:18px">'));
+  await oltreLAvviso(app);
+  await modelli(app);
+  await app.evaluate(() => {
+    const P = globalThis.SN_PROVIDERS;
+    globalThis.__visti = [];
+    const a = P.completeWithFallback, b = P.streamCompleteWithFallback;
+    P.completeWithFallback = async (o) => { globalThis.__visti.push(o.messages); return a(o); };
+    P.streamCompleteWithFallback = async (o) => { globalThis.__visti.push(o.messages); return b(o); };
+  });
+  await page.locator('#x').click();
+  await page.keyboard.type(IBAN, { delay: 15 });
+  const aiuto = await apriAiuto(app, shell, page);
+  await chiedi(aiuto, 'ho scritto giusto?');
+  const visti = await app.evaluate(() => globalThis.__visti);
+  const testo = JSON.stringify(visti);
+  console.log('IBAN nel testo al modello:', testo.includes(IBAN));
+  const fs = await import('node:fs');
+  fs.mkdirSync('tests/.shots', { recursive: true });
+  let n = 0;
+  for (const m of visti.flat()) {
+    for (const p of Array.isArray(m && m.content) ? m.content : []) {
+      const u = p && (p.image_url?.url || p.url || '');
+      if (typeof u === 'string' && u.startsWith('data:image')) {
+        fs.writeFileSync(`tests/.shots/giro12-foto-${n++}.${u.slice(11, 15).replace(/;.*/, '')}`, Buffer.from(u.split(',')[1], 'base64'));
+      }
+    }
+  }
+  console.log('foto salvate', n);
+  expect(await dopoUnRiavvio(app)).not.toContain(compatta(IBAN));
+});
+
 test('codice letto, proposto e accettato resta letto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, POSTA);
