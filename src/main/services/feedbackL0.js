@@ -63,27 +63,46 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
     return true;
   }
 
-  // I segreti che si riconoscono senza modello: chiavi, password annunciate, quelli che Filo custodisce.
-  async function statici(testo) {
-    const g = G();
-    if (!g || !testo) return [];
-    const valori = [];
-    try { for (const x of g.segretiNelTesto(testo) || []) if (x && x.valore) valori.push(x.valore); } catch (_) {}
-    try {
-      for (const x of (await segreti()) || []) {
-        const sg = typeof x === 'string' ? { valore: x } : x;
-        const { v, min } = g.segretoDi(sg);
-        if (v && v.length >= min && testo.includes(v)) valori.push(v);
-      }
-    } catch (_) {}
-    return L().daValori(testo, valori);
+  // Quello che si riconosce senza modello: chiavi, password annunciate, carte e conti con la loro verifica, e i segreti
+  // che Filo custodisce anche travestiti, con lo stesso riconoscimento che li toglie da ciò che va ai modelli.
+  function trovatiSenzaModello(g, testo, custoditi) {
+    let valori = [];
+    let tratti = [];
+    try { valori = (g.segretiNelTesto(testo) || []).filter((x) => x && x.valore); } catch (_) {}
+    try { tratti = g.trattiSegreti(testo, custoditi) || []; } catch (_) {}
+    return { valori, tratti };
   }
 
-  // → { stato: 'pulito' | 'trovato' | 'saltato', esito? }. Non lancia mai.
-  async function controlla({ testo = '', immagini = [], entroMs = ATTESA_MS } = {}) {
+  async function custoditi() {
+    try {
+      return ((await segreti()) || []).map((x) => (typeof x === 'string' ? { valore: x } : x)).filter(Boolean);
+    } catch (_) { return []; }
+  }
+
+  async function statici(testo, allegati) {
+    const g = G();
+    if (!g) return [];
+    const cs = await custoditi();
+    const out = [];
+    if (testo) {
+      const { valori, tratti } = trovatiSenzaModello(g, testo, cs);
+      out.push(...L().daValori(testo, valori), ...L().daTratti(testo, tratti));
+    }
+    allegati.forEach((a, k) => {
+      if (a == null) return;
+      const { valori, tratti } = trovatiSenzaModello(g, a, cs);
+      out.push(...L().daAllegato(k, valori, tratti));
+    });
+    return out;
+  }
+
+  // → { stato: 'pulito' | 'trovato' | 'saltato', esito? }. Non lancia mai. `allegati`: i file del feedback
+  // ({ name, type, dataUrl }); si rileggono quelli di testo, nell'indice che hanno nel feedback.
+  async function controlla({ testo = '', immagini = [], allegati = [], entroMs = ATTESA_MS } = {}) {
     try {
       if (!(await acceso())) return { stato: 'saltato', motivo: 'spento' };
       const t = String(testo || '');
+      const testiAllegati = (Array.isArray(allegati) ? allegati : []).map(testoDiAllegato);
       const imm = (Array.isArray(immagini) ? immagini : []).filter((u) => typeof u === 'string' && /^data:image\//i.test(u));
       const ferma = new AbortController();
       let timer = null;
