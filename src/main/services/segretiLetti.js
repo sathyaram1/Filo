@@ -174,7 +174,7 @@ function tieni(chiave, r, desde) {
   }
   // Quello che una lettura ha messo da parte mentre il testo era in viaggio si toglie adesso.
   carica();
-  const da = Number.isFinite(desde) ? desde : 0;
+  const da = Number.isFinite(desde) ? desde : Date.now();
   letti.togli((v) => daPagina(v.fonte) && (Number(v.at) || 0) >= da && copre(r, v));
 }
 // `chiave` è l'elemento della pagina: il suo testo cresce mentre l'utente scrive, e sostituisce il precedente.
