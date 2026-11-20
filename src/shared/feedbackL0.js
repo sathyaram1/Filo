@@ -195,13 +195,15 @@
         if (!out.some((y) => y.inizio === at && y.fine === at + s.length)) out.push({ tipo, dove: 'testo', inizio: at, fine: at + s.length, pezzo: s });
         continue;
       }
-      let i = t.indexOf(s);
+      // Una carta si riconosce anche scritta a gruppi («4539 1488 …»), e il valore torna senza spazi: si ritrova così.
+      const forma = /^\d{12,19}$/.test(s) ? s.split('').join('[ -]?') : s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(forma, 'g');
+      let m;
       let guardia = 0;
-      while (i >= 0 && guardia++ < 50) {
-        if (!out.some((y) => y.inizio === i && y.fine === i + s.length)) {
-          out.push({ tipo, dove: 'testo', inizio: i, fine: i + s.length, pezzo: s });
-        }
-        i = t.indexOf(s, i + s.length);
+      while ((m = re.exec(t)) && guardia++ < 50) {
+        const i = m.index;
+        const f = i + m[0].length;
+        if (!out.some((y) => y.inizio === i && y.fine === f)) out.push({ tipo, dove: 'testo', inizio: i, fine: f, pezzo: m[0] });
       }
     }
     return out;
