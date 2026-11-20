@@ -133,7 +133,7 @@ function ascoltaIn(w, invia) {
   let numero = 0;
   let timer = null;
   // Tutto quello che l'utente immette nel documento, in fila: un numero diviso in più caselle ci sta intero.
-  const fila = { testo: '', detto: '' };
+  const fila = { testo: '', detto: '', inViaggio: 0 };
 
   function di() {
     timer = null;
