@@ -511,6 +511,11 @@
   const CAP_MIN = 0;
   const CAP_MAX = 10;
   const CAP_KEYS = ['cap3', 'cap2', 'cap1'];
+  // Il tetto totale delle verifiche di un lavoro (`tettoVerifiche`, #2338): intervallo e valore di partenza stanno qui,
+  // il server li incorpora e l'app li ripete in constants.js sotto sentinella (tettoVerificheGestione.test.mjs).
+  const TETTO_MIN = 1;
+  const TETTO_MAX = 50;
+  const TETTO_PARTENZA = 6;
 
   /** I bilanci che mancano (né in `caps` né in `defaults`): [] se ci sono tutti. PURA. */
   function missingCaps(caps, defaults) {
