@@ -240,7 +240,7 @@ describe('il segno della corsa di finish:check', () => {
       p.on('close', (code) => ok({ code, so }));
     });
     assert.equal(r.code, 0, r.so);
-    assert.doesNotMatch(r.so, /morta senza finire|--guasto/);
+    assert.doesNotMatch(r.so, /interrotta senza finire|--guasto/);
   });
 
   test('ogni corsa dice in fondo la sua memoria: picco e uccisioni da quando è partita', () => {
