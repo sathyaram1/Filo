@@ -17,7 +17,7 @@ test('sonda', async ({ app, openTab }) => {
     const chat = chats.find((c) => (c.messages || []).some((m) => Array.isArray(m.immagini) && m.immagini.length));
     out.prima = chats.map((c) => c.id);
     out.copie = globalThis.SN_IMMAGINI_RISPOSTA.copieDi(chat.messages);
-    const orig = C.togliSeOrfane;
+    out.pulite = await C.pulisci();
     try {
       await globalThis.SN_FILO_CHATS.remove(chat.id);
     } catch (e) { out.err = e.message; }
