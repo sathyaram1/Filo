@@ -1233,7 +1233,9 @@
   // PROPRIO POSTO — l'unico modo di aggiornarla senza rimescolare la lista sotto il puntatore.
   function bindCardActions(root) {
     root.querySelectorAll('.fb-act').forEach((b) => {
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
+        const correzione = b.dataset.correzione ? testoCorrezione(b, e.detail) : null;
+        if (b.dataset.correzione && correzione === null) return;
         const to = b.dataset.to; // stato CANONICO (todo | done | archived | *_confirmed)
         const id = b.dataset.id;
         const payload = { status: to };
@@ -1245,6 +1247,8 @@
           payload.reviewDecision = 'accepted';
           payload.reviewedAt = new Date().toISOString();
           ottimistico.reviewDecision = 'accepted';
+          // Un'ora nuova col commento vecchio lo farebbe arrivare a chi corregge come correzione (#2575).
+          if (correzione !== null) { payload.reviewComment = correzione; ottimistico.reviewComment = correzione; }
         }
         if (b.dataset.local) {
           payload.localOnly = true;
