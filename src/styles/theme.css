@@ -211,7 +211,8 @@
 .sn-rinomina-campo:disabled { opacity: 0.6; }
 .sn-rinomina-ext { flex: 0 0 auto; color: var(--sn-muted); white-space: nowrap; }
 .sn-rinomina-ok,
-.sn-rinomina-annulla {
+.sn-rinomina-annulla,
+.sn-rinomina-rimedio {
   flex: 0 0 auto;
   padding: 7px 12px;
   border-radius: var(--sn-radius);
@@ -221,8 +222,12 @@
 }
 .sn-rinomina-ok { background: var(--sn-btn-bg); color: var(--sn-btn-fg); border: 1px solid transparent; }
 .sn-rinomina-ok:hover:not(:disabled) { opacity: 0.85; }
-.sn-rinomina-annulla { background: transparent; color: var(--sn-fg); border: 1px solid var(--sn-border); }
-.sn-rinomina-annulla:hover:not(:disabled) { background: var(--sn-hover); }
+.sn-rinomina-annulla,
+.sn-rinomina-rimedio { background: transparent; color: var(--sn-fg); border: 1px solid var(--sn-border); }
+.sn-rinomina-annulla:hover:not(:disabled),
+.sn-rinomina-rimedio:hover { background: var(--sn-hover); }
+/* Il tasto del rimedio sta in fondo alla riga dell'errore, la frase prende il resto. */
+.sn-rinomina-stato > span:not(.sn-rinomina-rotella) { flex: 1 1 auto; min-width: 0; }
 .sn-rinomina-ok:disabled,
 .sn-rinomina-annulla:disabled { opacity: 0.45; cursor: default; }
 .sn-rinomina-esito-testo { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

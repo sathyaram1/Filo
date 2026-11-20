@@ -287,6 +287,8 @@ async function perContoDellaScheda(sender, url, {
 
 module.exports = {
   perContoDellaScheda,
+  // Usa la stessa porta di dip.richiesta: una prova che la sostituisce vale anche per il «Riprova» (riprovaConPagina.js).
+  richiestaDiRete: (...a) => dip.richiesta(...a),
   refererPerConto,
   politicaDi,
   ricordaPoliticaDocumento,

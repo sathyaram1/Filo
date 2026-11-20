@@ -14,6 +14,7 @@
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/chatErrors.js"></script>
   <script src="filo://shared/ttsVoices.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
@@ -313,6 +314,7 @@
         <button type="button" class="sn-btn sn-btn-secondary" id="ttsModelPreview">Ascolta</button>
         <span id="ttsModelVoiceModel" class="sn-muted"></span>
         <span id="ttsModelPreviewStatus" class="sn-muted"></span>
+        <button type="button" class="sn-btn sn-btn-secondary" id="ttsModelPreviewRimedio" hidden></button>
       </div>
       <label for="ttsRate" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Velocità: <span id="ttsRateVal">1.0×</span></label>
       <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1" style="width:100%;max-width:360px;display:block;" />

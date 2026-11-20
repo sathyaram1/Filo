@@ -2182,7 +2182,7 @@
     return api.downloads.openFolder(id, luogo).then((res) => {
       if (!res) return;
       if (res.ok === false) { avvisoErrore(res.error || 'Non è stato possibile aprire la cartella', 'cartella_non_aperta'); return; }
-      if (res.missing) avvisoErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto');
+      if (res.missing && res.avviso) avvisoErrore(res.avviso, 'file_non_aperto');
     }).catch(() => {});
   }
 
@@ -2311,7 +2311,7 @@
             return {
               label: a.label,
               onClick: () => api.downloads.rimettiNome(id, 'notifica').then((r) => {
-                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`, { tipo: 'nome_rimesso' });
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`, { tipo: 'nome_rimesso', indirizzo: r.indirizzo || '' });
                 else avvisoErrore((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima', 'nome_non_rimesso');
               }).catch(() => {}),
             };

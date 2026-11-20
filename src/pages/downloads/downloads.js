@@ -115,7 +115,7 @@
     if (!res) return;
     if (res.ok === false) { flashErrore(res.error || 'Cartella non disponibile', 'cartella_non_aperta'); if (res.missing) reload(); return; }
     // Cartella aperta ma senza il file dentro: dillo, invece di lasciarlo cercare.
-    if (res.missing) { flashErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto'); reload(); }
+    if (res.missing) { if (res.avviso) flashErrore(res.avviso, 'file_non_aperto'); reload(); }
   }
   async function copyPath(r) {
     const p = r.savePath || '';
@@ -398,21 +398,21 @@
       });
     }
 
-    // Clic sinistro = azione primaria: apre solo se completato e il file c'è ancora.
-    if (r.state === 'completed' && !r.missing) {
-      row.addEventListener('click', () => openFile(r));
-    }
     // Tasto destro = menu completo (centralità del tasto destro in Filo). La riga può restare in pagina a più
     // ridisegni (SN_RIGHE_VIVE): il menu si costruisce sulla voce di ADESSO, non su quella che l'ha creata.
     const attuale = () => items.find((x) => x.id === r.id) || r;
+    // Clic sinistro = azione primaria: apre un file arrivato. Se non è più al suo posto Filo prima lo cerca (#473).
+    if (r.state === 'completed') {
+      row.addEventListener('click', () => openFile(attuale()));
+    }
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       openCtxMenu(e.clientX, e.clientY, attuale());
     });
     // Tastiera: Invio/Spazio = primaria (apri se completato); Menu/Shift+F10 = menu.
     row.addEventListener('keydown', (e) => {
-      if ((e.key === 'Enter' || e.key === ' ') && r.state === 'completed' && !r.missing) {
-        e.preventDefault(); openFile(r);
+      if ((e.key === 'Enter' || e.key === ' ') && r.state === 'completed') {
+        e.preventDefault(); openFile(attuale());
       } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const rect = row.getBoundingClientRect();

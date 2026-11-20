@@ -245,6 +245,7 @@
       etichetta: 'Cartella',
       fai: () => d.send({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id }).then((res) => {
         if (res && res.ok === false) avvisoErrore(res.error || 'La cartella non si apre', 'cartella_non_aperta');
+        else if (res && res.missing && res.avviso) avvisoErrore(res.avviso, 'file_non_aperto');
         caricaDownloads();
       }),
     };

@@ -50,12 +50,15 @@ test('gli avvisi che compongono la frase da sé passano la risposta d\'errore pe
 test('descrizione delle immagini, «Leggi», titolo e riassunto dell\'Editor e filtro dei mazzi passano la risposta per il tasto', () => {
   assert.match(leggi('src/content/actions.js'), /warnModelConfigOnce\(res\.error, res\)/);
   assert.match(leggi('src/content/actions.js'), /showToast\(message, \{[^}]*rimedio:/);
-  // Ogni avviso col perché della voce del modello porta il tasto: anche la chiave rifiutata, non solo i codici.
+  // Ogni avviso col perché della voce del modello porta il tasto: anche la chiave rifiutata, non solo i codici. Il
+  // perché lo compone sintesiNonRiuscita, la stessa per «Leggi» e per «Ascolta» delle Preferenze (#1344.2).
   const tts = leggi('src/content/tts.js');
   // toastErrore è lo showToast contato dei contatori anonimi (#1461).
   const avvisi = tts.match(/(?:showToast\(I18n\.t\(|toastErrore\()'tts_model_fallback_reason'[^\n]*/g) || [];
-  assert.ok(avvisi.length >= 2, 'mancano gli avvisi col perché');
+  assert.ok(avvisi.length >= 1, 'manca l’avviso col perché');
   for (const a of avvisi) assert.match(a, /rimedio \}/, a);
+  assert.match(tts, /CE\.sintesiNonRiuscita\(res\)/);
+  assert.match(leggi('src/pages/preferences/preferences.js'), /CE\.sintesiNonRiuscita\(res\)/);
   assert.match(leggi('src/main/services/handlers/ai.js'), /keyRefused \? \{ keyRefused: true/);
   const editor = leggi('src/pages/editor/editor.js');
   assert.doesNotMatch(editor, /catch \([^)]*\) \{\s*if \([^)]*\) showEditorToast\('Non sono riuscito a generare il (titolo|riassunto)\.'\)/);

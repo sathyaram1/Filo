@@ -114,6 +114,25 @@
     return el;
   }
 
+  // Una frase che nomina Crediti o Opzioni porta il tasto per andarci (#1344.2): dove, lo dice SN_CHAT_ERRORS.
+  function mostraRimedio(statoEl, rimedio, chiudiRiquadro) {
+    const vecchio = statoEl.querySelector('.sn-rinomina-rimedio');
+    if (vecchio) vecchio.remove();
+    const CE = global.SN_CHAT_ERRORS;
+    const pagina = rimedio && CE && CE.rimedioPagina ? CE.rimedioPagina(rimedio) : null;
+    if (!pagina) return;
+    const b = doc.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-rinomina-rimedio';
+    b.textContent = pagina.label;
+    b.title = pagina.title || '';
+    b.addEventListener('click', () => {
+      send({ type: MSG().OPEN_URL, url: pagina.url }).catch(() => {});
+      chiudiRiquadro();
+    });
+    statoEl.appendChild(b);
+  }
+
   // ── il riquadro ──
   function chiudi() {
     if (!aperto) return;
@@ -189,11 +208,12 @@
     let caricando = true;
     let confermaInAttesa = false;
 
-    const mostraStato = (testo, { carica = false, errore = false } = {}) => {
+    const mostraStato = (testo, { carica = false, errore = false, rimedio = null } = {}) => {
       statoEl.hidden = !testo;
       rotella.hidden = !carica;
       statoEl.classList.toggle('sn-rinomina-errore', !!errore);
       statoTesto.textContent = testo || '';
+      mostraRimedio(statoEl, rimedio, chiudi);
     };
 
     const fuori = (e) => { if (!el.contains(e.target) && !(ancora && ancora.contains(e.target))) chiudi(); };
@@ -236,15 +256,15 @@
     const bersaglio = downloadId ? { downloadId } : { percorso };
 
     mostraStato('Leggo il file…', { carica: true });
-    const senzaProposta = (frase) => {
+    const senzaProposta = (frase, rimedio) => {
       caricando = false;
       if (!attivo || fatto) return;
       if (confermaInAttesa) { confermaInAttesa = false; ok.disabled = false; }
-      mostraStato(frase || 'Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true });
+      mostraStato(frase || 'Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true, rimedio });
       try { campo.focus({ preventScroll: true }); } catch (_) {}
     };
     send({ type: MSG().FILE_NOME_PROPONI, ...bersaglio }).then((r) => {
-      if (!(r && r.ok && r.proposta)) { senzaProposta(r && r.frase); return; }
+      if (!(r && r.ok && r.proposta)) { senzaProposta(r && r.frase, r && r.rimedio); return; }
       caricando = false;
       if (!attivo || fatto) return;
       mostraStato('');
