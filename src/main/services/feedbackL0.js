@@ -159,7 +159,7 @@ function testoDiAllegato(f) {
 // uno zero fra una lettera e l'altra, e nessuna password si riconoscerebbe.
 function daByte(b) {
   if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) return b.subarray(2).toString('utf16le');
-  if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) return Buffer.from(b.subarray(2)).swap16().toString('utf16le');
+  if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) return Buffer.from(b.subarray(2, b.length - (b.length % 2))).swap16().toString('utf16le');
   const campione = b.subarray(0, 4096 - (Math.min(b.length, 4096) % 2));
   let pari = 0;
   let dispari = 0;
