@@ -1905,5 +1905,16 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo, cosaAccount };
+  // Il testo di una ricerca di immagini (#2272): chi la esegue, il freno sulle uscite e quello sui segreti leggono questo.
+  const CAMPI_RICERCA_IMMAGINI = ['query', 'cerca', 'testo', 'q', 'text'];
+  function ricercaImmaginiDi(action) {
+    if (!action || typeof action !== 'object') return '';
+    for (const k of CAMPI_RICERCA_IMMAGINI) {
+      const v = action[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return '';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
