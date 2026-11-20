@@ -93,11 +93,8 @@
     const p = (s) => (sec(s).privacy && typeof sec(s).privacy === 'object' ? sec(s).privacy : {});
     const del = (s) => (sec(s).pagineDelicate && typeof sec(s).pagineDelicate === 'object' ? sec(s).pagineDelicate : {});
     if (alza(p(primaSettings), p(dopoSettings))) return true;
-    const chiediPrima = pulisciSiti(del(primaSettings).siti);
-    const chiediDopo = pulisciSiti(del(dopoSettings).siti);
-    if (chiediPrima.some((s) => !chiediDopo.includes(s))) return true;
-    const toltiPrima = pulisciSiti(del(primaSettings).nonDelicati);
-    return pulisciSiti(del(dopoSettings).nonDelicati).some((s) => !toltiPrima.includes(s));
+    if (sitiTolti(del(primaSettings).siti, del(dopoSettings).siti).length) return true;
+    return sitiTolti(del(dopoSettings).nonDelicati, del(primaSettings).nonDelicati).length > 0;
   }
 
   // I siti delle pagine delicate dopo un ripristino o un backup: quelli dove Filo chiede sempre restano, e fra i segnati
