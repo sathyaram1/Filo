@@ -3098,6 +3098,7 @@ class TabManager {
     if (!tab) return;
     tab._gestoFiloAt = Date.now();
     if (!canGoFwd(tab.view.webContents)) { this._vaiFuori(tab, 'avanti', 0); return; }
+    if (this._caduta(tab) && this._passoDallaCaduta(tab, 1)) return;
     const meta = this._vocePassoStoria(tab, 1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
     tab._passoStoria = true;
