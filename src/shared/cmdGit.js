@@ -228,8 +228,8 @@
     const low = resto.map((a) => a.toLowerCase());
     if (verbo === 'unset' || verbo === 'remove-section' || verbo === 'rename-section') return 3;
     if (verbo === 'list' || verbo === 'edit') return 2;
-    if (verbo === 'set') return Math.max(2, gitConfigForma(low.includes('--append') ? resto.concat('--add') : resto));
-    if (low.some((a) => /^--(regexp|url)(=|$)/.test(a))) return 2;
+    if (verbo === 'set') return Math.max(2, gitConfigForma(conOpzione(resto, 'append') ? resto.concat('--add') : resto));
+    if (conOpzione(resto, 'regexp', 'url')) return 2;
     return gitConfigForma(resto);
   }
 
@@ -279,9 +279,10 @@
     },
     config: gitConfigVerbi,
     remote: (cmd) => {
-      const ops = gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'));
+      const args = gitArgsAfterSub(cmd);
+      const ops = args.filter((a) => !a.startsWith('-'));
       // `git remote -v` elenca gli URL, che possono contenere un token → conferma.
-      if (!ops.length) return /(^|\s)(-v|--verbose)(\s|$)/.test(cmd) ? 2 : 1;
+      if (!ops.length) return args.includes('-v') || conOpzione(args, 'verbose') ? 2 : 1;
       const action = ops[0].toLowerCase();
       if (action === 'show' || action === 'get-url') return 2; // stampano l'URL col token
       if (action === 'remove' || action === 'rm' || action === 'prune') return 3; // cancellazioni
