@@ -11,7 +11,7 @@
     {
       version: '0.2.296', date: '2026-11-20',
       features: [
-        { testo: 'La traduzione della pagina si chiede anche a Filo: «traducimi questa pagina», «riprendi la traduzione», «torna all\'originale». Se la pagina è già tradotta o già com\'era, te lo dice.', segnalazione: 504 },
+        { testo: 'La traduzione della pagina si chiede anche a Filo, nella chat o nell\'Aiuto della pagina: «traducimi questa pagina», «riprendi la traduzione», «torna all\'originale». Se la pagina è già tradotta o già com\'era, te lo dice. Il tasto che traduce la selezione, premuto senza niente di selezionato, traduce la pagina.', segnalazione: 504 },
       ],
     },
     {
