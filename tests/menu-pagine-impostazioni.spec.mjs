@@ -200,6 +200,44 @@ test('Preferenze: un tasto destro dato prima non si rigioca se la pagina l’ha 
   expect(await etichette(vecchio)).toContain('Rimetti di serie');
 });
 
+// #2444.1 — dopo il tasto destro l'utente è passato ad altro: il menu non deve comparire più tardi sulla voce di prima.
+for (const { nome, poi } of [
+  { nome: 'un clic sinistro altrove', poi: (page) => page.mouse.click(5, 300) },
+  { nome: 'Esc', poi: (page) => page.keyboard.press('Escape') },
+]) {
+  test(`Preferenze: tasto destro e poi ${nome} prima che Filo sia pronto: il menu non compare dopo`, async ({ app, openTab }) => {
+    test.setTimeout(60_000);
+    await trattieniImpostazioni(app);
+    const page = await openTab('filo://preferences/preferences.html');
+    const etichetta = page.locator('label', { has: page.locator('#tabPreviewEnabled') });
+    await expect(etichetta).toBeVisible({ timeout: 10_000 });
+    await etichetta.click({ button: 'right' });
+    await poi(page);
+    expect(await menuInAscolto(page)).toBe(false);
+    await apriImpostazioni(app);
+    await pronta(page);
+    await page.waitForTimeout(1_000);
+    await expect(menuDi(page).principale).toHaveCount(0);
+    await etichetta.click({ button: 'right' });
+    expect(await etichette(page)).toContain('Rimetti di serie');
+  });
+}
+
+test('Preferenze: se la voce cliccata viene ridisegnata mentre Filo si prepara, il menu si apre su quella sotto il cursore', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await trattieniImpostazioni(app);
+  const page = await openTab('filo://preferences/preferences.html');
+  const etichetta = page.locator('label', { has: page.locator('#tabPreviewEnabled') });
+  await expect(etichetta).toBeVisible({ timeout: 10_000 });
+  await etichetta.click({ button: 'right' });
+  // Come le pagine che costruiscono gli elenchi dopo aver letto le impostazioni.
+  await etichetta.evaluate((el) => { el.dataset.vecchia = '1'; el.replaceWith(el.cloneNode(true)); });
+  await expect(page.locator('label[data-vecchia]')).toHaveCount(1);
+  expect(await page.evaluate(() => document.querySelector('label[data-vecchia]').isConnected)).toBe(true);
+  await apriImpostazioni(app);
+  expect(await etichette(page)).toContain('Rimetti di serie');
+});
+
 // Una chiave non entra nel registro dei cambi: tolta, nessun Annulla la riporta. Si chiama per quello che fa, e chiede.
 test('Modelli: sulla chiave OpenRouter la voce è «Togli la chiave», chiede conferma, e il no la lascia', async ({ app, openTab }) => {
   test.setTimeout(90_000);
