@@ -522,9 +522,11 @@ function chiudiFile(c, file) {
 
 /**
  * Chi è la sessione che lancia i test: non arriva ai test. In una routine li faceva misurare il consumo vero, che finiva
- * nei corpi confrontati e nelle cartelle di prova: rossi anche su main, solo lì (#949.1). Chi serve un test lo mette lui.
+ * nei corpi confrontati e nelle cartelle di prova: rossi anche su main, solo lì (#949.1). Il processo di Claude Code e la
+ * sua epoca dicono se la sessione è ripartita (#2571.1): letti dal vero, la veglia di una prova vedeva ripartenze finte.
+ * Chi serve un test lo mette lui.
  */
-export const IDENTITA_SESSIONE = Object.freeze(['FILO_ROUTINE', 'FILO_ROUTINE_TICKET', 'FILO_ROUTINE_ROLE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID']);
+export const IDENTITA_SESSIONE = Object.freeze(['FILO_ROUTINE', 'FILO_ROUTINE_TICKET', 'FILO_ROUTINE_ROLE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID', 'CLAUDE_PID', 'CLAUDE_CODE_WORKER_EPOCH']);
 
 /**
  * Le cartelle che i test troverebbero della sessione anche senza variabili, sostituite da cartelle loro: il transcript più
