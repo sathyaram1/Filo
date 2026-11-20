@@ -230,10 +230,15 @@ test('Preferenze: se la voce cliccata viene ridisegnata mentre Filo si prepara, 
   const etichetta = page.locator('label', { has: page.locator('#tabPreviewEnabled') });
   await expect(etichetta).toBeVisible({ timeout: 10_000 });
   await etichetta.click({ button: 'right' });
-  // Come le pagine che costruiscono gli elenchi dopo aver letto le impostazioni.
-  await etichetta.evaluate((el) => el.replaceWith(el.cloneNode(true)));
+  // Come le pagine che costruiscono gli elenchi dopo aver letto le impostazioni: al posto della voce cliccata ora c'è
+  // un'altra voce, ed è di quella che il menu deve parlare.
+  await etichetta.evaluate((el) => el.replaceWith(document.getElementById('autoArchiveEnabled').closest('label')));
   await apriImpostazioni(app);
-  expect(await etichette(page)).toContain('Rimetti di serie');
+  expect(await etichette(page)).toContain('Chiedi a Filo');
+  await menuDi(page).voce('Chiedi a Filo').first().click();
+  const campo = page.locator('.sn-sidebar-input textarea');
+  await expect(campo).toBeVisible({ timeout: 8_000 });
+  await expect(campo).toHaveValue(/^Sull'impostazione «.*riordino.*»: $/i);
 });
 
 // Una chiave non entra nel registro dei cambi: tolta, nessun Annulla la riporta. Si chiama per quello che fa, e chiede.
