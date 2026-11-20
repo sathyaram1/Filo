@@ -270,39 +270,3 @@ function trova(testo) {
 global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi };
 if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
-
-// Le parti di una richiesta del correttore che portano testo: quello del campo, i candidati, la pagina intorno. Il campo
-// intero e il testo sopra servono solo qui: non partono.
-function richiestaSenzaRiservati(payload) {
-  const p = payload && typeof payload === 'object' ? payload : {};
-  const out = { ...p };
-  delete out.campo;
-  delete out.campoDa;
-  delete out.sopra;
-  // Il testo sopra lo legge la pagina a ogni richiesta; senza, vale quello che parte con lei.
-  const sopra = [p.sopra, p.contesto && p.contesto.prima, p.luogo && p.luogo.conversazione].find((t) => typeof t === 'string') || '';
-  const chiavi = ['prima', 'nuovo', 'dopo'];
-  const { pezzi, valori } = pezziOscurati(chiavi.map((k) => (typeof p[k] === 'string' ? p[k] : '')), p.campo, p.campoDa, sopra);
-  chiavi.forEach((k, i) => { if (typeof p[k] === 'string') out[k] = pezzi[i]; });
-  const delCampo = (t) => oscura(oscura(t, valori));
-  if (Array.isArray(p.candidati)) out.candidati = p.candidati.map((c) => (c && typeof c === 'object' ? { ...c, pezzo: delCampo(c.pezzo) } : c));
-  if (p.luogo && typeof p.luogo === 'object') {
-    out.luogo = { ...p.luogo };
-    for (const k of ['titolo', 'conversazione']) if (typeof p.luogo[k] === 'string') out.luogo[k] = delCampo(p.luogo[k]);
-  }
-  if (p.contesto && typeof p.contesto === 'object') {
-    out.contesto = { ...p.contesto };
-    for (const k of ['prima', 'dopo']) if (typeof p.contesto[k] === 'string') out.contesto[k] = delCampo(p.contesto[k]);
-  }
-  // Le date da giudicare portano il pezzo del campo e le righe della pagina (o del titolo) che dicono l'anno.
-  const testo = (t) => (typeof t === 'string' ? delCampo(t) : '');
-  if (Array.isArray(p.date)) {
-    out.date = p.date.filter((d) => d && typeof d === 'object').map((d) => ({
-      ...d, pezzo: testo(d.pezzo),
-      anni: (Array.isArray(d.anni) ? d.anni : []).map((a) => (a && typeof a === 'object' ? { ...a, riga: testo(a.riga) } : a)),
-    }));
-  }
-  return out;
-}
-
-module.exports = { SEGNAPOSTO, oscura, pezziOscurati, richiestaSenzaRiservati, formeLibere };
