@@ -144,15 +144,15 @@ function ricorda(testo, fonte) {
 }
 
 // Quello che l'utente ha immesso in una pagina in questa sessione (#810.8): i suoi tasti, incolla e trascina in un campo,
-// in una casella libera o nella chat dell'assistente, e le proposte dell'assistente che la porta ha lasciato passare.
-// Dove una pagina lo mostra non è letto da fuori. Mai da quello che sta nella pagina: un sito ci metterebbe ogni codice.
-// Solo in memoria.
+// in una casella libera o nella chat dell'assistente, e i testi che Filo vi mette per lui. Dove una pagina lo mostra non
+// è letto da fuori. Mai da quello che sta nella pagina: un sito ci metterebbe ogni codice. Solo in memoria.
 const MAX_IMMESSI = 5000;
 const MAX_CARATTERI_IMMESSI = 20000000;
 const immessi = new Map();
 let caratteriImmessi = 0;
 const compatto = (t) => String(t || '').replace(/[\s-]/g, '').toLowerCase();
-const daPagina = (fonte) => /^da(lla| una) pagina/.test(String(fonte || ''));
+// Chi compone la provenienza di una pagina e chi la riconosce sono la stessa regola, in src/shared/urlExfil.js.
+const daPagina = (fonte) => !!globalThis.SN_URL_EXFIL?.fonteDiPagina?.(fonte);
 const copre = (r, x) => { const v = compatto(x && x.valore); return !!v && r.includes(v); };
 function dellUtente(x, fonte) {
   if (!immessi.size || !daPagina(fonte)) return false;
