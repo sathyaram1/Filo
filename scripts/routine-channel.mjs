@@ -2042,7 +2042,7 @@ if (isMain) {
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
     });
     console.log(esito.testo);
-    // Un finish:check ucciso (137) non lascia processi: senza questa riga l'attesa direbbe solo «finito» (#2571).
+    // Un finish:check interrotto non lascia processi: senza questa riga l'attesa direbbe solo «finito» (#2571).
     if (esito.uscita === 0) {
       const { corsaInterrotta, testoPerIlWorker } = await import('./lib/corsa-controlli.mjs');
       const morta = corsaInterrotta(ROOT);
