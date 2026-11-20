@@ -572,12 +572,15 @@ export async function chiamaConChiave(data, passphrase, { fetchImpl = fetch } = 
   return body.result || {};
 }
 
-/** Il registro con una chiave di classe: l'operazione `registro` del canale del manutentore, che le accetta tutte e due. */
-async function registroConChiave(passphrase, parole) {
-  const [{ call }, { corpoManutentore }] = await Promise.all([import('./routine-channel.mjs'), import('./manutentore.mjs')]);
-  const { status, body } = await call('routineManutentore', corpoManutentore({ passphrase }, 'registro', { parole }));
-  if (status === 200 && body && body.ok !== false) return body;
-  throw new Error(`Non riuscito: ${visibile((body && (body.detail || body.reason)) || `errore ${status}`)}`);
+/**
+ * Il registro con una chiave di classe: l'operazione `registro` del canale del manutentore, che le accetta tutte e due,
+ * dalla stessa strada del suo strumento, che porta il biglietto della sessione perché il server la segni (#2027.3).
+ */
+export async function registroConChiave(passphrase, parole, opts = {}) {
+  const { chiama } = await import('./manutentore.mjs');
+  const r = await chiama({ passphrase }, 'registro', { parole }, opts);
+  if (r && r.ok !== false) return r;
+  throw new Error(`Non riuscito: ${visibile((r && (r.detail || r.reason)) || 'errore')}`);
 }
 
 async function credenzialeDelloAmbiente() {
