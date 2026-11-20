@@ -1776,7 +1776,19 @@
 
   // Lens-style reverse search (più affidabile di searchbyimage)
   function imageSearchUrlFor(imgEl) {
-    return global.SN_URL_NAV.indirizzoRicercaImmagine(imgEl && (imgEl.currentSrc || imgEl.src));
+    return global.SN_URL_NAV.indirizzoRicercaImmagine(indirizzoDellImmagine(imgEl));
+  }
+
+  // L'indirizzo di un'immagine per chi lo usa fuori da Filo (copiarlo, cercarlo). Una copia di Filo (#2272) vale
+  // l'indirizzo da cui viene (`data-originale`), o nessuno se è stata creata: mai il rimando interno alla copia.
+  function indirizzoDellImmagine(imgEl) {
+    if (!imgEl) return '';
+    const src = imgEl.currentSrc || imgEl.src || '';
+    if (imgEl.hasAttribute && imgEl.hasAttribute('data-originale')) {
+      const o = imgEl.getAttribute('data-originale') || '';
+      return /^https?:\/\//i.test(o) ? o : '';
+    }
+    return /^filo:/i.test(src) ? '' : src;
   }
 
   function searchImageOnWeb(imgEl) {
