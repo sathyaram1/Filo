@@ -5,8 +5,8 @@
   'use strict';
 
   const SCALA = 1000;
-  // I formati che il lettore e lo strato sopra la scheda accettano: un altro (SVG, AVIF…) si ridisegna prima in JPEG.
-  const IMMAGINE = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+  // Sotto questo stacco (grigi 0..255) fra le due classi della soglia, nel riquadro non c'è una scritta da misurare.
+  const STACCO_INCHIOSTRO = 40;
   const num = (v) => (typeof v === 'number' ? v : Number.parseFloat(String(v == null ? '' : v).replace(',', '.')));
 
   // Una riga col riquadro in 0..1, o senza (posizione null) se il modello non l'ha data o l'ha data rotta.
