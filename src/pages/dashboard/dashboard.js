@@ -1944,6 +1944,15 @@
     bubblesEl.appendChild(nota);
     return { entry, host, nota, parziale };
   }
+  // La parte già scritta di un turno finito prima del tempo, come l'ha controllata il main (#2272): foto e fonti al loro
+  // posto, le stesse che la chat riaperta mostra. Vero se l'ha ridisegnata.
+  function conGiaScritta(bolla, r) {
+    const g = r && r.giaScritta;
+    if (!bolla || !g || typeof g.testo !== 'string' || !Array.isArray(g.fonti) || !Array.isArray(g.immagini)) return false;
+    if (!g.immagini.length && !g.fonti.length) return false;
+    setBubbleText(bolla, g.testo, true, g.fonti, g.immagini);
+    return true;
+  }
   // Il main ha finito il turno fermato: le azioni fatte restano (righe e bottoni) e lo storico le sa.
   function chiudiTurnoFermato(r, { entry, host, nota, parziale }, { pending, shown, chat = '' }) {
     const azioni = Array.isArray(r?.actions) ? r.actions : [];
