@@ -422,24 +422,9 @@ export async function fiduciaLocale(opts = {}) {
  * fermarsi per un guasto del server, e senza biglietto la sessione è già non fidata.
  * @returns {Promise<{ sporcati: number, inAttesa?: number, senzaBiglietto?: true, errori: string[] }>}
  */
-export async function sporca(motivo, { env, cwd, deps = {}, nowMs = Date.now() } = {}) {
-  const m = String(motivo || '').trim().slice(0, 300);
-  const out = { sporcati: 0, errori: [] };
-  if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
-  const trovati = trovaBiglietti({ env, cwd });
-  if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
-  let inAttesa = 0;
-  for (const b of trovati) {
-    let aggiunta = '';
-    try { annotaSporco(b, m, nowMs); } catch (_) { aggiunta = m; }
-    const r = await consegnaSporchi(b, { deps, nowMs, aggiunta });
-    if (!r.errore) out.sporcati += 1;
-    else {
-      out.errori.push(r.errore);
-      if (r.restano) inAttesa += 1;
-    }
-  }
-  return inAttesa ? Object.assign(out, { inAttesa }) : out;
+export async function sporca(motivo, opts = {}) {
+  const { fatti, ...resto } = await segnaInCoda(CODE.sporco, consegnaSporchi, motivo, opts);
+  return Object.assign({ sporcati: fatti }, resto);
 }
 
 /**
