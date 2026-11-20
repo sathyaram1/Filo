@@ -449,6 +449,8 @@ test('git config — scrivere una chiave che avvia un programma chiede «conferm
     'git config --worktree diff.external x', 'git config CORE.EDITOR x',
     // `git pop`, che lo farebbe partire, vale già 3 da solo (#2619): `pop` non è un comando di git.
     'git config alias.pop "!python3 evil.py"',
+    // #2623: il remoto di un ramo accetta anche un indirizzo, e decide dove va il prossimo push.
+    'git config branch.main.remote origin',
   ]) {
     assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
   }
