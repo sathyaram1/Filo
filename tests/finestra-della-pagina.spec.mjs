@@ -100,6 +100,21 @@ for (const [forma, apri] of [
   });
 }
 
+test('anche dal riquadro di un altro sito la finestra chiesta per nome col clic torna davanti', async ({ app, openTab, testServer }) => {
+  const prima = testServer.html('<title>PRIMA DEST</title>');
+  const seconda = testServer.html('<title>SECONDA DEST</title>');
+  const link = (id, dest) => `<a id="${id}" href="${dest}" target="_new" style="display:block;width:200px;height:40px">vai</a>`;
+  const riquadro = testServer.html(`${link('a', prima)}${link('b', seconda)}`, { pubblico: true });
+  const page = await openTab(testServer.html(`<title>ELENCO</title><iframe src="${riquadro}" width="300" height="120"></iframe>`));
+  await expect.poll(() => page.frames().some((f) => f.url() === riquadro), { timeout: 8000 }).toBe(true);
+  const fr = () => page.frames().find((f) => f.url() === riquadro);
+  await fr().click('#a');
+  await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'PRIMA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+  await davanti(app, page.url());
+  await fr().click('#b');
+  await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'SECONDA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+});
+
 test('la finestra con nome che la pagina riempie da sola, senza clic, resta dietro', async ({ app, openTab, testServer }) => {
   const prima = testServer.html('<title>PRIMA DEST</title>');
   const seconda = testServer.html('<title>SECONDA DEST</title>');
