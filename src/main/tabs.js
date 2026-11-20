@@ -507,7 +507,10 @@ class TabManager {
     VociMenuUsate.servizio().carica().catch(() => {});
     this.codaRiapertura = new CodaRiapertura({ carica: (tab) => this._caricaRinviata(tab) });
     if (window && typeof window.once === 'function') {
-      window.once('closed', () => { this.chiudiSessione(); this.anteprime.chiudi(); for (const r of riserveDi(this)) r.spegni(); this.codaRiapertura.chiudi(); });
+      window.once('closed', () => {
+        this.chiudiSessione(); this.anteprime.chiudi(); for (const r of riserveDi(this)) r.spegni(); this.codaRiapertura.chiudi();
+        for (const t of this.tabs) FileDelComputer.revoca(t._fileConcesso);
+      });
     }
     this.avvisi = new AvvisiSopraPagina(window, {
       dopoInCima: () => { if (this.propostaEmail) this.propostaEmail.inCima(); this.conferme.inCima(); if (this.strato) this.strato.inCima(); },
