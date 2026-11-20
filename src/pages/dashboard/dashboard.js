@@ -1923,16 +1923,22 @@
   if (!self.SN_VOCI_PAGINA.includes(vociSeguito)) self.SN_VOCI_PAGINA.push(vociSeguito);
   // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
   // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
-  function apriTurnoFermato({ pending, streamBubble, streamedText }) {
+  function apriTurnoFermato({ pending, streamBubble, streamedText, grezzo = '', azioni = [] }) {
     const turn = pending.endTurn();
-    const parziale = String(streamedText || '').trim();
+    const conFoto = streamBubble ? giaScrittaConFoto(grezzo, azioni) : null;
+    const parziale = conFoto ? conFoto.text : String(streamedText || '').trim();
     const entry = { role: 'filo', text: parziale, actions: [], interrotto: true, fermato: true };
+    if (conFoto) {
+      entry.immagini = conFoto.immagini;
+      if (conFoto.fonti.length) entry.fonti = conFoto.fonti;
+    }
     if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
     threadHistory.push(entry);
     let host = streamBubble;
     if (host) {
       host.classList.remove('dash-bubble-streaming');
-      if (parziale) setBubbleText(host, parziale, true);
+      if (conFoto) setBubbleText(host, conFoto.text, true, conFoto.fonti, conFoto.immagini);
+      else if (parziale) setBubbleText(host, parziale, true);
     } else {
       host = makeBubble({ role: 'filo', text: '' });
       host.hidden = true;
