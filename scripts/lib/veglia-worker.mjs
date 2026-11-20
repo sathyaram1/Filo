@@ -238,7 +238,7 @@ export function testoGuasto({
   }
   // #2571.1: una sessione di Claude Code ripartita dopo l'ultimo strumento non torna, e la risposta che manca non è un
   // permesso. Un worker vivo risponde a un'uscita di segnale (oltre 128): tacere dopo vuol dire che col comando si è
-  // fermata anche la sua sessione.
+  // fermato anche lui. «Sessione» resta il processo di Claude Code, che può essere vivo con il worker morto (#2571.1).
   const ultimoMs = attesa && Number.isFinite(attesa.ms) ? attesa.ms : ultimo && Number.isFinite(ultimo.ms) ? ultimo.ms : NaN;
   const ripartita = sessioneDellaCorsa(memoria, corsa && corsa.memoria, ultimoMs) === 'ripartita';
   const ucciso = !attesa && ultimo && ultimo.risposta && ultimo.uscita >= UCCISO_DA;
