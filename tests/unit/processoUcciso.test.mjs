@@ -1,6 +1,6 @@
 // #2571: tre primi lavori morti mentre aspettavano finish:check, con l'ultimo comando uscito 137 e la veglia che diceva
-// «forse un permesso, forse il modello». Qui: la memoria vista dai comandi, il segno della corsa ucciso con SIGKILL, il
-// guasto col 137 e la riga che il worker riceve per riprendere o rilasciare.
+// «forse un permesso, forse il modello». Qui: la memoria vista dai comandi, il segno della corsa interrotta (senza un
+// numero che non sa), la sessione di Claude Code ripartita o la stessa (#2571.1), e la riga che il worker riceve.
 
 import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
@@ -12,10 +12,15 @@ import { pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
+// La sessione che lancia le prove non entra nelle letture finte: la si legge solo dove la si chiede.
+const ENV_VERO = { ...process.env };
+delete process.env.CLAUDE_PID;
+delete process.env.CLAUDE_CODE_WORKER_EPOCH;
+
 const REPO = resolve(import.meta.dirname, '..', '..');
-const { letturaMemoria, testoMemoria, cgroupDi, uccisiPerMemoria } = await import('../../scripts/lib/memoria-contenitore.mjs');
+const { letturaMemoria, testoMemoria, cgroupDi, uccisiPerMemoria, sessioneClaude } = await import('../../scripts/lib/memoria-contenitore.mjs');
 const {
-  apriCorsa, corsaInterrotta, codiceDellaCorsa, fileCorsa, guastoDellaCorsa, testoPerIlWorker, testoUcciso, CODICE_SIGKILL,
+  apriCorsa, corsaInterrotta, fileCorsa, guastoDellaCorsa, testoPerIlWorker, testoUcciso, sessioneDellaCorsa,
 } = await import('../../scripts/lib/corsa-controlli.mjs');
 const { testoGuasto, ultimoPasso, quadroDelFermo, veglia, autopsiaDelWorker, USCITA_FERMO } = await import('../../scripts/lib/veglia-worker.mjs');
 const { codiceUscita, rigaErrore } = await import('../../scripts/session-report.mjs');
