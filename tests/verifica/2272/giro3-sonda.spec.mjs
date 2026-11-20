@@ -106,12 +106,7 @@ test('sicurezza: titoli con HTML, pagina javascript:, immagine file:// non passa
   test.setTimeout(150_000);
   const dir = cartellaTemporanea();
   const locale = path.join(dir, 'segreto.png');
-  await app.evaluate(({ nativeImage }, p) => {
-    const buf = Buffer.alloc(16 * 16 * 4, 200);
-    require('node:fs').writeFileSync(p, nativeImage.createFromBitmap(buf, { width: 16, height: 16 }).toPNG());
-  }, locale).catch(async () => {
-    await app.evaluate(({ nativeImage }) => nativeImage.createEmpty());
-  });
+  fs.writeFileSync(locale, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
   const fileUrl = 'file://' + locale.split(path.sep).join('/');
   await prepara(app, [
     { immagine: 'https://upload.wikimedia.org/antilope-0.png', titolo: '<img src=x onerror="window.__xss=1">', sito: '<b>x</b>', pagina: 'javascript:window.__xss2=1' },
