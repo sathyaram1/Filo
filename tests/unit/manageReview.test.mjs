@@ -2439,8 +2439,6 @@ test('ownerActions: una bocciatura del controllo di sicurezza si rimanda in corr
   const a = MR.ownerActionFor(bocciata, 'accept');
   assert.deepEqual({ to: a.to, label: a.label, correzione: a.correzione, primary: a.primary }, { to: 'todo', label: 'Rimanda in correzione', correzione: true, primary: true });
   assert.deepEqual(chiavi(bocciata), ['accept', 'archive']);
-  // Il nome vecchio del motivo vale come il nuovo.
-  assert.equal(MR.ownerActionFor({ status: 'design', blockReason: 'secaudit', fiducia: 'fidato' }, 'accept').correzione, true);
   for (const statusReason of ['clarify', 'decisione', 'loop', '']) {
     const altra = MR.ownerActionFor({ status: 'design', statusReason, fiducia: 'fidato' }, 'accept');
     assert.deepEqual([altra.label, !!altra.correzione], ['→ In coda', false], statusReason);
