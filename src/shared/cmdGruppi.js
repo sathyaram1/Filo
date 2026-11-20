@@ -316,17 +316,17 @@
       let det = UNO;
       // I valori si raccolgono man mano: rifare l'elenco a ogni `$_` costava il quadrato dei comandi (#1994.1).
       const valori = new Set();
-      let visti = false;
+      let primo = true;
       let ignoto = false;
       for (const part of seq) {
         let forme = [part];
         if (usaUltimoArg(part, c)) {
-          if (!visti || ignoto || valori.size > ULTIMI_MAX) return TRE;
+          if (primo || ignoto || valori.size > ULTIMI_MAX) return TRE;
           forme = [...valori].map((v) => part.replace(ULTIMO_ARG_RE, () => comeParola(v)));
         }
         for (const f of forme) {
           for (const cc of cands) det = peggiore(det, classifyOneDet(f, cc));
-          visti = true;
+          primo = false;
           if (ignoto || valori.size > ULTIMI_MAX) continue;
           const u = ultimiArgomenti(f, c);
           if (u) u.forEach((v) => valori.add(v));
