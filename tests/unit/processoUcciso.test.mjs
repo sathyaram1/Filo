@@ -367,7 +367,7 @@ describe('il guasto di un processo ucciso', () => {
       dorme: async () => {},
     });
     assert.equal(r.uscita, USCITA_FERMO);
-    assert.match(dichiarato, /^guasto: strumento finish-check: processo ucciso \(137\) durante finish:check/);
+    assert.match(dichiarato, /^guasto: strumento finish-check: finish:check interrotto senza finire/);
     assert.match(dichiarato, /Ultimo strumento: Bash alle 19:06:00 UTC, con risposta, uscita 137\./);
   });
 
