@@ -2371,6 +2371,7 @@ class TabManager {
       }
       this._archiveClosedTab(tab, reason, { voce, giro: via === 'chat' ? 'chat' : giro });
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+      FileDelComputer.revoca(tab._fileConcesso);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
         // Solo se c'è ancora: chiusa mentre il modello decideva, l'ha già detto chi l'ha chiusa.
