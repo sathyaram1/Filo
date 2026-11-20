@@ -86,7 +86,8 @@ test('r2 chi usa i crediti e chiede di disegnare viene mandato dove la scelta si
   const visto = await app.evaluate(() => globalThis.__visti[1] || '');
   const nota = (/\[Immagine NON creata[^\]]*\]/.exec(visto) || [''])[0];
   expect(nota).not.toBe('');
-  // La voce indicata, con i modelli predefiniti accesi, nelle Opzioni non si vede.
+  // Chi usa i crediti ha i modelli predefiniti accesi: lì la voce indicata nelle Opzioni non si vede.
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ useDefaultModels: true }));
   const opzioni = await openTab('filo://options/');
   const voceVisibile = await opzioni.getByText('Immagini create in chat').first().isVisible({ timeout: 5000 }).catch(() => false);
   expect(voceVisibile || /chiave/i.test(nota), `voce visibile: ${voceVisibile}; nota: ${nota}`).toBe(true);
