@@ -282,7 +282,7 @@
       const args = gitArgsAfterSub(cmd);
       const ops = args.filter((a) => !a.startsWith('-'));
       // `git remote -v` elenca gli URL, che possono contenere un token → conferma.
-      if (!ops.length) return args.includes('-v') || conOpzione(args, 'verbose') ? 2 : 1;
+      if (!ops.length) return args.some((a) => /^-v+$/.test(a)) || conOpzione(args, 'verbose') ? 2 : 1;
       const action = ops[0].toLowerCase();
       if (action === 'show' || action === 'get-url') return 2; // stampano l'URL col token
       if (action === 'remove' || action === 'rm' || action === 'prune') return 3; // cancellazioni
