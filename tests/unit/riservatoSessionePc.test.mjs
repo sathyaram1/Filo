@@ -46,10 +46,9 @@ test('segnaRiservato manda il motivo al server col biglietto della sessione; sen
     assert.deepEqual(r, { segnati: 1, errori: [] });
     assert.deepEqual(s.chiamate, [{ op: 'riservato', ticket: SEGRETO, motivo: 'letto #813' }]);
     assert.equal(await B.rigaRiservato('letto #813', { env, cwd, deps: s.deps }), '', 'riuscito, niente da dire');
-    // Server giù: la riga dice come dichiararlo a mano, prima di scrivere.
+    // Server giù: il segno resta annotato in locale (#2027.3), e la riga lo dice.
     const riga = await B.rigaRiservato('letto #813', { env, cwd, deps: localTicket({ rompi: true }).deps });
-    assert.match(riga, /NON preso/);
-    assert.match(riga, /node scripts\/biglietto\.mjs riservato "letto #813"/);
+    assert.match(riga, /Server non raggiunto \(fetch failed\): il segno riservato è annotato in locale/);
   });
   const vuoto = localTicket();
   const fuori = cartellaTemporanea('senza-');
