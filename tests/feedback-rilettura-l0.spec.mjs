@@ -215,6 +215,7 @@ test('un log allegato con una password: il riquadro si riapre con l\'avviso e il
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
   await finti(app);
+  await imposta(app, { ritardo: 1_500 });
   await page.evaluate(() => window.SN_FEEDBACK_UI.open());
   await page.locator('.sn-fb-text').fill('Allego il log: il login fallisce sempre.');
   const log = 'avvio...\nutente = mario.rossi\npassword = hunter22\nerrore 401\n';
