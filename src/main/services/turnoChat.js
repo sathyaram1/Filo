@@ -1338,6 +1338,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
       model: r && r.model, provider: r && r.provider, seguitiLetti,
+      ...(giaScrittaControllata ? { giaScritta: giaScrittaControllata } : {}),
     };
   }
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
