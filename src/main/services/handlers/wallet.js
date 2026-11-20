@@ -120,10 +120,12 @@ module.exports = function register(on, ctx) {
   function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
 
   // Ogni risposta pagata col ripiego lo dice: la riga sotto la risposta, o un avviso, uno per
-  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detta solo la riga arrivata a schermo
-  // (KEY_FALLBACK_SHOWN), non la richiesta di chi potrebbe mostrarla: una spiegazione anticipata
-  // mai aperta, o un riquadro chiuso prima, lascia partire l'avviso. Le richieste con la riga in
-  // volo (`conRipiegoDetto`) tengono fermo l'avviso finché la loro riga ha il tempo di comparire.
+  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detto solo quando una pagina in vista l'ha
+  // mostrato (#662.1): la riga arrivata a schermo (KEY_FALLBACK_SHOWN), o l'avviso preso dalla coda
+  // degli avvisi da una pagina davanti agli occhi, mai quello solo spedito. Le richieste con la riga
+  // in volo (`conRipiegoDetto`) tengono fermo l'avviso finché la loro riga ha il tempo di comparire.
+  const CODA = ctx.avvisiFuoriPolitica || null;
+  const AVVISO_RIPIEGO = 'ripiego';
   const FINESTRA_RIPIEGO_MS = 10 * 60 * 1000;
   const ATTESA_AVVISO_RIPIEGO_MS = 4000;
   let inVoloConRiga = 0;
@@ -150,14 +152,14 @@ module.exports = function register(on, ctx) {
     if (inVoloConRiga > 0) return;
     const { status } = avvisoSospeso;
     avvisoSospeso = null;
-    const now = Date.now();
-    if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
-    ultimoAvvisoRipiego = now;
-    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 }); } catch (_) {}
+    if (!CODA || Date.now() - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
+    const messaggio = { type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 };
+    CODA.avvisa(AVVISO_RIPIEGO, () => ({ messaggio, alMostrare: ripiegoMostrato }));
   }
   function ripiegoMostrato() {
     ultimoAvvisoRipiego = Date.now();
     annullaAvvisoSospeso();
+    if (CODA) CODA.ritira(AVVISO_RIPIEGO);
   }
   function avvisaRipiegoMuto(status) {
     const now = Date.now();
@@ -203,6 +205,7 @@ module.exports = function register(on, ctx) {
   async function ownKeyChanged() {
     ultimoAvvisoRipiego = 0;
     annullaAvvisoSospeso();
+    if (CODA) CODA.ritira(AVVISO_RIPIEGO);
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();

@@ -82,9 +82,6 @@
   // appena riportato indietro (#407).
   let runSeq = 0;
   let usoContato = false;
-  // La riga del ripiego sui crediti di Filo (#662): la pagina tradotta non ha un riquadro sotto cui
-  // scriverla, la dice un avviso al primo pezzo pagato così (a fine giro si perde chi lascia la pagina prima).
-  let ripiegoDelGiro = '';
   // L'avviso "sto traducendo" del giro in corso. Serve a chi lo FERMA: le
   // richieste già spedite tornano quando vogliono, e finché non tornano il
   // riquadro "Traduzione pagina in corso…" resterebbe sullo schermo accanto a
@@ -167,7 +164,6 @@
     }
     pageTranslating = true;
     clearTimeout(aperturaTimer);
-    ripiegoDelGiro = '';
     // Ripresa o nuovo giro: chi continua non è tornato all'originale.
     if (!quiet && !daSola) { contaFinale(false); avanzamento = { applied: 0, total: 0 }; }
     // Una traduzione è un uso, non un uso per blocco: la conta la prima richiesta del giro, le altre (e quelle dei
@@ -932,20 +928,16 @@
       let res = null;
       const parteDiUnUso = usoContato;
       usoContato = true;
+      // Senza riquadro sotto cui scrivere la riga del ripiego (#662): la dice l'avviso del main, che aspetta una pagina in vista.
       try {
         res = await chrome.runtime.sendMessage({
           type: MSG.AI_REQUEST,
           action: ACTIONS.TRANSLATE_PAGE,
           payload: { chunk },
-          diceRipiego: true,
           ...(parteDiUnUso ? { parteDiUnUso: true } : {}),
         });
       } catch (e) {
         res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };
-      }
-      if (res?.ok && res.keyFallback && res.keyFallback.line && !ripiegoDelGiro) {
-        ripiegoDelGiro = res.keyFallback.line;
-        Popup.ripiegoMostrato(Popup.showToast(ripiegoDelGiro, { duration: 7000 }).el);
       }
       const CE = global.SN_CHAT_ERRORS;
       const tagliata = res?.ok && CE && CE.troncata(res.finishReason) ? CE.erroreTagliata(res.finishReason) : null;

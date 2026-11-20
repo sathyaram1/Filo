@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.295', date: '2026-11-20',
+      fixes: [
+        { testo: 'Se Filo risponde coi suoi crediti perché la tua chiave OpenRouter è stata rifiutata mentre sei in un\'altra applicazione, l\'avviso che lo dice ti aspetta e compare quando torni su Filo.', segnalazione: 662 },
+      ],
+    },
+    {
       version: '0.2.294', date: '2026-11-19',
       features: [
         { testo: 'Nella home puoi rispondere a un solo pezzo di una risposta di Filo: selezionalo e premi Rispondi. Nello stesso messaggio citi più pezzi, ognuno col suo commento, e un clic su una citazione ti riporta al testo citato.', segnalazione: 2346 },
