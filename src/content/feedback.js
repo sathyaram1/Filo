@@ -528,6 +528,10 @@
         const chip = document.createElement('div');
         chip.className = 'sn-fb-file-chip';
         chip.title = f.name;
+        if (fileSegnati.has(f)) {
+          chip.classList.add('sn-fb-file-chip--l0');
+          chip.title = `${f.name}: da ricontrollare`;
+        }
         const ic = document.createElement('span');
         ic.className = 'sn-fb-file-ic';
         // Icona documento in linea: nel set condiviso non c'è un'icona 'file'.
