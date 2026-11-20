@@ -4245,6 +4245,7 @@
 
   function renderActions(fb) {
     if (!mgActions || !mgActionsRow) return;
+    disarmaCorrezione();
     chiudiRiapertura();
     chiudiConfermaSegno();
     setActionMsg('', '');
