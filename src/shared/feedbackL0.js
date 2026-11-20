@@ -133,7 +133,7 @@
     if (!np) return null;
     const at = nt.testo.indexOf(np);
     if (at < 0) return null;
-    return { inizio: nt.pos[at], fine: nt.pos[at + np.length - 1] + 1 };
+    return { inizio: nt.pos[at], fine: dopo(t, nt.pos[at + np.length - 1]) };
   }
 
   function json(raw) {
