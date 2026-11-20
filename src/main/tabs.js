@@ -4404,6 +4404,7 @@ class TabManager {
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+    FileDelComputer.revoca(tab._fileConcesso);
     this.tabs.splice(idx, 1);
     if (this.activeId === tab.id) {
       const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
