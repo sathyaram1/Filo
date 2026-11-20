@@ -385,7 +385,7 @@ describe('il guasto di un processo ucciso', () => {
     const fermata = { nome: 'TaskStop', ms: ORA, risposta: true };
     const g = testoGuasto({ fermoMs: 21 * 60000, ultimo: fermata, corsa: segno, memoria: segno.memoria, quadro: 'Processi nella cartella: nessuno.' });
     assert.match(g, /^guasto: strumento worker: worker fermo da 21 minuti .*forse un permesso, forse il modello\. Prima: finish:check interrotto senza finire \(fase spec delle aree toccate/);
-    assert.doesNotMatch(g, /137|ucciso \(|si è fermata anche la sua sessione/);
+    assert.doesNotMatch(g, /137|ucciso \(|si è fermato anche il worker|sessione non è tornata/);
     const rosso = testoGuasto({ fermoMs: 21 * 60000, ultimo: { ...fermata, nome: 'Bash', uscita: 1 }, corsa: segno, memoria: segno.memoria });
     assert.match(rosso, /^guasto: strumento worker:/);
   });
