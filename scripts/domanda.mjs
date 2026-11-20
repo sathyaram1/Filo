@@ -746,11 +746,10 @@ export async function esegui(argv, io = {}) {
     }
     // Il registro (§3.6): col biglietto delle routine passa dal canale, che lo dà solo a chi lo può leggere.
     // Ogni lettura porta il biglietto della sessione: col token dell'owner è così che il server la riconosce, e le dà
-    // sporco e segno riservato prima che il testo esca (SPEC-DOMANDE §5.1, #2027).
+    // sporco e segno riservato prima che il testo esca (SPEC-DOMANDE §5.1, #2027); anche con la chiave (#2027.3).
     const lettura = async (data) => {
-      if (conChiave()) return parla(data);
       const s = await bigliettoLocale();
-      return chiama(s ? Object.assign(data, { biglietto: s }) : data);
+      return parla(s ? Object.assign(data, { biglietto: s }) : data);
     };
     if (a.cmd === 'registro') {
       const t = await biglietto();
