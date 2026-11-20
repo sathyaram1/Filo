@@ -73,58 +73,120 @@ function scrittoDallUtente(percorso, parole) {
   return forme.some((f) => testo.includes(f));
 }
 
-// Le cartelle dei file aperti: lì la pagina locale prende immagini, stili e script suoi.
-const cartelle = new Set();
+// Ogni scheda di un file ha la sua sessione e la sua concessione, che si toglie quando la scheda si chiude: una pagina
+// non legge le cartelle aperte da un'altra. `PARTIZIONE` da sola non concede niente.
+const concessioni = new Map();
+let progressivo = 0;
 const chiave = (p) => (process.platform === 'win32' || process.platform === 'darwin' ? p.toLowerCase() : p);
+const dentro = (cartella, p) => {
+  const rel = path.relative(cartella, p);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+};
 
-function dentroConcesse(percorso) {
-  if (!percorso) return false;
-  const p = chiave(percorso);
-  for (const c of cartelle) {
-    const rel = path.relative(c, p);
-    if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) return true;
-  }
-  return false;
+// La cartella di casa (o una che la contiene) e la radice di un disco non si concedono intere: lì ci sono chiavi,
+// profili e documenti che il file aperto non ha chiesto.
+function cartellaTroppoLarga(cartella) {
+  const c = chiave(cartella);
+  if (path.parse(c).root === c) return true;
+  const casa = chiave(path.normalize(os.homedir() || ''));
+  return Boolean(casa) && dentro(c, casa);
 }
 
-async function servi(req) {
+// Quello che una pagina si porta dietro: immagini, stili, script, caratteri, media, altre pagine.
+const RISORSE = new Set([...VISIBILI, 'css', 'js', 'mjs', 'woff', 'woff2', 'ttf', 'otf', 'eot', 'map', 'vtt', 'srt']);
+const NOMINA = /\b(?:src|href|data|poster|background|srcset|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))|url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|@import\s+(?:"([^"]*)"|'([^']*)')/gi;
+const LETTURA_MAX = 16 * 1024 * 1024;
+
+// I file che una pagina in una cartella troppo larga nomina accanto a sé o sotto: solo questi, oltre a lei.
+function nominati(percorso, cartella) {
+  if (!/^(html?|xhtml|svg|xml)$/i.test(path.extname(percorso).slice(1))) return [];
+  let testo = '';
+  try {
+    const fd = fs.openSync(percorso, 'r');
+    try {
+      const buf = Buffer.alloc(Math.min(fs.fstatSync(fd).size, LETTURA_MAX));
+      testo = buf.toString('utf8', 0, fs.readSync(fd, buf, 0, buf.length, 0));
+    } finally { fs.closeSync(fd); }
+  } catch (_) { return []; }
+  const base = indirizzoDi(percorso);
+  const fuori = [];
+  for (const m of testo.matchAll(NOMINA)) {
+    const valore = m.slice(1).find((v) => v != null) || '';
+    for (const pezzo of /srcset/i.test(m[0]) ? valore.split(',') : [valore]) {
+      const ref = pezzo.trim().split(/\s+/)[0].replace(/&amp;/g, '&');
+      if (!ref || ref.startsWith('#')) continue;
+      let p = null;
+      try { p = percorsoDi(new URL(ref, base).href); } catch (_) {}
+      if (p && dentro(cartella, chiave(p)) && permessoNellaCartella(chiave(cartella), chiave(p))) fuori.push(chiave(p));
+    }
+  }
+  return fuori;
+}
+
+// Sotto la cartella concessa: niente cartelle e file nascosti (.git, .ssh, .env), e solo tipi da pagina.
+function permessoNellaCartella(cartella, p) {
+  const rel = path.relative(cartella, p);
+  if (rel.split(/[\\/]/).some((s) => s.startsWith('.'))) return false;
+  return RISORSE.has(path.extname(p).slice(1).toLowerCase()) || !path.extname(p);
+}
+
+function permesso(c, percorso) {
+  if (!c || !percorso) return false;
+  const p = chiave(percorso);
+  if (c.file.has(p)) return true;
+  return c.cartella != null && dentro(c.cartella, p) && permessoNellaCartella(c.cartella, p);
+}
+
+// Ogni risposta, di qualunque tipo: un XML o un file senza estensione che Chromium riconosce come HTML eseguono script.
+async function servi(partizione, req) {
   const percorso = percorsoDi(req.url);
-  if (!percorso || !dentroConcesse(percorso)) return new Response('', { status: 403 });
+  if (!permesso(concessioni.get(partizione), percorso)) return new Response('', { status: 403 });
   let r;
   try { r = await require('electron').net.fetch(req, { bypassCustomProtocolHandlers: true }); } catch (_) {
     return new Response('', { status: 404 });
   }
-  const tipo = String(r.headers.get('content-type') || '').toLowerCase();
-  if (!/^(text\/html|application\/xhtml\+xml|image\/svg\+xml)/.test(tipo)) return r;
   const h = new Headers(r.headers);
   h.set('Content-Security-Policy', CSP_DOCUMENTO);
   return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
 }
 
-let sessione = null;
-function preparaSessione() {
-  if (sessione) return sessione;
+const sessioni = new Map();
+function preparaSessione(partizione = PARTIZIONE) {
+  if (sessioni.has(partizione)) return sessioni.get(partizione);
   const { session } = require('electron');
-  sessione = session.fromPartition(PARTIZIONE);
-  sessione.protocol.handle('file', servi);
+  const s = session.fromPartition(partizione);
+  s.protocol.handle('file', (req) => servi(partizione, req));
   // Come le altre sessioni delle schede: le pagine d'errore di Filo, e le richieste che la pagina locale fa al web.
-  try { require('../protocol').registerFiloProtocolForSession(sessione); } catch (_) {}
-  try { const Cookies = require('./cookies'); Cookies.ensureRequestHook(sessione); Cookies.coverAdblock(sessione); } catch (_) {}
-  return sessione;
+  try { require('../protocol').registerFiloProtocolForSession(s); } catch (_) {}
+  try { const Cookies = require('./cookies'); Cookies.ensureRequestHook(s); Cookies.coverAdblock(s); } catch (_) {}
+  sessioni.set(partizione, s);
+  return s;
 }
 
-// Da chiamare prima di caricare il file: apre la sua cartella alla pagina.
+// Da chiamare prima di caricare il file, da ogni strada che lo apre: dà la partizione della scheda nuova, o null.
 function concedi(input) {
   const percorso = percorsoDi(input);
-  if (!percorso) return false;
-  preparaSessione();
-  cartelle.add(chiave(path.dirname(percorso)));
-  return true;
+  if (!percorso || require('./documentRead').percorsoDiRete(percorso)) return null;
+  const cartella = path.dirname(percorso);
+  const larga = cartellaTroppoLarga(cartella);
+  const c = {
+    cartella: larga ? null : chiave(cartella),
+    file: new Set([chiave(percorso), ...(larga ? nominati(percorso, cartella) : [])]),
+  };
+  progressivo += 1;
+  const partizione = `${PARTIZIONE}:${progressivo}`;
+  concessioni.set(partizione, c);
+  preparaSessione(partizione);
+  return partizione;
 }
 
-// Un collegamento da un file aperto a un altro della stessa cartella si segue come sul web.
-function concessoDaLink(input) {
-  return dentroConcesse(percorsoDi(input));
+function revoca(partizione) {
+  if (partizione) concessioni.delete(partizione);
 }
 
-module.exports = { PARTIZIONE, VISIBILI, percorsoDi, indirizzoDi, giudica, scrittoDallUtente, concedi, concessoDaLink, preparaSessione };
+// Un collegamento da un file aperto a un altro che la sua scheda può leggere si segue come sul web.
+function concessoDaLink(partizione, input) {
+  return permesso(concessioni.get(partizione), percorsoDi(input));
+}
+
+module.exports = { PARTIZIONE, VISIBILI, percorsoDi, indirizzoDi, giudica, scrittoDallUtente, concedi, revoca, concessoDaLink, preparaSessione };
