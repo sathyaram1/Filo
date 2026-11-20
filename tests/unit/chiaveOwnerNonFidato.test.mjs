@@ -113,7 +113,7 @@ test('con la chiave owner-non-fidato elenco, mostra, rispondi, archivia e riapri
   assert.ok(f.out.some((s) => s === 'OK: D-3 è aperta.'), 'la riapre');
   const c = finto(NON_FIDATO, { mostra: { domanda: DOMANDA(), riferimenti: {} }, consiglio: { esiti: [{ id: 'D-3', ok: true }] } });
   assert.equal(await Q.esegui(['consiglio', 'D-3'], c.io), 0, c.err.join(' | '));
-  assert.deepEqual(c.chiave.map((x) => x.data), [{ op: 'mostra', id: 'D-3' }, { op: 'consiglio', ids: ['D-3'] }]);
+  assert.deepEqual(c.chiave.map((x) => x.data), [{ op: 'mostra', id: 'D-3', biglietto: b }, { op: 'consiglio', ids: ['D-3'], biglietto: b }]);
   assert.equal(c.owner.length, 0);
 });
 
