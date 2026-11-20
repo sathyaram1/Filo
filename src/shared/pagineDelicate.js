@@ -73,8 +73,9 @@
     return out;
   }
 
+  // Un dominio vale anche per i suoi sottodomini; un host vuoto non è in nessun elenco.
   function dentro(h, lista) {
-    return lista.some((d) => h === d || h.endsWith(`.${d}`));
+    return Boolean(h) && (Array.isArray(lista) ? lista : []).some((d) => h === d || h.endsWith(`.${d}`));
   }
 
   // Le categorie in uso: quelle di serie, con sopra quelle della configurazione remota (ognuna sostituisce la sua).
