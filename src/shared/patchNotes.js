@@ -12,6 +12,7 @@
       version: '0.2.295', date: '2026-11-20',
       features: [
         { testo: 'Nella chat della home Filo ti mostra le immagini dentro la risposta, fra un pezzo di testo e l\'altro: una sola o una fila che scorri di lato, col sito da cui viene ognuna. Clic per ingrandirla. Con un modello che disegna, scelto in Impostazioni alla voce «Immagini create in chat», crea anche le immagini che gli chiedi, segnate come fatte con l\'AI.', segnalazione: 2272 },
+        { testo: 'Incolla in chat il percorso di un file del computer, una pagina HTML, un PDF o un\'immagine, e Filo lo apre in una scheda così com\'è. La pagina non può leggere gli altri file del computer.', segnalazione: 1905 },
       ],
       fixes: [
         { testo: 'In modalità terminale, un git config che imposta un programma da far partire dopo, come l\'editor dei commit o il comando di ssh, ti chiede di digitare «conferma», come se lanciassi quel programma. Prima bastava un OK, e il programma partiva al git commit o al git fetch successivo.', segnalazione: 2621 },
@@ -52,7 +53,6 @@
       features: [
         { testo: 'Trascina un collegamento, o la miniatura di un video, su una scheda per aprirlo lì; fra due schede o sul + si apre in una scheda nuova in quel punto, come in Chrome.', segnalazione: 2393 },
         { testo: 'Trascrivi lascia a schermo la porzione scelta con sopra il suo testo, selezionabile come in un PDF: prendi solo la parola o la riga che ti serve e la copi con Ctrl+C (Cmd+C su Mac), o tutto con «Copia tutto». Funziona anche su un\'immagine, dal tasto destro, e chiedendolo a Filo.', segnalazione: 2374 },
-        { testo: 'Incolla in chat il percorso di un file del computer, una pagina HTML, un PDF o un\'immagine, e Filo lo apre in una scheda così com\'è. La pagina non può leggere gli altri file del computer.', segnalazione: 1905 },
       ],
       fixes: [
         { testo: 'Ctrl+W (Cmd+W su Mac) chiude sempre la scheda che stai guardando, anche se ci sei appena tornato.', segnalazione: 871 },
