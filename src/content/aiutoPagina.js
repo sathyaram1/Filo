@@ -342,6 +342,7 @@
           return { ok: true, riga: 'pagina salvata in «Aperti per dopo»: chiudo la scheda' };
         }
         case 'share_link': await Actions?.shareLink(linkEl); break;
+        case 'translate_page': return traduciPagina(page);
         default: return { ok: false, riga: `${label}: non riuscita` };
       }
     } catch (_) {
