@@ -17,8 +17,10 @@ test('debug', async ({ app, openTab, testServer }) => {
   await page.waitForTimeout(2000);
   console.log('TOAST-TASTO', JSON.stringify(await page.evaluate(() => window.__t)), await page.locator('#title').innerText());
   await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    globalThis.__filoShortcuts.dispatch('translate-selection', win);
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['alt'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'T', modifiers: ['alt'] });
   });
   await page.waitForTimeout(3000);
   console.log('TOAST-DISPATCH', JSON.stringify(await page.evaluate(() => window.__t)), await page.locator('#title').innerText());
