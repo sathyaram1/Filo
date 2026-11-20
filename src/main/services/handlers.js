@@ -723,7 +723,6 @@ const handlerCtx = {
   contattabilePrimaDelClic,
   SCHEMI_USCITA,
   ricordaLettoDallAiuto,
-  ricordaPropostaDellAiuto,
   ricordaLettoInChat,
   ricordaVerdettiArchiviati,
   decisioneAzionePagina,
