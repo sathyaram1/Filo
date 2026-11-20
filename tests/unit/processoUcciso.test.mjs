@@ -434,6 +434,17 @@ describe('il guasto di un processo ucciso', () => {
     assert.match(testoGuasto({ fermoMs: 21 * 60000, attesa, memoria: stessa }), /^guasto: permessi npm:/);
   });
 
+  test('#2571.1 la veglia: dopo un 137 con la stessa sessione viva si è fermato il worker, non la sessione', () => {
+    const stessa = letturaMemoria(leggiDa(conClaude(contenitore(), 226, 11000)), { CLAUDE_PID: '226', CLAUDE_CODE_WORKER_EPOCH: '1' });
+    const ultimo = { nome: 'Bash', programma: 'npx', ms: Date.parse('2026-11-17T18:45:00Z'), risposta: true, uscita: 137 };
+    for (const corsa of [null, { ...segno, memoria: allaPartenza }]) {
+      const g = testoGuasto({ fermoMs: 21 * 60000, ultimo, corsa, memoria: stessa, quadro: 'Processi nella cartella: nessuno.' });
+      assert.match(g, /la sessione di Claude Code che l'ha lanciato è la stessa, ancora viva/, g);
+      assert.match(g, /Il suo ultimo strumento è uscito 137 e da lì il worker non dà segni di vita da 21 minuti \([^)]*\): col comando si è fermato anche il worker, il sotto-agente che girava nella sessione\. Processi nella cartella: nessuno\./, g);
+      assert.doesNotMatch(g, /si è fermata anche la sua sessione|sessione non è tornata/, 'la sessione viva non si dice anche morta');
+    }
+  });
+
   test('#2571.1 in questo sistema l\'avvio di un processo vero si legge da /proc: questo, nato da poco', { skip: process.platform !== 'linux' && 'senza /proc' }, () => {
     const s = sessioneClaude({ CLAUDE_PID: String(process.pid), CLAUDE_CODE_WORKER_EPOCH: '4' });
     const nato = Date.now() - process.uptime() * 1000;
