@@ -173,15 +173,22 @@ function escPrimaAFilo(e, ascolto, UI) {
   } catch (_) {}
 }
 
-// Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
+// Il clic destro si rigioca, in copia, quando l'handler vero è pronto; un gesto dato intanto lo scarta senza menu.
+let tastoDestroInAttesa = null;
 function replayContextMenu(e, clic) {
-  const { copiaDelClic, RIGIOCO_MS } = require('./menu-del-sito.js');
-  const copy = copiaDelClic(e);
-  const deadline = Date.now() + RIGIOCO_MS;
+  const { tastoDestroInAttesa: crea, RIGIOCO_MS } = require('./menu-del-sito.js');
+  if (!tastoDestroInAttesa) tastoDestroInAttesa = crea(window);
+  const attesa = tastoDestroInAttesa;
+  const mio = attesa.tieni(e);
   const tick = () => {
-    if (globalThis.__snFiloSpento === true) { menuDiRiserva(clic); return; }
-    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
-    if (Date.now() > deadline) { menuDiRiserva(clic); return; }
+    if (!attesa.ancora(mio)) return;
+    if (globalThis.__snFiloSpento === true) { attesa.prendi(); menuDiRiserva(clic); return; }
+    if (typeof contextMenuHandler === 'function') {
+      const copia = attesa.prendi();
+      if (copia) apriMenuDiFilo(copia, clic); else menuDiRiserva(clic);
+      return;
+    }
+    if (Date.now() - mio.alle > RIGIOCO_MS) { attesa.prendi(); menuDiRiserva(clic); return; }
     setTimeout(tick, 16);
   };
   setTimeout(tick, 16);
