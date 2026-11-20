@@ -925,7 +925,7 @@
 
   global.SN_VERIFIER_ROUND = {
     LEVELS, SEDI, SPIEGAZIONE_SEDE, SPIEGAZIONE_SEGNO, SPIEGAZIONE_ZERO, SPIEGAZIONE_VICINO, SPIEGAZIONE_ESTERNO, SPIEGAZIONE_INTERNO,
-    MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
+    MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX, TETTO_MIN, TETTO_MAX, TETTO_PARTENZA,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, testoRilieviNonRiconosciuti, normalizeFindings, maxLevel, primaFrase,
     sedeDi, livelloLetto, livelloMostrato, motivoScalaVecchia, livelloDegliInterni, decisioneFerma, destinatarioDelFermo, bloccaSuUnRilievo, missingCaps, normalizeCaps, normalizeCounts,
     livelloCheLoPaga, decideRound, RILIEVI_CHE_FERMANO, dueDaParteRiga, bilancioPagato, derivedGroups, groupLabel,
