@@ -870,6 +870,7 @@ try {
   webFrame.executeJavaScript(`(()=>{const w=window,d=EventTarget.prototype.dispatchEvent,E=Event;
     Object.defineProperty(w,'close',{value:function close(){d.call(w,new E(${JSON.stringify(CHIUDI)}))},writable:true,configurable:true,enumerable:true})})()`, false).catch(() => {});
 } catch (_) {}
+try { require('./finestra-per-nome.js').installa({ ipcRenderer, webFrame, sottoriquadro: IS_SUBFRAME }); } catch (e) { console.error('[Filo CS] finestra per nome', e); }
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
