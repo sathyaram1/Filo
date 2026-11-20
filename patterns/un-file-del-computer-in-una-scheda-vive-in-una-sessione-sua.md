@@ -28,7 +28,8 @@ che Chromium riconosce come HTML, esegue script (controllo di sicurezza di #1905
 
 La sessione non giudica la provenienza. Quella la decide chi apre, prima di `openTab(..., { fileDelComputer: true })`:
 il percorso scritto dall'utente in chat, un suo clic su una pagina di Filo, la sua sessione salvata o le sue schede
-chiuse. Un percorso che l'utente non ha scritto passa dal suo OK (costo 2 di NAVIGA).
+chiuse. Un percorso che l'utente non ha scritto passa dal suo OK (costo 2 di NAVIGA). Il percorso di rete lo ferma
+`concedi`, la porta comune di tutte le strade.
 
 Codice: `src/main/services/fileDelComputer.js`; prove: `tests/file-del-computer.spec.mjs`,
 `tests/unit/fileDelComputer.test.mjs`.
