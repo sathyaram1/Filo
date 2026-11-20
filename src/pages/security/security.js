@@ -1408,7 +1408,11 @@
 
   // Un sito tolto da quelli dove Filo chiede sempre alza quanto esce: «conferma» all'uscita dalla casella, come dalla
   // chat. Detto no, i siti tolti tornano nella casella; quelli aggiunti restano.
-  const sitiTolti = (prima, dopo) => (Array.isArray(prima) ? prima : []).filter((s) => !dopo.includes(s));
+  // Se alza lo decide il calcolo condiviso (lo stesso della chat e degli annulli): qui solo quali siti nominare.
+  const sitiTolti = (prima, dopo) => {
+    const come = (siti) => ({ security: { pagineDelicate: { siti } } });
+    return Privacy.alzaTutto(come(prima), come(dopo)) ? Privacy.sitiTolti(prima, dopo) : [];
+  };
   async function cambiaSitiChiedi() {
     const primaDel = (mostrata && mostrata.pagineDelicate) || {};
     const dopo = parseBlacklist($('sec-delicate-sites').value).valid;
