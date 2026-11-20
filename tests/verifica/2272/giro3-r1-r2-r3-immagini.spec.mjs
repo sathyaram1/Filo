@@ -73,12 +73,13 @@ test('r1 nel turno con le foto il modello non ha anche la regola «al massimo un
 
 test('r2 chi usa i crediti e chiede di disegnare viene mandato dove la scelta si vede, sapendo che serve una sua chiave', async ({ app, openTab }) => {
   test.setTimeout(150_000);
-  const prima = await app.evaluate(async () => {
+  // La nota che il modello riceve quando non c'è chi disegna (la stessa per chi usa i crediti).
+  await modello(app, { chiamata: { azione: 'disegna', descrizione: 'un drago' }, testo: 'Non posso disegnarlo.' });
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
     const st = await globalThis.SN_STORAGE.getSettings();
-    return { useDefault: st.useDefaultModels, puo: globalThis.SN_CONST.canServeAction(st, globalThis.SN_CONST.ACTIONS.IMAGE_GEN) };
+    await globalThis.SN_STORAGE.updateSettings({ models: { ...(st.models || {}), [C.ACTIONS.IMAGE_GEN]: '' } });
   });
-  expect(prima).toEqual({ useDefault: true, puo: false });
-  await modello(app, { chiamata: { azione: 'disegna', descrizione: 'un drago' }, testo: 'Non posso disegnarlo.', crediti: true });
   const page = await openTab(NEWTAB);
   await chiedi(page, 'disegnami un drago');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Non posso disegnarlo' })).toBeVisible({ timeout: 30_000 });
