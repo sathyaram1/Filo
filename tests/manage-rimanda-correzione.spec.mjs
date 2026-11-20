@@ -101,12 +101,13 @@ test('scrivere dopo l’avviso lo toglie, e il tasto manda il testo; Ctrl+Invio 
   await casella.click();
   await page.keyboard.press('Control+Enter');
   await expect(tasto).toHaveText('Manda lo stesso');
-  await expect(page.locator('#mgActionMsg')).toContainText('non saprà cosa correggere');
+  await expect(casella).toHaveAttribute('placeholder', /non saprà cosa correggere/);
   expect(await aggiornamenti(page)).toEqual([]);
 
   await page.keyboard.type('Usa la coda che c’è già.');
   await expect(tasto).toHaveText('Rimanda in correzione');
-  await expect(page.locator('#mgActionMsg')).toHaveText('');
+  await expect(casella).toHaveAttribute('placeholder', /arriva a chi corregge/);
+  await expect(casella).not.toHaveClass(/mg-accept-comment--avviso/);
   await tasto.click();
   await expect.poll(async () => (await aggiornamenti(page)).length).toBe(1);
   expect((await aggiornamenti(page))[0]).toMatchObject({ status: 'todo', reviewComment: 'Usa la coda che c’è già.' });
