@@ -1771,8 +1771,8 @@ function comanda(richiesta) {
 }
 
 // Il nome vero di una rete o di un dispositivo detto a parole, letto prima di chiedere conferma: { nome, gia } se ce
-// n'è uno solo (`gia`: è già come lo si chiede), { esito } (l'errore con l'elenco) se nessuno o più d'uno, {} se
-// l'elenco non si legge.
+// n'è uno solo (`gia`: è già come lo si chiede; per il Bluetooth anche `indirizzo`, che la conferma fissa), { esito }
+// (l'errore con l'elenco) se nessuno o più d'uno, {} se l'elenco non si legge.
 async function risolviNome(richiesta) {
   const q = normalizzaRichiesta(richiesta);
   if (q.errore || !q.nome || (q.cosa !== 'wifi' && q.cosa !== 'bluetooth')) return {};
