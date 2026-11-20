@@ -152,6 +152,50 @@ export async function consegnaSporchi(b, { deps = {}, nowMs = Date.now(), aggiun
   return { consegnati: tutte.length, restano: sporchiInAttesa(b).length };
 }
 
+// Il segno riservato che il server non ha ancora ricevuto (#2027.3), come lo sporco: dentro la cartella dello sporco,
+// così chiusura e scadenza lo tolgono con lui. Finché c'è, il biglietto non parte con le scritture (segretoPerScrivere).
+export function cartellaRiservati(b) {
+  return join(cartellaSporchi(b), 'riservati');
+}
+
+/** Annota in locale una lettura di dati privati del biglietto `b`. Lancia se non riesce a scrivere. */
+export function annotaRiservato(b, motivo, nowMs = Date.now()) {
+  const dir = cartellaRiservati(b);
+  mkdirSync(dir, { recursive: true });
+  const nome = `${String(Math.round(Number(nowMs) || Date.now())).padStart(14, '0')}-${process.pid}-${randomBytes(4).toString('hex')}.json`;
+  writeFileSync(join(dir, nome), `${JSON.stringify({ motivo: String(motivo || ''), at: Number(nowMs) || Date.now() })}\n`, { encoding: 'utf8', mode: 0o600 });
+}
+
+/** Le letture di dati privati annotate e non ancora consegnate. Una voce illeggibile conta lo stesso. */
+export function riservatiInAttesa(b) {
+  const dir = cartellaRiservati(b);
+  let nomi = [];
+  try { nomi = readdirSync(dir).filter((n) => n.endsWith('.json')).sort(); } catch (_) { return []; }
+  return nomi.map((n) => {
+    const file = join(dir, n);
+    try {
+      const d = JSON.parse(readFileSync(file, 'utf8'));
+      return { file, motivo: String((d && d.motivo) || '').trim() || 'dati privati', at: Number(d && d.at) || 0 };
+    } catch (_) {
+      return { file, motivo: 'dati privati (annotazione illeggibile)', at: 0 };
+    }
+  });
+}
+
+/** Consegna al server il segno riservato annotato di `b`, più `aggiunta`. Mai un'eccezione. → { consegnati, restano, errore? } */
+export async function consegnaRiservati(b, { deps = {}, nowMs = Date.now(), aggiunta = '' } = {}) {
+  const voci = riservatiInAttesa(b);
+  const tutte = aggiunta ? voci.concat([{ motivo: aggiunta, at: nowMs }]) : voci;
+  if (!tutte.length) return { consegnati: 0, restano: 0 };
+  try {
+    await chiama('riservato', { ticket: b.ticket, motivo: motivoDaConsegnare(tutte, nowMs) }, deps);
+  } catch (e) {
+    return { consegnati: 0, restano: voci.length, errore: String((e && e.message) || e).slice(0, 200) };
+  }
+  for (const v of voci) { try { rmSync(v.file, { force: true }); } catch (_) { /* si riconsegna: il segno non si toglie */ } }
+  return { consegnati: tutte.length, restano: riservatiInAttesa(b).length };
+}
+
 /**
  * Il biglietto di questa sessione, in una lista di al più uno: quello di FILO_BIGLIETTO_FILE se vale, altrimenti quello
  * col nome della sessione nella cartella del checkout principale. Mai quelli delle altre sessioni: una dichiarazione
