@@ -319,7 +319,7 @@ test('le copie delle foto restano finché una chat le nomina, e se ne vanno con 
   await app.evaluate(() => globalThis.__filoCopieIcone.pulisci());
   for (const p of percorsi) expect(fs.existsSync(p), `dopo la pulizia: ${p}`).toBe(true);
   // Cancellata la conversazione, le sue copie se ne vanno.
-  await app.evaluate((id) => globalThis.SN_FILO_CHATS.remove(id), file.chat);
+  await app.evaluate((_e, id) => globalThis.SN_FILO_CHATS.remove(id), file.chat);
   await expect.poll(() => percorsi.filter((p) => fs.existsSync(p)).length, { timeout: 10_000 }).toBe(0);
 });
 
