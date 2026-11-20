@@ -770,7 +770,7 @@
     if (!letti) { stato.textContent = I18n.t('admin_defaults_servito_vuoto'); return; }
     const tutte = letti < (Number(servito.limite) || Infinity);
     stato.textContent = I18n.t(tutte ? 'admin_defaults_servito_tutte' : 'admin_defaults_servito_ultime',
-      letti.toLocaleString('it-IT'), dataServito(servito.dal) || '—');
+      numeroIt(letti), dataServito(servito.dal) || '—');
     const ul = document.createElement('ul');
     ul.className = 'sn-wallet-scheda-elenco sn-wallet-router';
     for (const r of window.SN_WALLET.chiHaServito(servito.conti, collectExcluded())) {
