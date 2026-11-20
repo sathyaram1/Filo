@@ -421,6 +421,46 @@ test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti'
   }
 });
 
+// #2621: il comando di git che fa partire il programma resta a 2 (commit, fetch, merge): chiede chi lo scrive.
+test('git config — scrivere una chiave che avvia un programma chiede «conferma», come lanciarlo', () => {
+  for (const [scrittura, poi] of [
+    ['git config core.sshCommand "python3 evil.py"', 'git fetch'],
+    ['git config core.editor "python3 evil.py"', 'git commit'],
+    ['git config --global core.pager "python3 evil.py"', 'git commit'],
+    ['git config alias.pop "!python3 evil.py"', 'git pop'],
+    ['git config core.hooksPath ganci', 'git commit -m x'],
+    ['git config merge.x.driver "python3 evil.py %A"', 'git merge main'],
+    ['git config init.templateDir modelli', 'git init'],
+  ]) {
+    assert.equal(lvl('python3 evil.py'), 3);
+    assert.equal(lvl(poi), 2, `"${poi}" è il comando che fa partire il programma`);
+    assert.equal(lvl(scrittura), 3, `"${scrittura}" lascia un programma da avviare a "${poi}"`);
+    assert.equal(lvl(`${scrittura} && ${poi}`), 3);
+  }
+  for (const cmd of [
+    // Ogni forma che scrive: verbo di git 2.46, --add, --replace-all, l'escape della shell, un'opzione col valore
+    // staccato che sposta la chiave, una sezione rinominata che diventa `core`.
+    'git config set core.editor x', 'git config set --append core.editor x', 'git config --add credential.helper x',
+    'git config --replace-all gpg.program x', 'git config core.ssh\\Command x', 'git config --type bool core.pager x',
+    'git config --comment user.name core.pager x', 'git config --local filter.x.clean x', 'git config include.path altro',
+    'git config core.fsmonitor x', 'git config --rename-section color core', 'git config rename-section color core',
+    'git config --worktree diff.external x', 'git config CORE.EDITOR x',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  }
+  // Le chiavi che non avviano niente restano un OK.
+  for (const cmd of [
+    'git config user.name "Mario Rossi"', 'git config --global user.email a@b.c', 'git config pull.rebase true',
+    'git config core.autocrlf false', 'git config core.fsmonitor true', 'git config init.defaultBranch main',
+    'git config merge.conflictstyle diff3', 'git config branch.main.remote origin', 'git config --global --add safe.directory /x',
+    'git config set user.name Bob', 'git config --type bool commit.gpgsign true', 'git config color.ui auto',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
+  }
+  assert.equal(lvl('git config --get core.editor'), 1);
+  assert.equal(lvl('git config --get-urlmatch http.sslverify https://example.test'), 2);
+});
+
 test('git remote — elenca/mostra (1), rinomina (2), aggiunge/cambia indirizzo/rimuove (3)', () => {
   assert.equal(lvl('git remote'), 1, '"git remote" (soli nomi) dovrebbe essere livello 1');
   // #587: `-v`, `show`, `get-url` stampano gli URL, che possono contenere un token.
