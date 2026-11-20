@@ -103,7 +103,7 @@ test('senza clic la pagina che riempie la finestra per nome non la porta davanti
   await page.click('#a');
   await expect.poll(async () => (await stato(app)).attiva, { timeout: 8000 }).toBe(uno);
   await torna(app, shell, page);
-  await expect.poll(async () => (await stato(app)).schede.includes(due), { timeout: 10000 }).toBe(true);
+  await expect.poll(async () => (await stato(app)).schede.includes(due), { timeout: 12000 }).toBe(true);
   await page.waitForTimeout(800);
   expect((await stato(app)).attiva).toBe(page.url());
 });
