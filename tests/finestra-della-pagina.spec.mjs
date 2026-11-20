@@ -76,6 +76,43 @@ test('nella finestra tenuta dalla pagina Filo c\'è: da sola non apre schede, co
   await expect.poll(async () => (await schede(app)).some((s) => s.url === dalClic), { timeout: 8000 }).toBe(true);
 });
 
+const davanti = (app, u) => app.evaluate(({ BrowserWindow }, url) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+  tm.activate(tm.tabs.find((x) => x.view.webContents.getURL() === url).id);
+}, u);
+
+// Come nei browser la finestra chiesta di nuovo per nome dal clic torna davanti, coi collegamenti e con window.open (#737.8).
+for (const [forma, apri] of [
+  ['un collegamento con target="_new"', (id, dest) => `<a id="${id}" href="${dest}" target="_new" style="display:block;width:200px;height:60px">vai</a>`],
+  ['window.open con lo stesso nome', (id, dest) => pulsante(id, 'aiuto', `window.open(${JSON.stringify(dest)},'aiuto')`)],
+]) {
+  test(`la finestra chiesta di nuovo per nome da ${forma} torna davanti con la seconda pagina`, async ({ app, openTab, testServer }) => {
+    const prima = testServer.html('<title>PRIMA DEST</title>');
+    const seconda = testServer.html('<title>SECONDA DEST</title>');
+    const page = await openTab(testServer.html(`<title>ELENCO</title>${apri('a', prima)}${apri('b', seconda)}`));
+    const n = (await schede(app)).length;
+    await page.click('#a');
+    await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'PRIMA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+    await davanti(app, page.url());
+    await page.click('#b');
+    await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'SECONDA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+    expect((await schede(app)).length, 'la stessa scheda di prima, riempita con la seconda pagina').toBe(n + 1);
+  });
+}
+
+test('la finestra con nome che la pagina riempie da sola, senza clic, resta dietro', async ({ app, openTab, testServer }) => {
+  const prima = testServer.html('<title>PRIMA DEST</title>');
+  const seconda = testServer.html('<title>SECONDA DEST</title>');
+  const page = await openTab(testServer.html(`<title>ELENCO</title>${pulsante('a', 'apri', `window.open(${JSON.stringify(prima)},'aiuto')`)}`));
+  await page.click('#a');
+  await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'PRIMA DEST')?.attiva, { timeout: 8000 }).toBe(true);
+  await davanti(app, page.url());
+  await page.waitForTimeout(5500);
+  await page.evaluate((u) => { window.open(u, 'aiuto'); }, seconda);
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'SECONDA DEST'), { timeout: 8000 }).toBe(true);
+  expect((await schede(app)).find((s) => s.titolo === 'ELENCO')?.attiva, 'senza un clic la pagina che si legge resta davanti').toBe(true);
+});
+
 test('la pagina chiude la ricevuta che ha scritto, e Filo resta aperto', async ({ app, openTab, testServer }) => {
   const page = await openTab(testServer.html(`${pulsante('b', 'Stampa', "window.__w=window.open('');window.__w.document.write('<title>RICEVUTA</title>');window.__w.document.close();")}${pulsante('c', 'Chiudi', 'window.__w.close()')}`));
   const prima = (await schede(app)).length;
