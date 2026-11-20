@@ -248,13 +248,12 @@ function formeLibere(testo) {
 const valoreDi = (x) => String((x && x.valore) || '');
 const lunghi = (vs) => vs.map(valoreDi).filter((v) => v.length >= 4);
 
-function riservati(testo) {
-  const G = globalThis.SN_GUARDIANO_STATICO;
-  const X = globalThis.SN_URL_EXFIL;
+// I valori (minuscoli, da quattro caratteri) che in questo testo sono una password scritta a mano: le forme libere e
+// la risposta sotto chi la chiede. Mai un throw.
+function trova(testo) {
   const out = [];
-  const l = testo.toLowerCase();
-  try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
-  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l)); } catch (_) {}
+  const l = String(testo == null ? '' : testo).toLowerCase();
+  if (!l.trim()) return [];
   try { out.push(...formeLibere(l)); } catch (_) {}
   try {
     // Un testo lungo che ripete la stessa domanda e la stessa risposta si legge una volta sola.
@@ -265,11 +264,12 @@ function riservati(testo) {
       if (!viste.has(k)) { viste.add(k); out.push(...valoriRisposta(risposta, r.tipo)); }
     }
   } catch (_) {}
-  // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
-  for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   return lunghi(out);
 }
 
+global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi };
+if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
+})(typeof globalThis !== 'undefined' ? globalThis : self);
 
 // Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
 // Una parola di sole lettere vale intera: il «camera» di una risposta non tocca «cameraman».
