@@ -132,7 +132,11 @@ test('#2027.3: senza biglietto leggere dati privati lo dice, come per lo sporco'
 
 test('#2027.3: domanda.mjs chiedi si dichiara sessione, così senza biglietto il server la fa riservata', async () => {
   const mandate = [];
-  const domandaFile = JSON.stringify({ titolo: 'Una scelta', priorita: 'importante', problema: 'Due strade.', opzioni: [] });
+  const azione = { tipo: 'riprendi', feedbackId: 'f1' };
+  const domandaFile = JSON.stringify({
+    titolo: 'Una scelta', priorita: 'importante', problema: 'Due strade.', blocca: true, consiglio: { opzione: 0, perche: 'costa meno' },
+    opzioni: [{ testo: 'La corta', pro: 'rapida', contro: 'fragile', azione }, { testo: 'La lunga', pro: 'solida', contro: 'lenta', azione }],
+  });
   const io = {
     chiama: async (data) => { mandate.push(data); return { ok: true, id: 'D-5', fiducia: 'non_fidato' }; },
     biglietto: async () => '', credenziale: async () => ({ tipo: 'admin' }), bigliettoLocale: async () => '',
