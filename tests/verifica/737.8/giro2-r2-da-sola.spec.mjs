@@ -18,7 +18,7 @@ const torna = async (app, shell, page) => {
 };
 
 test('r2 la chat che si riporta davanti da sola non porta via dalla pagina quando ci si clicca sopra il testo', async ({ app, shell, openTab, testServer }) => {
-  const chat = testServer.html('<title>CHAT</title><script>setInterval(function(){window.focus()},150)</script>');
+  const chat = testServer.html('<title>CHAT</title><script>setTimeout(function(){setInterval(function(){window.focus()},150)},4000)</script>');
   const page = await openTab(testServer.html(`<button id="a" style="height:40px" onclick="window.open(${JSON.stringify(chat)},'chat')">chat</button>
     <p id="testo" style="height:200px">Un articolo da leggere, con del testo su cui si clicca.</p>`));
   await page.click('#a');
