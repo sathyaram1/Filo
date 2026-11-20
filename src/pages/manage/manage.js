@@ -4353,6 +4353,17 @@
     avvisoAccanto(btn, AVVISO_SENZA_TESTO, 'err');
     return true;
   }
+  if (mgAcceptComment) {
+    mgAcceptComment.addEventListener('input', () => { if (correzioneArmata && mgAcceptComment.value.trim()) disarmaCorrezione(); });
+    // Invio va a capo; Ctrl+Invio (Cmd sul Mac) manda la correzione passando dal tasto, avviso compreso.
+    mgAcceptComment.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || e.isComposing) return;
+      const btn = mgActionsRow && mgActionsRow.querySelector('button[data-correzione]');
+      if (!btn || btn.disabled) return;
+      e.preventDefault();
+      btn.click();
+    });
+  }
 
   // Il cammino UNICO di ogni azione di stato del pannello. `gesto` ({ btn, detail }): il tasto premuto, per l'avviso sul posto.
   async function applyAction(action, extra, gesto) {
