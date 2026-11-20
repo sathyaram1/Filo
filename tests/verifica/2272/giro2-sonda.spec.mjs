@@ -27,6 +27,18 @@ test('sonda', async ({ app, openTab }) => {
   });
   console.log('SONDA', JSON.stringify(r));
   await page.waitForTimeout(3000);
-  const r2 = await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list({ nascoste: true })).map((c) => c.id + ':' + globalThis.SN_IMMAGINI_RISPOSTA.copieDi(c.messages).length));
+  const r2 = await app.evaluate(async (_e, copie) => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const C = globalThis.__filoCopieIcone;
+    const esiste = () => copie.map((s) => fs.existsSync(path.join(C.cartella(), C.nomeDa(s))));
+    const out = { dopoRemove: esiste() };
+    C.togliSeOrfane(copie);
+    await new Promise((r) => setTimeout(r, 300));
+    await C.togliSeOrfane([]);
+    await new Promise((r) => setTimeout(r, 1500));
+    out.dopoManuale = esiste();
+    return out;
+  }, r.copie);
   console.log('SONDA2', JSON.stringify(r2));
 });
