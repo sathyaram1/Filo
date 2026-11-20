@@ -15,7 +15,7 @@ for (const [forma, script] of [
 ]) {
   test(`prima apertura con ${forma}`, async ({ app, openTab, testServer }) => {
     const aiuto = testServer.html(`<title>AIUTO</title>${script}<p>aiuto</p>`);
-    const page = await openTab(testServer.html(`<button id="a" style="height:40px" onclick="window.open(${JSON.stringify(aiuto)},'aiuto','width=400,height=300')">aiuto</button>`));
+    const page = await openTab(testServer.html(`<button id="a" style="height:40px" onclick="window.open(${JSON.stringify(aiuto).replace(/"/g, '&quot;')},'aiuto','width=400,height=300')">aiuto</button>`));
     await page.click('#a');
     await expect.poll(async () => (await stato(app)).schede.includes(aiuto), { timeout: 8000 }).toBe(true);
     await page.waitForTimeout(1500);
