@@ -55,7 +55,7 @@ async function fornitore(app, { failAfter = -1, delay = 0 } = {}) {
       if (prompt.indexOf('@@@SN_SEP@@@') < 0) return orig(args);
       const s = globalThis.__t;
       s.calls++;
-      if (s.delay) await new Promise((r) => setTimeout(r, s.delay));
+      if (s.delay) await new Promise((r) => setTimeout(r, s.delay * s.calls));
       if (s.failAfter >= 0 && s.calls > s.failAfter) throw new Error('fetch failed');
       const APRE = '<<<TESTO_IN_PAGINA>>>\n';
       const CHIUDE = '\n<<<FINE_TESTO_IN_PAGINA>>>';
