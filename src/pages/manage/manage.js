@@ -4408,7 +4408,7 @@
     if (action.locale) { payload.localOnly = true; if (action.approva) payload.localApproval = true; }
 
     setActionsBusy(true);
-    setActionMsg(ACTION_PROGRESS[action.key] || 'Salvo…', '');
+    setActionMsg(action.correzione ? 'Rimando in correzione…' : (ACTION_PROGRESS[action.key] || 'Salvo…'), '');
     try {
       const r = await sendToMain(payload);
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
