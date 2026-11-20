@@ -148,14 +148,18 @@ for (const [forma, pagina, attesa] of [
   });
 }
 
-test('Ctrl+clic su un pulsante che apre una finestra per nome la apre dietro, anche se la pagina la riporta davanti', async ({ app, openTab, testServer }) => {
-  const dest = testServer.html('<title>DIETRO</title>');
-  const page = await openTab(testServer.html(`<title>ELENCO</title>${pulsante('a', 'apri', `var w=window.open(${JSON.stringify(dest)},'aiuto');w.focus()`)}`));
-  await page.click('#a', { modifiers: ['Control'] });
-  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'DIETRO'), { timeout: 8000 }).toBe(true);
-  await page.waitForTimeout(1000);
-  expect((await schede(app)).find((s) => s.titolo === 'ELENCO')?.attiva).toBe(true);
-});
+// Col blocco spento la finestra nuova non spende il clic: lì conta che la finestra nata da quel clic resti dove l'ha messa.
+for (const blocco of [true, false]) {
+  test(`Ctrl+clic su un pulsante che apre una finestra per nome la apre dietro, anche se la pagina la riporta davanti (blocco popup ${blocco ? 'acceso' : 'spento'})`, async ({ app, openTab, testServer }) => {
+    await app.evaluate(({ BrowserWindow }, b) => { BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.security.blockPopups = b; }, blocco);
+    const dest = testServer.html('<title>DIETRO</title>');
+    const page = await openTab(testServer.html(`<title>ELENCO</title>${pulsante('a', 'apri', `var w=window.open(${JSON.stringify(dest)},'aiuto');setTimeout(function(){w.focus()},300)`)}`));
+    await page.click('#a', { modifiers: ['Control'] });
+    await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'DIETRO'), { timeout: 8000 }).toBe(true);
+    await page.waitForTimeout(1000);
+    expect((await schede(app)).find((s) => s.titolo === 'ELENCO')?.attiva).toBe(true);
+  });
+}
 
 test('la finestra con nome che la pagina riempie da sola, senza clic, resta dietro', async ({ app, openTab, testServer }) => {
   const prima = testServer.html('<title>PRIMA DEST</title>');
