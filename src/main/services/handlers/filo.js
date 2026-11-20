@@ -78,9 +78,7 @@ module.exports = function register(on, ctx) {
         const tipo = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.tipoErroreVisto(e);
         if (tipo && contatori()) contatori().erroreVisto(`chat:${tipo}`);
       } catch (_) {}
-      // La parte già scritta, controllata come nell'archivio: la bolla la ridisegna con foto e fonti (#2272).
-      const giaScritta = e && e.filoGiaScritta ? { giaScritta: e.filoGiaScritta } : {};
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...giaScritta };
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto };
     } finally {
       fineLavoro();
     }
