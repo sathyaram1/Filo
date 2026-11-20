@@ -347,7 +347,8 @@ describe('il guasto di un processo ucciso', () => {
     assert.match(g, /Processi nella cartella: nessuno\. Rilasciato dalla veglia di chi guida il giro\.$/);
     assert.doesNotMatch(g, /forse un permesso|SEGRETO/);
     const conCorsa = testoGuasto({ fermoMs: 21 * 60000, ultimo, corsa: segno, memoria: segno.memoria });
-    assert.match(conCorsa, /^guasto: strumento finish-check: processo ucciso \(137\) durante finish:check \(fase spec delle aree toccate/);
+    assert.match(conCorsa, /^guasto: strumento finish-check: finish:check interrotto senza finire \(fase spec delle aree toccate/);
+    assert.match(conCorsa, /Il suo ultimo strumento è uscito 137 e da lì .*: col comando si è fermata anche la sua sessione\./, 'il 137 c\'è dove lo dice il risultato dello strumento');
     // Un'uscita 1 è un rosso qualunque: il fermo resta quello di prima.
     const rosso = testoGuasto({ fermoMs: 21 * 60000, ultimo: { ...ultimo, uscita: 1 } });
     assert.match(rosso, /^guasto: strumento worker: worker fermo da 21 minuti .*forse un permesso, forse il modello/);
