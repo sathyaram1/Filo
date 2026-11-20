@@ -154,6 +154,28 @@ test('#2027.3: con la chiave del manutentore il biglietto della sessione va col 
   assert.deepEqual(manutentore.corpoManutentore({ passphrase: 'k' }, 'stato'), { passphrase: 'k', op: 'stato', dati: {} });
 });
 
+test('#2027.3: con una chiave lo strumento del manutentore e il registro delle domande trovano il biglietto della sessione e lo mandano', async () => {
+  await conBiglietto(async ({ env }) => {
+    const prima = process.env.FILO_BIGLIETTO_FILE;
+    process.env.FILO_BIGLIETTO_FILE = env.FILO_BIGLIETTO_FILE;
+    const corpi = [];
+    const fetchImpl = async (url, init) => {
+      corpi.push(JSON.parse(init.body));
+      return { status: 200, text: async () => JSON.stringify({ ok: true, voci: [] }) };
+    };
+    try {
+      assert.equal((await manutentore.chiama({ passphrase: 'k' }, 'leggi', { numero: '813' }, { fetchImpl, attempts: 1 })).ok, true);
+      await manutentore.chiama({ ticket: 't1' }, 'leggi', { numero: '813' }, { fetchImpl, attempts: 1 });
+      await registroConChiave('k', 'rimborso', { fetchImpl, attempts: 1 });
+    } finally {
+      if (prima === undefined) delete process.env.FILO_BIGLIETTO_FILE; else process.env.FILO_BIGLIETTO_FILE = prima;
+    }
+    assert.equal(corpi[0].bigliettoLocale, SEGRETO, 'la lettura con la chiave porta il biglietto');
+    assert.equal(corpi[1].bigliettoLocale, undefined, 'col biglietto del manutentore il segno lo prende lui');
+    assert.deepEqual([corpi[2].op, corpi[2].bigliettoLocale], ['registro', SEGRETO], 'il registro letto con la chiave porta il biglietto');
+  });
+});
+
 test('#2027.3: le risposte alla domanda di fine sessione prendono sporco e segno riservato prima di uscire', async () => {
   const ordine = [];
   const testo = await leggiRisposte(5, {
