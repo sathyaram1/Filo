@@ -1332,9 +1332,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     volo.esito = 'fermato';
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
-      model: r && r.model, provider: r && r.provider, seguitiLetti,
-      ...(giaScrittaControllata ? { giaScritta: giaScrittaControllata } : {}),
-    };
+      model: r && r.model, provider: r && r.provider, seguitiLetti,    };
   }
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
   // deve scrivere testo di riempimento: il "(vuoto)" che compariva era un
