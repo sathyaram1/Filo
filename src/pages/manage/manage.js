@@ -4317,8 +4317,45 @@
     if (mgReopenCancel) mgReopenCancel.disabled = !!busy;
   }
 
-  // Il cammino UNICO di ogni azione di stato del pannello.
-  async function applyAction(action, extra) {
+  // Una correzione senza testo parte solo al secondo gesto sullo stesso tasto (#2575): chi riprende non saprebbe cosa
+  // correggere. L'avviso sta accanto al tasto premuto; scrivere o cambiare scheda disarma.
+  let correzioneArmata = null;
+  let correzioneTimer = null;
+  function disarmaCorrezione() {
+    if (correzioneTimer) { clearTimeout(correzioneTimer); correzioneTimer = null; }
+    const btn = correzioneArmata;
+    correzioneArmata = null;
+    if (!btn) return;
+    window.SN_CONFERMA_SUL_POSTO.disarma(btn, btn.dataset.etichetta || btn.textContent);
+    avvisoAccanto(btn, '', '');
+  }
+  function avvisoAccanto(btn, testo, kind) {
+    const esito = btn && btn.closest('.mg-liv-azioni') ? btn.closest('.mg-liv-azioni').querySelector('.mg-liv-esito') : null;
+    if (!esito) { setActionMsg(testo, kind); return; }
+    esito.textContent = testo;
+    esito.dataset.kind = testo ? kind : '';
+  }
+  function correzioneDaConfermare(action, comment, gesto) {
+    if (!action.correzione || comment) return false;
+    const btn = gesto && gesto.btn;
+    if (btn && correzioneArmata === btn) {
+      // La coda di un doppio clic non è la conferma.
+      if (gesto.detail > 1) return true;
+      disarmaCorrezione();
+      return false;
+    }
+    disarmaCorrezione();
+    if (!btn) return true;
+    btn.dataset.etichetta = btn.textContent;
+    window.SN_CONFERMA_SUL_POSTO.arma(btn, ETICHETTA_SENZA_TESTO);
+    correzioneArmata = btn;
+    correzioneTimer = setTimeout(disarmaCorrezione, 8000);
+    avvisoAccanto(btn, AVVISO_SENZA_TESTO, 'err');
+    return true;
+  }
+
+  // Il cammino UNICO di ogni azione di stato del pannello. `gesto` ({ btn, detail }): il tasto premuto, per l'avviso sul posto.
+  async function applyAction(action, extra, gesto) {
     if (!selectedId || !action) return;
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
@@ -4330,6 +4367,8 @@
       setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
       return;
     }
+    const testoCorrezione = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
+    if (correzioneDaConfermare(action, testoCorrezione, gesto)) return;
     // La riga per chi ha segnalato parte PRIMA del cambio di stato, e il
     // cambio di stato non parte se lei non è arrivata: chiudere una
     // segnalazione buttando via l'unica frase che il mittente leggerà è il
