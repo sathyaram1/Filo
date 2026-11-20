@@ -970,7 +970,20 @@
     return niente;
   }
 
+  // La provenienza di un segreto letto da una pagina: la frase è per l'utente, e il registro dei segreti letti la
+  // riconosce da qui per sapere che può essere dell'utente (#810.8). Una frase nuova si aggiunge qui, non altrove.
+  // Sentinella: tests/unit/usciteSegreti.test.mjs.
+  const FONTI_DI_PAGINA = Object.freeze({ conSito: 'dalla pagina', senzaSito: 'dalla pagina', busta: 'da una pagina', letta: 'da una pagina letta' });
+  function fonteDallaPagina(host, senzaSito = FONTI_DI_PAGINA.senzaSito) {
+    return host ? `${FONTI_DI_PAGINA.conSito} ${host}` : senzaSito;
+  }
+  function fonteDiPagina(fonte) {
+    const f = String(fonte || '');
+    return Object.values(FONTI_DI_PAGINA).includes(f) || f.startsWith(`${FONTI_DI_PAGINA.conSito} `);
+  }
+
   global.SN_URL_EXFIL = {
+    FONTI_DI_PAGINA, fonteDallaPagina, fonteDiPagina,
     assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
     DAI_SITI, testoDeiSitiComeAzione, indirizziDelComando, comandoInRete,
     taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
