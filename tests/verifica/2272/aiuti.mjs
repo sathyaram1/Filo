@@ -19,7 +19,7 @@ export async function preparaImmagini(app, quante, { w = 320, h = 220 } = {}) {
       const k = Number((/antilope-(\d+)/.exec(url) || [])[1]);
       return new Response(png(k), { status: 200 });
     };
-  }, quante);
+  }, { quante, w, h });
 }
 
 // `copione`: un passo per chiamata al modello; { strumento } chiama web(...), { testo } risponde. Nel testo $ID0, $ID1…
