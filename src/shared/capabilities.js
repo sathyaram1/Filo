@@ -906,9 +906,16 @@
       out[k] = c[k]
         .replace(/\{se:([a-z-]+)\}([\s\S]*?)(?:\{altrimenti\}([\s\S]*?))?\{\/se\}/g,
           (_, nome, si, no) => (aperto(aperti, nome) ? si : (no || '')))
-        .replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id));
+        .replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id))
+        .replace(/\{tetto:(elimina|rinomina)\}/g, (_, n) => tetto(n));
     }
     return out;
+  }
+  // Quanti file per richiesta si cancellano o rinominano: il numero lo tiene il registro delle azioni, che usa il main.
+  function tetto(nome) {
+    if (!global.SN_ACTION_LEVELS && typeof require === 'function') require('./actionLevels.js');
+    const L = global.SN_ACTION_LEVELS;
+    return String(L ? L[nome === 'elimina' ? 'LOTTO_ELIMINA' : 'LOTTO_RINOMINA'] : '');
   }
 
   // Indice COMPATTO (id + titolo + categoria), pensato per stare sempre in
