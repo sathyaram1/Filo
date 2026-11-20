@@ -1172,6 +1172,7 @@ class TabManager {
       const wc = view.webContents;
       AzioniContate.scheda(wc);
       wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id, { daSola: true }); }));
+      wc.on('did-start-navigation', (e) => this._chiestaPerNome(tab, wc, e));
     }
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
