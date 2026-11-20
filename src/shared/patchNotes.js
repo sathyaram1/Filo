@@ -16,6 +16,9 @@
       fixes: [
         { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
         { testo: 'Se il computer risponde lento una volta, la home torna da sola a leggere subito Bluetooth e Wi-Fi, senza riavviare Filo, e dopo una pausa del computer non ti mostra come attuale lo stato di prima.', segnalazione: 2394 },
+        { testo: 'Se avevi la protezione delle pagine delicate accesa, dopo l\'aggiornamento Filo resta su «Chiedi sulle delicate»: da posta, banca, sanità, enti pubblici e pagine con una password non parte niente da solo finché non lo cambi tu.', segnalazione: 1589 },
+        { testo: '«Annulla» sul segno di un tuo messaggio in chat, e dal tasto destro sulla bolla, rimette anche un livello di privacy più largo: ti chiede di scrivere «conferma», come l\'elenco dei cambi nella home.', segnalazione: 1589 },
+        { testo: 'Una password scritta a mano in una chat, come risposta sotto chi te la chiede, non arriva ai modelli né alla ricerca web, neanche quando chiedi a Filo di spiegare la pagina.', segnalazione: 1589 },
       ],
     },
     {
