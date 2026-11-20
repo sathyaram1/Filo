@@ -5,13 +5,15 @@
 
 // Una cornice che sta ancora caricando non ascolta ancora: l'avviso le arriva appena ha finito. Senza, un timer scaduto
 // mentre Filo riapre la finestra apposta per farsi sentire, o mentre la ricarica, non avvisava nessuno (#2390.1).
+// Si aspetta did-stop-loading, l'evento che spegne isLoading(): did-finish-load arriva prima, e un avviso nato fra i due
+// restava in coda per sempre (#2611). Sentinella: tests/unit/caricamentoAspettato.test.mjs.
 const inAttesa = new Map();
 function quandoPronta(wc, chiave, invia) {
   let coda = inAttesa.get(wc);
   if (!coda) {
     coda = [];
     inAttesa.set(wc, coda);
-    wc.once('did-finish-load', () => {
+    wc.once('did-stop-loading', () => {
       inAttesa.delete(wc);
       for (const v of coda) { try { v.invia(); } catch (_) {} }
     });
