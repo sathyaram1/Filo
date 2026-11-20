@@ -4005,8 +4005,11 @@ class TabManager {
   // La finestra tenuta dalla pagina, riempita da un'altra scheda col clic (un target o window.open con lo stesso nome),
   // torna davanti come nei browser; senza clic resta dietro (#737.8).
   _chiestaPerNome(tab, wc, e) {
-    try { if (e && e.isMainFrame) console.log('[DBG737]', JSON.stringify({ u: e.url, cur: wc.getURL(), len: wc.navigationHistory.length(), init: !!e.initiator, att: this.activeId === tab.id })); } catch (_) {}
     if (!e || !e.isMainFrame || e.isSameDocument || !e.initiator || this.activeId === tab.id || !this.tabs.includes(tab)) return;
+    // La prima navigazione è l'apertura stessa, già davanti o dietro come ha chiesto il clic (Ctrl+clic: dietro).
+    let aperta = '';
+    try { aperta = wc.getURL(); } catch (_) {}
+    if (!aperta) return;
     let da = null;
     try { da = webContents.fromFrame(e.initiator); } catch (_) {}
     let chiede = '';
