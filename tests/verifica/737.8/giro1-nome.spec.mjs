@@ -29,7 +29,20 @@ test('target con nome: il secondo clic porta davanti la finestra con la seconda 
   await torna(app, shell, page);
   await page.click('#b');
   await expect.poll(async () => (await stato(app)).attiva, { timeout: 8000 }).toBe(due);
-  expect((await stato(app)).schede.length).toBe(2);
+  const s = await stato(app);
+  expect(s.schede.filter((u) => u === due).length).toBe(1);
+  expect(s.schede.includes(uno)).toBe(false);
+});
+
+test('r1 finestra già aperta riportata davanti dalla pagina (focus): il secondo clic porta davanti', async ({ app, shell, openTab, testServer }) => {
+  const uno = testServer.html('<title>UNO</title>');
+  const page = await openTab(testServer.html(`<script>var w=null;function apri(){if(w&&!w.closed){w.focus();}else{w=window.open(${JSON.stringify(uno)},'aiuto');}}</script>
+    <button id="a" style="height:40px" onclick="apri()">aiuto</button>`));
+  await page.click('#a');
+  await expect.poll(async () => (await stato(app)).attiva, { timeout: 8000 }).toBe(uno);
+  await torna(app, shell, page);
+  await page.click('#a');
+  await expect.poll(async () => (await stato(app)).attiva, { timeout: 8000 }).toBe(uno);
 });
 
 test('window.open con lo stesso nome: il secondo pulsante porta davanti', async ({ app, shell, openTab, testServer }) => {
