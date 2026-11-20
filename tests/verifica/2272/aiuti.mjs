@@ -56,6 +56,26 @@ export async function stubModello(app, copione) {
   }, copione);
 }
 
+// Dopo stubModello con la ricerca al primo passo: la risposta cita le prime due foto e poi scrive piano, a lungo.
+export async function rispostaLenta(app) {
+  await app.evaluate(() => {
+    const prima = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => {
+      if (globalThis.__passo === 0) return prima(o);
+      globalThis.__passo++;
+      const visto = o.messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+      const ids = [...new Set(visto.match(/\b[ig]\d+\b(?=:|,|\))/g) || [])];
+      const text = `Ecco le antilopi che ho trovato per te.\n\n[[immagini: ${ids[0]}, ${ids[1]}]]\n\n` + 'Testo lungo che continua a arrivare piano piano. '.repeat(60);
+      for (let i = 0; i < text.length; i += 4) {
+        if (o.signal && o.signal.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
+        if (o.onDelta) o.onDelta(text.slice(i, i + 4));
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      return { model: o.attempts[0].model, provider: o.attempts[0].provider, usage: {}, reasoningDetails: [], text, toolCalls: [], finishReason: 'stop' };
+    };
+  });
+}
+
 export async function chiedi(page, testo) {
   await page.locator('#input').fill(testo);
   await page.locator('#sendBtn').click();
