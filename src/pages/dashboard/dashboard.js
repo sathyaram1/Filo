@@ -1304,7 +1304,7 @@
       // dice sotto che il lavoro dopo non è riuscito. Il testo a metà del giro fallito invece se ne va.
       if (rispostaPrima && streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
-        setBubbleText(streamBubble, rispostaPrima, true);
+        if (!conGiaScritta(streamBubble, r)) setBubbleText(streamBubble, rispostaPrima, true);
         Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: chiudiConversazione, activity: pending, shown, chat: msg.chatId });
         streamBubble = null;
       }
