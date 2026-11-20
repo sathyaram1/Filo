@@ -86,4 +86,4 @@ function paginaNuova(prima, ora, passo) {
   return ora.n > prima.n || ora.a === prima.a + 1;
 }
 
-module.exports = { nuova, vociDellaVista, conserva, salta, elenco, fuori, paginaNuova, tornabile };
+module.exports = { nuova, vociDellaVista, conserva, salta, daCaduta, elenco, fuori, paginaNuova, tornabile };
