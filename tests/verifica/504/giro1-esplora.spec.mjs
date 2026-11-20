@@ -243,7 +243,8 @@ test('Aiuto sulla pagina: «traducimi questa pagina»', async ({ app, shell, ope
   console.log('AIUTO-PROMPT-HA-TRADUCI', prompt.includes('TRADUCI_PAGINA'), /tradu[a-z]* (la|questa|l'intera) pagina/i.test(prompt));
   await page.waitForTimeout(5000);
   console.log('AIUTO-TITOLO', await page.locator('#title').innerText());
-  await page.screenshot({ path: 'tests/.shots/v504-aiuto.png' });
+  console.log('AIUTO-LOG', await pannello.locator('.sn-sidebar').innerText().catch(() => '?'));
+  await pannello.screenshot({ path: 'tests/.shots/v504-aiuto.png' });
 });
 
 test('Alt+T senza selezione sulla pagina', async ({ app, openTab, testServer }) => {
