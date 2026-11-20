@@ -598,7 +598,7 @@
       const righe = tok.split('\n');
       const coda = [];
       while (righe.length > 1 && quanto(righe.slice(0, -1).join('\n')) >= tutto) coda.unshift(righe.pop());
-      return [OSCURATO, ...coda].join('\n');
+      return [segno(righe.join('\n')), ...coda].join('\n');
     });
     // Separatori qualunque fra un carattere e l'altro: si confronta la sola forma alfanumerica e si toglie il tratto originale.
     let piatto = alnumMinuscolo(t);
