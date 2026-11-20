@@ -5,8 +5,11 @@
 (function (global) {
   'use strict';
 
-  // I formati che i fornitori accettano tutti: il resto (SVG, BMP, TIFF, AVIF…) si ridisegna.
-  const LETTA = /^data:image\/(png|jpeg|webp|gif);base64,/i;
+  // I formati che i fornitori accettano tutti: il resto (SVG, BMP, TIFF, AVIF…) si ridisegna. INTERA è il controllo di
+  // chi riceve il data: da un altro processo (lo strato sopra la scheda).
+  const FORMATI = 'png|jpeg|webp|gif';
+  const LETTA = new RegExp(`^data:image\\/(${FORMATI});base64,`, 'i');
+  const INTERA = new RegExp(`^data:image\\/(${FORMATI});base64,[A-Za-z0-9+/=]+$`);
   const tetti = () => (global.SN_CONST && global.SN_CONST.ALLEGATI_CHAT) || {};
   const byteDi = (dataUrl) => Math.floor((dataUrl.length - dataUrl.indexOf(',') - 1) * 3 / 4);
 
