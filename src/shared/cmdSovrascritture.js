@@ -225,6 +225,62 @@
     }
   }
 
+  // ── Impostazioni e hook di git (#2619.5) ──────────────────────────────────
+  // Scelgono i programmi che partono al prossimo comando git: chi scrive lì vale 3, come la redirezione sullo stesso
+  // file. Si guarda ogni parola, sorgenti comprese: le destinazioni sottintese le copre la cartella di lavoro.
+  const CUORE_GIT = 'cambia le impostazioni o gli hook di git, che scelgono quali programmi avviare';
+
+  // Come la shell confronta un nome: maiuscole, nome corto 8.3 (`GIT~1`), flusso alternativo (`config:$DATA`), jolly;
+  // un jolly in testa non prende un nome col punto, come in bash (`cp * altrove` resta 2).
+  function puoEssere(seg, nome) {
+    const s = String(seg).replace(/:.*$/, '');
+    const corto = /^([^~]+)~\d/.exec(s);
+    if (corto) return nome.replace(/^\./, '').startsWith(corto[1].toLowerCase());
+    if (!JOLLY.test(s)) return nomeNorm(s) === nome;
+    if (nome.startsWith('.') && !s.startsWith('.')) return false;
+    let re = '';
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      const chiusa = ch === '[' ? s.indexOf(']', i + 2) : -1;
+      if (ch === '*') re += '.*';
+      else if (ch === '?' || ch === '�') re += '.';
+      else if (chiusa > 0) { re += `[${s.slice(i + 1, chiusa).replace(/^!/, '^').replace(/\\/g, '\\\\')}]`; i = chiusa; }
+      else re += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    try { return new RegExp(`^${re}$`, 'i').test(nome); } catch (_) { return true; }
+  }
+
+  // Dentro una cartella `.git` (o il file `.git` di un worktree), gli hook e la configurazione di un repository nudo,
+  // la configurazione dell'utente (`~/.gitconfig`, `~/.config/git/config`) e quella di sistema (`etc/gitconfig`).
+  function nelCuoreDiGit(segs) {
+    return segs.some((s, i) => {
+      if (puoEssere(s, '.git') || puoEssere(s, '.gitconfig') || puoEssere(s, 'gitconfig')) return true;
+      const dopo = segs[i + 1];
+      if (dopo == null) return false;
+      if (/\.git$/.test(nomeNorm(s)) && (puoEssere(dopo, 'config') || puoEssere(dopo, 'hooks'))) return true;
+      return puoEssere(s, 'git') && puoEssere(dopo, 'config');
+    });
+  }
+
+  function toccaIlCuoreDiGit(raw, c) {
+    const parole = new Set(['.', ...dequote(raw).split(/\s+/)]);
+    const elenchi = forsePowerShell(c);
+    for (const vuote of [false, true]) {
+      const lette = argomenti(raw, { ...c, vuote, elenchi }).map((a) => a.testo);
+      for (const p of lette.concat((shellPosix(c) || c.sistemaIgnoto ? graffe(lette) : null) || [])) parole.add(p);
+    }
+    for (const p of parole) {
+      // Il valore di un'opzione: `--target-directory=x`, `-Destination:x`, `/LOG:x`.
+      const valore = /^[-/][^=:\\/]*[=:](.+)$/.exec(p);
+      for (const t of valore ? [p, valore[1]] : [p]) {
+        if (nelCuoreDiGit(pezzi(t))) return true;
+        const r = dove(t, c);
+        if (r && typeof r === 'object' && nelCuoreDiGit(r.segs)) return true;
+      }
+    }
+    return false;
+  }
+
   // Il programma riceve il comando dopo la shell: escape tolti, `$'…'` e `$"…"` decodificati, le espansioni che possono
   // valere niente tolte (`--out$1put=x` è `--output=x`), le graffe di bash aperte, gli elenchi di PowerShell spezzati.
   // Le opzioni si cercano anche lì, e vale la lettura peggiore (#1994). Ciò che non si sa riprodurre (una variabile di
