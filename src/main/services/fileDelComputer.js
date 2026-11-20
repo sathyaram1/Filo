@@ -196,4 +196,5 @@ function concessoDaLink(partizione, input) {
   return permesso(concessioni.get(partizione), percorsoDi(input));
 }
 
-module.exports = { PARTIZIONE, VISIBILI, percorsoDi, indirizzoDi, giudica, scrittoDallUtente, concedi, revoca, concessoDaLink, preparaSessione };
+module.exports = { PARTIZIONE, VISIBILI, percorsoDi, indirizzoDi, giudica, scrittoDallUtente, concedi, revoca, concessoDaLink, preparaSessione,
+  concessioneDi, permesso, CSP_DOCUMENTO };
