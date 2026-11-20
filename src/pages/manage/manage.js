@@ -4318,7 +4318,7 @@
   }
 
   // Una correzione senza testo parte solo al secondo gesto sullo stesso tasto (#2575): chi riprende non saprebbe cosa
-  // correggere. L'avviso sta accanto al tasto premuto; scrivere o cambiare scheda disarma.
+  // correggere. L'avviso sta nella casella vuota, dove si rimedia, e non sposta il tasto; scrivere o cambiare scheda disarma.
   let correzioneArmata = null;
   let correzioneTimer = null;
   function disarmaCorrezione() {
@@ -4327,13 +4327,18 @@
     correzioneArmata = null;
     if (!btn) return;
     window.SN_CONFERMA_SUL_POSTO.disarma(btn, btn.dataset.etichetta || btn.textContent);
-    avvisoAccanto(btn, '', '');
+    avvisoSenzaTesto(false);
   }
-  function avvisoAccanto(btn, testo, kind) {
-    const esito = btn && btn.closest('.mg-liv-azioni') ? btn.closest('.mg-liv-azioni').querySelector('.mg-liv-esito') : null;
-    if (!esito) { setActionMsg(testo, kind); return; }
-    esito.textContent = testo;
-    esito.dataset.kind = testo ? kind : '';
+  function avvisoSenzaTesto(acceso) {
+    if (!mgAcceptComment) return;
+    if (acceso) {
+      if (mgAcceptComment.dataset.segnaposto == null) mgAcceptComment.dataset.segnaposto = mgAcceptComment.placeholder;
+      mgAcceptComment.placeholder = AVVISO_SENZA_TESTO;
+    } else if (mgAcceptComment.dataset.segnaposto != null) {
+      mgAcceptComment.placeholder = mgAcceptComment.dataset.segnaposto;
+      delete mgAcceptComment.dataset.segnaposto;
+    }
+    mgAcceptComment.classList.toggle('mg-accept-comment--avviso', !!acceso);
   }
   function correzioneDaConfermare(action, comment, gesto) {
     if (!action.correzione || comment) return false;
