@@ -570,13 +570,16 @@
     return out;
   }
 
-  function oscuraTesto(s, chiavi, finestre) {
+  // `segno(tolto)` dà quello che prende il posto del tratto tolto: OSCURATO verso un modello, un segno lungo quanto il
+  // tratto per chi deve sapere dove stava (trattiSegreti).
+  const SEGNO_OSCURATO = () => OSCURATO;
+  function oscuraTesto(s, chiavi, finestre, segno = SEGNO_OSCURATO) {
     // Una foto mandata al modello è pixel, non testo: decodificarla costerebbe e non troverebbe niente.
     if (/^data:image\//i.test(s.slice(0, 16))) return s;
     let t = s;
     for (const c of chiavi) {
-      t = t.split(c.v).join(OSCURATO);
-      t = t.replace(c.re, OSCURATO);
+      t = t.split(c.v).join(segno(c.v));
+      t = t.replace(c.re, (m) => segno(m));
     }
     // Base64 a righe (il comando base64 va a capo ogni 76 caratteri) si legge come un pezzo solo.
     t = t.replace(/[A-Za-z0-9+/=_-]{16,}(?:[ \t]*\r?\n[ \t]*[A-Za-z0-9+/=_-]{4,})+|\S{8,}/g, (tok) => {
