@@ -15,7 +15,9 @@ function livelli() {
   return globalThis.SN_LIVELLI_PRIVACY;
 }
 
-function sceltoDopo(registro) {
+// Il livello l'ha scelto lui dopo l'aggiornamento: cambiato (registro dei cambi) o confermato nell'intervista.
+function sceltoDopo(registro, intervista) {
+  if (intervista && Array.isArray(intervista.ticked) && intervista.ticked.includes('privacy')) return true;
   for (const e of Array.isArray(registro) ? registro : []) {
     if (!e || e.tipo !== 'impostazioni' || !Array.isArray(e.cambi)) continue;
     if (e.cambi.some((c) => c && c.chiave === PERCORSO)) return true;
