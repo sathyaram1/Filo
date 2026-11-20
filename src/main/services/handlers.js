@@ -38,7 +38,7 @@ const {
 const {
   getAssistantCwd, cartellaDelComando, displayCwd, pendingConfirmKey, recordPendingConfirm, consumePendingConfirm,
   daPaginaDiFilo, chiaveSchermo, bersagliMostrati, timerRefOf, describeTimerEntry, perimetroLettura, shellDeiComandi,
-  segretiCustoditi, ricordaLettoDallAiuto, ricordaPropostaDellAiuto, ricordaLettoInChat, testoDiAltriNelleAzioni, controllaUscita,
+  segretiCustoditi, ricordaLettoDallAiuto, ricordaLettoInChat, testoDiAltriNelleAzioni, controllaUscita,
   rifiutoNonCompare, ricercaNelSito, SCHEMI_USCITA, sitoDaConfermare, contattabilePrimaDelClic,
   ricordaVerdettiArchiviati, apriDaFilo, primaVoltaDelTerminale, richiestaDiSistema, perSempreDetto, idDelCambio,
   preparaEliminazione, preparaRinomina,
