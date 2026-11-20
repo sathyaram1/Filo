@@ -79,7 +79,8 @@ test('a casella vuota un avviso sul posto ferma il primo clic; il secondo sullo 
 
   await tasto.click({ position: bordo });
   await expect(tasto).toHaveText('Manda lo stesso');
-  await expect(page.locator('#mgActionMsg')).toContainText('non saprà cosa correggere');
+  await expect(page.locator('#mgAcceptComment')).toHaveAttribute('placeholder', /non saprà cosa correggere/);
+  await expect(page.locator('#mgAcceptComment')).toHaveClass(/mg-accept-comment--avviso/);
   expect(await aggiornamenti(page)).toEqual([]);
   const armato = await tasto.boundingBox();
   expect(armato.width).toBeGreaterThanOrEqual(prima.width - 0.5);
