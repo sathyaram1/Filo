@@ -793,6 +793,8 @@ module.exports = function register(on, ctx) {
     vistaLetta = null;
     return { result };
   }));
+  const chiHaServito = require('../chiHaServito').crea();
+  on(MSG.WALLET_OWNER_SERVED_BY, ownerOnly(async () => ({ servito: await chiHaServito.leggi({ idToken: await auth.getIdToken() }) })));
 
   // Le manopole dei crediti (#652). Non passano da una callable: `config/credits`
   // è un documento che l'account admin scrive direttamente, come già fa per i
