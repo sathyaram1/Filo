@@ -61,7 +61,7 @@ function presenta() {
 
 // «pasword», «passowrd», «pssword»: chi chiede in chat sbaglia la parola e non la corregge. Al più due errori, e la
 // parola resta quella che comincia per p e finisce per d («passport» no).
-const NOVITA = () => globalThis.SN_NOVITA || (require('../../shared/novita.js'), globalThis.SN_NOVITA);
+const NOVITA = () => globalThis.SN_NOVITA || (require('./novita.js'), globalThis.SN_NOVITA);
 function refusoDiPassword(w) {
   if (w === 'password' || w.length < 6 || w.length > 10 || w[0] !== 'p' || !w.endsWith('d')) return false;
   return NOVITA().distanza(w, 'password', 2) <= 2;
