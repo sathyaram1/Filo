@@ -1109,7 +1109,7 @@
       modelli: piuDi(g.modelli).map(([modello, n]) => ({ modello, n })),
       violazione: g.violazione,
       fuori: g.violazione ? (VIOLAZIONI_USO[g.violazione] || '') : '',
-    })).sort((a, b) => b.n - a.n || a.host.localeCompare(b.host));
+    })).sort((a, b) => b.n - a.n || Number(!a.host) - Number(!b.host) || a.host.localeCompare(b.host));
   }
 
   global.SN_WALLET = {
