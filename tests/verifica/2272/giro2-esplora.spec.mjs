@@ -67,7 +67,8 @@ test('salva immagine come', async ({ app, openTab }) => {
   await img.click({ button: 'right' });
   await menuDi(page).voce('Salva immagine come').click();
   await page.waitForTimeout(4000);
-  console.log('SALVA', dest, fs.existsSync(dest) ? fs.statSync(dest).size : 'manca', fs.readdirSync(path.dirname(dest)));
+  const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR || '');
+  console.log('SALVA', dir, dir && fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => f + ':' + fs.statSync(path.join(dir, f)).size) : 'nessuna cartella');
   console.log('TOAST', await page.locator('.sn-toast, [class*=toast]').allTextContents().catch(() => []));
 });
 
