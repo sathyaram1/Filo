@@ -2878,6 +2878,7 @@ class TabManager {
     if (passo && this._maybeBlockNavigation(tab, salto.meta.url)) return true;
     tab.storia = salto.storia;
     this._recreateView(tab, salto.meta.url, { storia: true, titolo: salto.meta.titolo });
+    AzioniContate.scheda(tab.view.webContents);
     return true;
   }
 
