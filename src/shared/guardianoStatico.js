@@ -517,7 +517,7 @@
 
   // Toglie i tratti che le finestre coprono. Posizioni e forma piatta nascono insieme: un carattere che cambia lunghezza
   // quando diventa minuscolo non sposta il taglio.
-  function togliFinestre(t, finestre) {
+  function togliFinestre(t, finestre, segno) {
     const pos = [];
     let piatto = '';
     for (let i = 0; i < t.length; i++) {
