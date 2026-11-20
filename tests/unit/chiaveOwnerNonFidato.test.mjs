@@ -33,9 +33,9 @@ test('senza credenziali il rifiuto nomina le variabili che mancano, in tutti e d
   }
 });
 
-test('il corpo per chiaveDomande: la parola d’ordine in passphrase, senza biglietto né sessione', async () => {
+test('il corpo per chiaveDomande: la parola d’ordine in passphrase, senza sessione; il biglietto resta per il segno delle letture', async () => {
   assert.deepEqual(Q.corpoChiave({ op: 'rispondi', id: 'D-3', scelta: 1, sessione: true, biglietto: 'segreto' }, 'k'),
-    { op: 'rispondi', id: 'D-3', scelta: 1, passphrase: 'k' });
+    { op: 'rispondi', id: 'D-3', scelta: 1, biglietto: 'segreto', passphrase: 'k' });
   assert.deepEqual(Q.corpoChiave({ op: 'elenco', passphrase: 'altra' }, 'k'), { op: 'elenco', passphrase: 'k' });
   const viste = [];
   const fetchImpl = async (url, init) => {
