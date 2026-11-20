@@ -170,15 +170,9 @@ function preparaSessione(partizione = PARTIZIONE) {
 function concedi(input) {
   const percorso = percorsoDi(input);
   if (!percorso || require('./documentRead').percorsoDiRete(percorso)) return null;
-  const cartella = path.dirname(percorso);
-  const larga = cartellaTroppoLarga(cartella);
-  const c = {
-    cartella: larga ? null : chiave(cartella),
-    file: new Set([chiave(percorso), ...(larga ? nominati(percorso, cartella) : [])]),
-  };
   progressivo += 1;
   const partizione = `${PARTIZIONE}:${progressivo}`;
-  concessioni.set(partizione, c);
+  concessioni.set(partizione, concessioneDi(percorso));
   preparaSessione(partizione);
   return partizione;
 }
