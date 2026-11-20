@@ -433,7 +433,8 @@
     }
     // Il push verso il remoto già configurato si rimedia; verso un indirizzo scritto nel comando manda il codice
     // a un server qualsiasi, e non torna indietro (#530).
-    if (sub === 'push' && gitArgsAfterSub(cmd).some((a) => /:\/\//.test(a) || /^(--repo=)?[^\s/:=-][^\s/:=]*@[^\s:]+:/.test(a))) return 3;
+    const indirizzo = (a) => /:\/\//.test(a) || /^[^\s/:=-][^\s/:=]*@[^\s:]+:/.test(a);
+    if (sub === 'push' && gitArgsAfterSub(cmd).some((a) => indirizzo(a) || (gitOpzione(a, ['repo']) && indirizzo(opzioneLunga(a, 'repo', 1))))) return 3;
     if (GIT_WRITE.has(sub)) return 2;
     return 3; // sotto-comando git sconosciuto → cautela
   }
