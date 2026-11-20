@@ -165,6 +165,36 @@
     }
     return null;
   }
+  // Le opzioni con cui git lancia un programma scritto nel comando: verso un remoto locale `--upload-pack`/`--receive-pack`
+  // li esegue la shell della macchina, `clone -c core.sshCommand=…` ne imposta uno, `--template` porta gli hook. È codice
+  // arbitrario come ARBITRARY_CODE (#2618). Le lunghe valgono accorciate fino a una lettera (git accetta ogni prefisso
+  // unico); le corte anche dentro un gruppo (`-qu`), fino alla prima lettera che prende un valore.
+  const GIT_LANCIA = {
+    push: { lunghe: ['receive-pack', 'exec'] },
+    fetch: { lunghe: ['upload-pack'] },
+    pull: { lunghe: ['upload-pack'] },
+    'ls-remote': { lunghe: ['upload-pack', 'exec'] },
+    archive: { lunghe: ['exec'] },
+    clone: { lunghe: ['upload-pack', 'config', 'template'], corte: 'uc', conValore: 'jobuc' },
+    init: { lunghe: ['template'] },
+    rebase: { lunghe: ['exec'], corte: 'x', conValore: 'SxsXC' },
+  };
+  function cortaNelGruppo(t, corte, conValore) {
+    if (!/^-[^-]/.test(t)) return false;
+    for (const ch of t.slice(1)) {
+      if (corte.includes(ch)) return true;
+      if (conValore.includes(ch)) return false;
+    }
+    return false;
+  }
+  function gitLanciaProgramma(sub, args) {
+    // `git submodule foreach <comando>` fa girare il comando nella shell, in ogni sotto-modulo.
+    if (sub === 'submodule') return argVariants(args.find((a) => !a.startsWith('-')) || '').some((v) => v.toLowerCase() === 'foreach');
+    const o = GIT_LANCIA[sub];
+    return !!o && args.some((a) => argVariants(a).some((v) =>
+      o.lunghe.some((n) => opzioneLunga(v, n, 1) != null) || (!!o.corte && cortaNelGruppo(v, o.corte, o.conValore))));
+  }
+
   // Le letture di git che con certe forme scrivono o eseguono: il livello a cui salgono, 0 se restano letture.
   // Sentinella: ogni nome di GIT_READ sta nella tabella di letturaCheScrive.test.mjs.
   const GIT_READ_MUTATES = {
