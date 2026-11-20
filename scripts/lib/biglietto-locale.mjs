@@ -424,30 +424,36 @@ export async function sporca(motivo, { env, cwd, deps = {}, nowMs = Date.now() }
 
 /**
  * Il segno riservato (SPEC-DOMANDE §5.1, #2027) per i dati privati che la sessione legge senza passare dal server (il
- * feedback dal database): quello che scrive dopo lo porta. Mai un'eccezione.
- * @returns {Promise<{ segnati: number, senzaBiglietto?: true, errori: string[] }>}
+ * feedback dal database): quello che scrive dopo lo porta. Annotato prima in locale, come lo sporco: col server giù
+ * parte alla prossima chiamata (`inAttesa`). Mai un'eccezione.
+ * @returns {Promise<{ segnati: number, inAttesa?: number, senzaBiglietto?: true, errori: string[] }>}
  */
-export async function segnaRiservato(motivo, { env, cwd, deps = {} } = {}) {
+export async function segnaRiservato(motivo, { env, cwd, deps = {}, nowMs = Date.now() } = {}) {
   const m = String(motivo || '').trim().slice(0, 300);
   const out = { segnati: 0, errori: [] };
   if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
   const trovati = trovaBiglietti({ env, cwd });
   if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
+  let inAttesa = 0;
   for (const b of trovati) {
-    try {
-      await chiama('riservato', { ticket: b.ticket, motivo: m }, deps);
-      out.segnati += 1;
-    } catch (e) {
-      out.errori.push(String((e && e.message) || e).slice(0, 200));
+    let aggiunta = '';
+    try { annotaRiservato(b, m, nowMs); } catch (_) { aggiunta = m; }
+    const r = await consegnaRiservati(b, { deps, nowMs, aggiunta });
+    if (!r.errore) out.segnati += 1;
+    else {
+      out.errori.push(r.errore);
+      if (r.restano) inAttesa += 1;
     }
   }
-  return out;
+  return inAttesa ? Object.assign(out, { inAttesa }) : out;
 }
 
-/** La riga per chi ha letto dati privati: '' se il segno è preso o non c'è un biglietto da segnare. */
+/** La riga per chi ha letto dati privati, da dire prima che escano: '' se il server ha preso il segno. */
 export async function rigaRiservato(cosa, opts = {}) {
   const r = await segnaRiservato(cosa, opts);
-  if (r.segnati || r.senzaBiglietto) return '';
+  if (r.segnati) return '';
+  if (r.senzaBiglietto) return `Nessun biglietto trovato da qui, quindi niente segno riservato: i compiti e le domande che scrivi da questo repo nascono riservati, ma se la sessione ha un biglietto in un altro repo dichiaralo da lì con node scripts/biglietto.mjs riservato "${cosa}".`;
+  if (r.inAttesa) return `Server non raggiunto (${r.errori.join('; ')}): il segno riservato è annotato in locale e parte alla prossima chiamata; intanto i compiti e le domande che scrivi da qui nascono riservati.`;
   return `Segno riservato NON preso (${r.errori.join('; ')}): prima di scrivere compiti o feedback dichiaralo con node scripts/biglietto.mjs riservato "${cosa}".`;
 }
 
