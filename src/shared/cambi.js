@@ -28,7 +28,7 @@
   const nomeLivelloPrivacy = (v) => {
     const L = livelliPrivacy();
     const l = L && L.LIVELLI.find((x) => x.id === v);
-    return l ? l.nome.toLowerCase() : String(v);
+    return l ? l.nome.toLowerCase() : (v == null ? 'nessuno' : String(v));
   };
   const nomeCategoria = (c) => { const L = livelliPrivacy(); return L ? L.nomeCategoria(c) : String(c); };
   const millisecondi = (v) => `${intero(Math.round(Number(v)))} ms`;
