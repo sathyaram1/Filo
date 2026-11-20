@@ -58,6 +58,9 @@ async function openStubbedEditor(openTab, overrides = {}) {
             };
           }
           return { ok: false, error: 'Chiave gemini non configurata' };
+        case 'wallet_owner_served_by':
+          if (fakeConfig.__servitoErrore) return { ok: false, error: fakeConfig.__servitoErrore };
+          return fakeConfig.__servito ? { ok: true, servito: fakeConfig.__servito } : { ok: true };
         case 'default_providers_list':
           return fakeConfig.__catalogFails ? { ok: false, error: 'HTTP 500' } : {
             ok: true,
