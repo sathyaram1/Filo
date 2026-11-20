@@ -70,7 +70,7 @@ function refusoDiPassword(w) {
 // I nomi della password: quelli che il filtro riconosce già (urlExfil), «pw», «pass» e i refusi di «password».
 let soloNomePassword = null;
 function nomeDiPassword(w) {
-  const P = globalThis.SN_URL_EXFIL && globalThis.SN_URL_EXFIL.PRESENTA;
+  const P = exfil() && exfil().PRESENTA;
   if (!soloNomePassword && P) soloNomePassword = new RegExp(`^(?:${P.password.replace(/^\\b|\\b$/g, '')}|pw|pass)$`, 'u');
   return (soloNomePassword ? soloNomePassword.test(w) : w === 'password') || refusoDiPassword(w);
 }
