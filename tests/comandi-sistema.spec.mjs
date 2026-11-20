@@ -427,7 +427,7 @@ test('in chat, «dimentica le casse» nomina il dispositivo vero e, confermato, 
   ]);
   await chiedi(page, 'dimentica le casse');
   await page.waitForTimeout(4000);
-  console.log('DEBUG', (await chiamateAlModello(app)).length, JSON.stringify(await chiamate(app)), (await page.locator('body').innerText().catch(() => '')).slice(-1500));
+  console.log('DEBUG', (await chiamateAlModello(app)).length, await page.locator('.sn-confirm-host, [class*=confirm], [class*=propost]').evaluateAll((els) => els.map((e) => `${e.className}: ${e.innerText.slice(0, 200)}`)));
   await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('Dimenticare il dispositivo Bluetooth\nCasse JBL');
   // Fra la domanda e l'OK si abbina un altro dispositivo con lo stesso nome: parte quello che la conferma ha mostrato.
   await app.evaluate(() => globalThis.__pcDisp.unshift({ indirizzo: '00:11:22:33:44:77', nome: 'Casse JBL', collegato: false }));
