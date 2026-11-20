@@ -14,7 +14,7 @@ import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { paginaDellAiuto, statoDi, clicca, scrivi } from './helpers/riquadri.mjs';
 
 const CODICE = '482913';
 const PAGINA_OTP = `<!doctype html><html><head><title>Banca Esempio</title></head>
