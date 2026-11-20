@@ -583,9 +583,24 @@
       // Lo spazio in coda tiene l'ultima riga vuota alta quanto quella della casella.
       evidenzeEl.appendChild(document.createTextNode(v.slice(at) + ' '));
       evidenzeEl.parentElement.classList.add('sn-fb-campo--evidenze');
+      allineaEvidenze();
+    }
+    // La barra di scorrimento della casella (Windows, Linux) stringe le sue righe: lo sfondo prende lo stesso margine,
+    // se no va a capo altrove e l'evidenza scivola su un'altra riga.
+    function allineaEvidenze() {
+      if (!evidenzeEl.parentElement.classList.contains('sn-fb-campo--evidenze')) return;
+      const cs = getComputedStyle(textEl);
+      const bordi = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+      const barra = Math.max(0, textEl.offsetWidth - textEl.clientWidth - bordi);
+      evidenzeEl.style.paddingRight = `${(parseFloat(cs.paddingRight) || 0) + barra}px`;
       evidenzeEl.scrollTop = textEl.scrollTop;
     }
     textEl.addEventListener('scroll', () => { evidenzeEl.scrollTop = textEl.scrollTop; });
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(() => allineaEvidenze());
+      ro.observe(textEl);
+      stacchi.push(() => ro.disconnect());
+    }
 
     // L'avviso di L0 sopra la casella: frasi e due strade, correggere o mandarlo com'è.
     function mostraRilettura(r) {
