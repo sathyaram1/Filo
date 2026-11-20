@@ -4008,7 +4008,9 @@ class TabManager {
     if (!e || !e.isMainFrame || e.isSameDocument || !e.initiator || this.activeId === tab.id || !this.tabs.includes(tab)) return;
     let da = null;
     try { da = webContents.fromFrame(e.initiator); } catch (_) {}
-    if (!da || da === wc || !this.tabs.some((t) => t.view.webContents === da) || !Permessi.gestoRecente(da)) return;
+    let chiede = '';
+    try { chiede = e.initiator.url; } catch (_) {}
+    if (!da || da === wc || !this.tabs.some((t) => t.view.webContents === da) || !Permessi.gestoPer(da, chiede)) return;
     this.activate(tab.id);
   }
 
