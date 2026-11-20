@@ -45,7 +45,7 @@ test('il corpo per chiaveDomande: la parola d’ordine in passphrase, senza sess
   assert.deepEqual(await Q.chiamaConChiave({ op: 'elenco', biglietto: 's' }, 'k', { fetchImpl }), { ok: true, domande: [] });
   assert.match(viste[0].url, /\/chiaveDomande$/);
   assert.equal(viste[0].init.headers.Authorization, undefined, 'niente token admin con la chiave');
-  assert.deepEqual(JSON.parse(viste[0].init.body), { data: { op: 'elenco', passphrase: 'k' } });
+  assert.deepEqual(JSON.parse(viste[0].init.body), { data: { op: 'elenco', biglietto: 's', passphrase: 'k' } });
   const rifiuto = async () => ({ ok: false, status: 403, json: async () => ({ error: { message: 'serve la chiave owner-non-fidato' } }) });
   await assert.rejects(Q.chiamaConChiave({ op: 'elenco' }, 'k', { fetchImpl: rifiuto }), /Non riuscito: serve la chiave owner-non-fidato/);
   const assente = async () => ({ ok: false, status: 404, json: async () => ({}) });
