@@ -25,6 +25,7 @@
         { testo: 'Sul Mac e su Linux, quando Filo allinea due cartelle con rsync --delete o rclone sync, che cancellano dalla destinazione senza cestino, ti chiede di digitare «conferma» come per robocopy /MIR su Windows. Prima bastava un OK.', segnalazione: 1909 },
         { testo: 'In modalità terminale, copiare o spostare un file sopra le impostazioni o gli hook di git, o scegliere con git config il programma che git fa partire, ti chiede di digitare «conferma», come scriverci con una redirezione. Prima bastava un OK.', segnalazione: 2619 },
         { testo: 'Un comando git che fa partire un altro programma, come un rebase con -x o un submodule foreach, ti chiede di scrivere «conferma», come se quel programma lo lanciassi da solo.', segnalazione: 2619 },
+        { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
       ],
     },
     {
