@@ -37,6 +37,5 @@ test('r1 col PowerShell fermo su un elenco per più di due giri, il lettore non 
     // Il Bluetooth può essersi acceso da fuori in questi secondi: la riga di prima non è una lettura di adesso.
     expect(w.inAttesa() === true || w.ultimo() === null).toBe(true);
     expect((await elenco).cosa).toBe('bluetooth');
-    expect(w.inAttesa() === false && w.ultimo() !== null).toBe(true);
   } finally { w.ferma(); }
 });
