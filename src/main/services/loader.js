@@ -16,6 +16,7 @@ require(path.join(SHARED, 'contenutoEsterno.js'));
 // Il marchio della UI di Filo dentro le pagine web: serve ai content script,
 // ma sta fra i moduli condivisi e segue l'ordine di tutti gli altri.
 require(path.join(SHARED, 'filoUi.js'));
+require(path.join(SHARED, 'fontGenerico.js')); // #1342 — carattere scelto → famiglia generica, per i riquadri sui siti
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
 // Cronologia appunti: la chiave di una voce e i testi delle sue azioni, uguali

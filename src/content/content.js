@@ -1123,6 +1123,9 @@
   function applyThemeTokens(tokens) {
     const reg = self.SN_THEME_TOKENS;
     if (reg) reg.applyToDocument(document, tokens || {});
+    // I riquadri chiusi sui siti non leggono --sn-font dal documento (lo scrive anche il sito): il carattere glielo
+    // diciamo da qui, e la famiglia generica la sceglie SN_FILO_UI (#1342).
+    self.SN_FILO_UI?.carattereScelto?.(tokens && tokens.font);
   }
 
   // Il vero elemento cliccato. Il listener contextmenu vive su window (via il

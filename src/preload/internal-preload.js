@@ -125,6 +125,7 @@ function loadContentScripts() {
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
   // la disegnano, lo legge chi cammina sulla pagina.
   safe(path.join(SHARED, 'filoUi.js'), 'SN_FILO_UI');
+  safe(path.join(SHARED, 'fontGenerico.js'), 'SN_FONT_GENERICO');
   safe(path.join(SHARED, 'i18n.js'), 'SN_I18N');
   safe(path.join(SHARED, 'clipboardHistory.js'), 'SN_CLIPBOARD'); // #256 — cronologia appunti: chiave e testi uguali da ogni parte
   safe(path.join(SHARED, 'messages.js'), 'SN_MSG');

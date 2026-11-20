@@ -1299,12 +1299,36 @@
     if (!el) return el;
     if (opts.sticky) el.dataset.snSticky = '1';
     global.SN_AVVISI.chiudibile(el, opts.chiudi || (() => unmountToast(el)), opts.azioni);
+    aggiungiX(el);
     tempi().segui(el);
     toastHost().appendChild(el);
     tempi().ripulisci();
     enforceToastCap();
     syncToastOverflow();
     return el;
+  }
+
+  // La X di ogni avviso della pila (#1677) chiama la chiusura registrata in quel momento, la stessa del «Chiudi» del
+  // tasto destro: chi la registra dopo il montaggio (showToast) vale anche qui. Il clic finto del sito non chiude.
+  function aggiungiX(el) {
+    // Un avviso che è tutto un tasto (la pill della dettatura: premerla è chiuderla) non ne contiene un altro.
+    if (el.tagName === 'BUTTON' || el.querySelector(':scope > .sn-toast-x')) return;
+    const x = document.createElement('button');
+    x.type = 'button';
+    // Il segno lo disegna il CSS: nel testo dell'avviso (letto, copiato, controllato) una × in coda non c'entra.
+    x.className = 'sn-toast-x';
+    x.title = I18n.t('popup_close');
+    x.setAttribute('aria-label', I18n.t('popup_close'));
+    x.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); });
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const vero = global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted;
+      if (!vero) return;
+      const reg = global.SN_AVVISI.avvisoSotto(el);
+      if (reg) reg.chiudi(); else unmountToast(el);
+    });
+    el.appendChild(x);
   }
 
   // Da chiamare quando un elemento agganciato esce di scena: rimuove e
