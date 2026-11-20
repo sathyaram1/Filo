@@ -128,7 +128,8 @@
     if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test((ops[0] || '').toLowerCase())) return 3;
     // Una chiave che avvia un programma, scritta, lo fa partire al prossimo comando di git che resta a 2: `core.editor`
     // a commit, `core.sshCommand` a fetch. Il programma scritto nel comando chiede come se lo si lanciasse (#2621).
-    if (scrive && gitConfigScriveLancia(ops)) return 3;
+    // `--get chiave modello` legge: git rifiuta due azioni insieme.
+    if (scrive && !low.some((a) => /^--get(-|$)/.test(a)) && gitConfigScriveLancia(ops)) return 3;
     if (low.some((a) => a === '--add' || a === '--replace-all' || a === '-e' || a === '--edit')) return 2;
     if (ops.length >= 2) return 2; // `chiave valore` imposta
     // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
