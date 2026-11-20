@@ -3119,6 +3119,7 @@ class TabManager {
       if (!this.codaRiapertura.subito(tab)) this._caricaRinviata(tab);
       return;
     }
+    if (this._caduta(tab) && this._passoDallaCaduta(tab, 0)) return;
     // #327 — parità di cammini: ricaricare una scheda che mostra la pagina
     // d'errore deve RITENTARE il sito fallito (come il bottone "Riprova"),
     // non ricaricare la pagina d'errore stessa.
