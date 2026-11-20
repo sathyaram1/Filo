@@ -119,7 +119,7 @@ describe('il segno della corsa di finish:check', () => {
   });
   const fine = (c) => new Promise((ok) => c.once('exit', (codice, segnale) => ok({ codice, segnale })));
 
-  test('ucciso con SIGKILL il segno resta, col processo morto: la corsa è interrotta e la sua uscita è 137', { skip: process.platform === 'win32' }, async () => {
+  test('ucciso con SIGKILL il segno resta, col processo morto: la corsa è interrotta, senza un numero che il segno non sa', { skip: process.platform === 'win32' }, async () => {
     const root = repo();
     const c = await lancia(root);
     assert.equal(corsaInterrotta(root), null, 'finché il processo vive la corsa non è interrotta');
@@ -129,9 +129,26 @@ describe('il segno della corsa di finish:check', () => {
     const s = corsaInterrotta(root);
     assert.ok(s, 'il segno è rimasto');
     assert.equal(s.fase, 'spec delle aree toccate — lotto 2/3');
-    assert.equal(s.segnale, undefined);
-    assert.equal(codiceDellaCorsa(s), CODICE_SIGKILL);
+    assert.match(guastoDellaCorsa(s, null), /^guasto: strumento finish-check: finish:check interrotto senza finire \(fase spec delle aree toccate — lotto 2\/3/);
+    assert.doesNotMatch(testoPerIlWorker(s, null), /137|ucciso \(/);
   });
+
+  // Verifica #2571 giro 2, r1: il worker ferma la corsa che non gli serve più (lo strumento dei comandi in sottofondo,
+  // Ctrl+C). Il segno non sa il segnale: non deve dire «ucciso (137)», e il testo deve lasciargli il caso della fermata.
+  for (const segnale of ['SIGTERM', 'SIGINT']) {
+    test(`fermata apposta con ${segnale}: niente «processo ucciso (137)», e il worker legge che se l'ha fermata lui non è un guasto`, { skip: process.platform === 'win32' }, async () => {
+      const root = repo();
+      const c = await lancia(root);
+      const finito = fine(c);
+      c.kill(segnale);
+      assert.equal((await finito).segnale, segnale);
+      const testo = testoPerIlWorker(corsaInterrotta(root), null);
+      assert.doesNotMatch(testo, /processo ucciso|\(137\)/);
+      assert.match(testo, /^La corsa di finish:check si è interrotta senza finire: fase spec delle aree toccate/);
+      assert.match(testo, /Se l'hai fermata tu \(lo strumento che ferma i comandi in sottofondo, Ctrl\+C\) non è un guasto/);
+      assert.match(testo, /Se l'ha fermata il tempo massimo del comando, rilanciala in sottofondo col tetto più largo/);
+    });
+  }
 
   test('fermata durante una prova lanciata in modo sincrono la corsa si ferma subito, e un\'uscita normale toglie il segno', { skip: process.platform === 'win32' }, async () => {
     // Un gestore dei segnali girerebbe solo a prova finita: la corsa fermata lancerebbe ancora il lotto dopo.
