@@ -92,6 +92,77 @@ test('le letture dello strumento delle domande portano il biglietto della sessio
   assert.equal(mandate[0].biglietto, undefined);
 });
 
+test('#2027.3: col server giù il segno resta annotato, parte alla chiamata dopo, e intanto il biglietto non va con le scritture', async () => {
+  await conBiglietto(async ({ env, cwd }) => {
+    const giu = localTicket({ rompi: true });
+    const r = await B.segnaRiservato('letto #813', { env, cwd, deps: giu.deps });
+    assert.equal(r.segnati, 0);
+    assert.equal(r.inAttesa, 1);
+    const [b] = B.trovaBiglietti({ env, cwd });
+    assert.deepEqual(B.riservatiInAttesa(b).map((v) => v.motivo), ['letto #813']);
+    assert.match(await B.rigaRiservato('letto #814', { env, cwd, deps: giu.deps }), /annotato in locale e parte alla prossima chiamata.*nascono riservati/);
+    // Ancora giù: compiti e domande partono senza biglietto, e il server li fa riservati.
+    assert.equal(await B.segretoPerScrivere({ env, cwd, deps: giu.deps }), '');
+    assert.equal((await B.trovaBiglietto({ env, cwd, deps: giu.deps })).riservatoInAttesa, 2);
+
+    // Il server torna: la prima chiamata consegna il segno, poi il biglietto scrive di nuovo col suo nome.
+    const su = localTicket();
+    assert.equal(await B.segretoPerScrivere({ env, cwd, deps: su.deps }), SEGRETO);
+    const riservato = su.chiamate.find((c) => c.op === 'riservato');
+    assert.ok(riservato, JSON.stringify(su.chiamate));
+    assert.match(riservato.motivo, /letto #813; letto #814/);
+    assert.ok(su.chiamate.indexOf(riservato) < su.chiamate.findIndex((c) => c.op === 'stato'), 'il segno parte prima di leggere lo stato');
+    assert.deepEqual(B.riservatiInAttesa(b), []);
+  });
+});
+
+test('#2027.3: senza biglietto leggere dati privati lo dice, come per lo sporco', async () => {
+  const fuori = cartellaTemporanea('senza-');
+  try {
+    const riga = await B.rigaRiservato('letto #813', { env: {}, cwd: fuori, deps: localTicket().deps });
+    assert.match(riga, /Nessun biglietto trovato da qui.*nascono riservati/);
+    const righe = await dichiaraLettura({ numero: '813', motivi: [] }, { riserva: (cosa) => B.rigaRiservato(cosa, { env: {}, cwd: fuori }) });
+    assert.equal(righe.length, 1);
+    assert.match(righe[0], /node scripts\/biglietto\.mjs riservato "letto #813"/);
+  } finally {
+    togliCartella(fuori);
+  }
+});
+
+test('#2027.3: domanda.mjs chiedi si dichiara sessione, così senza biglietto il server la fa riservata', async () => {
+  const mandate = [];
+  const domandaFile = JSON.stringify({ titolo: 'Una scelta', priorita: 'importante', problema: 'Due strade.', opzioni: [] });
+  const io = {
+    chiama: async (data) => { mandate.push(data); return { ok: true, id: 'D-5', fiducia: 'non_fidato' }; },
+    biglietto: async () => '', credenziale: async () => ({ tipo: 'admin' }), bigliettoLocale: async () => '',
+    leggiFile: () => domandaFile, sporca: async () => '', scrivi: () => {}, errore: () => {},
+  };
+  assert.equal(await domanda(['chiedi', 'd.json'], io), 0);
+  assert.deepEqual([mandate[0].op, mandate[0].sessione, mandate[0].biglietto], ['chiedi', true, undefined]);
+});
+
+test('#2027.3: con la chiave del manutentore il biglietto della sessione va col corpo, perché il server segni le letture', () => {
+  assert.deepEqual(manutentore.corpoManutentore({ passphrase: 'k' }, 'leggi', { numero: '813' }, { bigliettoLocale: SEGRETO }),
+    { passphrase: 'k', op: 'leggi', dati: { numero: '813' }, bigliettoLocale: SEGRETO });
+  assert.deepEqual(manutentore.corpoManutentore({ ticket: 't1' }, 'leggi', {}, { bigliettoLocale: SEGRETO }), { ticket: 't1', op: 'leggi', dati: {} },
+    'col biglietto del manutentore il segno lo prende lui');
+  assert.deepEqual(manutentore.corpoManutentore({ passphrase: 'k' }, 'stato'), { passphrase: 'k', op: 'stato', dati: {} });
+});
+
+test('#2027.3: le risposte alla domanda di fine sessione prendono sporco e segno riservato prima di uscire', async () => {
+  const ordine = [];
+  const testo = await leggiRisposte(5, {
+    chiama: async (d) => { ordine.push(['chiama', d.op, d.limit]); return { answers: [] }; },
+    sporca: async (cosa) => { ordine.push(['sporca', cosa]); return 'sporcato'; },
+    riserva: async (cosa) => { ordine.push(['riserva', cosa]); return 'riga del segno'; },
+    errore: (s) => ordine.push(['errore', s]),
+  });
+  assert.equal(typeof testo, 'string');
+  assert.deepEqual(ordine.map((x) => x[0]), ['chiama', 'sporca', 'errore', 'riserva', 'errore']);
+  assert.match(ordine[3][1], /risposte delle routine/);
+  assert.equal(ordine[4][1], 'riga del segno');
+});
+
 test('l’elenco dei compiti porta il biglietto, e la creazione dice se il compito è riservato', async () => {
   const mandate = [];
   const scritto = [];
