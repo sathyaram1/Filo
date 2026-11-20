@@ -609,15 +609,17 @@
           const pos = [];
           for (let i = 0; i < t.length; i++) if (/[A-Za-z0-9]/.test(t[i])) pos.push(i);
           const at = piatto.indexOf(cerca);
-          t = t.slice(0, pos[at]) + OSCURATO + t.slice(pos[at + cerca.length - 1] + 1);
+          const a = pos[at];
+          const b = pos[at + cerca.length - 1] + 1;
+          t = t.slice(0, a) + segno(t.slice(a, b)) + t.slice(b);
           piatto = alnumMinuscolo(t);
         }
       }
     }
-    return haFinestra(piatto, finestre) ? togliFinestre(t, finestre) : t;
+    return haFinestra(piatto, finestre) ? togliFinestre(t, finestre, segno) : t;
   }
 
-  function oscuraSegreti(valore, segreti) {
+  function chiaviDi(segreti) {
     const chiavi = [];
     const finestre = new Set();
     for (const x of Array.isArray(segreti) ? segreti : []) {
@@ -627,6 +629,29 @@
       chiavi.push({ v, norm: p.norm, rov: rovescio(p.norm), nuclei: p.nuclei, re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
       for (const f of finestreSegreto(p)) finestre.add(f);
     }
+    return { chiavi, finestre };
+  }
+
+  // Dove un testo porta un segreto custodito, riconosciuto come lo riconosce oscuraSegreti (anche travestito o senza
+  // prefisso): `[[inizio, fine]]` nel testo originale. Chi avvisa l'utente deve vedere quello che il modello non vede.
+  const SEGNO_TRATTO = '\u0000';
+  function trattiSegreti(testoLetto, segreti) {
+    const s = testo(testoLetto).split(SEGNO_TRATTO).join(' ');
+    const { chiavi, finestre } = chiaviDi(segreti);
+    if (!chiavi.length || !s) return [];
+    const segnato = oscuraTesto(s, chiavi, finestre, (tolto) => SEGNO_TRATTO.repeat(tolto.length));
+    const out = [];
+    for (let i = segnato.indexOf(SEGNO_TRATTO); i >= 0; i = segnato.indexOf(SEGNO_TRATTO, i)) {
+      let j = i;
+      while (segnato[j] === SEGNO_TRATTO) j++;
+      out.push([i, j]);
+      i = j;
+    }
+    return out;
+  }
+
+  function oscuraSegreti(valore, segreti) {
+    const { chiavi, finestre } = chiaviDi(segreti);
     if (!chiavi.length || valore == null) return valore;
     // Lo stesso oggetto quando non c'è niente da togliere: chi lo riceve non paga una copia.
     const giro = (v, n) => {
