@@ -1110,6 +1110,8 @@ class TabManager {
       // Zoom da ripristinare in una copia (0 = 100%), una volta a fine carico.
       restoreZoomLevel: typeof restoreZoomLevel === 'number' ? restoreZoomLevel : null,
       partition,
+      // La sessione del file che questa scheda ha aperto: vale finché la scheda vive (FileDelComputer.revoca).
+      _fileConcesso: fileConcesso || null,
       partitionSite: isInternal ? null : (adotta && adotta.sito) || Cookies.registrableOf(url),
       // Proxy per-tab ("Apri da un altro paese"): { country, tier } finché la
       // tab è instradata da un altro paese, null altrimenti. Vedi setTabProxy.
