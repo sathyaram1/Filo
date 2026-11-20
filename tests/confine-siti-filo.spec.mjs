@@ -5,6 +5,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const OPZIONI = 'filo://options/options.html';
 const HOME = 'filo://newtab/';
@@ -127,17 +128,10 @@ test('dai canali dei content script un sito apre una pagina di Filo solo dopo il
 
 // Le pagine https della finestrella le serve Filo stesso, come in tests/finestrella-di-accesso.spec.mjs.
 async function servi(app, pagine) {
-  await app.evaluate(({ session, net }, pg) => {
-    const risposta = (req) => {
-      const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname];
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
-    };
-    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-    session.defaultSession.protocol.handle('https', risposta);
+  await serviSiti(app, pagine, { schemi: ['https'] });
+  await app.evaluate(() => {
     globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
-  }, pagine);
+  });
 }
 const GOOGLE = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=1&redirect_uri=x';
 const finestrella = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()

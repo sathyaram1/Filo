@@ -56,6 +56,10 @@
   const ID_TASTI = TASTI.map((t) => t.id);
   const carta = (id) => CARTE.find((c) => c.id === id) || null;
   const tasto = (id) => TASTI.find((t) => t.id === id) || null;
+  // Chi può avere una lettera del doppio tocco (#2372): i tasti, e le carte che aprono un'app («Filo ti suggerisce» non
+  // ha dove portare). La chiedono il salvataggio, le Preferenze, il tasto destro e la home che la esegue.
+  const conLettera = () => [...TASTI, ...CARTE.filter((c) => c.url)];
+  const prendeLettera = (id) => conLettera().find((t) => t.id === id) || null;
   const lista = (v) => (Array.isArray(v) ? v : []);
   const unici = (arr) => [...new Set(arr)];
   const chiaveValida = (k) => typeof k === 'string' && k.length > 0 && k.length <= TETTO_CHIAVE;
@@ -340,7 +344,7 @@
 
   global.SN_CARTE_HOME = {
     CARTE, APP, TASTI, SEGNALAZIONI, IDS, ID_TASTI, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
-    carta, tasto, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
+    carta, tasto, conLettera, prendeLettera, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
     downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
     chiaveTimer, chiaveDownload, cartaDiAvviso,
   };

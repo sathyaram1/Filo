@@ -96,16 +96,24 @@ module.exports = function register(on, ctx) {
     const chatId = isFilo(origin) && typeof msg.chatId === 'string' ? msg.chatId : '';
     // La segnalazione che Filo aveva proposto in chat (#360), confermata: la contano i contatori del servizio (#1472).
     const a = msg && msg.action;
-    if (isFilo(origin) && a && a._proposta === true && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK') {
+    // «Manda così» dopo la rilettura (#1403.1) è la stessa conferma ripetuta: non si conta due volte.
+    const senzaRilettura = msg && msg.senzaRilettura === true;
+    if (isFilo(origin) && a && a._proposta === true && !senzaRilettura && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK') {
       require('../contatoriServizio').misura('proposta', 'confermata');
     }
     // #1668 — di una segnalazione partono solo gli allegati che il riquadro di una pagina di Filo ha mostrato e l'utente ha tenuto.
     const AS = globalThis.SN_ALLEGATI_SEGNALAZIONE;
     let azione = msg.action;
-    if (a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK' && AS && AS.haAllegati(a)) {
+    if (a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK' && AS && AS.haAllegati(a) && msg.assistente === true) {
+      // #1664 — dall'Aiuto: le immagini che l'utente gli ha dato e ha tenuto nel riquadro, che sta nello strato di Filo e
+      // non nel sito. L'azione resta com'era, perché la conferma da un sito combacia con la richiesta solo così.
+      azione = { ...a, _allegatiIndicati: true, _immaginiAiuto: msg.immaginiAiuto && typeof msg.immaginiAiuto === 'object' ? msg.immaginiAiuto : {} };
+    } else if (a && String(a.type || '').toUpperCase() === 'INVIA_FEEDBACK' && AS && AS.haAllegati(a)) {
       azione = { ...AS.soloQuesti(a, isFilo(origin) && Array.isArray(msg.allegatiScelti) ? msg.allegatiScelti : []), _allegatiIndicati: true };
+      // #1664 — le immagini che solo il riquadro sa ridisegnare: valgono per le voci che il main ha segnato da preparare.
+      if (isFilo(origin) && msg.allegatiPreparati && typeof msg.allegatiPreparati === 'object') azione._allegatiPreparati = msg.allegatiPreparati;
     }
-    const r = await executeFiloAction(azione, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg), chatNelFilo: chatId, nelFilo: 'conferma' });
+    const r = await executeFiloAction(azione, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg), chatNelFilo: chatId, nelFilo: 'conferma', senzaRilettura });
     if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.

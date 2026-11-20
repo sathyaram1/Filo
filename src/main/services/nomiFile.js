@@ -349,8 +349,12 @@ async function proponi(percorso) {
   } catch (e) {
     // Una frase per l'utente, mai il messaggio grezzo del fornitore (quello resta nei log).
     console.warn('[Filo nomi] proposta non riuscita:', (e && e.message) || e);
+    // `rimedio`: la frase che nomina Crediti o Opzioni porta il tasto per andarci, su ogni superficie (#1344.2).
     const CE = globalThis.SN_CHAT_ERRORS;
-    return { ok: false, errore: 'modello', frase: (CE && CE.sentence(e)) || 'Il modello non ha risposto: riprova', ...fondo };
+    return {
+      ok: false, errore: 'modello', frase: (CE && CE.sentence(e)) || 'Il modello non ha risposto: riprova', ...fondo,
+      ...(CE ? { rimedio: CE.perIlRimedio(e) } : {}),
+    };
   }
   const proposta = N().pulisci(grezzo, { ext });
   if (!proposta) return { ok: false, errore: 'nessun_nome', frase: frase('nessun_nome'), ...fondo };

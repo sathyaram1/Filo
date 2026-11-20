@@ -152,13 +152,16 @@
   }
 
   let menuAperto = null;
+  // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+  let scorsoDopo = () => true;
+  function scorre(ev) { if (scorsoDopo(ev)) chiudiMenu(); }
   function chiudiMenu() {
     if (!menuAperto) return;
     menuAperto.remove();
     menuAperto = null;
     document.removeEventListener('mousedown', fuori, true);
     document.removeEventListener('keydown', tasto, true);
-    window.removeEventListener('scroll', chiudiMenu, true);
+    window.removeEventListener('scroll', scorre, true);
     window.removeEventListener('resize', chiudiMenu);
   }
   function fuori(ev) { if (menuAperto && !menuAperto.contains(ev.target)) chiudiMenu(); }
@@ -174,6 +177,7 @@
   }
   function apriMenu(x, y, items) {
     chiudiMenu();
+    scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop bd-mia-menu';
     menu.setAttribute('role', 'menu');
@@ -203,7 +207,7 @@
     setTimeout(() => {
       if (menuAperto !== menu) return;
       document.addEventListener('mousedown', fuori, true);
-      window.addEventListener('scroll', chiudiMenu, true);
+      window.addEventListener('scroll', scorre, true);
       window.addEventListener('resize', chiudiMenu);
     }, 0);
   }

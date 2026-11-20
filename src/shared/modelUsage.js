@@ -101,6 +101,9 @@
     user('file-name', 'Nome sensato a un file', 'File', A.FILE_NAME,
       'Legge l\'inizio del testo o una miniatura del file e propone un nome che dice cosa contiene. Serve un modello che veda le immagini.'),
 
+    user('image-gen', 'Immagini create in chat', 'Home', A.IMAGE_GEN,
+      'Disegna l\'immagine che chiedi a Filo in chat. Serve un modello che restituisca immagini; senza, Filo dice che non può crearle.'),
+
     // Mazzi
     user('decks-chat', 'Mazzi — ricerca carte in chat', 'Mazzi', A.DECKS_CHAT),
     user('decks-opinion', 'Mazzi — parere su una carta', 'Mazzi', A.DECKS_OPINION),

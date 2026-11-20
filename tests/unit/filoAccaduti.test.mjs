@@ -387,7 +387,7 @@ const SEGNO_DAI_TASTI = {
   gesto: ['INVIA_FEEDBACK', 'TOGLI_PERMESSO_SITO', 'EVENTO_CALENDARIO', 'DIMENTICA', 'CORREGGI_MEMORIA',
     'NON_TENERE_APERTA', 'CARTA_HOME', 'BARRA_SITI', 'INSTALLA_AGGIORNAMENTO', 'CANCELLA_ARCHIVIO'],
   // Chat e tasti passano dallo stesso punto, che scrive l'azione: aprire un file, dargli un nome, instradare una scheda.
-  punto: ['VOLUME', 'BLUETOOTH', 'WIFI', 'SPOSTA_ICONA', 'APRI_FILE', 'RINOMINA_FILE', 'PROXY_TAB', 'RIMUOVI_PROXY'],
+  punto: ['VOLUME', 'BLUETOOTH', 'WIFI', 'SPOSTA_ICONA', 'APRI_FILE', 'RINOMINA_FILE', 'PROXY_TAB', 'RIMUOVI_PROXY', 'BLOCCA_PC'],
   // Dai tasti passa dalla porta delle azioni, come la chat.
   porta: ['PULISCI_TAB'],
   // Dai tasti lascia lo stato che scrive: un cambio, una scheda, un documento, una cancellazione, una ricerca.
@@ -401,8 +401,8 @@ const SEGNO_DAI_TASTI = {
   // Nessun tasto la fa: letture, proposte e comandi che si chiedono solo a parole.
   soloFilo: ['SALVA_LEZIONE', 'ONBOARDING', 'CAPACITA_DETTAGLIO', 'LEGGI_IMPOSTAZIONI', 'CERCA_CHAT', 'ESPANDI_FILO',
     'CERCA_SALVATE', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_PAGINA', 'VEDI_SCHERMO', 'CERCA_DOCUMENTI', 'LEGGI_TRASPARENZA',
-    'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', 'RIMUOVI_PROXY_TUTTE', 'TIENI_APERTA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA',
-    'ORDINA_DESKTOP', 'ELIMINA_FILE', 'SCHEDE_CHIUSE', 'RIPRENDI_AUDIO', 'PAUSA_AUDIO', 'MOSTRA_SCHEDA'],
+    'CANCELLA_MEMORIA', 'LEGGI_MEMORIA', 'ESEGUI_COMANDO', 'RIMUOVI_PROXY_TUTTE', 'TIENI_APERTA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA',
+    'ORDINA_DESKTOP', 'ELIMINA_FILE', 'SCHEDE_CHIUSE', 'RIPRENDI_AUDIO', 'PAUSA_AUDIO', 'MOSTRA_SCHEDA', 'IMMAGINI_WEB', 'GENERA_IMMAGINE'],
 };
 
 test('ogni azione del catalogo dice dove nasce il suo segno quando la fa l\'utente coi tasti, e ogni tasto dichiarato esiste', () => {

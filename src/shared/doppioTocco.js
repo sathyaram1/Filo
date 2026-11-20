@@ -38,18 +38,14 @@
     } catch (_) { return ''; }
   }
 
-  const tastiNoti = () => {
-    const H = global.SN_CARTE_HOME;
-    if (!H) return [];
-    // Le carte valgono se aprono un'app: «Filo ti suggerisce» non ha dove portare.
-    return [...H.TASTI, ...H.CARTE.filter((c) => c.url)].map((t) => t.id);
-  };
+  // Chi può avere una lettera lo dice solo carteHome.js (conLettera): qui, nella home e nelle Preferenze.
+  const prende = (id) => !!(global.SN_CARTE_HOME && typeof id === 'string' && global.SN_CARTE_HOME.prendeLettera(id));
 
   function voce(v) {
     if (!v || typeof v !== 'object') return null;
     const l = lettera(v.lettera);
     if (!l) return null;
-    if (typeof v.tasto === 'string' && tastiNoti().includes(v.tasto)) return { lettera: l, tasto: v.tasto };
+    if (prende(v.tasto)) return { lettera: l, tasto: v.tasto };
     const url = indirizzo(v.url);
     return url ? { lettera: l, url } : null;
   }
@@ -79,14 +75,20 @@
   const diTasto = (cfg, id) => normalizza(cfg).lettere.find((x) => x.tasto === id) || null;
 
   // Assegna `l` a un tasto o a un indirizzo. Una lettera ha un'azione sola; un tasto ha una lettera sola, così «cambia
-  // lettera» dal suo tasto destro non ne lascia una vecchia. → { lettere } | { rifiuto }
+  // lettera» dal suo tasto destro non ne lascia una vecchia. `sostituita`: quello che la lettera apriva prima, se era
+  // un'altra cosa: chi la ridà deve saperlo. → { lettere, sostituita } | { rifiuto }
   function assegna(cfg, l, bersaglio) {
     const x = voce({ lettera: l, ...(bersaglio || {}) });
     if (!lettera(l)) return { rifiuto: 'serve una lettera sola' };
     if (!x) return { rifiuto: 'serve un tasto della home o un indirizzo da aprire' };
-    const resto = normalizza(cfg).lettere.filter((v) => v.lettera !== x.lettera && !(x.tasto && v.tasto === x.tasto));
-    return { lettere: [...resto, x] };
+    const prima = normalizza(cfg).lettere;
+    const vecchia = prima.find((v) => v.lettera === x.lettera);
+    const resto = prima.filter((v) => v !== vecchia && !(x.tasto && v.tasto === x.tasto));
+    const sostituita = vecchia && (vecchia.tasto !== x.tasto || vecchia.url !== x.url) ? vecchia : null;
+    return { lettere: [...resto, x], sostituita };
   }
+  // La frase che accompagna un'assegnazione: «yy → example.com (prima apriva youtube.com)».
+  const conPrima = (testo, r) => (r && r.sostituita ? `${testo} (prima apriva ${nomeBersaglio(r.sostituita)})` : testo);
   function togli(cfg, l) {
     return { lettere: normalizza(cfg).lettere.filter((v) => v.lettera !== lettera(l)) };
   }
@@ -120,10 +122,10 @@
     const dove = m[2].trim().replace(/^(apre|apri|a|ad|per|su)\s+/i, '');
     const H = global.SN_CARTE_HOME;
     const id = H ? H.risolvi(dove, { esatto: true }) || H.risolvi(dove.replace(/^(la|il|lo|l')\s*/i, '').replace(/^(pagina|app)\s+(de(i|gli|ll[ae']?|l)\s*)?/i, ''), { esatto: true }) : null;
-    const bersaglio = id && tastiNoti().includes(id) ? { tasto: id } : { url: dove };
+    const bersaglio = prende(id) ? { tasto: id } : { url: dove };
     const r = assegna(cfg, l, bersaglio);
     if (r.rifiuto) return r;
-    return { lettere: r.lettere, label: `Doppio tocco: ${etichetta(r.lettere[r.lettere.length - 1])}` };
+    return { lettere: r.lettere, sostituita: r.sostituita, label: conPrima(`Doppio tocco: ${etichetta(r.lettere[r.lettere.length - 1])}`, r) };
   }
 
   // Il riconoscimento, una battuta alla volta. `b`: { key, repeat, mod (Ctrl/Alt/Cmd premuti), t (ms), vuoto (il campo
@@ -158,6 +160,6 @@
 
   global.SN_DOPPIO_TOCCO = {
     SOGLIA_LIMITI, SOGLIA_DI_SERIE, TETTO_LETTERE,
-    lettera, indirizzo, normalizza, sogliaMs, diLettera, diTasto, assegna, togli, daTesto, etichetta, nomeBersaglio, riconoscitore,
+    lettera, indirizzo, normalizza, sogliaMs, diLettera, diTasto, assegna, conPrima, togli, daTesto, etichetta, nomeBersaglio, riconoscitore,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

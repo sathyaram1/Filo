@@ -341,6 +341,11 @@ test('il codice che l’utente scrive in chat esce anche dopo l’OK, dove l’h
   await page.locator('#input').fill(`manda una segnalazione a Filo: il codice ${CODICE} della banca arriva dopo dieci minuti`);
   await page.locator('#sendBtn').click();
   await clickConfirm(page, 'ok', { timeout: 20_000 });
+  // La rilettura L0 (#1403.1) ripropone la segnalazione col codice segnato: il freno delle uscite non la ferma, e
+  // «Manda così» la manda com'è.
+  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
+  expect(await app.evaluate(() => globalThis.__fbInviati.length)).toBe(0);
+  await clickConfirm(page, 'ok');
   await expect.poll(() => app.evaluate(() => globalThis.__fbInviati.length), { timeout: 10_000 }).toBe(1);
   expect(JSON.stringify(await app.evaluate(() => globalThis.__fbInviati))).toContain(CODICE);
   await expect(page.locator('.dash-activity-row', { hasText: 'Non ho inviato' })).toHaveCount(0);

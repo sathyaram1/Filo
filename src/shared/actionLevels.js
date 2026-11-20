@@ -630,6 +630,29 @@
         return ['Cercare sul web ', cit(q)];
       },
     },
+    // #2272 — come CERCA_WEB: la ricerca porta fuori la sua query, e il main alza il costo se ci viaggia un segreto.
+    IMMAGINI_WEB: {
+      costo: (a) => (a && a._exfil ? 2 : 0),
+      campo: 'web',
+      uscita: (a) => ricercaImmaginiDi(a),
+      fonte: (a, out) => (Array.isArray(out.immagini) && out.immagini.length
+        ? { classe: 5, campo: 'web', chiave: 'web:immagini', motivo: 'ho cercato immagini sul web' } : null),
+      describe: (a) => {
+        const q = ricercaImmaginiDi(a);
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return [`Cercare immagini sul web con un testo${why}:\n`, cit(q),
+            '\n\nPotrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.'];
+        }
+        return ['Cercare immagini di ', cit(q)];
+      },
+    },
+    // Disegnare costa qualche centesimo e non tocca niente dell'utente: si annulla ignorando l'immagine.
+    GENERA_IMMAGINE: {
+      costo: 1,
+      campo: null,
+      describe: (a) => ['Disegnare un\'immagine: ', cit(String(a.descrizione || a.prompt || ''))],
+    },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
       // le cose che ha scoperto o detto e dichiara quando l'intervista è
@@ -925,6 +948,13 @@
       campo: null,
       describe: (a) => (a && a.doc ? ['Rileggere la pagina di trasparenza ', cit(String(a.doc), true)] : 'Rileggere la pagina di trasparenza'),
     },
+    LEGGI_MEMORIA: {
+      // #2536.1 — la stessa memoria che la chat ha di solito nel CONTESTO: sola lettura, niente esce.
+      costo: 0,
+      campo: null,
+      describe: () => 'Rileggere la memoria',
+      describeDone: () => 'Riletta la memoria',
+    },
     EVENTO_CALENDARIO: {
       costo: 1,
       campo: null,
@@ -1156,16 +1186,14 @@
         const label = (t && t.label) || estTok(a) || 'un elemento';
         const val = estVal(a);
         if (a && a._illegible) {
-          // Nel popup solo parole di Filo: un token del registro e un valore valido.
+          // Nel popup solo parole di Filo: un token del registro e un colore valido, che non sa dire frasi.
           const nome = (t && t.label) || 'un elemento';
-          const valido = T && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
+          const valido = t && t.type === 'color' && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
           return `Cambiare “${nome}” a ${valido} renderebbe il testo `
             + `quasi illeggibile (colore troppo vicino allo sfondo). Applico comunque?`;
         }
-        // Fuori dal registro nome e valore sono del modello: stanno nel riquadro.
-        const valOk = !!(t && val && T.validate && T.validate(estTok(a), val));
-        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]),
-          ...(val ? (valOk ? [` a ${val}`] : [' a ', cit(val, true)]) : [])];
+        // Il valore è del modello anche quando è valido (un font può essere una frase, #592.21): sta nel riquadro.
+        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]), ...(val ? [' a ', cit(val, true)] : [])];
       },
     },
     ESEGUI_COMANDO: {
@@ -1589,6 +1617,12 @@
         return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
       },
     },
+    // Costo 1 (#2377): subito, senza domanda; un blocco non voluto costa solo la password.
+    BLOCCA_PC: {
+      costo: 1,
+      campo: null,
+      describe: () => 'Bloccare il computer',
+    },
     // ── icone del desktop del computer (#1621) ───────────────────────────────
     // Costo 1: ogni riordino è un cambio del filo, e l'annullo rimette ogni icona dov'era.
     ORDINA_DESKTOP: {
@@ -1745,7 +1779,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-    'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO',
+    'LEGGI_MEMORIA', 'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO', 'IMMAGINI_WEB',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
@@ -1881,5 +1915,16 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo, cosaAccount };
+  // Il testo di una ricerca di immagini (#2272): chi la esegue, il freno sulle uscite e quello sui segreti leggono questo.
+  const CAMPI_RICERCA_IMMAGINI = ['query', 'cerca', 'testo', 'q', 'text'];
+  function ricercaImmaginiDi(action) {
+    if (!action || typeof action !== 'object') return '';
+    for (const k of CAMPI_RICERCA_IMMAGINI) {
+      const v = action[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return '';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -10,6 +10,8 @@
   const n = (k) => (k < NUMERI.length ? NUMERI[k] : String(k));
   const TITOLI = {
     CERCA_WEB: ['Cercato sul web', (k) => `Fatte ${n(k)} ricerche sul web`, 'ricerca'],
+    IMMAGINI_WEB: ['Cercate immagini', (k) => `Fatte ${n(k)} ricerche di immagini`, 'immagini'],
+    GENERA_IMMAGINE: ['Disegnata un\'immagine', (k) => `Disegnate ${n(k)} immagini`, 'disegno'],
     CERCA_CHAT: ['Cercato nel filo', (k) => `Fatte ${n(k)} ricerche nel filo`, 'filo'],
     ESPANDI_FILO: ['Riletto il filo', (k) => `Riletto ${n(k)} volte il filo`, 'filo'],
     RICORDO_FILO: ['Ricordato dal filo', (k) => `Ricordati ${n(k)} pezzi del filo`, 'ricordo'],
@@ -45,6 +47,7 @@
     TOGLI_CHAT: ['Tolta una conversazione', (k) => `Tolte ${n(k)} conversazioni`, 'conversazione'],
     RIMETTI_CHAT: ['Rimessa una conversazione', (k) => `Rimesse ${n(k)} conversazioni`, 'conversazione'],
     CORREGGI_MEMORIA: ['Corretta una cosa', (k) => `Corrette ${n(k)} cose`, 'memoria'],
+    LEGGI_MEMORIA: ['Riletta la memoria', (k) => `Riletta la memoria ${n(k)} volte`, 'memoria'],
     CANCELLA_MEMORIA: ['Cancellata la memoria', (k) => `Cancellata la memoria ${n(k)} volte`, 'memoria'],
     CANCELLA_PAGINE: ['Cancellate pagine visitate', (k) => `Cancellate pagine visitate ${n(k)} volte`, 'pagine visitate'],
     IMPOSTA_PREFERENZA: ['Cambiata un\'impostazione', (k) => `Cambiate ${n(k)} impostazioni`, 'impostazione'],
@@ -77,6 +80,7 @@
     BLUETOOTH: ['Comandato il Bluetooth', (k) => `Comandato il Bluetooth ${n(k)} volte`, 'Bluetooth'],
     WIFI: ['Comandato il Wi-Fi', (k) => `Comandato il Wi-Fi ${n(k)} volte`, 'Wi-Fi'],
     ORDINA_DESKTOP: ['Sistemate le icone del desktop', (k) => `Sistemate le icone del desktop ${n(k)} volte`, 'desktop'],
+    BLOCCA_PC: ['Bloccato il computer', (k) => `Bloccato il computer ${n(k)} volte`, 'computer'],
     PULSANTE_PREFERENZE: ['Usato un pulsante delle Preferenze', (k) => `Usati ${n(k)} pulsanti delle Preferenze`, 'Preferenze'],
     RIMEDIO_CREDITI: ['Lavorato sui crediti', (k) => `Lavorato sui crediti ${n(k)} volte`, 'crediti'],
     INSTALLA_AGGIORNAMENTO: ['Avviato l\'aggiornamento', (k) => `Avviato l'aggiornamento ${n(k)} volte`, 'aggiornamento'],

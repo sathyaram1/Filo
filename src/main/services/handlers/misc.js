@@ -85,42 +85,7 @@ async function fetchToFile({ sender, url, politiche, kind = 'image', onHeaders, 
   }
 }
 
-// Stesso volume: rinomina istantanea. Altro disco: copia a blocchi, mai passando dalla
-// memoria.
-async function moveInto(from, to) {
-  const fs = require('node:fs');
-  try {
-    await fs.promises.rename(from, to);
-    return;
-  } catch (e) {
-    if (!e || (e.code !== 'EXDEV' && e.code !== 'EPERM' && e.code !== 'EACCES')) throw e;
-  }
-  await fs.promises.copyFile(from, to);
-  try { await fs.promises.unlink(from); } catch (_) {}
-}
-
-// Nome file dal Content-Disposition se c'è, altrimenti dal path dell'URL.
-function filenameFromHeaders(hdrs, url) {
-  try {
-    const cd = hdrs && hdrs['content-disposition'];
-    if (cd) {
-      // filename*=UTF-8''… (RFC 5987) ha priorità su filename=…
-      let m = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd);
-      if (m) { try { return decodeURIComponent(m[1].trim().replace(/^["']|["']$/g, '')); } catch (_) { return m[1]; } }
-      m = /filename=("?)([^";]+)\1/i.exec(cd);
-      if (m) return m[2].trim();
-    }
-  } catch (_) {}
-  return filenameFromUrl(url);
-}
-
-function filenameFromUrl(url) {
-  try {
-    const u = new URL(url);
-    const base = decodeURIComponent((u.pathname || '').split('/').filter(Boolean).pop() || '');
-    return base || '';
-  } catch (_) { return ''; }
-}
+const { moveInto, filenameFromHeaders, filenameFromUrl } = require('../riprovaConPagina');
 
 // #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
 // da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
@@ -263,6 +228,7 @@ module.exports = function register(on, ctx) {
     segreti: async () => (typeof ctx.segretiCustoditi === 'function' ? ctx.segretiCustoditi() : []),
     redTeam: () => require('../redteamGate').visibile(),
   });
+  require('../feedbackL0').usa(L0);
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo
   // — l'invio non deve MAI fallire per colpa del titolo.
@@ -771,7 +737,7 @@ module.exports = function register(on, ctx) {
       const r = await Outbox.enqueue(payload, { dallOwner, attendiMs: ATTESA_CONSEGNA_MS, trattieni: msg.rileggi === true });
       let tentativo = r?.tentativo;
       if (r?.trattenuta) {
-        const letto = await L0.controlla({ testo: payload.text, immagini: (payload.images || []).map((i) => i && i.dataUrl) });
+        const letto = await L0.controlla({ testo: payload.text, immagini: (payload.images || []).map((i) => i && i.dataUrl), allegati: payload.files });
         if (letto.stato === 'trovato' && await Outbox.ritira(r.id)) {
           const id = String(payload.submissionId);
           // Il riquadro si riapre col testo intatto; senza riquadro la segnalazione resta fra le non partite, da rimandare.

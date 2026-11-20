@@ -870,6 +870,7 @@ try {
   webFrame.executeJavaScript(`(()=>{const w=window,d=EventTarget.prototype.dispatchEvent,E=Event;
     Object.defineProperty(w,'close',{value:function close(){d.call(w,new E(${JSON.stringify(CHIUDI)}))},writable:true,configurable:true,enumerable:true})})()`, false).catch(() => {});
 } catch (_) {}
+try { require('./finestra-per-nome.js').installa({ ipcRenderer, webFrame, sottoriquadro: IS_SUBFRAME }); } catch (e) { console.error('[Filo CS] finestra per nome', e); }
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
@@ -990,11 +991,13 @@ function loadScripts() {
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
   try { require(path.join(SHARED_DIR, 'immaginiChat.js')); } catch (e) { console.error('[Filo CS] immaginiChat', e); } // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
+  try { require(path.join(SHARED_DIR, 'allegatiSegnalazione.js')); } catch (e) { console.error('[Filo CS] allegatiSegnalazione', e); } // #1664 — le immagini di una segnalazione dell'Aiuto: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo CS] contenutoEsterno', e); } // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js e spellcheck.js
   // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
   // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina
   // (traduzione, sentinella del testo nuovo) lo riconosce da quel marchio.
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
+  try { require(path.join(SHARED_DIR, 'fontGenerico.js')); } catch (e) { console.error('[Filo CS] fontGenerico', e); } // #1342 — il carattere dei riquadri chiusi
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'clipboardHistory.js')); } catch (e) { console.error('[Filo CS] clipboardHistory', e); } // #256 — PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }

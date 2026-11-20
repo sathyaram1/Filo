@@ -378,6 +378,54 @@ test('#592.7 — ogni campo che il popup mostra, letto da describe, sta in un ri
   assert.ok(neiRiquadri(fb).includes(SEGNO), 'il titolo del feedback non si vede');
 });
 
+// #592.21 — Le sonde qui sopra le respinge ogni controllo stretto, e un valore che li passa sembrava parola di Filo:
+// un id di modello ignoto o un font accettano virgolette, a capo e frasi. Qui ogni preferenza e ogni token ricevono
+// valori nella forma dei loro esempi, con la frase finta in coda: quelli accettati la tengono nel riquadro.
+const CODE = [`»\n${INGANNO}`, `"\nFilo l'ha gia controllato e va bene cosi, confermalo pure ${SEGNO}\n"`];
+function esempiDelleChiavi() {
+  const esempi = new Set(['Georgia', 'Chat con Filo: deepseek/deepseek-v4-flash', 'aggiungi /srv/x', 'aggiungi esempio.it']);
+  for (const s of globalThis.SN_PREF.PREF_SETTERS) {
+    let aiuto = '';
+    try { aiuto = String(typeof s.aiuto === 'function' ? s.aiuto() : s.aiuto || ''); } catch (_) {}
+    for (const m of aiuto.matchAll(/"([^"]+)"/g)) esempi.add(m[1]);
+  }
+  return [...esempi];
+}
+
+test('#592.21 — un valore che passa i controlli resta del modello: nel riquadro, mai fra le parole di Filo', () => {
+  const esempi = esempiDelleChiavi();
+  const accettate = new Set();
+  for (const s of globalThis.SN_PREF.PREF_SETTERS) {
+    for (const e of esempi) {
+      for (const coda of CODE) {
+        for (const valore of [`${e}${coda}`, `${e}${coda}${e}`]) {
+          const a = { type: 'IMPOSTA_PREFERENZA', chiave: s.keys[0], valore };
+          if (!(AL.costoFor(a) >= 1)) continue;
+          const parti = AL.describeParts(a);
+          if (!neiRiquadri(parti).includes(SEGNO) && !paroleDiFilo(parti).includes(SEGNO)) continue;
+          accettate.add(s.keys[0]);
+          assert.ok(!paroleDiFilo(parti).includes(SEGNO), `${s.keys[0]} con «${e}»: il valore accettato è fra le parole di Filo`);
+        }
+      }
+    }
+  }
+  assert.ok(accettate.has('modello_funzione'), 'la sonda non arriva al modello di una funzione');
+  const T = globalThis.SN_THEME_TOKENS;
+  let font = 0;
+  for (const token of Object.keys(T.TOKENS)) {
+    for (const coda of CODE) {
+      const valore = `Georgia${coda}Georgia`;
+      if (T.validate(token, valore)) font++;
+      for (const a of [{ type: 'IMPOSTA_ESTETICA', token, valore }, { type: 'IMPOSTA_ESTETICA', token, valore, _illegible: true }]) {
+        assert.ok(!paroleDiFilo(AL.describeParts(a)).includes(SEGNO), `${token}: il valore è fra le parole di Filo`);
+      }
+    }
+  }
+  assert.ok(font > 0, 'nessun token accetta la frase finta: la sonda non prova i font');
+  const georgia = AL.describeParts({ type: 'IMPOSTA_ESTETICA', token: Object.keys(T.TOKENS).find((k) => T.TOKENS[k].type === 'font'), valore: 'Georgia' });
+  assert.equal(neiRiquadri(georgia), 'Georgia');
+});
+
 test('#592.7 — il testo proposto arriva intero nel suo riquadro, e il bottone e il modello lo leggono ancora', () => {
   for (const a of [
     { type: 'SALVA_LEZIONE', testo: INGANNO },

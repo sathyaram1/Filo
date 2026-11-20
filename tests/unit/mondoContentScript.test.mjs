@@ -28,6 +28,20 @@ test('il main non scrive a mano il numero del mondo dei content script', () => {
   assert.deepEqual(colpevoli.map((f) => f.slice(ROOT.length + 1)), []);
 });
 
+// Il cercatore dei segni della prova da utente e gli aiutanti delle prove: una copia rimasta indietro dava zero segni e
+// zero riquadri senza dirlo (#2507.1).
+test('gli strumenti delle prove non scrivono a mano il numero del mondo dei content script', () => {
+  const scritto = new RegExp(`(MONDO\\w*\\s*=\\s*${MONDO}\\b|executeJavaScriptInIsolatedWorld\\(\\s*${MONDO}\\b)`);
+  const mjsSotto = (dir) => readdirSync(dir).flatMap((nome) => {
+    const p = join(dir, nome);
+    if (statSync(p).isDirectory()) return nome.startsWith('.') ? [] : mjsSotto(p);
+    return p.endsWith('.mjs') ? [p] : [];
+  });
+  const colpevoli = ['tests/agent', 'tests/helpers'].flatMap((d) => mjsSotto(join(ROOT, d)))
+    .filter((f) => scritto.test(readFileSync(f, 'utf8')));
+  assert.deepEqual(colpevoli.map((f) => f.slice(ROOT.length + 1)), []);
+});
+
 test('le copie dei preload coincidono col numero di mondo-esente', () => {
   for (const [file, nome] of [['src/preload/page-preload.js', 'MONDO_DEL_PRELOAD'], ['src/preload/wheel-zoom.js', 'MONDO_FILO']]) {
     const m = readFileSync(join(ROOT, file), 'utf8').match(new RegExp(`${nome}\\s*=\\s*(\\d+)`));

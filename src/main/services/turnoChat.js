@@ -36,7 +36,7 @@ const {
 } = require('./osservazioniPerModello');
 const {
   noteProvenienzaImmagini, ricordaOrigineInChat, origineGiaLettaInChat, buildMessages, handleAIRequest,
-  lessonsBufferText, lezioniAutomaticheConsentite, maybeRunLessonAgent, compattaDaFermo, parteFissaChat,
+  memoriaPerModello, lezioniAutomaticheConsentite, maybeRunLessonAgent, compattaDaFermo, parteFissaChat, baseDellaChat,
 } = require('./chiamateModello');
 const {
   archiviaDomanda, appendToChatArchive, citazioneDelMessaggio, affidaChat, archiviaAperturaAccoglienza,
@@ -475,6 +475,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       tettiChat = { ...tettiChat, token: finestra };
       contaSe('adattamento', ACTIONS.FILO_CHAT, modelloPrimo, 'finestra_piccola');
     }
+    // Il tetto vale per la richiesta intera: il tratto lascia il posto alla parte fissa (#2473.1).
+    try { tettiChat = { ...tettiChat, fissi: baseDellaChat(require('../shim/storage').inIncognito()) }; } catch (_) {}
     filo = await componiFilo(tettiChat);
   } catch (e) { console.warn('[Filo] tratto del filo non letto, rispondo con la sola scheda:', e?.message || e); }
   const codaScheda = filo && chatId ? filo.coda : cleanHistory;
@@ -501,10 +503,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     && ![...cleanHistory, ...vistiDalFilo, ...codaScheda].some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
   // #2536 — nell'intervista rifatta conta solo quello che l'utente dice lì: la memoria che il modello vedeva la citava,
   // gliela attribuiva o la ricopiava nel profilo, anche col divieto scritto. Fuori dall'intervista torna intera.
+  // La frase che dice al modello che la memoria c'è ma è fuori vale solo con questa decisione (payloadBase).
   const memoriaNascosta = onbActive && onbBefore.rifatta === true;
-  const memory = memoriaNascosta ? null : await FiloMem.getMemory();
-  const { profilo, preferenze, espansioni } = memoriaNascosta ? {} : FiloMem.renderMemoryForPrompt(memory);
-  const lezioni = memoriaNascosta ? '' : await lessonsBufferText();
+  const { profilo, preferenze, espansioni, lezioni } = memoriaNascosta ? {} : await memoriaPerModello();
   // Nel benvenuto delle schede aperte arriva solo il sito: un titolo scritto da una pagina non detta lo stile (#1297).
   const { state: statoDelTurno, stateText, sezioniChat: sezioniDelTurno, attese: attesePrimaDelModello } = await FiloState.assemble({
     creditiFreschi: true, soloSiti: onbActive, finestra: winOf(sender)?.id ?? null, schedaChat: sender?.tab?.id ?? null,
@@ -590,11 +591,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const riprovata = imageList.length && String(m.text || '') === String(userMessage || '');
     const quanteFoto = role === 'user' && !riprovata ? FCx.numeroImmagini(m) : 0;
     if (quanteFoto) content = `${content}\n${FCx.notaImmagini(quanteFoto)}`;
-    // La risposta citata, come la pagina l'ha davanti: qui arrivano solo i messaggi che il filo non ha (#1620).
-    const citataQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPagina(m.rispostaA) : null;
-    if (citataQui && citataQui.testo.trim()) {
-      content = `${FCx.notaRisposta({ role: citataQui.role === 'user' ? 'user' : 'filo', testo: RispostaA.taglia(citataQui.testo, RispostaA.PER_IL_MODELLO) })}\n${content}`;
-    }
+    // Le risposte citate, come la pagina le ha davanti: qui arrivano solo i messaggi che il filo non ha (#1620, #2346).
+    const citateQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPaginaTutte(m.rispostaA) : [];
+    const lette = citateQui.map((c) => {
+      const passo = c.a != null ? c.testo.slice(c.da, c.a) : '';
+      return { role: c.role === 'user' ? 'user' : 'filo', testo: RispostaA.taglia(passo || c.testo, RispostaA.PER_IL_MODELLO), ...(passo || c.passo ? { passo: true } : {}), ...(c.pos ? { pos: c.pos } : {}) };
+    }).filter((c) => c.testo);
+    if (lette.length) content = FCx.conCitazioni(content, lette);
     const msg = { role, content };
     if (role === 'assistant') {
       const parts = [];
@@ -628,10 +631,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   const indiceDomanda = threadMessages.length;
   const giaLetta = origineGiaLettaInChat(chatId);
-  const notaCitazione = FCx.notaRisposta(citazione.citata);
   // #1373 — la ripresa dopo l'OK porta com'è andata, come il risultato di uno strumento: il registro lo scrive, non la scheda.
   const esitoDopoOk = dopoOk ? globalThis.SN_ESITO.perModello(globalThis.SN_ESITO.vociArchivio(dopoOk)) : '';
-  const domandaConCitazione = [notaCitazione, String(userMessage || ''), esitoDopoOk].filter(Boolean).join('\n');
+  const domandaConCitazione = [FCx.conCitazioni(String(userMessage || ''), citazione.citata), esitoDopoOk].filter(Boolean).join('\n');
   const gettoniLetti = notaDeiGettoni(lettureGettoni);
   // Le note di questo turno sulla domanda: tornano con lei nei turni dopo (src/main/services/contestoFilo.js).
   let origineImmagini = '';
@@ -728,6 +730,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
     onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
     onboardingRifatta: onbActive && onbBefore.rifatta === true,
+    memoriaNascosta,
     ...(filo ? { filoTratto: filo.messaggi, indiceDomanda, chatCorrente: chatId, chatNuova: filo.nuova } : {}),
   };
   // SPEC-CONTESTO § La compattazione: prima di ogni richiesta, anche a metà di un giro di strumenti. Oltre la soglia (o
@@ -763,7 +766,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // il peso dei turni: la soglia vera, il grezzo che resta e l'anticipo vengono da lì (SN_FILO_COMPATTAZIONE.limiti).
     // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero.
     if (round === 1) {
-      try { Compattazione.segnaBase(incognitoTurno, parteFissaChat(tools, payloadBase.parteUtente)); } catch (_) {}
+      try {
+        const fissi = parteFissaChat(tools, payloadBase.parteUtente);
+        Compattazione.segnaBase(incognitoTurno, fissi);
+        // Una parte fissa più grossa di quella prevista stringe il tratto subito: il tetto vale per la richiesta intera.
+        tettiChat = { ...tettiChat, fissi };
+        if (filo.token > globalThis.SN_FILO_CONTESTO.tettoDelTratto(tettiChat.token, fissi)) {
+          await ricomponi();
+          token = await stimaRichiesta();
+        }
+      } catch (e) { console.warn('[Filo] parte fissa non misurata:', e?.message || e); }
       try { limitiDelTurno = await Compattazione.limiti(incognitoTurno, { tetti: tettiChat }); } catch (_) { limitiDelTurno = null; }
     }
     const l = limitiDelTurno || {};
@@ -867,7 +879,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (filo && filo.haDomanda && !internal) {
     const resa = filo.domanda({
       stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca,
-      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax, onboardingRifatta: payloadBase.onboardingRifatta }) : '',
+      onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax, onboardingRifatta: payloadBase.onboardingRifatta, memoriaNascosta: payloadBase.memoriaNascosta }) : '',
       ricordi, dopo: [origineImmagini, gettoniLetti, giaLetta], immagini: imageList,
     });
     if (resa) threadMessages[indiceDomanda] = resa;
@@ -993,8 +1005,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let finestraDaRicordare = null;
   const stringiTratto = async (rifiuto, caratteri, caratteriTratto) => {
     const FC = globalThis.SN_FILO_CONTESTO;
-    const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
-    if (token == null || token >= tettiChat.token) return false;
+    const perTratto = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
+    const fissi = tettiChat.fissi || 0;
+    if (perTratto == null || perTratto >= FC.tettoDelTratto(tettiChat.token, fissi)) return false;
+    // Il rifiuto misura il solo tratto; il tetto, che vale per la richiesta intera, ci rimette la parte fissa.
+    const token = perTratto + fissi;
     strette++;
     tettiChat = { ...tettiChat, token };
     try { filo = await componiFilo(tettiChat); } catch (_) { return false; }
@@ -1052,17 +1067,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
   const archiviaGiaFatto = async () => {
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
-    // Anche la parte già scritta porta le sue fonti controllate, mai i marcatori grezzi (#2383).
-    const F = globalThis.SN_FONTI_CITATE;
-    const citate = F.controlla(unisciTesti(risposta), F.sorgenti(renderedActions));
+    // Anche la parte già scritta porta le sue fonti e immagini controllate, mai i marcatori grezzi (#2383, #2272).
+    const citate = globalThis.SN_IMMAGINI_RISPOSTA.controllaConFonti(unisciTesti(risposta), renderedActions);
     const giaScritta = citate.text;
-    if (!chatId || (!successe.length && !giaScritta)) return;
+    if (!chatId || (!successe.length && !giaScritta && !citate.immagini.length)) return;
     const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     // La parte già scritta non è passata dal giudizio dei collegamenti: riaperta, i suoi chiedono l'OK (#1505).
     const dopo = await appendToChatArchive(chatId, {
       role: 'filo', text: giaScritta, actions: successe, esiti: renderedActions, classeLetta, senzaVerdetto: true, ...(cambi.length ? { cambi } : {}),
       ...(citate.fonti.length ? { fonti: citate.fonti } : {}),
+      ...(citate.immagini.length ? { immagini: citate.immagini } : {}),
     }, { onboarding: onbActive });
     const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
@@ -1381,9 +1396,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const mutoDopoOk = dopoOk && !String(textReply || '').trim() && !rawActions.length;
   // #2383 — i marcatori di fonte si controllano qui, prima che la risposta si salvi o si mostri: resta l'etichetta solo
   // per un indirizzo letto in questo turno, con la frase cercata nella pagina intera.
-  const Fonti = globalThis.SN_FONTI_CITATE;
-  const citate = Fonti.controlla(textReply, Fonti.sorgenti(renderedActions));
+  // #2272 — lo stesso per le immagini: restano solo quelle trovate o create in questo turno, al posto del marcatore.
+  const Immagini = globalThis.SN_IMMAGINI_RISPOSTA;
+  const Fonti = { nascondi: (t) => Immagini.nascondi(globalThis.SN_FONTI_CITATE.nascondi(t)) };
+  const citate = Immagini.controllaConFonti(textReply, renderedActions);
   const fonti = citate.fonti;
+  const immagini = citate.immagini;
   textReply = citate.text || (rawActions.length || mutoDopoOk ? '' : '(vuoto)');
   if (notaRisposta) notaRisposta = Fonti.nascondi(notaRisposta).trim();
   // L'esito che la persona ha davanti (#1463): lo stesso «Continua» che la scheda mette sotto, o la frase che lo sostituisce.
@@ -1465,6 +1483,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         ...(senzaVerdetto ? { senzaVerdetto } : {}),
         ...(cambi.length ? { cambi } : {}),
         ...(fonti.length ? { fonti } : {}),
+        ...(immagini.length ? { immagini } : {}),
       },
       { onboarding: onbActive },
     );
@@ -1559,6 +1578,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     notes: notes.map((n) => Fonti.nascondi(n).trim()).filter(Boolean), reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
     ...(fonti.length ? { fonti } : {}),
+    ...(immagini.length ? { immagini } : {}),
     ...(senzaRisposta ? { senzaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(linkDaConfermare.length ? { linkDaConfermare } : {}),

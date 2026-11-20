@@ -61,10 +61,11 @@ const recenti = new Map();
 
 // `dato`: un data: URL d'immagine (quello che la scheda ha già scaricato). Torna il rimando alla copia, o '' se non è un'immagine.
 // In incognito torna il data: URL ripulito, che resta solo in memoria con la voce.
-async function conserva(dato) {
+// `tetto`: le immagini della chat (#2272) sono foto, non icone, e ne reggono di più.
+async function conserva(dato, { tetto = TETTO_BYTE } = {}) {
   if (eCopia(dato)) return dato;
-  const buf = bytesDaDataUrl(dato);
-  const tipo = buf && buf.length && buf.length <= TETTO_BYTE ? tipoImmagine(buf) : '';
+  const buf = Buffer.isBuffer(dato) ? dato : bytesDaDataUrl(dato);
+  const tipo = buf && buf.length && buf.length <= tetto ? tipoImmagine(buf) : '';
   if (!tipo) return '';
   if (inIncognito()) return `data:${tipo};base64,${buf.toString('base64')}`;
   // Una copia che non si scrive (disco pieno, file bloccato) lascia la voce col globo: mai la voce persa per la sua icona.

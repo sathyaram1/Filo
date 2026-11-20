@@ -81,7 +81,7 @@ async function azioneOnboarding(action, { intervista }) {
 }
 
 async function azioneInviaFeedback(action, {
-  confirmed, sender, contesto, fontiLette, assistente, chatId, impostazioni,
+  confirmed, sender, contesto, fontiLette, assistente, chatId, impostazioni, senzaRilettura = false,
 }) {
   // Filo invia un feedback a nome dell'utente (#146.5). Livello 2: a
   // questo punto la conferma è già passata (il gate sopra ha lasciato
@@ -108,10 +108,31 @@ async function azioneInviaFeedback(action, {
     const conAllegati = globalThis.SN_ALLEGATI_SEGNALAZIONE.haAllegati(action);
     if (conAllegati) {
       const chatDellAzione = chatId || (Registro.corrente() && Registro.corrente().chat) || '';
-      const { voci } = await require('../allegatiDellaChat').voci(action, chatDellAzione);
-      const p = globalThis.SN_ALLEGATI_SEGNALAZIONE.payload(payload, voci);
+      const AS = globalThis.SN_ALLEGATI_SEGNALAZIONE;
+      const { voci } = action._immaginiAiuto && typeof action._immaginiAiuto === 'object'
+        ? { voci: AS.vociAiuto(action, action._immaginiAiuto) }
+        : await require('../allegatiDellaChat').voci(action, chatDellAzione);
+      const pronte = globalThis.SN_ALLEGATI_SEGNALAZIONE.conPreparati(voci, action._allegatiPreparati);
+      const p = globalThis.SN_ALLEGATI_SEGNALAZIONE.payload(payload, pronte);
       if (p.errore) return { executed: false, kept: false, output: { error: p.errore } };
       payload = p.payload;
+    }
+    // La rilettura L0 (#1403.1) vale anche qui: dopo l'OK il riquadro di conferma la ripropone con l'avviso, e un
+    // secondo sì («Manda così») arriva con `senzaRilettura`. Al modello e al diario vanno solo le frasi, mai i pezzi.
+    const L0 = senzaRilettura ? null : require('../feedbackL0').corrente();
+    if (L0) {
+      const letto = await L0.controlla({ testo, immagini: (payload.images || []).map((i) => i && i.dataUrl), allegati: payload.files });
+      if (letto.stato === 'trovato' && letto.esito) {
+        const { titolo: t, frasi } = letto.esito;
+        return {
+          executed: false,
+          kept: false,
+          output: {
+            error: `la segnalazione non è partita: prima di mandarla ci ho visto qualcosa da ricontrollare. ${frasi.join(' ')}`,
+            rilettura: { titolo: t, frasi },
+          },
+        };
+      }
     }
     const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
     const allegati = (payload.images || []).length + (payload.files || []).length;

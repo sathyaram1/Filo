@@ -733,6 +733,7 @@
   function runProb() {
     const runId = ++probRunId;
     const out = $('probResult');
+    $('probMullNote').hidden = !Stats.resolveConditions(probConditions()).mulliganUncounted;
     const want = probWants();
     if (!want.length) {
       out.textContent = 'Scegli almeno una categoria.';

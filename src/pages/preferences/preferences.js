@@ -705,6 +705,16 @@
   }
 
   let modelPreviewAudio = null;
+  // Il tasto della pagina che la frase nomina (Crediti, Opzioni); `pagina` null lo toglie.
+  function mostraRimedioVoce(pagina) {
+    const btn = $('ttsModelPreviewRimedio');
+    if (!btn) return;
+    btn.hidden = !pagina;
+    if (!pagina) return;
+    btn.textContent = pagina.label;
+    btn.title = pagina.title || '';
+    btn.onclick = () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url });
+  }
   async function previewModelVoice() {
     const btn = $('ttsModelPreview');
     const status = $('ttsModelPreviewStatus');
@@ -715,10 +725,15 @@
     if (modelPreviewAudio) { try { modelPreviewAudio.pause(); } catch (_) {} modelPreviewAudio = null; }
     btn.disabled = true;
     status.textContent = '…';
+    mostraRimedioVoce(null);
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text, lang, voice });
       if (!res || !res.ok) {
-        status.textContent = (res && res.error) || 'Voce naturale non disponibile in questo momento';
+        // La frase e il tasto di «Leggi» (#1344.2): mai il motivo grezzo del servizio.
+        const CE = window.SN_CHAT_ERRORS;
+        const { frase, rimedio } = CE && res ? CE.sintesiNonRiuscita(res) : { frase: '', rimedio: null };
+        status.textContent = frase || 'Voce naturale non disponibile in questo momento';
+        mostraRimedioVoce(rimedio && CE ? CE.rimedioPagina(rimedio) : null);
         return;
       }
       const m = /rate=(\d+)/.exec(String(res.mimeType || ''));
@@ -875,6 +890,8 @@
       case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro({ uscitaMs: $('pannelloUscita').value }).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs;
       case 'doppioTocco.sogliaMs': return window.SN_DOPPIO_TOCCO.sogliaMs($('doppioToccoSoglia').value);
+      case 'doppioCtrl.acceso': return $('doppioCtrlAcceso').checked;
+      case 'doppioCtrl.sogliaMs': return window.SN_DOPPIO_CTRL.sogliaMs($('doppioCtrlSoglia').value);
       case 'ricercaFilo.pausaMs': return window.SN_CONST.opzioniRicercaFilo({ pausaMs: $('ricercaFiloPausa').value }).pausaMs;
       case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
@@ -983,6 +1000,8 @@
       case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro(s.pannelloDestro).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno(s.avvisoSchermoPieno).durataMs;
       case 'doppioTocco.sogliaMs': return window.SN_DOPPIO_TOCCO.normalizza(s.doppioTocco).sogliaMs;
+      case 'doppioCtrl.acceso': return window.SN_DOPPIO_CTRL.normalizza(s.doppioCtrl).acceso;
+      case 'doppioCtrl.sogliaMs': return window.SN_DOPPIO_CTRL.normalizza(s.doppioCtrl).sogliaMs;
       case 'ricercaFilo.pausaMs': return window.SN_CONST.opzioniRicercaFilo(s.ricercaFilo).pausaMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
@@ -1174,6 +1193,8 @@
     if (vuole('pannelloDestro.uscitaMs')) $('pannelloUscita').value = String(pannello.uscitaMs);
     if (vuole('avvisoSchermoPieno.durataMs')) $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno(settings.avvisoSchermoPieno).durataMs);
     if (vuole('doppioTocco.sogliaMs')) $('doppioToccoSoglia').value = String(window.SN_DOPPIO_TOCCO.normalizza(settings.doppioTocco).sogliaMs);
+    if (vuole('doppioCtrl.acceso')) $('doppioCtrlAcceso').checked = window.SN_DOPPIO_CTRL.normalizza(settings.doppioCtrl).acceso;
+    if (vuole('doppioCtrl.sogliaMs')) $('doppioCtrlSoglia').value = String(window.SN_DOPPIO_CTRL.normalizza(settings.doppioCtrl).sogliaMs);
     if (vuole('ricercaFilo.pausaMs')) $('ricercaFiloPausa').value = String(window.SN_CONST.opzioniRicercaFilo(settings.ricercaFilo).pausaMs);
 
     const terminal = settings.terminal || {};
@@ -1604,7 +1625,7 @@
     const lista = $('doppioToccoTasti');
     if (lista && !lista.childElementCount && window.SN_CARTE_HOME) {
       const H = window.SN_CARTE_HOME;
-      for (const t of [...H.TASTI, ...H.CARTE.filter((c) => c.url)]) {
+      for (const t of H.conLettera()) {
         const o = document.createElement('option');
         o.value = t.titolo;
         lista.appendChild(o);
@@ -1622,20 +1643,25 @@
     const l = D.lettera($('doppioToccoNuova').value);
     const dove = $('doppioToccoDove').value.trim();
     const H = window.SN_CARTE_HOME;
-    const perTitolo = H && [...H.TASTI, ...H.CARTE].find((t) => t.titolo.toLowerCase() === dove.toLowerCase());
+    const perTitolo = H && H.conLettera().find((t) => t.titolo.toLowerCase() === dove.toLowerCase());
     const r = l && dove ? (perTitolo ? D.assegna({ lettere: lettereSalvate }, l, { tasto: perTitolo.id }) : D.daTesto(`${l} ${dove}`, { doppioTocco: { lettere: lettereSalvate } })) : null;
-    const hint = $('doppioToccoHint');
     if (!r || r.rifiuto) {
-      if (hint) {
-        hint.textContent = !l ? 'Serve una lettera' : !dove ? 'Scrivi cosa apre' : (r && r.rifiuto) || 'Non ho capito cosa apre';
-        hint.classList.add('sn-show');
-        setTimeout(() => { hint.classList.remove('sn-show'); hint.textContent = 'Salvato'; }, 2400);
-      }
+      avvisoLettere(!l ? 'Serve una lettera' : !dove ? 'Scrivi cosa apre' : (r && r.rifiuto) || 'Non ho capito cosa apre', 2400);
       return;
     }
     $('doppioToccoNuova').value = '';
     $('doppioToccoDove').value = '';
     await salvaLettere(r.lettere);
+    // Ridata a un'altra cosa, la lettera dice cosa apriva: la riga di prima è sparita dall'elenco.
+    avvisoLettere(D.conPrima('Salvato', r), r.sostituita ? 6000 : 1200);
+  }
+  function avvisoLettere(testo, ms) {
+    const hint = $('doppioToccoHint');
+    if (!hint) return;
+    hint.textContent = testo;
+    hint.classList.add('sn-show');
+    clearTimeout(_savedTimers.doppioToccoHint);
+    _savedTimers.doppioToccoHint = setTimeout(() => { hint.classList.remove('sn-show'); hint.textContent = 'Salvato'; }, ms);
   }
 
   async function salvaSitiMenu(nuovo) {
@@ -2037,6 +2063,8 @@
     });
     $('showHomeMessage').addEventListener('change', persist);
     $('barraSitiVisibile').addEventListener('change', persist);
+    $('doppioCtrlAcceso').addEventListener('change', persist);
+    for (const n of document.querySelectorAll('.tasto-ctrl')) n.textContent = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl') : 'Ctrl';
     for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth', 'homeSisVolume']) $(id).addEventListener('change', persist);
     $('tabPreviewEnabled').addEventListener('change', () => {
       $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
@@ -2129,9 +2157,9 @@
     $('avvisoSchermoPienoDurata').addEventListener('blur', () => {
       $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs);
     });
-    for (const id of ['doppioToccoSoglia', 'ricercaFiloPausa']) {
+    for (const id of ['doppioToccoSoglia', 'doppioCtrlSoglia', 'ricercaFiloPausa']) {
       $(id).addEventListener('change', persist);
-      $(id).addEventListener('blur', () => { $(id).value = String(valoreDelCampo(id === 'doppioToccoSoglia' ? 'doppioTocco.sogliaMs' : 'ricercaFilo.pausaMs')); });
+      $(id).addEventListener('blur', () => { $(id).value = String(valoreDelCampo(CAMPO_DI[id])); });
     }
     $('doppioToccoAggiungi').addEventListener('click', () => { aggiungiLettera().catch(() => {}); });
     for (const id of ['doppioToccoNuova', 'doppioToccoDove']) {

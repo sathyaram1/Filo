@@ -120,10 +120,12 @@ function loadContentScripts() {
   // L'ordine conta: le ragioni stanno in fila nella gemella src/preload/page-preload.js.
   safe(path.join(SHARED, 'constants.js'), 'SN_CONST');
   safe(path.join(SHARED, 'immaginiChat.js'), 'SN_IMMAGINI_CHAT'); // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
+  safe(path.join(SHARED, 'allegatiSegnalazione.js'), 'SN_ALLEGATI_SEGNALAZIONE'); // #1664 — le immagini di una segnalazione dell'Aiuto: PRIMA di sidebar.js
   safe(path.join(SHARED, 'contenutoEsterno.js'), 'SN_ESTERNO'); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
   // la disegnano, lo legge chi cammina sulla pagina.
   safe(path.join(SHARED, 'filoUi.js'), 'SN_FILO_UI');
+  safe(path.join(SHARED, 'fontGenerico.js'), 'SN_FONT_GENERICO');
   safe(path.join(SHARED, 'i18n.js'), 'SN_I18N');
   safe(path.join(SHARED, 'clipboardHistory.js'), 'SN_CLIPBOARD'); // #256 — cronologia appunti: chiave e testi uguali da ogni parte
   safe(path.join(SHARED, 'messages.js'), 'SN_MSG');

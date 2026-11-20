@@ -1117,7 +1117,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
   test('ogni parametro dei metodi pagati del fornitore è un campo di testo oscurato o un dato che non è testo', () => {
     const or = readFileSync(join(ROOT, 'src', 'main', 'services', 'providers', 'openrouter.js'), 'utf8');
     const NON_TESTO = new Set(['apiKey', 'model', 'cache', 'reasoning', 'maxTokens', 'providerRouting', 'tools', 'toolChoice',
-      'onDelta', 'onReasoning', 'onToolCall', 'signal', 'voice', 'speed', 'audioBase64', 'format', 'language', 'dim']);
+      'onDelta', 'onReasoning', 'onToolCall', 'signal', 'voice', 'speed', 'audioBase64', 'format', 'language', 'dim', 'modalities']);
     const testo = new Set(globalThis.SN_MODEL_GATE.CAMPI_TESTO);
     const ignoti = [];
     for (const m of ['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed']) {

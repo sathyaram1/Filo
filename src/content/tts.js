@@ -347,18 +347,11 @@
     // che Filo non conosce: il messaggio dice dove scriverlo.
     // E quando nessun fornitore ammesso serve il modello, o manca l'invito: la richiesta non è partita.
     // L'avviso porta il tasto della pagina che la frase nomina (#663, #1344.1).
+    // La chiave rifiutata (crediti finiti compresi): il perché in italiano, non «non disponibile ora». La frase la
+    // compone sintesiNonRiuscita, la stessa del tasto «Ascolta» delle Preferenze.
     const CE = global.SN_CHAT_ERRORS;
-    const rimedio = { code: res.errorCode, keyRefused: !!res.keyRefused, reason: res.reason };
-    const spiegato = [...((CE && CE.CODICI_GIA_SCRITTI) || ['NO_MODEL_FOR_ACTION', 'NO_ALLOWED_HOST', 'NO_API_KEY']), 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
-    if (spiegato.includes(res.errorCode) && res.error) {
-      try { Popup.toastErrore('tts_model_fallback_reason', { duration: 9000, rimedio }, String(res.error)); } catch (_) {}
-      return;
-    }
-    // La chiave rifiutata (crediti finiti compresi): il perché in italiano, non «non disponibile ora».
-    if (res.keyRefused && CE) {
-      const frase = CE.sentence(CE.fromResponse({
-        error: res.error, status: res.status, provider: res.provider, userMessage: res.userMessage, keyRefused: true,
-      }, ''));
+    const { frase, rimedio } = CE ? CE.sintesiNonRiuscita(res) : { frase: '', rimedio: null };
+    if (frase) {
       try { Popup.toastErrore('tts_model_fallback_reason', { duration: 9000, rimedio }, frase); } catch (_) {}
       return;
     }

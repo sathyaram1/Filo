@@ -214,3 +214,96 @@ test('«cerca nel filo orche» scritto nella chat apre la stessa ricerca, senza 
   await apriPiu(page);
   await page.screenshot({ path: join(SHOTS, '2372-tasti-scura.png') });
 });
+
+// #2372.1 — un risultato che è una pagina apre al centro la sua riga di pagine; un altro risultato o la ricerca chiusa
+// la richiudono.
+test('mouse o frecce su una pagina trovata aprono la sua riga di pagine; un altro risultato o Esc la richiudono', async ({ app }) => {
+  test.setTimeout(60_000);
+  const NARVALI = 'https://narvali.example/zanna';
+  await app.evaluate(async (_e, url) => {
+    const E = globalThis.SN_FILO_EVENTI;
+    const qui = await globalThis.SN_IL_FILO.dispositivo();
+    const iso = (minFa) => new Date(Date.now() - minFa * 60_000).toISOString();
+    const ev = [];
+    const chat = (id, testo, minFa) => {
+      ev.push(E.crea(E.TIPI.CHAT_APERTA, { chat: id }, { ts: iso(minFa), dispositivo: qui }));
+      ev.push(E.crea(E.TIPI.MESSAGGIO, { chat: id, msg: { role: 'user', text: testo } }, { ts: iso(minFa - 0.1), dispositivo: qui, autore: 'utente' }));
+      ev.push(E.crea(E.TIPI.CHAT_CHIUSA, { chat: id }, { ts: iso(minFa - 0.5), dispositivo: qui }));
+    };
+    chat('primo', 'apro qualche pagina', 120);
+    ev.push(E.crea(E.TIPI.NAVIGAZIONE, { url, titolo: 'La zanna dei narvali' }, { ts: iso(110), dispositivo: qui }));
+    ev.push(E.crea(E.TIPI.NAVIGAZIONE, { url: 'https://altro.example/', titolo: 'Un altro sito' }, { ts: iso(109), dispositivo: qui }));
+    chat('narvali', 'perché i narvali hanno una zanna sola?', 100);
+    for (let i = 0; i < 20; i++) chat(`r${i}`, `riempitivo ${i}`, 90 - i * 3);
+    await globalThis.SN_IL_FILO.importa(ev.map(E.riga).join(''));
+  }, NARVALI);
+  const page = await casa(app);
+  const rigaAperta = () => page.evaluate((url) => [...document.querySelectorAll('.dash-pagine')]
+    .filter((n) => n._gruppo && n._gruppo.pagine.some((p) => p.url === url))
+    .some((n) => n.classList.contains('dash-pagine-aperte')), NARVALI);
+  expect(await rigaAperta()).toBe(false);
+
+  await tasto(page, 'cerca').click();
+  await page.keyboard.type('narvali');
+  const pagina = page.locator('#cercaRisultati .dash-cerca-pagina', { hasText: 'La zanna dei narvali' });
+  const messaggio = page.locator('#cercaRisultati .dash-cerca-msg', { hasText: 'perché i narvali' });
+  await expect(pagina).toBeVisible();
+  await expect(messaggio).toBeVisible();
+  await pagina.hover();
+  await expect.poll(rigaAperta).toBe(true);
+  await expect(page.locator('.dash-pagine.dash-pagine-aperte')).toBeInViewport();
+  await page.screenshot({ path: join(SHOTS, '2372-1-ricerca-pagina.png') });
+  // Su un messaggio la riga aperta dalla ricerca si richiude.
+  await messaggio.hover();
+  await expect.poll(rigaAperta).toBe(false);
+
+  // Con le frecce: la pagina scelta la apre, Esc chiude la ricerca e la riga.
+  await page.locator('#cercaInput').focus();
+  const voci = await page.locator('#cercaRisultati .dash-cerca-voce').evaluateAll((ns) => ns.map((n) => n.classList.contains('dash-cerca-pagina')));
+  for (let i = 0; i <= voci.indexOf(true); i++) await page.keyboard.press('ArrowDown');
+  await expect.poll(rigaAperta).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#cercaFilo')).toBeHidden();
+  await expect.poll(rigaAperta).toBe(false);
+});
+
+// #2372.1 — il tasto del Profilo porta la foto dell'account all'apertura della home, nel «+» e in vista, anche dopo
+// che i tasti si ridisegnano.
+test('col tasto del Profilo nel «+» o in vista c’è la foto dell’account, anche dopo un ridisegno dei tasti', async ({ app }) => {
+  test.setTimeout(60_000);
+  const foto = await app.evaluate(() => globalThis.__filoCopieIcone.conserva(
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4YaMBAAL8AS3/gzpXAAAAAElFTkSuQmCC'));
+  // Un account entrato con la sua foto già copiata, come dopo un accesso vero; il servizio dei token irraggiungibile,
+  // come senza rete, così la sessione finta resta.
+  await app.evaluate(async (_e, foto) => {
+    const vera = globalThis.fetch;
+    globalThis.fetch = function fetch(input, init) {
+      const url = String((input && input.url) || input);
+      if (/^https:\/\/securetoken\.googleapis\.com\//.test(url)) return Promise.reject(new TypeError('fetch failed'));
+      return vera.call(this, input, init);
+    };
+    const req = process.getBuiltinModule('module').createRequire(`${process.cwd()}/src/main/main.js`);
+    const ga = req('./auth/google-auth');
+    const remota = 'https://lh3.example/foto-di-prova';
+    req('./auth/token-store').save({ refreshToken: 'r-finto', email: 'mario@example.it', name: 'Mario Rossi', picture: remota, foto, fotoDi: remota });
+    ga.restore();
+    ga.getUid = async () => 'uid-di-prova';
+  }, foto);
+  const page = await casa(app);
+  const avatar = (sel) => sel.locator('img.account-avatar');
+  // All'apertura il Profilo sta nel «+», chiuso: la foto c'è già.
+  await expect(avatar(fuori(page, 'profilo'))).toHaveAttribute('src', foto);
+  await expect(fuori(page, 'profilo')).toHaveAttribute('aria-label', 'Profilo: Mario Rossi');
+  await apriPiu(page);
+  await expect.poll(() => avatar(fuori(page, 'profilo')).evaluate((i) => i.naturalWidth)).toBe(1);
+  // Rimesso in vista, il tasto ridisegnato ha la sua foto.
+  await fuori(page, 'profilo').click({ button: 'right' });
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rimetti in vista' }).click();
+  await expect(tasto(page, 'profilo')).toBeVisible();
+  await expect(page.locator('.dash-altro-griglia.vista .dash-altro-app[data-id="profilo"] img.account-avatar')).toHaveAttribute('src', foto);
+  // Un altro ridisegno (il «+» richiuso) non la perde.
+  await page.locator('#altroPiu').click();
+  await expect(page.locator('#altroPiu')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.dash-altro-griglia.vista .dash-altro-app[data-id="profilo"] img.account-avatar')).toHaveAttribute('src', foto);
+  await page.screenshot({ path: join(SHOTS, '2372-1-profilo-foto.png') });
+});

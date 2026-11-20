@@ -143,9 +143,13 @@
     if (tolto || !el?.matches?.('input, textarea') || el.selectionStart == null) return;
     // Un campo che execCommand non tocca: si toglie a mano, senza annullo, piuttosto che lasciare il testo due volte.
     const start = el.selectionStart;
-    el.value = el.value.slice(0, start) + el.value.slice(el.selectionEnd);
-    el.setSelectionRange(start, start);
-    el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'deleteByCut' })));
+    scriviNellaCasella(el, { start, end: el.selectionEnd }, '', 'deleteByCut');
+    try { el.setSelectionRange(start, start); } catch (_) {}
+  }
+
+  // Il testo che Filo mette nella casella di un sito lo deve contare anche il sito: la regola sta nel correttore (#2052).
+  function scriviNellaCasella(el, range, testo, tipo) {
+    return !!global.SN_SPELLCHECK?.scriviNellaCasella?.(el, range, testo, { tipo });
   }
 
   function blobToDataUrl(blob) {
@@ -341,13 +345,12 @@
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;
-      el.value = el.value.slice(0, start) + text + el.value.slice(end);
+      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
+      scriviNellaCasella(el, { start, end }, text, 'insertFromPaste');
       const caret = start + text.length;
-      el.setSelectionRange(caret, caret);
+      try { el.setSelectionRange(caret, caret); } catch (_) {}
       ctx.start = caret;
       ctx.end = caret;
-      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
-      el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text })));
     } else if (kind === 'ce') {
       el.focus();
       // La selezione va ripristinata PRIMA di inserire: il click sul bottone sposta il fuoco,
@@ -1395,6 +1398,27 @@
       document.body.appendChild(a); a.click(); a.remove();
       return;
     }
+    // Una copia che Filo tiene per sé (filo://, le immagini delle risposte #2272): i byte li legge la pagina, che la
+    // mostra già; il main scarica solo dal web.
+    if (/^filo:/i.test(src)) {
+      try {
+        const r = await fetch(src);
+        const blob = r.ok ? await r.blob() : null;
+        if (!blob || !blob.size || !/^image\//i.test(blob.type)) throw new Error('non leggibile');
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl;
+        const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/[^a-z0-9]/gi, '');
+        const daFuori = indirizzoDellImmagine(imgEl);
+        const base = daFuori ? decodeURIComponent(new URL(daFuori).pathname.split('/').pop() || '').replace(/\.[a-z0-9]{2,5}$/i, '') : '';
+        a.download = `${base || 'immagine'}.${ext}`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
+      } catch (_) {
+        Popup.toastErrore('toast_image_save_failed');
+      }
+      return;
+    }
     // Sulle immagini http(s) cross-origin Chromium ignora l'attributo download e la scheda
     // NAVIGAVA sull'immagine (#274): scarica il main, che risponde a download concluso.
     try {
@@ -1752,7 +1776,19 @@
 
   // Lens-style reverse search (più affidabile di searchbyimage)
   function imageSearchUrlFor(imgEl) {
-    return global.SN_URL_NAV.indirizzoRicercaImmagine(imgEl && (imgEl.currentSrc || imgEl.src));
+    return global.SN_URL_NAV.indirizzoRicercaImmagine(indirizzoDellImmagine(imgEl));
+  }
+
+  // L'indirizzo di un'immagine per chi lo usa fuori da Filo (copiarlo, cercarlo). Una copia di Filo (#2272) vale
+  // l'indirizzo da cui viene (`data-originale`), o nessuno se è stata creata: mai il rimando interno alla copia.
+  function indirizzoDellImmagine(imgEl) {
+    if (!imgEl) return '';
+    const src = imgEl.currentSrc || imgEl.src || '';
+    if (imgEl.hasAttribute && imgEl.hasAttribute('data-originale')) {
+      const o = imgEl.getAttribute('data-originale') || '';
+      return /^https?:\/\//i.test(o) ? o : '';
+    }
+    return /^filo:/i.test(src) ? '' : src;
   }
 
   function searchImageOnWeb(imgEl) {
@@ -2289,6 +2325,7 @@
     searchUrlFor,
     searchImageOnWeb,
     imageSearchUrlFor,
+    indirizzoDellImmagine,
     // video / audio
     buildMediaItems,
     azioniDelMedia,

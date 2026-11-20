@@ -73,7 +73,7 @@ SN_CONST.registraCaricatoreCatalogo(() => require('./costoModelli').listino());
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, provenienza = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, chiesta = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
-  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null, intervista = false,
+  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null, intervista = false, senzaRilettura = false,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -267,14 +267,15 @@ async function eseguiAzioneFilo(action, {
     } catch (_) {}
   }
 
+  // Le righe della memoria non arrivano a una pagina visitata: né nel popup che le mostra né lette dal modello.
+  if ((type === 'DIMENTICA' || type === 'CORREGGI_MEMORIA' || type === 'LEGGI_MEMORIA') && /^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+    return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+  }
+
   // DIMENTICA: le righe che la frase indica le trova il main, prima del gate,
   // così il popup mostra quelle che se ne andranno (#592).
-  // Il popup riporta righe della memoria: a una pagina visitata non si mostrano.
   let righeDaDimenticare = [];
   if (type === 'DIMENTICA') {
-    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
-      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
-    }
     try {
       if (confirmed) {
         const visti = bersagliMostrati(sender, action);
@@ -308,9 +309,6 @@ async function eseguiAzioneFilo(action, {
   // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
   let rigaDaCorreggere = null;
   if (type === 'CORREGGI_MEMORIA') {
-    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
-      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
-    }
     let trovate = [];
     try {
       if (confirmed) {
@@ -627,7 +625,7 @@ async function eseguiAzioneFilo(action, {
     return await esegui(action, {
       confirmed, sender, contesto, fontiLette, assistente, parole, avanzamento, chatId, segnale, nascostiDellaChat,
       domanda, capRilettura, schedeViste, intervista, type, righeDaDimenticare, rigaDaCorreggere, impostazioni,
-      decisione, daChiedere, sospesa,
+      decisione, daChiedere, sospesa, senzaRilettura: senzaRilettura === true,
 });
   } catch (e) {
     console.warn('[Filo] action exec failed', type, e);
@@ -644,6 +642,7 @@ const AZIONI = Object.freeze(Object.assign(Object.create(null),
   require('./azioni/proxy'),
   require('./azioni/impostazioni'),
   require('./azioni/sistema'),
+  require('./azioni/immagini'),
 ));
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {

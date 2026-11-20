@@ -558,6 +558,12 @@
         for (const r of results) if (r && r.url) linkNoti.add(chiaveLink(r.url));
         daFuori(results.filter(Boolean).map((r) => `${testo(r.title)}\n${testo(r.url)}\n${testo(r.snippet)}`).join('\n'),
           'dai risultati di una ricerca');
+      } else if (type === 'IMMAGINI_WEB') {
+        // #2272 — titoli e pagine delle immagini li scrive chi le pubblica, come i risultati di una ricerca.
+        const immagini = Array.isArray(out.immagini) ? out.immagini.filter(Boolean) : [];
+        if (immagini.length) nonFidato = true;
+        for (const i of immagini) if (i.pagina) linkNoti.add(chiaveLink(i.pagina));
+        daFuori(immagini.map((i) => `${testo(i.titolo)}\n${testo(i.pagina)}`).join('\n'), 'dai risultati di una ricerca di immagini');
       }
     }
     let letto = pezzi.filter(Boolean).join('\n');
@@ -624,6 +630,7 @@
     NAVIGA: "non ho aperto l'indirizzo",
     LEGGI_PAGINA: 'non ho letto la pagina',
     CERCA_WEB: 'non ho fatto la ricerca',
+    IMMAGINI_WEB: 'non ho cercato le immagini',
     ESEGUI_COMANDO: 'non ho eseguito il comando',
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
@@ -942,6 +949,14 @@
       const url = L && L.indirizzoDi ? L.indirizzoDi(action) : String(action.url ?? action.href ?? action.link ?? '').trim();
       const v = url ? valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda }) : null;
       if (v && v.exfil) return { ...niente, exfil: true, reason: v.reason };
+    }
+    if (tipo === 'IMMAGINI_WEB') {
+      // Senza il modulo delle azioni si guardano tutti i campi insieme: più di quello che esce, mai meno.
+      const L = global.SN_ACTION_LEVELS;
+      const q = L && L.ricercaImmaginiDi ? L.ricercaImmaginiDi(action)
+        : [action.query, action.cerca, action.testo, action.q, action.text].filter((x) => x != null).join('\n');
+      const v = valutaRicerca(String(q), { memoria, azioni });
+      if (v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
     if (tipo === 'CERCA_WEB') {
       const v = valutaRicerca(String(action.query ?? action.q ?? action.testo ?? action.text ?? ''), { memoria, azioni });

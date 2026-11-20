@@ -431,6 +431,29 @@
 }
 .sn-toast.sn-toast-visible:hover { background: var(--sn-hover); }
 
+/* La X di ogni avviso della pila (#1677), come quella delle carte della barra. Nell'avviso a testo sta nell'angolo,
+   nelle pill in coda alla riga. Sotto il puntatore il fondo è già --sn-hover: la X prende l'accento. */
+.sn-toast { position: relative; padding-right: 32px; }
+.sn-toast-x {
+  all: unset;
+  box-sizing: border-box;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--sn-muted);
+  cursor: pointer;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-toast-x::before { content: '×'; font-size: 16px; line-height: 1; }
+.sn-toast-x:hover,
+.sn-toast-x:focus-visible { background: rgba(var(--sn-accent-rgb), 0.35); color: var(--sn-fg); }
+.sn-toast > .sn-toast-x { position: absolute; top: 7px; right: 7px; }
+.sn-save-confirm > .sn-toast-x { margin-right: -6px; }
+
 /* Pill della dettatura: si comporta come un toast ma è interattiva, cliccandola si ferma la registrazione. */
 .sn-dictate-pill {
   flex: none;

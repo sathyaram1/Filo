@@ -203,6 +203,21 @@ html[data-chrome-compact="1"] .addr {
 /* Portata fuori dalla fila torna al suo posto, spenta: la sta prendendo chi sta sotto il puntatore. */
 .tab.dragging.fuori { opacity: 0.45; box-shadow: none; }
 html.trascina-scheda, html.trascina-scheda * { cursor: grabbing !important; }
+/* Un collegamento portato sulla fila (#2393): la scheda che lo riceverebbe si tinge d'accento, fra due schede un
+   segno sottile dice dove nascerà quella nuova. */
+.tab.link-sopra,
+.tab.link-sopra:hover { background: color-mix(in srgb, var(--accent) 24%, var(--tab-bg-eff)); }
+.tab.link-sopra:not(.active)::after,
+.tab:not(.active):has(+ .tab.link-sopra)::after { display: none; }
+.link-posto {
+  position: fixed;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 10;
+}
+.link-posto[hidden] { display: none; }
 .tab.active {
   background: var(--tab-active);
   color: var(--fg);
@@ -268,6 +283,18 @@ html.trascina-scheda, html.trascina-scheda * { cursor: grabbing !important; }
   left: auto;
   width: 8px;
   background: radial-gradient(circle at top right, transparent 8px, var(--tab-active) 8px);
+}
+/* Con la fila sul bordo alto dello schermo la fascia sopra la scheda è sua, come in Chrome: la mano la prende senza
+   mirare (#2382.1). Altrove la fascia resta la presa della finestra. */
+.tab-cima { display: none; }
+html[data-schede-al-bordo] .tabs { margin-top: -8px; padding-top: 8px; }
+html[data-schede-al-bordo] .tab-cima {
+  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 8px;
 }
 .tab .title {
   flex: 1;
@@ -777,6 +804,16 @@ html[data-feedback-dim="1"] .shell {
 .permesso-msg { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .permesso-sotto { color: var(--fg-soft); }
 .permesso-cosa { display: inline-block; white-space: nowrap; }
+/* Il nome di un file o di una cartella è di chi l'ha creato: foglietto come il riquadro dei popup,
+   filo per metà colore del testo. */
+.permesso-oggetto {
+  display: inline-block;
+  padding: 0 7px;
+  background: rgba(var(--accent-rgb), 0.09);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  border-left: 3px solid color-mix(in srgb, var(--accent) 50%, currentColor);
+  border-radius: 4px;
+}
 .permesso-btn {
   padding: 5px 12px;
   border-radius: 8px;

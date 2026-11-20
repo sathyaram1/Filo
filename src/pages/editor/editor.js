@@ -1215,6 +1215,9 @@
   // Menu contestuale proprio, con preventDefault e le classi .sn-select-*. Pattern in
   // patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md.
   let titleMenuEl = null;
+  // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+  let titleMenuScorso = () => true;
+  function onTitleMenuScroll(e) { if (titleMenuScorso(e)) closeTitleMenu(); }
   function closeTitleMenu() {
     if (!titleMenuEl) return;
     titleMenuEl.remove();
@@ -1222,7 +1225,7 @@
     staleClick.arm(); // il menu sparisce da sotto il cursore
     document.removeEventListener('mousedown', onTitleMenuOutside, true);
     document.removeEventListener('keydown', onTitleMenuKeydown, true);
-    window.removeEventListener('scroll', closeTitleMenu, true);
+    window.removeEventListener('scroll', onTitleMenuScroll, true);
     window.removeEventListener('resize', closeTitleMenu);
   }
   function onTitleMenuOutside(e) {
@@ -1235,6 +1238,7 @@
   function openTitleMenu(x, y, { file = null } = {}) {
     closeTitleMenu();
     if (!file) closeDocPop();
+    titleMenuScorso = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop ed-title-ctxmenu';
     menu.setAttribute('role', 'menu');
@@ -1279,7 +1283,7 @@
     setTimeout(() => {
       if (titleMenuEl !== menu) return;
       document.addEventListener('mousedown', onTitleMenuOutside, true);
-      window.addEventListener('scroll', closeTitleMenu, true);
+      window.addEventListener('scroll', onTitleMenuScroll, true);
       window.addEventListener('resize', closeTitleMenu);
     }, 0);
   }
@@ -1965,9 +1969,14 @@
     // La finestra non sta ferma mentre la tendina è aperta (e in Filo si zooma di continuo): posare
     // solo all'apertura calcola il rientro su uno spazio che un istante dopo non c'è più.
     const riposa = () => { if (!pop.hidden) placePop(); };
+    // Chiude lo scorrimento che sposta il bottone, non quello del suo elenco né uno finito prima dell'apertura (#2586).
+    let scorsoDopo = () => true;
+    const scorre = (e) => { if (!(e.target instanceof Node && wrap.contains(e.target)) && scorsoDopo(e)) close(); };
     function open() {
       if (!pop.hidden) return;
       saveDocSelection(); // prima che il focus passi al popup
+      const b = button.getBoundingClientRect();
+      scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(b.left + b.width / 2, b.top + b.height / 2) || (() => true);
       pop.hidden = false;
       placePop();
       wrap.classList.add('sn-open');
@@ -1976,7 +1985,7 @@
       applyFilter('');
       setHover(visibleOptions()[0] || null);
       document.addEventListener('mousedown', onDocDown, true);
-      window.addEventListener('scroll', close, true);
+      window.addEventListener('scroll', scorre, true);
       window.addEventListener('resize', riposa);
       // Lo zoom della pagina muove il riquadro visuale senza sempre cambiare la
       // finestra: è una misura a sé, e va ascoltata a sé.
@@ -1997,7 +2006,7 @@
       button.setAttribute('aria-expanded', 'false');
       setHover(null);
       document.removeEventListener('mousedown', onDocDown, true);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', scorre, true);
       window.removeEventListener('resize', riposa);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', riposa);
@@ -2035,6 +2044,28 @@
     host.appendChild(pad);
   }
 
+  // insertUnorderedList di Chromium mette l'elenco DENTRO il paragrafo (<p><ul>…</ul></p>) e il salvataggio, che legge
+  // un paragrafo, lo perdeva: la riga già vuotata si sostituisce con l'elenco, in un passo che l'Annulla conosce (#2279).
+  function apriElenco(cmd) {
+    const sel = window.getSelection();
+    const bloccoAlCursore = () => {
+      let b = sel.anchorNode;
+      while (b && b !== docEl && !/^(P|DIV)$/.test(b.tagName || '')) b = b.parentNode;
+      return b && b !== docEl && b.parentNode === docEl ? b : null;
+    };
+    let block = bloccoAlCursore();
+    if (!block) { exec(cmd); return; }
+    // Su un <div> (quello che apre Invio) l'elenco incollato resterebbe dentro il div.
+    if (block.tagName === 'DIV') { document.execCommand('formatBlock', false, 'P'); block = bloccoAlCursore(); }
+    if (!block) { exec(cmd); return; }
+    const tag = cmd === 'insertOrderedList' ? 'ol' : 'ul';
+    const r = document.createRange();
+    r.selectNode(block);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    exec('insertHTML', `<${tag}><li><br></li></${tag}>`);
+  }
+
   // Shortcut markdown a livello blocco
   function handleMarkdownBlock() {
     const sel = window.getSelection();
@@ -2048,12 +2079,18 @@
       [/^##\s$/, () => exec('formatBlock', 'H2')],
       [/^###\s$/, () => exec('formatBlock', 'H3')],
       [/^>\s$/, () => exec('formatBlock', 'BLOCKQUOTE')],
-      [/^[-*]\s$/, () => exec('insertUnorderedList')],
-      [/^1\.\s$/, () => exec('insertOrderedList')],
+      [/^[-*]\s$/, () => apriElenco('insertUnorderedList')],
+      [/^1\.\s$/, () => apriElenco('insertOrderedList')],
     ];
     for (const [re, fn] of map) {
       if (re.test(text)) {
-        block.textContent = '';
+        // Svuotato a mano il blocco restava senza segnaposto: il cursore scivolava nel blocco dopo, che diventava lui
+        // il titolo, e un <p></p> alto zero si salvava (#2279). La cancellazione dell'editor tiene il <br> e l'Annulla.
+        const r = document.createRange();
+        r.selectNodeContents(block);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        document.execCommand('delete');
         fn();
         return true;
       }
@@ -2187,9 +2224,10 @@
     maybeAutoSummary();
   }
 
-  docEl.addEventListener('input', () => {
+  docEl.addEventListener('input', (e) => {
     if (ancorePiantate) togliAncore();
-    handleMarkdownBlock();
+    // Annulla e Ripeti che rimettono «# » non riconvertono: il Ripeti rifaceva la conversione e perdeva il resto della storia.
+    if (!/^history/.test(e.inputType || '')) handleMarkdownBlock();
     onDocInput();
   });
   // ── Incolla come testo semplice ─────────────────────────────────────

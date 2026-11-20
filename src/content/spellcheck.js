@@ -351,7 +351,8 @@
   // Una parola chiusa da un tasto vero in questa casella: si corregge da sé, o si conta per quello che Filo impara. Mai
   // dopo: il testo già superato non cambia da solo, e un testo messo da uno script non si tocca.
   function fineParolaBattuta(state, evento) {
-    if (suppressAutocorrect || !A()) return;
+    // Quello che scrive Filo (Incolla, dettatura, Modifica) arriva come una battuta ma non chiude una parola dell'utente.
+    if (suppressAutocorrect || !A() || state.filoScrive != null) return;
     const tipo = evento && evento.inputType;
     if (tipo !== 'insertText' && tipo !== 'insertLineBreak' && tipo !== 'insertParagraph') return;
     const G = global.SN_GESTO;
@@ -3404,7 +3405,7 @@
       return { prima: testoPrima, dopo: testoDopo, troncato: prima.pieno || dopo.pieno };
     } catch (e) {
       console.warn('[SN] coerenza — contesto non letto:', e);
-      return vuoto;
+      return { ...vuoto, nonArriva: true };
     }
   }
 
@@ -3478,7 +3479,10 @@
       el.setSelectionRange(range.start, range.end);
       // Il documento del campo: quello di un riquadro, quando lo corregge la pagina («Valuta», #1449).
       const doc = el.ownerDocument || document;
-      if (testo) doc.execCommand('insertText', false, testo);
+      // insertText paga ogni a capo (mille righe: dieci secondi di pagina ferma); in una casella insertHTML scrive lo
+      // stesso testo esatto in un passo solo (#2052).
+      if (testo.includes('\n')) doc.execCommand('insertHTML', false, testo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+      else if (testo) doc.execCommand('insertText', false, testo);
       else if (range.end > range.start) doc.execCommand('delete', false);
     } catch (_) {}
     if (el.value === prima) return false;
@@ -3486,6 +3490,34 @@
       const dove = caret >= range.end ? caret + testo.length - (range.end - range.start) : caret;
       try { el.setSelectionRange(dove, dove); } catch (_) {}
     }
+    return true;
+  }
+
+  // Il testo che Filo mette in una casella il sito deve contarlo come scritto, o all'invio lo trova vuoto (#2052): prima
+  // come una battuta; se no dal valore nativo, con un `input` che esce dall'ombra. `tipo` (un incolla) va in un evento suo.
+  // `fuoco` falso salta la battuta, che prende il fuoco del campo.
+  function scriviNellaCasella(el, range, testo, { cursore = 'end', tipo = 'insertText', fuoco = true } = {}) {
+    if (!el || !el.isConnected) return false;
+    testo = String(testo ?? '');
+    const prima = el.value;
+    const evento = () => {
+      const ev = new InputEvent('input', { bubbles: true, composed: true, inputType: tipo, data: testo });
+      el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+    };
+    if (fuoco && sostituisciComeBattuta(el, range, testo, cursore)) {
+      if (tipo !== 'insertText') evento();
+      return true;
+    }
+    try {
+      el.setRangeText(testo, range.start, range.end, cursore === 'preserve' ? 'preserve' : 'end');
+    } catch (_) {
+      const v = String(el.value || '');
+      const d = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value');
+      const nuovo = v.slice(0, range.start) + testo + v.slice(range.end);
+      if (d && d.set) d.set.call(el, nuovo); else el.value = nuovo;
+    }
+    if (el.value === prima) return false;
+    evento();
     return true;
   }
 
@@ -3525,19 +3557,7 @@
         console.warn('[SN] applyFix: range fuori bounds, skip', { range, length: v.length });
         return;
       }
-      if (!sostituisciComeBattuta(el, range, safeReplacement, cursorMode)) {
-        try {
-          el.setRangeText(safeReplacement, range.start, range.end, cursorMode === 'preserve' ? 'preserve' : 'end');
-        } catch (_) {
-          const before = v.slice(0, range.start);
-          const after = v.slice(range.end);
-          el.value = before + safeReplacement + after;
-          const caret = before.length + safeReplacement.length;
-          try { el.setSelectionRange(caret, caret); } catch (_) {}
-        }
-        // Segnato come nostro: un campo di un riquadro di Filo, chiuso ai finti, deve sentire la correzione.
-        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
-      }
+      scriviNellaCasella(el, range, safeReplacement, { cursore: cursorMode });
     } else {
       const text = el.textContent || '';
       if (range.start < 0 || range.end > text.length || range.end <= range.start) {
@@ -3768,13 +3788,9 @@
     scriveFilo(el, pezzo);
     const prima = getEditableText(el);
     const doc = el.ownerDocument || document;
-    const input = () => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
     try {
       if (campoDiTesto(el)) {
-        if (!sostituisciComeBattuta(el, { start: dove, end: dove }, pezzo, 'end')) {
-          el.setRangeText(pezzo, dove, dove, 'end');
-          el.dispatchEvent(input());
-        }
+        scriviNellaCasella(el, { start: dove, end: dove }, pezzo);
       } else {
         el.focus({ preventScroll: true });
         const sel = (doc.defaultView || window).getSelection();
@@ -3895,6 +3911,7 @@
     sostituisciNelCampo,
     rimettiNelCampo,
     sostituisciComeBattuta,
+    scriviNellaCasella,
     scriveFilo,
     riallineaIssues,
     addToDictionary,

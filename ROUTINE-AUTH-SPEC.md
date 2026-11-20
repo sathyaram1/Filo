@@ -435,10 +435,15 @@ sempre, non fonde e passa la pratica all'azione (`result: 'server'`,
   del server). All'emissione una punta oltre l'ultimo sha registrato è un buco,
   salvo che GitHub l'abbia vista arrivare mentre il biglietto dell'ultima voce
   viveva (dalla nascita al rilascio; per un biglietto morto senza rilascio,
-  alla scadenza del suo semaforo, #2021.1): allora è sua, voce `finestra` (#2021).
-  Un registro bucato lo sana solo l'owner (`npm run fiducia:sana -- <ramo>`,
-  che chiama `ownerFiducia` op `sana`), se ogni commit oltre main è nato
-  mentre viveva un biglietto pulito registrato, la stessa finestra. Al passo
+  alla scadenza del suo semaforo, #2021.1): allora è sua, voce `finestra` (#2021),
+  che le consegne dopo contano come controllata (#2565: la spinta del salvataggio
+  arrivata dopo il rilascio non riapre il buco). Un registro bucato si sana se ogni commit oltre main è nato mentre viveva un
+  biglietto pulito registrato, la stessa finestra, e la punta è l'ultimo sha
+  registrato: su un feedback fidato la coda lo fa da sé prima di far nascere
+  un biglietto (#2565), l'owner con `npm run fiducia:sana -- <ramo>`
+  (`ownerFiducia` op `sana`). Il motivo del buco resta nella riga della
+  sanatoria; quello che la sanatoria non copre si legge sulla scheda del
+  lavoro fermo e resta all'owner («Dichiara fidato com'è»). Al passo
   4, se L5 blocca **e** il lavoro è fidato (feedback fidato, registro tutto
   fidato, nessun buco, la punta è l'ultimo sha registrato), il server **non
   apre la richiesta**: fonde lo sha esaminato con la sua identità e registra

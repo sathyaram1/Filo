@@ -16,6 +16,7 @@
 
   const tabsEl = document.getElementById('tabs');
   const newBtn = document.getElementById('tab-new');
+  window.SN_LINK_SU_SCHEDA?.ascolta(document, { fila: tabsEl.closest('.tab-row'), schede: tabsEl, nuova: newBtn, manda: api.linkSuScheda });
   if (newBtn) newBtn.dataset.tip = `Nuova scheda (${tasto('Ctrl+T')})`;
   // #871 — la maniglia apre e chiude la barra laterale; un clic altrove nella fila la chiude.
   const manigliaBarra = document.getElementById('barra-maniglia');
@@ -542,6 +543,8 @@
     api.onBroadcast((m) => {
       const tipo = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
       if (m && m.type === tipo) quadratoPerSchermoIntero(!!m.fullscreen);
+      const alBordo = globalThis.SN_MSG?.MSG?.WINDOW_AT_SCREEN_EDGE || 'window_at_screen_edge';
+      if (m && m.type === alBordo) document.documentElement.toggleAttribute('data-schede-al-bordo', !!m.alBordo);
     });
   }
 
@@ -1474,7 +1477,10 @@
     close.className = 'close';
     if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
     else close.textContent = '×';
-    el.append(ico, title, close);
+    const cima = document.createElement('span');
+    cima.className = 'tab-cima';
+    cima.setAttribute('aria-hidden', 'true');
+    el.append(ico, title, close, cima);
     el._parti = { ico, title, close, paese: null, audio: null, permessi: null };
     return el;
   }
@@ -2176,7 +2182,7 @@
     return api.downloads.openFolder(id, luogo).then((res) => {
       if (!res) return;
       if (res.ok === false) { avvisoErrore(res.error || 'Non è stato possibile aprire la cartella', 'cartella_non_aperta'); return; }
-      if (res.missing) avvisoErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto');
+      if (res.missing && res.avviso) avvisoErrore(res.avviso, 'file_non_aperto');
     }).catch(() => {});
   }
 
@@ -2305,7 +2311,7 @@
             return {
               label: a.label,
               onClick: () => api.downloads.rimettiNome(id, 'notifica').then((r) => {
-                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`, { tipo: 'nome_rimesso' });
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`, { tipo: 'nome_rimesso', indirizzo: r.indirizzo || '' });
                 else avvisoErrore((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima', 'nome_non_rimesso');
               }).catch(() => {}),
             };
@@ -3237,10 +3243,11 @@
       msg.append(chi, ' ', testo);
       if (cosa.nome) {
         // Un nome lunghissimo non spinge giù la pagina di righe: si accorcia in mezzo, l'estensione resta, intero al passaggio.
+        // Il nome lo sceglie chi ha creato il file: sta nel suo riquadro, non fra virgolette che può chiudere da sé (#592.21).
         const n = document.createElement('strong');
         n.className = 'permesso-oggetto';
         const c = Array.from(cosa.nome);
-        n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
+        n.textContent = c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome;
         n.dataset.tip = String(cosa.percorso || cosa.nome);
         msg.append(' ', n);
       }

@@ -891,7 +891,8 @@ test('salto col ramo mosso dopo i controlli: lo dice, non ripropone il salto e l
   await expect(page.locator('#mgToast')).toContainText('commit che nessuno ha letto');
   await expect(page.locator('#mgSideBody')).toContainText('scrive nelle regole del database');
   const rimanda = page.locator('#mgL4RimandaBtn');
-  await expect(rimanda).toHaveText('Rimanda in lavorazione');
+  // Una bocciatura del controllo torna a chi corregge (#2575): la strada porta il nome della correzione.
+  await expect(rimanda).toHaveText('Rimanda in correzione');
   await expect(salta).toHaveCount(0);
   // Un clic in più dove stava il salto non rimanda la pratica.
   expect((await rimanda.boundingBox()).y).toBeGreaterThanOrEqual(dovEra.y + dovEra.height);
@@ -908,6 +909,10 @@ test('salto col ramo mosso dopo i controlli: lo dice, non ripropone il salto e l
     await page.screenshot({ path: `tests/.shots/1040-1-salto-ramo-mosso-${tema}.png` });
   }
 
+  // Senza testo per chi corregge la correzione parte al secondo gesto (#2575).
+  await rimanda.click();
+  await expect(page.locator('#mgAcceptComment')).toHaveClass(/mg-accept-comment--avviso/);
+  expect(await page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta']);
   await rimanda.click();
   await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta', 'feedback_update']);
   expect(await page.evaluate(() => window.__chiamate[1])).toMatchObject({ id: FB_BOCCIATO._id, status: 'todo', reviewDecision: 'accepted' });

@@ -18,6 +18,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
+import { serviSiti, chiudiLaRete } from './helpers/reteChiusa.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -258,20 +259,14 @@ for (const [cosa, a, b] of [
 // modulo Google chiede la password in un campo di testo. Pagine servite intercettando https; il giudice fa ciò che
 // il suo prompt chiede, cioè sospetta una pagina ospitata che chiede password o pagamento.
 async function servi(app, pagine) {
-  await app.evaluate(async ({ session, net }, pg) => {
-    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-    session.defaultSession.protocol.handle('https', (req) => {
-      const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname] || pg[u.hostname];
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
-    });
+  await serviSiti(app, pagine, { schemi: ['https'] });
+  await app.evaluate(async () => {
     globalThis.SN_SAFEBROWSE.setProviders({
       sandbox: null,
       llm: async (meta) => (meta.hostedOn && (meta.hasPassword || meta.hasPayment)
         ? { suspicious: true, reasonKey: 'hosted_credentials', reason: null, confidence: 'high' } : { suspicious: false, reason: null }),
     });
-  }, pagine);
+  });
 }
 
 async function livelloScheda(app, host, ms = 9000) {
@@ -464,7 +459,8 @@ test('Safe Browsing: una pagina in lista mostra l\'avviso, e a Google arrivano s
 // Una pagina che non finisce di caricarsi (#813.1): il modulo è già a schermo, lo script dopo non arriva mai. Il server
 // tiene aperto lo script finché la prova non lo chiude, e la scheda si apre senza aspettare il DOMContentLoaded.
 async function serviInCaricamento(app, pagine, providers) {
-  await app.evaluate(async ({ session, net }, { pg, gsbListed, ospitate }) => {
+  await chiudiLaRete(app);
+  await app.evaluate(async ({ session }, { pg, gsbListed, ospitate }) => {
     globalThis.__sbLenti = [];
     const risposta = (req) => {
       const u = new URL(req.url);
@@ -478,7 +474,7 @@ async function serviInCaricamento(app, pagine, providers) {
         return new Response(body, { headers: { 'content-type': 'text/html; charset=utf-8' } });
       }
       if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      return globalThis.__reteChiusa.resto(req);
     };
     for (const s of ['http', 'https']) {
       try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
@@ -730,15 +726,19 @@ for (const [nome, js] of [
   });
 }
 
-test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+T, il ritorno, Ctrl+W', async ({ app, shell }) => {
+// Il sito segnalato, poi Ctrl+T dalla tastiera dell'avviso: la scheda nuova (la home, che si sta ancora caricando) è
+// davanti e ha la tastiera. `torna` riporta davanti la scheda del sito, `tasto` preme dove sta la tastiera.
+async function sitoEPoiCtrlT(app, shell) {
   await serviInCaricamento(app, { 'conto-schede.com/login': MODULO }, { gsbListed: true });
   await apriSenzaAspettare(app, shell, 'https://conto-schede.com/login');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  // La home che si sta caricando non ha ancora un indirizzo nel suo webContents: vale quello della scheda.
   const schede = () => app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    return { n: tm.tabs.length, attiva: tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL() };
+    const url = (t) => t.view.webContents.getURL() || t.url || '';
+    return { n: tm.tabs.length, attiva: url(tm.tabs.find((t) => t.id === tm.activeId)), sito: tm.tabs.some((t) => /conto-schede/.test(url(t))) };
   });
   const prima = (await schede()).n;
   const tasto = (key, mod) => app.evaluate(({ webContents }, { key, mod }) => {
@@ -751,16 +751,40 @@ test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+
   // Sulla scheda nuova l'avviso non c'è e la tastiera è sua.
   await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
   await expect.poll(async () => (await copertura(app)).tastiera).toBe('pagina');
-  // Tornati sulla scheda del sito, l'avviso la copre di nuovo e si riprende la tastiera.
-  await app.evaluate(({ BrowserWindow }) => {
+  const torna = () => app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     tm.activate(tm.tabs.find((t) => /conto-schede/.test(t.view.webContents.getURL())).id);
   });
+  return { schede, prima, tasto, torna };
+}
+
+test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+T, il ritorno, Ctrl+W', async ({ app, shell }) => {
+  const { schede, prima, tasto, torna } = await sitoEPoiCtrlT(app, shell);
+  // Tornati sulla scheda del sito, l'avviso la copre di nuovo e si riprende la tastiera.
+  await torna();
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
   await tasto('W', 'control');
   await expect.poll(async () => (await schede()).n).toBe(prima);
-  expect((await schede()).attiva).not.toContain('conto-schede');
+  expect((await schede()).sito).toBe(false);
   expect((await copertura(app)).coperta).toBe(false);
+});
+
+// #871.5 — la home appena aperta si carica dietro e si prende la tastiera da sola: Ctrl+W premuto in quell'attimo,
+// appena tornati sul sito segnalato, chiudeva la home e lasciava aperta la scheda del sito.
+test('Ctrl+W premuto appena tornati sul sito segnalato, con la tastiera ancora sulla home che si carica, chiude il sito', async ({ app, shell }) => {
+  const { schede, prima } = await sitoEPoiCtrlT(app, shell);
+  // Il ritorno e il tasto senza aspettare nulla; la tastiera è dove la lascia la home quando si carica.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const home = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    tm.activate(tm.tabs.find((t) => /conto-schede/.test(t.view.webContents.getURL())).id);
+    home.focus();
+    home.sendInputEvent({ type: 'keyDown', keyCode: 'W', modifiers: ['control'] });
+    home.sendInputEvent({ type: 'keyUp', keyCode: 'W', modifiers: ['control'] });
+  });
+  await expect.poll(async () => (await schede()).sito).toBe(false);
+  expect((await schede()).n).toBe(prima);
+  expect((await schede()).attiva).toMatch(/^filo:\/\/newtab\//);
 });
 
 // Il menu di Filo si apre sopra l'avviso: chiedere a Filo del sito e segnalare il falso allarme si fanno in una scheda di

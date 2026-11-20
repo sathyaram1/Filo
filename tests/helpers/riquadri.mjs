@@ -2,7 +2,9 @@
 // filo://riquadri/ coi content script nel mondo isolato; gli altri pezzi di Filo nella pagina, in uno shadow root chiuso
 // (#1071). Si guardano dall'hook SN_FILO_UI._test (prima la scheda, poi lo strato) e si toccano coi clic e coi tasti veri.
 
-const MONDO_CONTENT_SCRIPT = 999;
+import { createRequire } from 'node:module';
+
+const { MONDO: MONDO_CONTENT_SCRIPT } = createRequire(import.meta.url)('../../src/preload/mondo-esente.js');
 
 // Esegue `fn(arg)` dove vivono i content script della scheda di `page`, o del riquadro incorporato `frame`.
 // `fn` deve bastare a sé stessa.

@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, menuDelloStratoAperto, paginaDelloStrato, statoDelloStrato, statoCronologia } from './helpers/menuContestuale.mjs';
 import { cronologiaPronta } from './helpers/cronologiaAppunti.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 test.use({ stratoDelMenu: true });
 
@@ -570,15 +571,12 @@ test.describe('il menu nello strato', () => {
     test.setTimeout(60_000);
     await pronto(app);
     const FINTA = 'https://login.sito-finto.it/login';
-    await app.evaluate(({ session, net }, html) => {
-      try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-      session.defaultSession.protocol.handle('https', (req) => {
-        const u = new URL(req.url);
-        if (u.hostname + u.pathname === 'login.sito-finto.it/login') return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-        return net.fetch(req, { bypassCustomProtocolHandlers: true });
-      });
+    await serviSiti(app, {
+      'login.sito-finto.it/login': '<title>Accedi</title><body style="margin:20px"><input id="pw" type="password" style="width:200px"></body>',
+    }, { schemi: ['https'] });
+    await app.evaluate(() => {
       globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
-    }, '<title>Accedi</title><body style="margin:20px"><input id="pw" type="password" style="width:200px"></body>');
+    });
     await appunti(app, 'segreto-1054');
     const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:40px">
       <button id="b" style="width:200px;height:50px" onclick="window.open('${FINTA}', 'acc', 'width=500,height=400')">Accedi con</button></body>`);

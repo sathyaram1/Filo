@@ -14,6 +14,7 @@
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/chatErrors.js"></script>
   <script src="filo://shared/ttsVoices.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
@@ -28,6 +29,7 @@
   <script src="filo://shared/urlNav.js"></script>
   <script src="filo://shared/carteHome.js"></script>
   <script src="filo://shared/doppioTocco.js"></script>
+  <script src="filo://shared/doppioCtrl.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
   <script src="filo://shared/cambi.js"></script>
   <script src="filo://shared/menuImpostazioni.js"></script>
@@ -312,6 +314,7 @@
         <button type="button" class="sn-btn sn-btn-secondary" id="ttsModelPreview">Ascolta</button>
         <span id="ttsModelVoiceModel" class="sn-muted"></span>
         <span id="ttsModelPreviewStatus" class="sn-muted"></span>
+        <button type="button" class="sn-btn sn-btn-secondary" id="ttsModelPreviewRimedio" hidden></button>
       </div>
       <label for="ttsRate" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Velocità: <span id="ttsRateVal">1.0×</span></label>
       <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1" style="width:100%;max-width:360px;display:block;" />
@@ -461,6 +464,19 @@
         <button class="sn-btn sn-btn-secondary" id="doppioToccoAggiungi" type="button">Aggiungi</button>
         <span id="doppioToccoHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
       </div>
+    </section>
+
+    <!-- #2377 — il doppio Ctrl: acceso e soglia; le lettere si cambiano dal box, il nome del tasto lo scrive preferences.js. -->
+    <section id="sec-doppio-ctrl">
+      <h2>Lettere di Filo</h2>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="doppioCtrlAcceso" />
+          <span>Due tocchi di <span class="tasto-ctrl"></span> aprono le lettere; <span class="tasto-ctrl"></span>, <span class="tasto-ctrl"></span> e una lettera fanno l'azione</span>
+        </label>
+      </div>
+      <label for="doppioCtrlSoglia" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Entro quanto il secondo tocco vale (millisecondi, da 150 a 1.500)</label>
+      <input type="number" id="doppioCtrlSoglia" min="150" max="1500" step="50" style="width:120px;" />
     </section>
 
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">

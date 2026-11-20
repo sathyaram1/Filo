@@ -47,10 +47,10 @@ test('gli spec che usano un modulo, anche di seconda mano; le prove dei giri no;
     { specs: [], troppoLarghi: [{ file: 'tests/agent/provaPreparazione.mjs', spec: 2 }] });
 });
 
-test('sul repo vero: il caso di #2551 sceglie i due spec della prova da utente, la fixture va oltre la soglia', () => {
+test('sul repo vero: il caso di #2551 sceglie gli spec della prova da utente, la fixture va oltre la soglia', () => {
   const vuoto = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
   const prep = specDellaScelta({ changed: ['tests/agent/provaPreparazione.mjs'], base: vuoto, root: ROOT });
-  assert.deepEqual(prep.specs.sort(), ['tests/prova-da-utente', 'tests/prova-da-utente-filo']);
+  assert.deepEqual(prep.specs.sort(), ['tests/prova-da-utente', 'tests/prova-da-utente-filo', 'tests/prova-da-utente-tastiera']);
   const fixture = specDellaScelta({ changed: ['tests/fixtures/electron.mjs'], base: vuoto, root: ROOT });
   assert.deepEqual(fixture.specs, []);
   assert.equal(fixture.troppoLarghi.length, 1);

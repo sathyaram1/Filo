@@ -218,3 +218,12 @@ test('haRisultato distingue chi riporta un esito da leggere da chi conferma e ba
   }
   for (const t of ['TIMER', 'NAVIGA', 'SVEGLIA']) assert.ok(!Tools.haRisultato(t), t);
 });
+
+// #2536.1 — senza il «solo se l'utente lo dice» il modello sceglieva la cancellazione per sempre per un «toglilo»: una
+// conferma in più, e la riga che non si rimette più.
+test('sentinella: ogni azione con per_sempre dice al modello di usarlo solo se l\'utente lo chiede', () => {
+  const desc = Tools.definitions().map((d) => d.function.description).join('\n');
+  const righe = desc.split('\n').filter((r) => r.includes('per_sempre'));
+  assert.ok(righe.length >= 3, righe.join('\n'));
+  for (const r of righe) assert.match(r, /per_sempre[^\n]*solo se l'utente/, r);
+});

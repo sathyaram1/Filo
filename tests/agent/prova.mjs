@@ -9,7 +9,8 @@ import { join, resolve, relative } from 'node:path';
 import { createInterface } from 'node:readline';
 import * as d from './driver.mjs';
 import { getApiKey } from './llm.mjs';
-import { preparaFilo } from './provaPreparazione.mjs';
+import { apriFiloPerLaProva, preparaFilo } from './provaPreparazione.mjs';
+import { eseguiMossa } from './provaMosse.mjs';
 import {
   USO, leggiArgomenti, sistema, messaggioPasso, leggiMossa, rigaMossa, servitoDa, esitoFinale, resoconto, argomentiModello,
 } from './provaRegole.mjs';
@@ -53,25 +54,6 @@ function apriModello(claude, modello, prompt) {
   };
 }
 
-async function esegui(app, shell, mossa, map, fuoco) {
-  const m = mossa.segno != null ? map.find((x) => x.i === mossa.segno) : null;
-  if (m) mossa.etichetta = m.label || m.tag;
-  switch (mossa.azione) {
-    case 'clic': return d.clickMark(app, shell, map, mossa.segno);
-    case 'destro': return d.clickMark(app, shell, map, mossa.segno, { button: 'right' });
-    case 'doppio': return d.clickMark(app, shell, map, mossa.segno, { clickCount: 2 });
-    case 'scrivi': {
-      const dove = mossa.segno != null ? await d.clickMark(app, shell, map, mossa.segno) : fuoco;
-      await d.typeText(app, shell, mossa.testo, dove);
-      return dove;
-    }
-    case 'tasto': await d.pressKey(app, shell, mossa.tasto, fuoco); return fuoco;
-    case 'scorri': await d.scrollBy(app, shell, mossa.dy); return fuoco;
-    case 'aspetta': await d.sleep(mossa.secondi * 1000); return fuoco;
-    default: return fuoco;
-  }
-}
-
 async function run() {
   const a = leggiArgomenti(process.argv.slice(2));
   if (!a.ok) { console.error(`${a.errore}\n\n${USO}`); return 2; }
@@ -106,8 +88,7 @@ async function run() {
   let finale = '';
   let app = null;
   try {
-    // Node nel main di Filo non segue il proxy da solo: senza, nel contenitore la chat non arriva al fornitore.
-    const aperta = await d.launchFilo({ userDataPrefix: 'filo-prova-', extraEnv: { NODE_USE_ENV_PROXY: '1' } });
+    const aperta = await apriFiloPerLaProva();
     app = aperta.app;
     const { shell } = aperta;
     if (chiave) await preparaFilo(app, shell, chiave);
@@ -143,7 +124,7 @@ async function run() {
       console.log(`[passo ${n}] ${passo.vedo} → ${rigaMossa(letta.mossa)}`);
       if (letta.mossa.azione === 'fine') { fine = letta.mossa; break; }
       try {
-        fuoco = (await esegui(app, shell, letta.mossa, map, fuoco)) || fuoco;
+        fuoco = await eseguiMossa(app, shell, letta.mossa, map, fuoco);
         await d.sleep(500);
       } catch (e) {
         passo.nota = `la mossa non è riuscita: ${String(e.message).split('\n')[0].slice(0, 200)}`;

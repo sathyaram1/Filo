@@ -3,8 +3,8 @@
 // Le regole della stima stanno in src/shared/stimaCosto.js.
 
 const CATALOGO = 'https://openrouter.ai/api/v1/models';
-// Il catalogo semplice elenca solo i modelli di testo: voce, dettatura e vettori stanno in liste a parte.
-const LISTE = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
+// Il catalogo semplice elenca solo i modelli di testo: voce, dettatura, vettori e immagini stanno in liste a parte.
+const LISTE = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings', '?output_modalities=image'];
 const FRESCO_MS = 6 * 60 * 60 * 1000;
 const RIPROVA_MS = 60 * 1000;
 const ATTESA_MS = 15 * 1000;
@@ -170,14 +170,18 @@ async function verificaCambio({ action, refs } = {}, { Defaults } = {}) {
 }
 const LISTINO_IN_RITARDO = 'Il listino di OpenRouter non è arrivato in tempo: Filo non stima il costo senza. Lo trovi in Opzioni, accanto al modello.';
 
-// «Circa 133 crediti per messaggio. Con opus i tuoi 4.300 crediti bastano per circa 32 messaggi.»
+// «Circa 133 crediti per messaggio. Con questo modello i tuoi 4.300 crediti bastano per circa 32 messaggi.»
+// Frase del popup: il nome scelto dal modello sta solo nel riquadro sopra, qui il modello si chiama per posto (#592.21).
+const ORDINALI = ['primo', 'secondo', 'terzo', 'quarto', 'quinto', 'sesto', 'settimo', 'ottavo', 'nono', 'decimo'];
 function fraseCosto(action, refs, registry, ctx) {
   const S = globalThis.SN_STIMA_COSTO;
-  const stime = refs.map((r) => ({ r, v: S.valuta(action, r, registry, ctx) })).filter((x) => x.v);
+  const solo = refs.length === 1;
+  const chi = (i) => (solo ? '' : `il ${ORDINALI[i] || `${i + 1}°`} modello`);
+  const stime = refs.map((r, i) => ({ chi: chi(i), v: S.valuta(action, r, registry, ctx, chi(i)) })).filter((x) => x.v);
   if (!stime.length) return '';
-  const cifre = stime.length === 1
+  const cifre = solo
     ? (stime[0].v.ok ? `${stime[0].v.perUso.charAt(0).toUpperCase()}${stime[0].v.perUso.slice(1)}.` : stime[0].v.testo)
-    : `${stime.map((x) => `${x.r}: ${x.v.ok ? x.v.perUso : x.v.breve}`).join('; ')}.`;
+    : `${stime.map((x, i) => `${i ? x.chi : `Il${x.chi.slice(2)}`}: ${x.v.ok ? x.v.perUso : x.v.breve}`).join('; ')}.`;
   const avvisi = [...new Set(stime.map((x) => x.v.avviso).filter(Boolean))];
   return [cifre, ...avvisi].join(' ');
 }

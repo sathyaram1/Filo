@@ -126,6 +126,8 @@
     mostrato = b;
     if (d.mostraFilo) d.mostraFilo();
     if (r.k === 'pagina') { if (d.coda.vaiAPagina) d.coda.vaiAPagina({ url: r.url, ts: r.ts }).catch(() => {}); return; }
+    // La riga di pagine aperta da un risultato di prima si richiude anche passando a un messaggio.
+    if (d.coda.richiudiPagine) d.coda.richiudiPagine();
     d.coda.vaiA({ chat: r.chat, i: r.i, app: !!r.app, ts: r.ts }).catch(() => {});
   }
   // Dopo una pausa nello scrivere il centro va sul primo risultato, il più probabile.
@@ -440,6 +442,20 @@
     });
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
+    // La C del doppio Ctrl (#2377): nella home la apre il comando, da un'altra scheda si arriva con ?cerca.
+    try {
+      global.chrome.runtime.onMessage.addListener((m) => {
+        if (m && m.type === MSG.SHORTCUT_TRIGGERED && m.command === 'cerca-nel-filo') apri();
+      });
+    } catch (_) {}
+    try {
+      const u = new URL(global.location.href);
+      if (u.searchParams.has('cerca')) {
+        u.searchParams.delete('cerca');
+        global.history.replaceState(global.history.state, '', u.pathname + u.search + u.hash);
+        apri();
+      }
+    } catch (_) {}
   }
 
   global.SN_DASH_CERCA = { init, apri, chiudi, aperta: () => aperta };

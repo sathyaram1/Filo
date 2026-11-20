@@ -2448,10 +2448,11 @@
     if (e.key === 'Escape') closeSortMenu();
   }
   // Il menu si chiude quando scorre l'owner, non quando la lista si riallinea
-  // da sola sotto di lui.
+  // da sola sotto di lui, né per uno scorrimento finito prima dell'apertura (#2452, #2586).
   let scrollDelGiroAt = 0;
-  function onSortScroll() {
-    if (Date.now() - scrollDelGiroAt < 300) return;
+  let sortMenuScorso = () => true;
+  function onSortScroll(e) {
+    if (Date.now() - scrollDelGiroAt < 300 || !sortMenuScorso(e)) return;
     closeSortMenu();
   }
   function chooseSort(mode) {
@@ -2480,6 +2481,7 @@
   // Un menu di voci nello stile dei select (PATTERNS.md); uno solo aperto per volta.
   function apriMenu(x, y, voci) {
     closeSortMenu();
+    sortMenuScorso = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop mg-ctxmenu';
     menu.setAttribute('role', 'menu');
@@ -3040,7 +3042,8 @@
     const fermo = fermoRestaLocale(fb, progress);
     if (fermo) {
       const dal = fermo.atMs ? ` Visto così il ${formatDateTime(new Date(fermo.atMs).toISOString())}.` : '';
-      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Per farlo ripartire serve un gesto. ${fermo.sblocchi.join(' ')}${dal}`;
+      const cause = fermo.cause.length ? ` Perché: ${fermo.cause.join('; ')}.` : '';
+      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}).${cause} Per farlo ripartire serve un gesto. ${fermo.sblocchi.join(' ')}${dal}`;
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(perche)}">Fermo: resta locale</span></div>`;
     }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
@@ -4230,6 +4233,10 @@
     resolve: 'Chiudi la segnalazione a mano',
     reopen: 'Riapri spiegando cosa manca ancora',
   };
+  const TASTO_MANDA_CORREZIONE = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+Invio') : 'Ctrl+Invio';
+  const TITOLO_CORREZIONE = `Torna a chi corregge, col testo scritto sopra (${TASTO_MANDA_CORREZIONE})`;
+  const ETICHETTA_SENZA_TESTO = MR.CORREZIONE.etichettaSenzaTesto;
+  const AVVISO_SENZA_TESTO = MR.CORREZIONE.avviso;
   const ACTION_PROGRESS = {
     accept: 'Metto in coda…',
     accept_local: 'Lo passo ai lavori server…',
@@ -4243,6 +4250,7 @@
 
   function renderActions(fb) {
     if (!mgActions || !mgActionsRow) return;
+    disarmaCorrezione();
     chiudiRiapertura();
     chiudiConfermaSegno();
     setActionMsg('', '');
@@ -4272,9 +4280,11 @@
       const conCommento = azioni.some((a) => a.kind === 'accept' || a.kind === 'reject');
       mgAcceptComment.hidden = !conCommento;
       mgAcceptComment.value = '';
-      mgAcceptComment.placeholder = MR.classifyBlock(fb)
-        ? 'Commento (opzionale): perché lo sblocchi…'
-        : 'Commento (opzionale): perché lo approvi…';
+      mgAcceptComment.placeholder = azioni.some((a) => a.correzione)
+        ? MR.CORREZIONE.segnaposto
+        : MR.classifyBlock(fb)
+          ? 'Commento (opzionale): perché lo sblocchi…'
+          : 'Commento (opzionale): perché lo approvi…';
     }
     for (const a of azioni) {
       const b = document.createElement('button');
@@ -4283,11 +4293,13 @@
       const id = ACTION_BTN_ID[a.key];
       if (id) b.id = id;
       b.dataset.actionKey = a.key;
+      if (a.correzione) b.dataset.correzione = '1';
       b.textContent = a.label;
-      b.title = a.key === 'accept_local' ? titoloLavoroLocale(fb) : (ACTION_TITLE[a.key] || a.label);
-      b.addEventListener('click', () => {
+      b.title = a.correzione ? TITOLO_CORREZIONE
+        : a.key === 'accept_local' ? titoloLavoroLocale(fb) : (ACTION_TITLE[a.key] || a.label);
+      b.addEventListener('click', (e) => {
         if (a.kind === 'reopen') { apriRiapertura(); return; }
-        applyAction(a, null);
+        applyAction(a, null, { btn: b, detail: e.detail });
       });
       mgActionsRow.appendChild(b);
     }
@@ -4306,8 +4318,61 @@
     if (mgReopenCancel) mgReopenCancel.disabled = !!busy;
   }
 
-  // Il cammino UNICO di ogni azione di stato del pannello.
-  async function applyAction(action, extra) {
+  // Una correzione senza testo parte solo al secondo gesto sullo stesso tasto (#2575): chi riprende non saprebbe cosa
+  // correggere. L'avviso sta nella casella vuota, dove si rimedia, e non sposta il tasto; scrivere o cambiare scheda disarma.
+  let correzioneArmata = null;
+  let correzioneTimer = null;
+  function disarmaCorrezione() {
+    if (correzioneTimer) { clearTimeout(correzioneTimer); correzioneTimer = null; }
+    const btn = correzioneArmata;
+    correzioneArmata = null;
+    if (!btn) return;
+    window.SN_CONFERMA_SUL_POSTO.disarma(btn, btn.dataset.etichetta || btn.textContent);
+    avvisoSenzaTesto(false);
+  }
+  function avvisoSenzaTesto(acceso) {
+    if (!mgAcceptComment) return;
+    if (acceso) {
+      if (mgAcceptComment.dataset.segnaposto == null) mgAcceptComment.dataset.segnaposto = mgAcceptComment.placeholder;
+      mgAcceptComment.placeholder = AVVISO_SENZA_TESTO;
+    } else if (mgAcceptComment.dataset.segnaposto != null) {
+      mgAcceptComment.placeholder = mgAcceptComment.dataset.segnaposto;
+      delete mgAcceptComment.dataset.segnaposto;
+    }
+    mgAcceptComment.classList.toggle('mg-accept-comment--avviso', !!acceso);
+  }
+  function correzioneDaConfermare(action, comment, gesto) {
+    if (!action.correzione || comment) return false;
+    const btn = gesto && gesto.btn;
+    if (btn && correzioneArmata === btn) {
+      // La coda di un doppio clic non è la conferma.
+      if (gesto.detail > 1) return true;
+      disarmaCorrezione();
+      return false;
+    }
+    disarmaCorrezione();
+    if (!btn) return true;
+    btn.dataset.etichetta = btn.textContent;
+    window.SN_CONFERMA_SUL_POSTO.arma(btn, ETICHETTA_SENZA_TESTO);
+    correzioneArmata = btn;
+    correzioneTimer = setTimeout(disarmaCorrezione, 8000);
+    avvisoSenzaTesto(true);
+    return true;
+  }
+  if (mgAcceptComment) {
+    mgAcceptComment.addEventListener('input', () => { if (correzioneArmata && mgAcceptComment.value.trim()) disarmaCorrezione(); });
+    // Invio va a capo; Ctrl+Invio (Cmd sul Mac) manda la correzione passando dal tasto, avviso compreso.
+    mgAcceptComment.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || e.isComposing) return;
+      const btn = mgActionsRow && mgActionsRow.querySelector('button[data-correzione]');
+      if (!btn || btn.disabled) return;
+      e.preventDefault();
+      btn.click();
+    });
+  }
+
+  // Il cammino UNICO di ogni azione di stato del pannello. `gesto` ({ btn, detail }): il tasto premuto, per l'avviso sul posto.
+  async function applyAction(action, extra, gesto) {
     if (!selectedId || !action) return;
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
@@ -4319,6 +4384,8 @@
       setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
       return;
     }
+    const testoCorrezione = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
+    if (correzioneDaConfermare(action, testoCorrezione, gesto)) return;
     // La riga per chi ha segnalato parte PRIMA del cambio di stato, e il
     // cambio di stato non parte se lei non è arrivata: chiudere una
     // segnalazione buttando via l'unica frase che il mittente leggerà è il
@@ -4326,7 +4393,7 @@
     // Il commento della revisione si legge PRIMA dell'attesa qui sotto: nel
     // frattempo la casella può svuotarsi, e il "perché" andrebbe perso senza
     // che niente lo dica.
-    const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
+    const comment = testoCorrezione;
     setActionsBusy(true);
     const fraseOk = await fraseAlSicuro();
     if (!fraseOk) {
@@ -4358,7 +4425,7 @@
     if (action.locale) { payload.localOnly = true; if (action.approva) payload.localApproval = true; }
 
     setActionsBusy(true);
-    setActionMsg(ACTION_PROGRESS[action.key] || 'Salvo…', '');
+    setActionMsg(action.correzione ? 'Rimando in correzione…' : (ACTION_PROGRESS[action.key] || 'Salvo…'), '');
     try {
       const r = await sendToMain(payload);
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
@@ -5675,10 +5742,12 @@
     b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
     b.id = s.id;
     b.dataset.strada = s.key;
-    b.textContent = s.label;
-    b.title = titoloStrada(fb, s.key);
+    // Su una bocciatura la strada è la stessa del tasto della riga, col suo nome (#2575).
+    const correzione = !!(s.azione && s.azione.correzione);
+    b.textContent = correzione ? s.azione.label : s.label;
+    b.title = correzione ? TITOLO_CORREZIONE : titoloStrada(fb, s.key);
     b.disabled = azioniInVolo;
-    b.addEventListener('click', () => applyAction(s.azione, null));
+    b.addEventListener('click', (e) => applyAction(s.azione, null, { btn: b, detail: e.detail }));
     return b;
   }
 

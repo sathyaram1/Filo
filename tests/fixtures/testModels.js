@@ -123,6 +123,19 @@
       "outputs": [
         "text"
       ]
+    },
+    "pittore": {
+      "label": "Qwen Image (pesi aperti, disegna)",
+      "provider": "openrouter",
+      "model": "qwen/qwen-image",
+      "weights": "open",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "image",
+        "text"
+      ]
     }
   };
 
@@ -171,6 +184,7 @@
     [A.PROVIDER_TEST]: 'deepseek-flash, gemma-lite',
     [A.FILE_NAME]: 'gemma, glm',
     [A.EMBED_COOKIE_CHECK]: 'gemma, glm',
+    [A.IMAGE_GEN]: 'pittore',
   };
 
   global.SN_TEST_MODELS = { registry, models };

@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura, scriviDallaTastiera } from './helpers/avvisoSito.mjs';
 import { livelloPrivacy } from './helpers/privacy.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 // Le ore di oggi sommate, misura per misura.
 const sicurezza = (app) => app.evaluate(async () => {
@@ -26,23 +27,14 @@ const statoContatori = (app) => app.evaluate(async () => JSON.stringify(await gl
 
 // Le pagine dei siti finti le serve la sessione stessa; Safe Browsing e il giudizio del modello sono finti.
 async function servi(app, pagine, { gsbListed = false } = {}) {
-  await app.evaluate(async ({ session, net }, { pg, gsbListed: lista }) => {
-    const risposta = (req) => {
-      const u = new URL(req.url);
-      const html = pg[u.hostname + u.pathname];
-      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
-    };
-    for (const s of ['http', 'https']) {
-      try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
-      session.defaultSession.protocol.handle(s, risposta);
-    }
+  await serviSiti(app, pagine);
+  await app.evaluate(async (_, lista) => {
     globalThis.SN_SAFEBROWSE.setProviders({
       gsb: lista ? async () => ({ listed: true, category: 'phishing' }) : null,
       rdap: null, ct: null, sandbox: null,
       llm: async () => ({ suspicious: false, reason: null }),
     });
-  }, { pg: pagine, gsbListed });
+  }, gsbListed);
 }
 
 async function apri(app, shell, url) {

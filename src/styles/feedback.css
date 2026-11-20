@@ -172,7 +172,8 @@
 .sn-fb-l0-titolo { font-weight: 600; }
 .sn-fb-l0-frasi { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
 .sn-fb-l0-azioni { display: flex; gap: 8px; justify-content: flex-end; }
-.sn-fb-thumb--l0 { border-color: rgba(240, 160, 40, 0.9); box-shadow: 0 0 0 2px rgba(240, 160, 40, 0.45); }
+.sn-fb-thumb--l0,
+.sn-fb-file-chip.sn-fb-file-chip--l0 { border-color: rgba(240, 160, 40, 0.9); box-shadow: 0 0 0 2px rgba(240, 160, 40, 0.45); }
 
 /* Una riga sola di azioni, senza header né footer separati. */
 .sn-fb-actions {

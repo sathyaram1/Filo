@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { barraPage, statoBarra, premi, comandaBarra, menuAperto, vociDelMenu, scegliNelMenu } from './helpers/barra.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -256,15 +257,10 @@ test('sopra l\'avviso del sito pericoloso, fermo sul bordo la barra si apre, e i
   test.setTimeout(90_000);
   const { app, x0, y, px, chiudi } = await avvia();
   try {
-    await app.evaluate(async ({ session, net }) => {
-      const pagina = '<title>Accedi</title><body style="margin:0"><button style="position:fixed;inset:0;width:100%">Accedi</button></body>';
-      const risposta = (req) => (new URL(req.url).hostname === 'conto-paypa1.com'
-        ? new Response(pagina, { headers: { 'content-type': 'text/html; charset=utf-8' } })
-        : net.fetch(req, { bypassCustomProtocolHandlers: true }));
-      for (const s of ['http', 'https']) {
-        try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
-        session.defaultSession.protocol.handle(s, risposta);
-      }
+    await serviSiti(app, {
+      'conto-paypa1.com': '<title>Accedi</title><body style="margin:0"><button style="position:fixed;inset:0;width:100%">Accedi</button></body>',
+    });
+    await app.evaluate(async () => {
       globalThis.SN_SAFEBROWSE.setProviders({ gsb: async (u) => ({ listed: /paypa1/.test(String(u && (u.url || u))), category: 'phishing' }), rdap: null, ct: null, sandbox: null, llm: async () => ({ suspicious: false }) });
     });
     const sito = app.windows().find((w) => { try { return w.url().endsWith('/sito'); } catch (_) { return false; } });

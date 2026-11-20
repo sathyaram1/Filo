@@ -13,6 +13,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
 
 - **Due tetti, vince il minore**: giorni (3) e token (100.000). L'utente li cambia in Preferenze → Impostazioni
   avanzate o dalla chat; l'owner nei Modelli predefiniti (`contestoFilo` in `config/models`). Vuoto = predefinito.
+  Il tetto in token vale per la richiesta intera (#2473.1): al tratto resta quello che la parte fissa (strumenti,
+  istruzioni, CONTESTO) lascia, `tettoDelTratto`; l'ancora resta legata al tetto scritto, così la parte fissa che cambia
+  di turno in turno non riscrive il tratto. Quando la compattazione non parte è l'ultima rete sotto il listino.
 - **L'ordine della richiesta** (#1562): strumenti, uguali per ogni utente, sistema e ruolo (`definitions()` senza
   argomenti: ONBOARDING c'è sempre e fuori dall'intervista lo ferma il main) → parte fissa (`filoChatStatic()`, uguale byte
   per byte per tutti) → CONTESTO dell'utente (sistema operativo, capacità, stile, modello, memoria, STATO senza ora né

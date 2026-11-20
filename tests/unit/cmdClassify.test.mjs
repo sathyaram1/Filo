@@ -413,11 +413,149 @@ test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti'
   for (const cmd of ['git config --list', 'git config -l', 'git config --get remote.origin.url', 'git config --get-regexp remote']) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (può stampare una credenziale) dovrebbe essere livello 2`);
   }
-  for (const cmd of ['git config user.name "Mario"', 'git config --global user.email a@b.c', 'git config --add safe.directory /x', 'git config --replace-all k v']) {
+  for (const cmd of ['git config user.name "Mario"', 'git config --global user.email a@b.c', 'git config --add safe.directory /x', 'git config --replace-all user.email a@b.c']) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (imposta) dovrebbe essere livello 2`);
   }
   for (const cmd of ['git config --unset user.name', 'git config --unset-all k', 'git config --remove-section branch.x']) {
     assert.equal(lvl(cmd), 3, `"${cmd}" (cancella) dovrebbe essere livello 3`);
+  }
+});
+
+// #2621: il comando di git che fa partire il programma resta a 2 (commit, fetch, merge): chiede chi lo scrive.
+test('git config — scrivere una chiave che avvia un programma chiede «conferma», come lanciarlo', () => {
+  for (const [scrittura, poi] of [
+    ['git config core.sshCommand "python3 evil.py"', 'git fetch'],
+    ['git config core.editor "python3 evil.py"', 'git commit'],
+    ['git config --global core.pager "python3 evil.py"', 'git commit'],
+    ['git config core.hooksPath ganci', 'git commit -m x'],
+    ['git config merge.x.driver "python3 evil.py %A"', 'git merge main'],
+    ['git config init.templateDir modelli', 'git init'],
+  ]) {
+    assert.equal(lvl('python3 evil.py'), 3);
+    assert.equal(lvl(poi), 2, `"${poi}" è il comando che fa partire il programma`);
+    assert.equal(lvl(scrittura), 3, `"${scrittura}" lascia un programma da avviare a "${poi}"`);
+    assert.equal(lvl(`${scrittura} && ${poi}`), 3);
+  }
+  for (const cmd of [
+    // Ogni forma che scrive: verbo di git 2.46, --add, --replace-all, l'escape della shell, un'opzione col valore
+    // staccato che sposta la chiave, una sezione rinominata che diventa `core`.
+    'git config set core.editor x', 'git config set --append core.editor x', 'git config --add credential.helper x',
+    'git config --replace-all gpg.program x', 'git config core.ssh\\Command x', 'git config --type bool core.pager x',
+    'git config --comment user.name core.pager x', 'git config --local filter.x.clean x', 'git config include.path altro',
+    'git config core.fsmonitor x', 'git config --rename-section color core', 'git config rename-section color core',
+    'git config --worktree diff.external x', 'git config CORE.EDITOR x',
+    // `git pop`, che lo farebbe partire, vale già 3 da solo (#2619): `pop` non è un comando di git.
+    'git config alias.pop "!python3 evil.py"',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  }
+  // Le chiavi che non avviano niente restano un OK.
+  for (const cmd of [
+    'git config user.name "Mario Rossi"', 'git config --global user.email a@b.c', 'git config pull.rebase true',
+    'git config core.autocrlf false', 'git config core.fsmonitor true', 'git config init.defaultBranch main',
+    'git config merge.conflictstyle diff3', 'git config branch.main.remote origin', 'git config --global --add safe.directory /x',
+    'git config set user.name Bob', 'git config --type bool commit.gpgsign true', 'git config color.ui auto',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
+  }
+  assert.equal(lvl('git config --get core.editor'), 1);
+  assert.equal(lvl('git config --get-urlmatch http.sslverify https://example.test'), 2);
+});
+
+// #2619: scrivere una chiave che fa avviare un programma a un comando successivo (anche a una lettura di livello 1)
+// vale quanto darla con `git -c`; le impostazioni comuni restano a una conferma leggera.
+test('git config — scrivere una chiave che avvia un programma vale 3, come `git -c`', () => {
+  const avviano = [
+    'git config core.sshCommand "ssh -o ProxyCommand=evil"', 'git config --global core.pager evil', 'git config core.fsmonitor ./monitor',
+    'git config diff.external ./x', 'git config filter.a.smudge ./x', 'git config merge.a.driver ./x',
+    'git config --global credential.helper "!sh -c evil"', 'git config credential.https://x.example.helper ./h',
+    'git config core.editor "vim -c !evil"', 'git config --global core.editor ./editor',
+    'git config sequence.editor "emacs --eval x"', 'git config core.editor "vim --default +!evil"',
+    'git config core.editor "code --wait; evil"', 'git config credential.helper "manager --value=x ./h"',
+    'git config CORE.SSHCOMMAND x', 'git config core.hooksPath /tmp/hook', 'git config init.templateDir /tmp/t',
+    'git config include.path ../altro', 'git config remote.origin.uploadpack ./x', 'git config gpg.program ./x',
+    'git config log.showSignature true', 'git config --add core.sshCommand x', 'git config --replace-all core.pager x',
+    'git config --file .git/config core.sshCommand x', 'git config --global --type=path core.askPass ./x',
+    // La forma coi verbi di git 2.46.
+    'git config set core.sshCommand x', 'git config set --append core.pager x', 'git config set --global diff.external x',
+    // Rinominare una sezione porta le sue chiavi in un'altra: `alias.sshCommand` diventa `core.sshCommand`.
+    'git config --rename-section alias core', 'git config rename-section alias core',
+  ];
+  for (const cmd of avviano) assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  for (const k of ['core.sshCommand=x', 'core.pager=x', 'credential.helper=!x']) {
+    assert.equal(lvl(`git -c ${k} status`), 3, `git -c ${k}`);
+  }
+  const comuni = [
+    'git config --global core.editor "code --wait"', 'git config core.editor vim', 'git config --global core.editor notepad.exe',
+    'git config --global core.editor "subl -n -w"', 'git config sequence.editor "code --wait"',
+    'git config --global credential.helper manager', 'git config credential.helper "cache --timeout=3600"',
+    'git config --global credential.https://github.com.username io', 'git config core.fsmonitor true',
+    'git config --bool core.fsmonitor false', 'git config --global init.defaultBranch main', 'git config pull.rebase true',
+    'git config --global push.autoSetupRemote true', 'git config core.autocrlf input',
+    'git config --global gpg.format ssh', 'git config --global user.signingkey ~/.ssh/id.pub', 'git config http.postBuffer 524288000',
+    'git config --global --add safe.directory /x', 'git config set user.name Mario', 'git config set --global core.editor "code --wait"',
+  ];
+  for (const cmd of comuni) assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
+  // Leggere una di quelle chiavi non avvia niente; le opzioni col valore staccato non passano per la chiave.
+  assert.equal(lvl('git config core.sshCommand'), 1);
+  assert.equal(lvl('git config --get core.pager'), 1);
+  assert.equal(lvl('git config --file .git/config --get remote.origin.url'), 2, 'stampa un URL che può portare un token');
+  // Le opzioni col valore staccato non passano per la chiave nemmeno scrivendo: un'impostazione comune resta leggera.
+  for (const cmd of [
+    'git config --file .gitmodules submodule.lib.branch main', 'git config --file ./altro.cfg user.name Mario',
+    'git config --type bool --global pull.rebase false', 'git config --file=./altro.cfg --type=bool fetch.prune true',
+  ]) assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
+});
+
+test('git config — pager, ssh ed editor coi valori comuni restano leggeri, un programma scelto vale 3 (#2619)', () => {
+  for (const cmd of [
+    'git config --global pager.branch false', 'git config --global pager.log true', 'git config --global core.pager cat',
+    'git config --global core.pager less', 'git config core.pager "less -FRX"', 'git config --global core.pager delta',
+    'git config core.sshCommand "ssh -i ~/.ssh/id_lavoro"', 'git config core.sshCommand "ssh -i ~/.ssh/k -o IdentitiesOnly=yes"',
+    'git config --global core.editor "\'C:/Program Files/Notepad++/notepad++.exe\' -multiInst -notabbar -nosession -noPlugin"',
+    'git config --global core.editor "C:/Program Files/Microsoft VS Code/Code.exe --wait"',
+    'git config --global core.editor /usr/bin/vim', 'git config --global user.name "Mario D\'Angelo"',
+  ]) assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
+  for (const cmd of [
+    'git config --global pager.log "sh -c x"', 'git config core.pager "less -oregistro"', 'git config core.pager "less +!x"',
+    'git config core.pager "cat x"', 'git config core.sshCommand "ssh -F ./cfg"', 'git config core.sshCommand "ssh -o LocalCommand=x"',
+    'git config --global core.editor /tmp/vim', 'git config --global core.editor "C:/Users/a/vim.exe"',
+    'git config --global core.editor "/usr/bin/../../tmp/vim"', 'git config --global core.editor "C:/Program Files/x/evil.exe"',
+  ]) assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+});
+
+test('git config — un valore spezzato da `;`, `&&` o un a capo dentro le virgolette vale 3 (#2619)', () => {
+  // git consegna editor e helper alla shell: il comando attaccato partirebbe a ogni commit o fetch.
+  for (const cmd of [
+    'git config --global core.editor "code;touch x"', "git config --global core.editor 'code --wait;touch x'",
+    'git config --global core.editor "code&&touch x"', 'git config --global core.editor "code\ntouch x"',
+    "git config sequence.editor 'code;touch x'", "git config credential.helper 'store;touch x'",
+  ]) assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  assert.equal(lvl('git config user.name x; git status'), 2, 'una sequenza vera resta il massimo dei suoi comandi');
+});
+
+test('git — alias e cartella dei modelli non portano un programma sotto un nome fidato (#2619)', () => {
+  // git distingue le maiuscole nei comandi ma non nelle chiavi: `git Status` usa `alias.status`. `pop` non è di git.
+  for (const cmd of ['git Status', 'git LOG -1', 'git Commit -m x', 'git pop']) assert.equal(lvl(cmd), 3, cmd);
+  for (const cmd of [
+    'git clone --template=/tmp/t https://github.com/a/b', 'git clone --template /tmp/t https://github.com/a/b',
+    'git init --template=/tmp/t', 'git init --templ /tmp/t nuovo',
+  ]) assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  for (const cmd of ['git clone https://github.com/a/b', 'git init']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
+  }
+  // Scrivere un alias chiede comunque «conferma» (#2621).
+  for (const cmd of ['git config --global alias.co checkout', 'git config alias.st status']) assert.equal(lvl(cmd), 3, cmd);
+});
+
+test('git fetch/pull/push/clone — il programma del trasporto scritto nel comando vale 3, come la sua chiave (#2619)', () => {
+  for (const cmd of [
+    'git fetch --upload-pack=./x origin', 'git fetch origin --upload-pack ./x', 'git pull --upload-pack=./x',
+    'git push --receive-pack=./x origin', 'git push --exec=./x', 'git push --rec=./x', 'git clone -u ./x /tmp/r',
+    'git clone --upload-pack ./x /tmp/r',
+  ]) assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  for (const cmd of ['git fetch origin', 'git pull --rebase', 'git push -u origin main', 'git clone https://github.com/a/b']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
   }
 });
 
@@ -1215,6 +1353,47 @@ test('git push — al remoto configurato si rimedia (2); a un indirizzo scritto 
   }
 });
 
+// #2619.1: un sotto-comando di git che lancia un programma scritto nel comando vale quanto lanciarlo da solo.
+test('git che esegue un programma scritto nel comando → livello 3, come il programma da solo', () => {
+  assert.equal(lvl('python3 evil.py'), 3);
+  for (const cmd of [
+    'git rebase -x "python3 evil.py" HEAD~1', 'git rebase --exec "python3 evil.py" HEAD~1', 'git rebase --exec="python3 evil.py" main',
+    'git rebase --exe "python3 evil.py" main', 'git rebase -i -x "python3 evil.py" main', 'git rebase -ix "python3 evil.py" main',
+    'git rebase -x"python3 evil.py" main', 'git rebase "-x" "python3 evil.py" main',
+    'git submodule foreach "python3 evil.py"', 'git submodule --quiet foreach --recursive "python3 evil.py"',
+    'git submodule "foreach" python3 evil.py', 'git submodule f\\oreach python3 evil.py',
+    'git clone --upload-pack="python3 evil.py" ./a b', 'git clone -u "python3 evil.py" ./a b', 'git clone -qu "python3 evil.py" ./a b',
+    'git clone --upl="python3 evil.py" ./a b', 'git fetch --upload-pack "python3 evil.py" ./a', 'git pull --upload-pack="python3 evil.py" ./a',
+    'git push --receive-pack="python3 evil.py" ./a main', 'git push --exec="python3 evil.py" ./a main',
+    'git clone -c core.sshCommand="python3 evil.py" git@host:r.git', 'git clone --config core.fsmonitor=evil ./a b',
+    'git clone --template=./modelli ./a b', 'git init --template ./modelli',
+    'git status && git rebase -x "python3 evil.py" HEAD~1',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  }
+  // Le forme vicine che non lanciano niente restano dove stavano.
+  for (const cmd of [
+    'git rebase main', 'git rebase -i HEAD~3', 'git rebase -X ours main', 'git rebase -Xsubtree=lib/x main', 'git rebase -s ort main',
+    'git rebase --empty=drop main', 'git rebase --no-exec main', 'git submodule update --init', 'git submodule add ./x',
+    'git clone ./a b', 'git clone -b main ./a b', 'git clone -o upstream ./a b', 'git fetch -u origin', 'git fetch --update-head-ok origin',
+    'git pull', 'git push origin main', 'git push --recurse-submodules=check origin main', 'git init',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
+  }
+});
+
+test('cancellaPerSempre: il programma che git lancia da sé si guarda come gli altri', () => {
+  for (const cmd of [
+    'git rebase -x "rm -rf build" HEAD~1', 'git rebase --exec="rm -rf build" main', 'git rebase -ix "rm x" main',
+    'git submodule foreach "rm -rf node_modules"', 'git submodule foreach --recursive rm -rf x', 'git rebase -x "sudo rm x" main',
+    'git push --receive-pack="rm -rf ~" ./a main',
+  ]) assert.equal(C.cancellaPerSempre(cmd), true, cmd);
+  for (const cmd of ['git rebase -x "npm test" main', 'git submodule foreach git status', 'git rebase main', 'git submodule update',
+    'git rebase -s rm main', 'git clone -c core.autocrlf=false ./a b']) {
+    assert.equal(C.cancellaPerSempre(cmd), false, cmd);
+  }
+});
+
 // #1909 — cancellare senza cestino si riconosce dal programma di ogni pezzo, anche nascosto dietro un altro comando.
 test('cancellaPerSempre: i comandi che cancellano senza cestino, in ogni shell', () => {
   for (const cmd of [
@@ -1235,6 +1414,26 @@ test('cancellaPerSempre: i comandi che cancellano senza cestino, in ogni shell',
   for (const cmd of ['ls', 'dir', 'grep del a.txt', 'echo rm', 'mv a b', 'git status', 'git rm --cached x', 'Get-ChildItem',
     'Move-Item a b', 'cat rm.txt', 'mkdir rm', 'find . -name x', '', '   ', 'echo do rm', 'grep unlink a.c', 'sudo -E ls rm.txt',
     'git commit -m "do rm later"', '$x = Get-Item a', 'gci | % Name', 'Start-Process notepad']) {
+    assert.equal(C.cancellaPerSempre(cmd), false, cmd);
+  }
+});
+
+// #1909.5 — allineare due cartelle sul Mac e su Linux cancella dalla destinazione come robocopy /MIR.
+test('cancellaPerSempre: rsync con --delete e rclone sync chiedono la parola come robocopy /MIR', () => {
+  for (const cmd of [
+    'rsync -a --delete vuota/ ~/Documenti/', 'rsync -av --del a/ b/', 'rsync -a --delete-after a/ b/',
+    'rsync -a --delete-before a/ b/', 'rsync -a --delete-during a/ b/', 'rsync -a --delete-delay a/ b/',
+    'rsync -a --delete-excluded --exclude "*.tmp" a/ b/', 'rsync -a --delete-missing-args x b/', 'RSYNC -a --DELETE a/ b/',
+    'sudo rsync -a --delete a/ /srv/b/', '/usr/bin/rsync -a --delete a/ b/', 'cd ~ && rsync -a "--delete" a/ b/',
+    'rsync -e "ssh -p 22" -a --delete a/ host:b/',
+    'rclone sync a remote:b', 'rclone --config c.conf sync a remote:b', 'rclone bisync a remote:b', 'rclone purge remote:b',
+    'rclone delete remote:b', 'rclone deletefile remote:b/x', 'rclone rmdirs remote:b', 'rclone cleanup remote:',
+  ]) {
+    assert.equal(C.cancellaPerSempre(cmd), true, cmd);
+    assert.equal(lvl(cmd), 3, cmd);
+  }
+  for (const cmd of ['rsync -a a/ b/', 'rsync -av --delay-updates a/ b/', 'rsync -a --dry-run a/ b/', 'echo rsync --delete',
+    'rclone copy a remote:b', 'rclone ls remote:', 'grep --delete a.txt']) {
     assert.equal(C.cancellaPerSempre(cmd), false, cmd);
   }
 });

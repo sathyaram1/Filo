@@ -17,6 +17,8 @@
     SALVA_LEZIONE: 'pin',
     INVIA_FEEDBACK: 'feedback',
     CERCA_WEB: 'searchWeb',
+    IMMAGINI_WEB: 'image',
+    GENERA_IMMAGINE: 'image',
     // #525 — rileggere le conversazioni di prima: l'icona è quella della
     // cronologia, che è esattamente quello che sta facendo.
     CERCA_CHAT: 'history',
@@ -49,6 +51,7 @@
     ELIMINA_FILE: 'trash',
     RIMETTI_CHAT: 'restore',
     CORREGGI_MEMORIA: 'pencil',
+    LEGGI_MEMORIA: 'readDocument',
     CANCELLA_PAGINE: 'eraser',
     IMPOSTA_PREFERENZA: 'options',
     IMPOSTA_ESTETICA: 'palette',
@@ -74,6 +77,7 @@
     BLUETOOTH: 'bluetooth',
     WIFI: 'wifi',
     ORDINA_DESKTOP: 'desktopIcons',
+    BLOCCA_PC: 'lock',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
     ANNULLA_CAMBIO: 'undo',

@@ -18,7 +18,7 @@
   const GIT_WRITE = new Set([
     'add', 'commit', 'push', 'pull', 'fetch', 'switch', 'merge',
     'rebase', 'cherry-pick', 'revert', 'init', 'clone', 'mv',
-    'apply', 'am', 'pop', 'worktree', 'submodule',
+    'apply', 'am', 'worktree', 'submodule',
   ]);
   // `checkout` e `stash` non stanno in GIT_WRITE: hanno forme distruttive e forme innocue,
   // quindi il livello dipende dagli argomenti e lo decide GIT_DUAL.
@@ -68,21 +68,169 @@
     return false;
   }
 
+  // Le chiavi di un repository che a una lettura non avviano niente; ogni altra chiave locale fa chiedere (#2292).
+  const GIT_CHIAVI_INERTI = [
+    // core.hooksPath sposta solo la cartella degli hook, che la sonda segue già da sé (husky la imposta).
+    /^core\.(repositoryformatversion|filemode|bare|worktree|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles|hookspath|commentchar|commentstring)$/,
+    // Di un remoto avviano un programma solo i comandi di rete (uploadpack, receivepack, vcs), e una lettura va in
+    // rete solo da un remoto promettente: quelle chiavi chiedono. Le altre le scrivono anche VS Code e GitHub CLI
+    // (gh-resolved). I rami non avviano niente.
+    /^remote\.[^=]+\.(?!(uploadpack|receivepack|vcs|promisor|partialclonefilter)$)[^.=]+$/,
+    /^branch\.[^=]+\.[^.=]+$/,
+    /^submodule\.[^=]+\.(url|active|branch)$/,
+    /^user\.(name|email|signingkey)$/,
+    /^(pull\.(rebase|ff)|push\.(default|autosetupremote)|fetch\.prune|init\.defaultbranch|merge\.(ff|conflictstyle)|rebase\.(autosquash|autostash))$/,
+    /^(extensions\.(objectformat|refstorage|worktreeconfig)|lfs\.repositoryformatversion|gui\.[^=]+|color\.[^=]+)$/,
+    // Sezioni intere che una lettura non usa per avviare niente: valgono per comandi che non sono letture (commit,
+    // merge, gc, maintenance…), o sono dati (alias di un nome che una lettura non usa, git-flow, blame, status).
+    /^(commit|tag|merge|rebase|pull|push|fetch|gc|maintenance|rerere|init|gitflow|alias|blame|status|index|feature|advice|format|pretty|i18n|column|checkout|clone)\.[^=]+$/,
+    /^(remote|branch|submodule)\.[^.=]+$/,
+    // diff.external avvia un programma; i driver (`diff.<nome>.*`) restano fuori.
+    /^diff\.(?!external$)[^.=]+$/,
+    // log.showSignature fa partire gpg a ogni git log.
+    /^log\.(?!showsignature$)[^.=]+$/,
+    // git-lfs, per indirizzo: come si autentica e il controllo dei lucchetti. Le estensioni di lfs avviano programmi.
+    /^lfs\.[^=]+\.(access|locksverify)$/,
+    /^core\.(splitindex|multipackindex|commitgraph|fsyncmethod|packedgitlimit|packedgitwindowsize|deltabasecachelimit|bigfilethreshold)$/,
+  ];
+  // Inerti a una lettura, non ai comandi che scrivono (#2621): gli hook partono a commit, init e clone, un driver di
+  // merge a merge, un alias `!` a un nome che il classificatore crede di git (`git pop`).
+  const GIT_CHIAVI_LANCIANO_SCRIVENDO = /^(core\.hookspath|init\.templatedir|alias\.[^=]+|merge\.[^=]+\.[^.=]+)$/;
+  // `scrivendo`: la chiave la scrive `git config`, e il programma partirebbe a un comando di git che scrive.
+  // safe.directory sta solo nelle impostazioni dell'utente e non avvia niente: ai repository che rende leggibili
+  // la sonda guarda prima di ogni lettura.
+  function gitChiaveInerte(chiave, valore, scrivendo) {
+    const k = String(chiave).toLowerCase();
+    // `core.fsmonitor` con un valore sì/no accende il demone di git, non un programma scelto dal repository.
+    if (k === 'core.fsmonitor') return /^(true|false|yes|no|on|off|1|0)?$/i.test(String(valore || '').trim());
+    if (scrivendo && k === 'safe.directory') return true;
+    if (scrivendo && GIT_CHIAVI_LANCIANO_SCRIVENDO.test(k)) return false;
+    return GIT_CHIAVI_INERTI.some((re) => re.test(k));
+  }
+
+  // Scriverla non fa avviare niente dopo (#2619): le inerti a una lettura, meno quelle che lanciano a un comando che
+  // scrive, più le globali che una lettura non guarda. Le altre → 3, come la stessa impostazione data con `git -c`.
+  const GIT_SCRITTE_INERTI = /^(safe\.directory|core\.(excludesfile|whitespace)|http\.(postbuffer|version|lowspeedlimit|lowspeedtime|maxrequests))$/;
+  // Un editor o un helper noto per nome, coi soli interruttori senza valore: `code --wait` resta 2, `vim -c '!…'` no.
+  const EDITORI = new Set(['code', 'code-insiders', 'codium', 'cursor', 'windsurf', 'zed', 'subl', 'atom', 'mate', 'nano',
+    'pico', 'vi', 'vim', 'nvim', 'gvim', 'mvim', 'emacs', 'micro', 'hx', 'helix', 'kak', 'joe', 'notepad', 'notepad++',
+    'gedit', 'kate', 'kwrite', 'mousepad', 'xed', 'pluma']);
+  const EDITORE_INTERRUTTORI = new Set(['--wait', '-w', '-n', '--new-window', '-r', '--reuse-window', '-f', '--nofork',
+    '-nw', '-multiinst', '-notabbar', '-nosession', '-noplugin']);
+  const HELPER_NOTI = new Set(['store', 'cache', 'manager', 'manager-core', 'osxkeychain', 'libsecret', 'wincred']);
+  // Un editor col percorso intero vale il suo nome solo in una cartella che scrive soltanto l'amministratore: è la forma
+  // che scrive l'installatore di git su Windows. Una cartella qualsiasi può ospitare un programma col nome di un editor.
+  const EDITORE_DI_SISTEMA = /^(?:c:[\\/]program files(?: \(x86\))?|\/usr\/bin|\/bin)[\\/](?:[^\\/]*[\\/])*([^\\/\s]+?)(?:\.exe)?(?:\s+|$)/i;
+  function editoreNoto(parole) {
+    const valore = parole.join(' ');
+    const m = /\.\./.test(valore) ? null : EDITORE_DI_SISTEMA.exec(valore);
+    const [nome, ...resto] = m ? [m[1], ...valore.slice(m[0].length).split(/\s+/).filter(Boolean)] : parole;
+    return Boolean(nome) && EDITORI.has(nome.toLowerCase().replace(/\.exe$/, ''))
+      && resto.every((x) => EDITORE_INTERRUTTORI.has(x.toLowerCase()));
+  }
+  // Pager e ssh coi valori più comuni, che non scelgono un programma qualsiasi: gli interruttori di less non prendono
+  // valori (niente `-o file`, `-k file`, `+comando`), di ssh solo la chiave e le opzioni che non avviano comandi.
+  const LESS_INTERRUTTORE = /^(-[FRSXrKiIMmNnWwQqs]+|--(RAW-CONTROL-CHARS|raw-control-chars|quit-if-one-screen|no-init|chop-long-lines|ignore-case|LINE-NUMBERS|quiet))$/;
+  function pagerNoto(parole) {
+    const nome = String(parole[0] || '').toLowerCase().replace(/\.exe$/, '');
+    if (nome === 'less') return parole.slice(1).every((x) => LESS_INTERRUTTORE.test(x));
+    return parole.length === 1 && ['cat', 'more', 'delta'].includes(nome);
+  }
+  const SSH_OPZIONE = /^(identitiesonly=(yes|no)|stricthostkeychecking=(yes|no|accept-new)|batchmode=(yes|no)|connecttimeout=\d+|port=\d+)$/i;
+  function sshNoto(parole) {
+    if (!/^ssh(\.exe)?$/i.test(parole[0] || '')) return false;
+    for (let i = 1; i < parole.length; i++) {
+      const x = parole[i];
+      if (x === '-i' && parole[i + 1] && !parole[i + 1].startsWith('-')) i += 1;
+      else if (x === '-o' && SSH_OPZIONE.test(parole[i + 1] || '')) i += 1;
+      else if (x === '-p' && /^\d+$/.test(parole[i + 1] || '')) i += 1;
+      else if (!/^-[46qvT]+$/.test(x)) return false;
+    }
+    return true;
+  }
+  const BOOLEANO = /^(true|false|yes|no|on|off|1|0)$/i;
+  function gitChiaveScrittaInerte(chiave, parole) {
+    const p = parole.map((x) => x.toLowerCase());
+    if (GIT_CHIAVI_LANCIANO_SCRIVENDO.test(chiave)) return false;
+    if (/^(core|sequence)\.editor$/.test(chiave)) return editoreNoto(parole);
+    // `pager.<comando>` con un sì o un no accende o spegne il pager di sempre; con un altro valore è il pager.
+    if (/^pager\.[^.=]+$/.test(chiave)) return (p.length === 1 && BOOLEANO.test(p[0])) || pagerNoto(parole);
+    if (chiave === 'core.pager') return pagerNoto(parole);
+    if (chiave === 'core.sshcommand') return sshNoto(parole);
+    if (/^credential\..*helper$/.test(chiave)) return HELPER_NOTI.has(p[0]) && p.slice(1).every((x) => /^--timeout=\d+$/.test(x));
+    if (/^credential\./.test(chiave)) return true; // username, useHttpPath…: dati che l'helper legge
+    if (chiave === 'gpg.format') return /^(openpgp|x509|ssh)$/.test(p.join(' '));
+    return GIT_SCRITTE_INERTI.test(chiave) || gitChiaveInerte(chiave, p.join(' '), true);
+  }
+
+  // Le opzioni di `git config` col valore staccato: senza saltarlo, il file di `-f <file>` passava per la chiave.
+  const GIT_CONFIG_COL_VALORE = new Set(['-f', '--file', '--blob', '--type', '--default', '--comment', '--value']);
+  const GIT_CONFIG_INTERRUTTORE = /^(-z|--(global|local|system|worktree|add|replace-all|append|all|bool|int|bool-or-int|path|expiry-date|no-type|null|fixed-value|show-origin|show-scope|includes|no-includes))$/;
+  // Le posizioni degli operandi di `git config` (verbo, chiave, valore), saltati i valori delle opzioni.
+  function gitConfigOperandi(args) {
+    const pos = [];
+    for (let i = 0; i < args.length; i++) {
+      if (GIT_CONFIG_COL_VALORE.has(args[i].toLowerCase())) i += 1;
+      else if (!args[i].startsWith('-')) pos.push(i);
+    }
+    return pos;
+  }
+
   // `git config` nella forma con le opzioni (`--unset`, `chiave valore`…): gli argomenti dopo il sotto-comando.
   function gitConfigForma(args) {
     const low = args.map((a) => a.toLowerCase());
     if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
-    const ops = args.filter((a) => !a.startsWith('-'));
+    // Rinominare una sezione sposta le sue chiavi in un'altra: `color.sshcommand` diventa `core.sshcommand` (#2621).
+    if (low.includes('--rename-section')) return 3;
+    const pos = gitConfigOperandi(args);
+    const ops = pos.map((i) => args[i]);
+    const chiave = (ops[0] || '').toLowerCase();
     // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
     const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
-    if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test((ops[0] || '').toLowerCase())) return 3;
-    if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
-    if (ops.length >= 2) return 2; // `chiave valore` imposta
+    if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test(chiave)) return 3;
+    // Il valore scritto, tolti gli interruttori senza valore di git config. Un'opzione col valore dopo la chiave resta
+    // dentro: potrebbe stare nel valore fra virgolette (`"vim --default +!x"`), e allora il controllo cade.
+    // `--get chiave modello` legge: git rifiuta due azioni insieme (#2621).
+    if (scrive && !low.some((a) => /^--get(-|$)/.test(a))) {
+      return gitChiaveScrittaInerte(chiave, args.slice(pos[0] + 1).filter((a, k) => !GIT_CONFIG_INTERRUTTORE.test(low[pos[0] + 1 + k]))) ? 2 : 3;
+    }
+    if (low.some((a) => a === '-e' || a === '--edit')) return 2;
     // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
     // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
     // conversazione → conferma (#587). Una chiave innocua (`user.email`) resta 1.
     if (low.some((a) => a === '--list' || a === '-l' || a === '--get-regexp' || a === '--get-urlmatch')) return 2;
-    return /(^|\.)url$|credential|password|token/.test((ops[0] || '').toLowerCase()) ? 2 : 1;
+    return /(^|\.)url$|credential|password|token/.test(chiave) ? 2 : 1;
+  }
+
+  // Da git 2.46 il primo operando può essere un verbo (`git config set remote.origin.url …`): una chiave ha
+  // sempre un punto, quindi un verbo senza punto non si confonde. Tolto il verbo, vale la forma di prima.
+  function gitConfigVerbi(cmd) {
+    const args = gitArgsAfterSub(cmd);
+    const i = gitConfigOperandi(args)[0];
+    const verbo = i === undefined ? '' : args[i].toLowerCase();
+    if (!/^(list|get|set|unset|edit|rename-section|remove-section|get-color|get-colorbool)$/.test(verbo)) return gitConfigForma(args);
+    const resto = args.filter((_, k) => k !== i);
+    const low = resto.map((a) => a.toLowerCase());
+    if (verbo === 'unset' || verbo === 'remove-section' || verbo === 'rename-section') return 3;
+    if (verbo === 'list' || verbo === 'edit') return 2;
+    if (verbo === 'set') return Math.max(2, gitConfigForma(low.includes('--append') ? resto.concat('--add') : resto));
+    if (low.some((a) => /^--(regexp|url)(=|$)/.test(a))) return 2;
+    return gitConfigForma(resto);
+  }
+
+  // Le virgolette restano aperte a fine comando, come le legge bash (il backslash fuori dagli apici protegge il
+  // carattere dopo): `"Mario D'Angelo"` è chiuso, `"code` no.
+  function virgoletteAperte(cmd) {
+    let dentro = '';
+    const s = String(cmd);
+    for (let k = 0; k < s.length; k++) {
+      const c = s[k];
+      if (dentro === "'") { if (c === "'") dentro = ''; continue; }
+      if (c === '\\') { k += 1; continue; }
+      if (dentro === '"') { if (c === '"') dentro = ''; continue; }
+      if (c === '"' || c === "'") dentro = c;
+    }
+    return dentro !== '';
   }
 
   // Sotto-comandi il cui livello dipende dagli argomenti: i duali ELENCANO (1) da nudi e
@@ -114,21 +262,7 @@
       const verbs = argVariants(raw).map((v) => v.toLowerCase());
       return verbs.some((v) => v === 'drop' || v === 'clear') ? 3 : 2;
     },
-    // Da git 2.46 il primo operando può essere un verbo (`git config set remote.origin.url …`): una chiave ha
-    // sempre un punto, quindi un verbo senza punto non si confonde. Tolto il verbo, vale la forma di prima.
-    config: (cmd) => {
-      const args = gitArgsAfterSub(cmd);
-      const i = args.findIndex((a) => !a.startsWith('-'));
-      const verbo = i < 0 ? '' : args[i].toLowerCase();
-      if (!/^(list|get|set|unset|edit|rename-section|remove-section|get-color|get-colorbool)$/.test(verbo)) return gitConfigForma(args);
-      const resto = args.filter((_, k) => k !== i);
-      const low = resto.map((a) => a.toLowerCase());
-      if (verbo === 'unset' || verbo === 'remove-section') return 3;
-      if (verbo === 'list' || verbo === 'edit' || verbo === 'rename-section') return 2;
-      if (verbo === 'set') return Math.max(2, gitConfigForma(low.includes('--append') ? resto.concat('--add') : resto));
-      if (low.some((a) => /^--(regexp|url)(=|$)/.test(a))) return 2;
-      return gitConfigForma(resto);
-    },
+    config: gitConfigVerbi,
     remote: (cmd) => {
       const ops = gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'));
       // `git remote -v` elenca gli URL, che possono contenere un token → conferma.
@@ -165,6 +299,36 @@
     }
     return null;
   }
+  // Le opzioni con cui git lancia un programma scritto nel comando: verso un remoto locale `--upload-pack`/`--receive-pack`
+  // li esegue la shell della macchina, `clone -c core.sshCommand=…` ne imposta uno, `--template` porta gli hook. È codice
+  // arbitrario come ARBITRARY_CODE (#2618). Le lunghe valgono accorciate fino a una lettera (git accetta ogni prefisso
+  // unico); le corte anche dentro un gruppo (`-qu`), fino alla prima lettera che prende un valore.
+  const GIT_LANCIA = {
+    push: { lunghe: ['receive-pack', 'exec'] },
+    fetch: { lunghe: ['upload-pack'] },
+    pull: { lunghe: ['upload-pack'] },
+    'ls-remote': { lunghe: ['upload-pack', 'exec'] },
+    archive: { lunghe: ['exec'] },
+    clone: { lunghe: ['upload-pack', 'config', 'template'], corte: 'uc', conValore: 'jobuc' },
+    init: { lunghe: ['template'] },
+    rebase: { lunghe: ['exec'], corte: 'x', conValore: 'SxsXC' },
+  };
+  function cortaNelGruppo(t, corte, conValore) {
+    if (!/^-[^-]/.test(t)) return false;
+    for (const ch of t.slice(1)) {
+      if (corte.includes(ch)) return true;
+      if (conValore.includes(ch)) return false;
+    }
+    return false;
+  }
+  function gitLanciaProgramma(sub, args) {
+    // `git submodule foreach <comando>` fa girare il comando nella shell, in ogni sotto-modulo.
+    if (sub === 'submodule') return argVariants(args.find((a) => !a.startsWith('-')) || '').some((v) => v.toLowerCase() === 'foreach');
+    const o = GIT_LANCIA[sub];
+    return !!o && args.some((a) => argVariants(a).some((v) =>
+      o.lunghe.some((n) => opzioneLunga(v, n, 1) != null) || (!!o.corte && cortaNelGruppo(v, o.corte, o.conValore))));
+  }
+
   // Le letture di git che con certe forme scrivono o eseguono: il livello a cui salgono, 0 se restano letture.
   // Sentinella: ogni nome di GIT_READ sta nella tabella di letturaCheScrive.test.mjs.
   const GIT_READ_MUTATES = {
@@ -183,19 +347,70 @@
     'symbolic-ref': (args) => (args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 0),
   };
 
-  function classifyGit(cmd) {
+  // I sotto-comandi di scrittura che eseguono un programma scelto nel comando: valgono quanto lanciarlo da soli (#2619.1).
+  // Le lunghe si riconoscono anche accorciate, come le accetta git; le corte anche raggruppate (`-ix`), fino alla
+  // prima che si prende il resto come valore. `config` e `template` di clone/init il programma lo scelgono senza scriverlo.
+  const GIT_ESEGUE = {
+    rebase: { lunghe: ['exec'], corte: 'x', conValore: 'sXCS' },
+    clone: { lunghe: ['upload-pack', 'config', 'template'], corte: 'uc', conValore: 'objuc' },
+    fetch: { lunghe: ['upload-pack'] },
+    pull: { lunghe: ['upload-pack'] },
+    push: { lunghe: ['receive-pack', 'exec'] },
+    init: { lunghe: ['template'] },
+  };
+  // `t` sono i token dopo `git`, senza virgolette. Il comando che git esegue, dal programma in poi (vuoto se non si
+  // legge, come per `config` e `template`), o null se la forma non esegue niente di scritto nel comando.
+  function gitProgrammaScritto(t) {
+    let k = 0;
+    while (k < t.length && String(t[k]).startsWith('-')) k += /^-[Cc]$/.test(t[k]) ? 2 : 1;
+    if (k >= t.length) return null;
+    const sub = String(t[k]).toLowerCase();
+    const args = t.slice(k + 1).map(String);
+    if (sub === 'submodule') {
+      const j = args.findIndex((a) => !a.startsWith('-'));
+      if (j < 0 || !argVariants(args[j]).some((v) => v.toLowerCase() === 'foreach')) return null;
+      const dopo = args.slice(j + 1);
+      return dopo.slice(Math.max(0, dopo.findIndex((a) => !a.startsWith('-'))));
+    }
+    const regola = GIT_ESEGUE[sub];
+    if (!regola) return null;
+    const conAttaccato = (valore, i) => (valore ? [valore, ...args.slice(i + 1)] : args.slice(i + 1));
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      for (const nome of regola.lunghe) {
+        const valore = opzioneLunga(a, nome, 1);
+        if (valore != null) return conAttaccato(valore, i);
+      }
+      if (!regola.corte || !/^-[^-]/.test(a)) continue;
+      for (let c = 1; c < a.length; c++) {
+        if (regola.corte.includes(a[c])) return conAttaccato(a.slice(c + 1), i);
+        if (regola.conValore.includes(a[c])) break;
+      }
+    }
+    return null;
+  }
+
+  function classifyGit(cmd, grezzo = cmd) {
     const sub = subcommandOf(cmd);
     const globali = tokens(cmd).slice(1).map(unquote);
     const k = globali.findIndex((x) => !x.startsWith('-'));
     if (sub && globali.slice(0, k).some((x) => !GIT_GLOBALI_INNOCUE.has(x) && !VERSION_TOKENS.has(x.toLowerCase()))) return 3;
     if (!sub) return 1; // `git` da solo stampa l'help → lettura
+    // git riconosce i suoi comandi solo scritti così, mentre le chiavi non badano alle maiuscole: `git Status` è
+    // l'alias `alias.status`, che può avviare un programma (#2619).
+    if (globali.find((x) => x && !x.startsWith('-')) !== sub) return 3;
     if (GIT_DESTROY.has(sub)) return 3;
     if (gitPericolosa(cmd)) return 3; // es. push --force, checkout -f, branch -D, tag -d
     const t = tokens(cmd).slice(1);
     if (t.slice(0, t.findIndex((x) => !x.startsWith('-'))).some((x) => !GIT_GLOBALI_INNOCUE.has(x) && !GIT_GLOBALE_CARTELLA.test(x))) return 3;
     if (gitScriveFile(cmd)) return 3;
+    if (gitLanciaProgramma(sub, gitArgsAfterSub(cmd))) return 3;
+    if (gitProgrammaScritto(globali)) return 3;
     const dual = GIT_DUAL[sub];
-    if (dual) return dual(cmd); // tag/branch/config/remote: dipende dagli argomenti
+    // Una scrittura di config con le virgolette aperte nel testo grezzo è un pezzo: la sequenza è stata spezzata dentro
+    // il valore, e quello che git consegnerà alla shell (`"code;evil"`) non è il valore controllato qui.
+    if (sub === 'config') { const v = dual(cmd); return v > 1 && virgoletteAperte(grezzo) ? 3 : v; }
+    if (dual) return dual(cmd); // tag/branch/remote: dipende dagli argomenti
     if (GIT_READ.has(sub)) {
       const args = gitArgsAfterSub(cmd);
       const sale = GIT_READ_MUTATES[sub] ? GIT_READ_MUTATES[sub](args) : 0;
@@ -228,5 +443,5 @@
     return 3; // run/exec/start/test/publish/sconosciuti → 3
   }
 
-  Object.assign(P, { GIT_READ, GIT_GLOBALE_CARTELLA, gitScriveFile, gitUscita, classifyGit, classifyNpm });
+  Object.assign(P, { GIT_READ, GIT_GLOBALE_CARTELLA, gitChiaveInerte, gitScriveFile, gitUscita, gitProgrammaScritto, classifyGit, classifyNpm });
 })(typeof globalThis !== 'undefined' ? globalThis : self);

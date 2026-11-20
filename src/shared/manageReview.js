@@ -86,19 +86,22 @@
     if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !statoCheAspetta(normalizeStatus(fb).status)) return null;
     const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
     if (!motivi.length) return null;
-    const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m, fb.branch)))];
-    return { motivi, sblocchi, atMs: Number(r.atMs) || 0 };
+    const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m, motivi)))];
+    // Il perché scritto dal server (#2235, #2565: anche il motivo del buco del registro), testo e basta.
+    const cause = (Array.isArray(r.cause) ? r.cause : []).map((c) => String(c || '').trim()).filter(Boolean);
+    return { motivi, sblocchi, cause, atMs: Number(r.atMs) || 0 };
   }
-  // Nessun motivo del fermo passa da solo (#2036.1): uno sporco non torna pulito, un registro bucato lo sana solo
-  // l'owner, la fiducia la dà lui. Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
-  function sbloccoFermo(motivo, ramo) {
+  // Nessun motivo del fermo che resta passa da solo (#2036.1): uno sporco non torna pulito, la fiducia la dà l'owner, e
+  // il buco che la sanatoria toglie la coda lo toglie prima di segnare il fermo (#2565), ma solo su un feedback fidato.
+  // Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
+  function sbloccoFermo(motivo, motivi = []) {
     const m = String(motivo || '').toLowerCase();
     if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.';
     if (/ramo|registro/.test(m)) {
-      const server = /server/.test(m);
-      const nome = String(ramo || '').trim() || '<ramo>';
-      return `Il ramo${server ? ' del server' : ''} non risulta pulito: se è un buco del registro lo togli con la sanatoria dal tuo PC, `
-        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, «Dichiara fidato com’è» nel dettaglio, dopo averlo letto.`;
+      const ramo = `Il ramo${/server/.test(m) ? ' del server' : ''} non risulta pulito`;
+      const feedbackNonFidato = (Array.isArray(motivi) ? motivi : []).some((x) => String(x || '').trim().toLowerCase() === 'feedback non fidato');
+      if (feedbackNonFidato) return `${ramo}: un buco che la sanatoria toglie lo toglie la coda da sé quando segni fidato il feedback; per il resto, se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.`;
+      return `${ramo} e la sanatoria non lo copre: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.`;
     }
     if (/domand/.test(m) && /fidat/.test(m)) return 'Una domanda di questo feedback non è fidata: riparte quando la segni fidata in Domande, dopo averla letta.';
     if (/fidat/.test(m)) return 'Il feedback non è fidato: riparte quando lo segni fidato, dopo averlo letto.';
@@ -855,6 +858,8 @@
         acts[0].primary = false;
         acts.push(lavoroServer);
       }
+      // Una bocciatura del controllo di sicurezza torna a chi corregge, col commento come istruzione (#2575).
+      else if (status === 'design' && statusReason === 'secaudit') Object.assign(acts[0], { label: 'Rimanda in correzione', correzione: true });
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
       // ancora classificato: le conferme possibili sono DUE, non una.
@@ -2245,7 +2250,16 @@
     };
   }
 
+  // «Rimanda in correzione» (#2575) ha la stessa forma in Gestione e nella pagina dei feedback: senza testo il primo
+  // gesto arma l'avviso, il secondo manda lo stesso. Prova: tests/manage-rimanda-correzione.spec.mjs.
+  const CORREZIONE = Object.freeze({
+    segnaposto: 'Cosa correggere: il testo arriva a chi corregge…',
+    avviso: 'Senza testo chi riprende non saprà cosa correggere: scrivilo qui, o premi di nuovo per mandarlo così.',
+    etichettaSenzaTesto: 'Manda lo stesso',
+  });
+
   global.SN_MANAGE_REVIEW = {
+    CORREZIONE,
     normalizeStatus,
     tastoFrase,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi

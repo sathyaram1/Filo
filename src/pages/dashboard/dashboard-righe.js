@@ -105,7 +105,7 @@
     // Le risposte di Filo con la formattazione leggera della home (come nell'app dove sono nate): il renderer escapa
     // l'HTML e filtra i link. Le domande dell'utente restano letterali.
     if (m.role !== 'user' && global.SN_MARKDOWN) {
-      div.innerHTML = global.SN_MARKDOWN.render(testo, { fonti: m.fonti });
+      div.innerHTML = global.SN_MARKDOWN.render(testo, { fonti: m.fonti, immagini: m.immagini });
       div.classList.add('dash-bubble-md');
     } else if (Array.isArray(m.schede) && m.schede.length && global.SN_SCHEDE_IN_CHAT) {
       // Le schede lasciate nel messaggio (#2085): i gettoni come nella bolla della home.
@@ -282,7 +282,7 @@
         return c.role === 'filo' && Md && Md.testo ? Md.testo(c.scritto) : c.scritto;
       },
       ruolo: (m) => (m.classList.contains('dash-riga-app-msg-user') ? 'user' : 'filo'),
-      rispondi: (m, testo) => { global.SN_DASH_RISPONDI.cita({ ...m._citabile, testo }); },
+      rispondi: (m, testo, sel) => { global.SN_DASH_RISPONDI.cita({ ...m._citabile, testo, el: m, sel }); },
     }));
   }
 
