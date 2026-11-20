@@ -130,9 +130,10 @@ test('un PDF e un\'immagine si aprono in una scheda, senza diventare uno scarica
   const pdf = join(dir, 'conto.pdf');
   copyFileSync(join(process.cwd(), 'tests', 'fixtures', 'documenti', 'documento-con-testo.pdf'), pdf);
   await home(app);
-  await app.evaluate(({ session }) => {
+  // Ogni scheda di un file ha la sua sessione: si guardano gli scaricamenti di tutte quelle che nascono.
+  await app.evaluate(({ app: a }) => {
     globalThis.__scaricati = [];
-    session.fromPartition('file-del-computer').on('will-download', (_e, item) => globalThis.__scaricati.push(item.getFilename()));
+    a.on('session-created', (s) => s.on('will-download', (_e, item) => globalThis.__scaricati.push(item.getFilename())));
   });
   for (const f of [pdf, join(dir, 'foto.png')]) {
     const r = await execAction(app, { type: 'NAVIGA', url: f }, { parole: `aprimi ${f}` });
@@ -142,10 +143,119 @@ test('un PDF e un\'immagine si aprono in una scheda, senza diventare uno scarica
   await expect.poll(async () => (id = await schedaFile(app, 'foto.png')), { timeout: 10_000 }).toBeTruthy();
   const foto = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
   await expect.poll(() => foto.evaluate(() => (document.querySelector('img') || {}).naturalWidth || 0)).toBeGreaterThan(0);
-  await expect.poll(() => schedaFile(app, 'conto.pdf'), { timeout: 10_000 }).toBeTruthy();
+  let idPdf = null;
+  await expect.poll(async () => (idPdf = await schedaFile(app, 'conto.pdf')), { timeout: 10_000 }).toBeTruthy();
   await foto.waitForTimeout(1500);
   expect(await schedaFile(app, 'conto.pdf'), 'il PDF resta nella sua scheda').toBeTruthy();
   expect(await app.evaluate(() => globalThis.__scaricati)).toEqual([]);
+  // Il PDF si vede anche con la CSP che ora va su ogni risposta.
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), idPdf);
+  await foto.waitForTimeout(2000);
+  const png = await app.evaluate(async ({ BrowserWindow }, i) => {
+    const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.id === i);
+    return (await t.view.webContents.capturePage()).toPNG().toString('base64');
+  }, idPdf);
+  mkdirSync(SHOTS, { recursive: true });
+  writeFileSync(join(SHOTS, 'file-del-computer-pdf.png'), Buffer.from(png, 'base64'));
+});
+
+// Quello che la sessione della scheda lascia leggere: la risposta del gestore dei file per quell'indirizzo.
+const leggeLaScheda = (app, id, url) => app.evaluate(async ({ BrowserWindow, session }, { id, url }) => {
+  const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.id === id);
+  const partizione = t ? t.partition : globalThis.__ultimaPartizioneFile;
+  globalThis.__ultimaPartizioneFile = partizione;
+  try { return (await session.fromPartition(partizione).fetch(url)).status; } catch (e) { return `errore ${e.message}`; }
+}, { id, url });
+
+test('un XML con uno script e un file senza estensione con dentro HTML non leggono gli altri file della cartella', async ({ app }) => {
+  const { dir } = preparaReport();
+  writeFileSync(join(dir, 'fattura.xml'), `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Fattura</title></head><body><p>Fattura 12</p>
+<script>document.documentElement.setAttribute('data-js', 'si');
+fetch('vicino.txt').then(function (r) { return r.text(); }).then(function (t) { document.documentElement.setAttribute('data-letto', t); },
+  function () { document.documentElement.setAttribute('data-letto', 'NO'); });</script></body></html>`);
+  writeFileSync(join(dir, 'pagina'), '<!doctype html><title>Senza estensione</title><script>fetch("vicino.txt").then((r) => r.text()).then((t) => { document.title = t; });</script>');
+  await home(app);
+  const xml = join(dir, 'fattura.xml');
+  expect((await execAction(app, { type: 'NAVIGA', url: xml }, { parole: `aprimi ${xml}` })).executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'fattura.xml')), { timeout: 10_000 }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+  const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+  await expect(pagina.locator('html')).toHaveAttribute('data-js', 'si', { timeout: 10_000 });
+  await expect(pagina.locator('html'), 'lo script del file XML non legge il file accanto').toHaveAttribute('data-letto', 'NO');
+  mkdirSync(SHOTS, { recursive: true });
+  await pagina.screenshot({ path: join(SHOTS, 'file-del-computer-xml.png') });
+
+  // Il file senza estensione non si serve, nemmeno a un collegamento della stessa cartella.
+  expect(await leggeLaScheda(app, id, pathToFileURL(join(dir, 'pagina')).href)).toBe(403);
+  expect(await leggeLaScheda(app, id, pathToFileURL(join(dir, 'foto.png')).href), 'le immagini accanto sì').toBe(200);
+  await pagina.evaluate((u) => { location.href = u; }, pathToFileURL(join(dir, 'pagina')).href);
+  await pagina.waitForTimeout(1500);
+  expect(await pagina.title()).not.toBe('VICINO');
+});
+
+test('ogni scheda legge solo la cartella del suo file, e chiusa la scheda la cartella si richiude', async ({ app }) => {
+  const { file, dir, fuori } = preparaReport();
+  writeFileSync(join(fuori, 'altra.html'), '<!doctype html><title>Altra</title><p>altra</p>');
+  await home(app);
+  const altra = join(fuori, 'altra.html');
+  for (const f of [file, altra]) expect((await execAction(app, { type: 'NAVIGA', url: f }, { parole: `aprimi ${f}` })).executed).toBe(true);
+  let uno = null;
+  let due = null;
+  await expect.poll(async () => (uno = await schedaFile(app, '2026-10-30-riquadro.html')), { timeout: 10_000 }).toBeTruthy();
+  await expect.poll(async () => (due = await schedaFile(app, 'altra.html')), { timeout: 10_000 }).toBeTruthy();
+  const privata = pathToFileURL(join(fuori, 'privata.png')).href;
+  const foto = pathToFileURL(join(dir, 'foto.png')).href;
+  expect(await leggeLaScheda(app, due, privata)).toBe(200);
+  expect(await leggeLaScheda(app, uno, privata), 'la cartella aperta dall\'altra scheda resta chiusa').toBe(403);
+  expect(await leggeLaScheda(app, due, foto)).toBe(403);
+  expect(await leggeLaScheda(app, uno, foto)).toBe(200);
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.closeTab(i), uno);
+  await expect.poll(() => schedaFile(app, '2026-10-30-riquadro.html')).toBeFalsy();
+  expect(await leggeLaScheda(app, '', foto), 'chiusa la scheda, la sua sessione non legge più niente').toBe(403);
+});
+
+test('una scheda della sessione salvata su una cartella di rete non torna, e non tocca l\'altro computer', { tag: '@linux-mac' }, async ({ app }) => {
+  test.skip(process.platform === 'win32', 'le cartelle /net/<host> sono di Mac e Linux');
+  const { file } = preparaReport();
+  await home(app);
+  await app.evaluate(async ({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    await globalThis.SN_STORAGE.setRaw(tm._sessionKey(), { tabs: ['file:///net/segreto-mario/condivisa/x.html', u], activeIndex: 0 });
+    await tm.restoreSession();
+  }, pathToFileURL(file).href);
+  await expect.poll(() => schedaFile(app, '2026-10-30-riquadro.html'), { timeout: 10_000 }).toBeTruthy();
+  expect(await schedaFile(app, 'x.html')).toBeNull();
+});
+
+// Una pagina aperta dalla cartella di casa: lì la casa non si concede intera (chiavi, profili, documenti).
+const CASA = cartellaTemporanea('casa-');
+test.describe('aperto un file nella cartella di casa', () => {
+  test.use({ envInPiu: { HOME: CASA, USERPROFILE: CASA } });
+  test('la pagina si vede con le immagini che nomina, e non legge gli altri file della casa', async ({ app }) => {
+    mkdirSync(join(CASA, 'Documenti'), { recursive: true });
+    mkdirSync(join(CASA, '.ssh'), { recursive: true });
+    copyFileSync(FOTO, join(CASA, 'foto.png'));
+    copyFileSync(FOTO, join(CASA, 'Documenti', 'passaporto.png'));
+    writeFileSync(join(CASA, '.ssh', 'id_rsa'), 'CHIAVE');
+    const appunti = join(CASA, 'appunti.html');
+    writeFileSync(appunti, '<!doctype html><title>Appunti</title><h1>Appunti</h1><img id="i" src="foto.png" width="80"><img id="p" src="Documenti/passaporto.png?x" width="10">');
+    // Il nome «passaporto.png?x» non è il file: nominato col trucco della query, il file resta fuori.
+    writeFileSync(appunti, '<!doctype html><title>Appunti</title><h1>Appunti</h1><img id="i" src="foto.png" width="80">');
+    await home(app);
+    expect(await app.evaluate(() => require('node:os').homedir())).toBe(CASA);
+    expect((await execAction(app, { type: 'NAVIGA', url: appunti }, { parole: `aprimi ${appunti}` })).executed).toBe(true);
+    let id = null;
+    await expect.poll(async () => (id = await schedaFile(app, 'appunti.html')), { timeout: 10_000 }).toBeTruthy();
+    await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+    const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+    await expect(pagina).toHaveTitle('Appunti');
+    await expect.poll(() => pagina.evaluate(() => document.getElementById('i').naturalWidth)).toBeGreaterThan(0);
+    expect(await leggeLaScheda(app, id, pathToFileURL(join(CASA, 'Documenti', 'passaporto.png')).href)).toBe(403);
+    expect(await leggeLaScheda(app, id, pathToFileURL(join(CASA, '.ssh', 'id_rsa')).href)).toBe(403);
+    expect(await pagina.evaluate((u) => fetch(u).then((r) => r.text()).catch(() => 'NO'), pathToFileURL(join(CASA, 'foto.png')).href)).toBe('NO');
+  });
 });
 
 // L'Aiuto sopra un sito vive nel DOM della pagina, che può scrivergli le parole e premergli i bottoni.
