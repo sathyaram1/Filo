@@ -27,15 +27,17 @@
 
   const livelloValido = (v, ripiego) => (ORDINE.includes(v) ? v : ripiego);
 
-  function pulisciSiti(lista) {
-    if (!Array.isArray(lista)) return [];
-    const out = [];
-    for (const x of lista) {
-      if (typeof x !== 'string') continue;
-      const d = x.trim().toLowerCase().replace(/^\*?\.+/, '').replace(/\.+$/, '').replace(/^www\./, '');
-      if (d && !out.includes(d)) out.push(d);
-    }
-    return out;
+  // Gli elenchi di siti si puliscono e si confrontano come quelli delle pagine delicate: la forma è una sola.
+  function delicate() {
+    if (!global.SN_PAGINE_DELICATE && typeof require === 'function') require('./pagineDelicate.js');
+    return global.SN_PAGINE_DELICATE;
+  }
+  const pulisciSiti = (lista) => delicate().pulisci(lista);
+  const dentro = (h, lista) => delicate().dentro(h, lista);
+  // I siti di `prima` che in `dopo` non ci sono più.
+  function sitiTolti(prima, dopo) {
+    const restano = pulisciSiti(dopo);
+    return pulisciSiti(prima).filter((s) => !restano.includes(s));
   }
 
   // La regola in vigore, da impostazioni qualunque (assenti, vecchie, manomesse): mai un throw.
