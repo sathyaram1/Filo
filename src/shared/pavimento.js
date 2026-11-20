@@ -547,7 +547,7 @@
     if (!R) return;
     const basso = s.toLowerCase();
     const stesso = basso.length === s.length;
-    for (const v of R.trova(s)) {
+    for (const v of R.trova(s, { sotto: true })) {
       if (!/[^\p{L}'’]/u.test(v)) continue;
       // Il valore torna minuscolo: si toglie com'è scritto, in ogni punto del testo.
       let i = stesso ? basso.indexOf(v) : -1;
