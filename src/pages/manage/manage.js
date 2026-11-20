@@ -720,7 +720,7 @@
     // Il tetto totale accanto ai bilanci (#2338): stesso meccanismo, intervallo suo.
     tettoVerifiche: {
       input: mgTettoVerifiche, save: mgTettoVerificheSave, msg: mgTettoVerificheMsg, cacheKey: TETTO_KEY,
-      min: AUTOMATION.TETTO_VERIFICHE_MIN ?? 1, max: AUTOMATION.TETTO_VERIFICHE_MAX ?? 50,
+      min: AUTOMATION.TETTO_VERIFICHE_MIN, max: AUTOMATION.TETTO_VERIFICHE_MAX,
     },
   };
 
