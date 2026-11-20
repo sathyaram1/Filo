@@ -72,6 +72,25 @@ customElements.define('chat-composer', class extends HTMLElement {
   expect(prompt).toContain('token GitHub in chiaro');
 });
 
+test('messaggi dentro componenti con shadow root aperto, casella nella pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer, `<!doctype html><meta charset="utf-8"><body style="margin:0;font:16px sans-serif">
+<main>
+  <chat-messaggio testo="Puoi fare push e merge?"></chat-messaggio>
+  <chat-messaggio testo="Fatto. ${MESSAGGIO}."></chat-messaggio>
+  <div id="ce" contenteditable="true" lang="it" style="min-height:60px;width:600px;font:20px monospace;border:1px solid #ccc"></div>
+</main>
+<script>
+customElements.define('chat-messaggio', class extends HTMLElement {
+  connectedCallback() { const r = this.shadowRoot || this.attachShadow({ mode: 'open' });
+    r.innerHTML = '<p>' + this.getAttribute('testo') + '</p>'; }
+});
+</script></body>`);
+  await page.locator('#ce').click();
+  const prompt = await promptDopo(app, page);
+  expect(prompt).toContain('token GitHub in chiaro');
+});
+
 test('popup di chat in un dialog piccolo sopra una pagina lunga', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const lungo = Array.from({ length: 40 }, (_, i) => `<p>Paragrafo ${i} di un articolo che non c'entra niente con la chat.</p>`).join('');
