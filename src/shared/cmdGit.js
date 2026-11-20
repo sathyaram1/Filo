@@ -225,7 +225,6 @@
     const verbo = i === undefined ? '' : args[i].toLowerCase();
     if (!/^(list|get|set|unset|edit|rename-section|remove-section|get-color|get-colorbool)$/.test(verbo)) return gitConfigForma(args);
     const resto = args.filter((_, k) => k !== i);
-    const low = resto.map((a) => a.toLowerCase());
     if (verbo === 'unset' || verbo === 'remove-section' || verbo === 'rename-section') return 3;
     if (verbo === 'list' || verbo === 'edit') return 2;
     if (verbo === 'set') return Math.max(2, gitConfigForma(conOpzione(resto, 'append') ? resto.concat('--add') : resto));
