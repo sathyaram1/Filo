@@ -3034,6 +3034,11 @@ class TabManager {
     tab._gestoFiloAt = Date.now();
     const f = Storia.fuori(i, h.length());
     if (f) { this._vaiFuori(tab, f.verso, f.k); return; }
+    if (this._caduta(tab)) {
+      const vista = this._vociDellaVista(tab);
+      const dove = vista.indici.indexOf(i);
+      if (dove >= 0 && this._passoDallaCaduta(tab, dove - vista.attiva)) return;
+    }
     tab._passoStoria = true;
     h.goToIndex(i);
   }
