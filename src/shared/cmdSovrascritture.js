@@ -254,11 +254,11 @@
   // la configurazione dell'utente (`~/.gitconfig`, `~/.config/git/config`) e quella di sistema (`etc/gitconfig`).
   function nelCuoreDiGit(segs) {
     return segs.some((s, i) => {
-      if (puoEssere(s, '.git') || puoEssere(s, '.gitconfig') || puoEssere(s, 'gitconfig')) return true;
+      if (puoEssere(s, '.git') || puoEssere(s, '.gitconfig')) return true;
       const dopo = segs[i + 1];
       if (dopo == null) return false;
       if (/\.git$/.test(nomeNorm(s)) && (puoEssere(dopo, 'config') || puoEssere(dopo, 'hooks'))) return true;
-      return puoEssere(s, 'git') && puoEssere(dopo, 'config');
+      return (puoEssere(s, 'git') && puoEssere(dopo, 'config')) || (puoEssere(s, 'etc') && puoEssere(dopo, 'gitconfig'));
     });
   }
 
