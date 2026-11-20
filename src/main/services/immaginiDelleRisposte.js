@@ -138,7 +138,7 @@ async function cerca(query, { tavilyKey = '' } = {}) {
     return src ? { ...v, src } : null;
   });
   const immagini = copiate.filter(Boolean).slice(0, QUANTE).map((v) => ({
-    id: nuovoId('i'), src: v.src, titolo: v.titolo, sito: v.sito,
+    id: nuovoId('i'), src: v.src, titolo: v.titolo, sito: v.sito, originale: v.immagine,
     ...(v.pagina ? { pagina: v.pagina } : {}),
     ...(v.larghezza ? { larghezza: Number(v.larghezza) } : {}), ...(v.altezza ? { altezza: Number(v.altezza) } : {}),
   }));
