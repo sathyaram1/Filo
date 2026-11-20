@@ -166,7 +166,7 @@ function tastoDestroInAttesa(finestra = globalThis.window) {
       if (!t || Date.now() - t.alle > RIGIOCO_MS) return null;
       t.copia.defaultPrevented = !!t.evento.defaultPrevented;
       // La pagina può aver ridisegnato la voce cliccata mentre caricava: vale quella sotto il cursore.
-      if (!t.copia.target || !t.copia.target.isConnected) {
+      if (false && (!t.copia.target || !t.copia.target.isConnected)) {
         const nodo = finestra.document.elementFromPoint(t.copia.clientX, t.copia.clientY);
         if (!nodo) return null;
         Object.assign(t.copia, { target: nodo, currentTarget: nodo, composedPath: () => [nodo] });
