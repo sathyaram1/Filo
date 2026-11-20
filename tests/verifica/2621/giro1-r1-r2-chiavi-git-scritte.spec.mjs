@@ -20,10 +20,11 @@ test('r1 scrivere l\'aggancio della pulizia di git chiede conferma come il progr
   }
 });
 
-test('r2 spegnere o accendere il paginatore di un comando resta un OK leggero', () => {
+test('r2 spegnere il paginatore o dare un nome corto a un comando di git resta un OK leggero', () => {
   for (const cmd of [
     'git config --global pager.branch false',
     'git config pager.log true',
+    'git config --global alias.co checkout',
   ]) {
     expect(C.classify(cmd, CTX), cmd).toBe(2);
   }
