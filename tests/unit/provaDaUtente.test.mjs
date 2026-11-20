@@ -11,6 +11,7 @@ import {
   TETTO_PASSI, TETTO_MINUTI, leggiArgomenti, leggiMossa, servitoDa, esitoFinale, resoconto, argomentiModello, sistema,
   messaggioPasso,
 } from '../agent/provaRegole.mjs';
+import { leggiTasto } from '../agent/combinazioni.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (p) => readFileSync(resolve(ROOT, p), 'utf8');
@@ -103,6 +104,38 @@ test('nel modo chat il compito si chiede a Filo, non si fa a mano', () => {
   assert.match(sistema('chat'), /lo CHIEDI a Filo/);
   assert.doesNotMatch(sistema('utente'), /CHIEDI a Filo/);
   assert.match(messaggioPasso({ compito: 'c', passo: 1, passi: 20, secondiRestanti: 200, map: [{ i: 1, page: 'shell', tag: 'button', label: 'Home' }] }), /#1 \[shell\] button "Home"/);
+});
+
+// Le scorciatoie della finestra Filo le ascolta in before-input-event, coi campi di Electron: «Ctrl+W» scritto da Haiku
+// diventava un tasto sconosciuto per Playwright, e la scorciatoia era data per rotta (#2507.1).
+test('una combinazione scritta come la scrive una persona diventa il tasto di Playwright e quello che vede Filo', () => {
+  const w = leggiTasto('Ctrl+W', 'linux');
+  assert.equal(w.playwright, 'Control+w');
+  assert.deepEqual(w.input, { key: 'w', code: 'KeyW', control: true, shift: false, alt: false, meta: false });
+  assert.equal(leggiTasto('Control+t', 'win32').playwright, 'Control+t');
+  assert.deepEqual(leggiTasto('cmd + shift + t', 'darwin').input, { key: 'T', code: 'KeyT', control: false, shift: true, alt: false, meta: true });
+  assert.equal(leggiTasto('Cmd+Shift+T', 'darwin').playwright, 'Meta+Shift+T');
+  assert.equal(leggiTasto('CmdOrCtrl+L', 'darwin').input.meta, true);
+  assert.equal(leggiTasto('CmdOrCtrl+L', 'linux').input.control, true);
+  assert.deepEqual(leggiTasto('Alt+1', 'linux').input, { key: '1', code: 'Digit1', control: false, shift: false, alt: true, meta: false });
+  assert.deepEqual([leggiTasto('Esc').playwright, leggiTasto('invio').playwright, leggiTasto('Ctrl+Tab').input.code], ['Escape', 'Enter', 'Tab']);
+  assert.deepEqual([leggiTasto('f11').input.key, leggiTasto('Control++').input.key, leggiTasto('Control+-').input.code], ['F11', '+', 'Minus']);
+  assert.equal(leggiTasto('Space').input.key, ' ');
+  assert.equal(leggiTasto('MediaPlayPause').playwright, 'MediaPlayPause');
+  assert.match(leggiTasto('').errore, /vuoto/);
+  assert.match(leggiTasto('Ctrl+').errore, /manca il tasto/);
+  assert.match(leggiTasto('Hyper+a').errore, /non è un modificatore/);
+});
+
+// Il lettore è quello di Filo: chi pilota e chi ascolta i tasti non divergono sui nomi italiani né su Ctrl che sul Mac è Cmd.
+test('una combinazione si legge coi nomi e le regole di Filo, anche in italiano e sul Mac', () => {
+  assert.deepEqual(leggiTasto('Ctrl+W', 'darwin').input, { key: 'w', code: 'KeyW', control: false, shift: false, alt: false, meta: true });
+  assert.deepEqual(leggiTasto('Ctrl+Cmd+F', 'darwin').input, { key: 'f', code: 'KeyF', control: true, shift: false, alt: false, meta: true });
+  assert.equal(leggiTasto('Controllo+T', 'linux').playwright, 'Control+t');
+  assert.equal(leggiTasto('Comando+W', 'darwin').playwright, 'Meta+w');
+  assert.deepEqual(leggiTasto('Opzione+1', 'linux').input, { key: '1', code: 'Digit1', control: false, shift: false, alt: true, meta: false });
+  assert.deepEqual([leggiTasto('Inizio').playwright, leggiTasto('freccia giù').playwright, leggiTasto('Maiusc+Tab').playwright], ['Home', 'ArrowDown', 'Shift+Tab']);
+  assert.equal(leggiTasto('Ctrl+freccia sinistra', 'win32').input.code, 'ArrowLeft');
 });
 
 test('la cartella delle prove non finisce nel repo', () => {

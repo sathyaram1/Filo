@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNellaBarra, puntatoreCheSegue } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { nelloStrato } from './helpers/riquadri.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
   <div id="z" style="position:fixed;left:0;top:0;width:240px;height:100%;background:#f3eee6">colonna del sito</div>
@@ -80,16 +81,10 @@ const SEGNALATA = '<title>Accedi</title><body style="margin:0;height:3000px"><bu
   + 'document.addEventListener("click",function(){__g.clic++},true);document.addEventListener("wheel",function(){__g.rotella++},true);</script></body>';
 
 async function apriSegnalata(app, shell) {
-  await app.evaluate(async ({ session, net }, html) => {
-    const risposta = (req) => (new URL(req.url).hostname === 'conto-paypa1.com'
-      ? new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
-      : net.fetch(req, { bypassCustomProtocolHandlers: true }));
-    for (const s of ['http', 'https']) {
-      try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
-      session.defaultSession.protocol.handle(s, risposta);
-    }
+  await serviSiti(app, { 'conto-paypa1.com': SEGNALATA });
+  await app.evaluate(async () => {
     globalThis.SN_SAFEBROWSE.setProviders({ gsb: async () => ({ listed: true, category: 'phishing' }), rdap: null, ct: null, sandbox: null, llm: async () => ({ suspicious: false }) });
-  }, SEGNALATA);
+  });
   await shell.evaluate((u) => window.filoShell.tabs.open(u), 'https://conto-paypa1.com/login');
   let page = null;
   await expect.poll(() => { page = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'conto-paypa1.com'; } catch (_) { return false; } }); return !!page; }).toBe(true);

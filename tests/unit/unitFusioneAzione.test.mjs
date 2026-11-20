@@ -101,6 +101,13 @@ test('nessun workflow usa le cache di Actions', () => {
   }
 });
 
+// L'uscita di una parte la può scrivere il codice del ramo (#2587): in `unit` entra solo come variabile, mai nella shell.
+test('le parti arrivano a `unit` solo come variabili d\'ambiente', () => {
+  const righe = LAVORI.unit.split('\n').filter((r) => r.includes('needs.'));
+  assert.equal(righe.length, 6, righe.join('\n'));
+  for (const r of righe) assert.match(r, /^ {6}(CAMPO|RISULTATO)_(LINUX|WINDOWS|SPEC): \$\{\{ needs\.(linux|windows|spec)\.(outputs\.campo|result) \}\}$/, r.trim());
+});
+
 test('argomenti: due sha interi e la cartella', () => {
   assert.deepEqual(leggiArgomenti(['--root', 'p', '--ramo', A.toUpperCase(), '--main', B]), { root: 'p', ramo: A, main: B, parte: '', unit: 'tutti', unisci: [], errori: [] });
   assert.ok(leggiArgomenti(['--root', 'p', '--ramo', 'main', '--main', B]).errori.length);
@@ -337,6 +344,38 @@ test('ramo che contiene già main: Linux risponde «main contenuto», Windows pr
     });
     assert.equal(finale.codice, 1, finale.uscita);
     assert.deepEqual(finale.campo.rossi, ['tests/unit/nuovo.test.mjs › il valore è uno [Windows]']);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
+// Un filtro di git scritto dall'installazione del ramo gira in checkout e fusione della prova, fuori dai test (#2558).
+test('checkout e fusione della prova non passano al codice del ramo i file dei comandi, ed esito e riassunto arrivano', () => {
+  const r = repoFinto();
+  try {
+    const spia = join(r.casa, 'spia.txt').replace(/\\/g, '/');
+    writeFileSync(spia, '', 'utf8');
+    r.git(['config', 'filter.spia.smudge', `echo "\${GITHUB_OUTPUT:-vuoto} \${GITHUB_ENV:-vuoto} \${GITHUB_STEP_SUMMARY:-vuoto}" >> '${spia}'; cat`]);
+    writeFileSync(join(r.lavoro, '.gitattributes'), '*.txt filter=spia\n', 'utf8');
+    const base = r.commit('main: filtro');
+    writeFileSync(join(r.lavoro, 'altro.txt'), 'x\n', 'utf8');
+    const m1 = r.commit('main: altro');
+    r.git(['push', '-q', 'origin', 'main']);
+    r.git(['checkout', '-q', '-b', 'claude/filtro', base]);
+    writeFileSync(join(r.lavoro, 'ramo.txt'), 'ramo\n', 'utf8');
+    const ramo = r.commit('ramo: un file');
+    const file = { GITHUB_OUTPUT: join(r.casa, 'uscita.txt'), GITHUB_ENV: join(r.casa, 'env.txt'), GITHUB_STEP_SUMMARY: join(r.casa, 'riassunto.txt') };
+    for (const f of Object.values(file)) writeFileSync(f, '', 'utf8');
+    writeFileSync(spia, '', 'utf8');
+    const p = azione(r, ramo, m1, { args: ['--root', r.lavoro, '--parte', 'linux', '--unit', 'tutti'], extra: file });
+    assert.equal(p.codice, 0, p.uscita);
+    const visti = readFileSync(spia, 'utf8').split('\n').filter(Boolean);
+    assert.ok(visti.length > 0, `il filtro del ramo non è nemmeno girato: la prova non prova niente\n${p.uscita}`);
+    assert.deepEqual([...new Set(visti)], ['vuoto vuoto vuoto'], 'il codice del ramo ha visto i file dei comandi');
+    const righe = readFileSync(file.GITHUB_OUTPUT, 'utf8').split('\n').filter(Boolean);
+    assert.equal(righe.length, 1, righe.join('\n'));
+    assert.equal(JSON.parse(righe[0].slice('campo='.length)).esito, 'verde', p.uscita);
+    assert.match(readFileSync(file.GITHUB_STEP_SUMMARY, 'utf8'), /Unit sulla fusione \(linux, tutti\)/);
   } finally {
     togliCartella(r.casa);
   }

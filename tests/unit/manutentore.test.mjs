@@ -106,6 +106,37 @@ test('il ramo di un worker prende il numero del suo feedback dall\'indice', () =
   assert.deepEqual(rami.map((r) => r.feedback), [['1680', '12'], ['5']]);
 });
 
+// #2480: le voci senza id (schede del server, non fidati) davano l'ultimo numero a ogni ramo che non è un tentativo.
+test('un ramo senza numero proprio resta senza numero, anche con voci dell\'indice senza id (#2480)', () => {
+  const rami = [{ ramo: 'claude/determined-sagan-19q19b', feedback: [] }, { ramo: 'claude/bozze-fuori', feedback: ['1674'] },
+    { ramo: 'worker/HNgzAr4lreN25OPInPXq-20261029T021625Z', feedback: [] }];
+  const dalServer = M.indiceDalServer([{ num: '2470', stato: 'todo' }, { num: '2479', stato: 'unlabeled' }]);
+  assert.deepEqual(M.conNumeri(rami, dalServer).map((r) => r.feedback), [[], ['1674'], []], 'contesto: le schede del server non hanno id');
+  const locale = M.conNonFidati([{ id: 'HNgzAr4lreN25OPInPXq', num: '1680' }], [{ num: '#2479' }]);
+  assert.deepEqual(M.conNumeri(rami, locale).map((r) => r.feedback), [[], ['1674'], ['1680']], 'rami: il non fidato senza id non va a nessuno');
+  assert.deepEqual(M.numeriDellIndice(locale), { 1680: 'HNgzAr4lreN25OPInPXq' });
+  const domanda = { id: 'D-1', titolo: 'T', stato: 'aperta', legata: 'HNgzAr4lreN25OPInPXq' };
+  assert.deepEqual(M.righeDomandeFerme([domanda], { indice: locale }), ['D-1 «T» ferma #1680 (aspetta l\'owner)']);
+});
+
+test('rami: un ramo claude/ senza numeri nei commit esce senza numero accanto a un non fidato appena nato (#2480)', async (t) => {
+  const leggi = catturaConsole(t);
+  const repo = repoConRami([['claude/vecchio', 'package-lock.json', 'chore: update package-lock.json from npm install'],
+    ['worker/HNgzAr4lreN25OPInPXq-20261114T060000Z', 'src/a.js', 'lavoro']], cartellaTemporanea('manutentore-2480'));
+  const schede = cartellaTemporanea('manutentore-2480-schede');
+  t.after(() => { togliCartella(repo); togliCartella(schede); });
+  writeFileSync(join(schede, 'indice.json'), JSON.stringify([{ id: 'HNgzAr4lreN25OPInPXq', num: '1680' }]));
+  writeFileSync(join(schede, 'non-fidati.json'), JSON.stringify([{ num: '2479', perizia: { classe: 3, file: ['package-lock.json'] } }]));
+  const env = { FILO_SERVER_CLONE: join(schede, 'nessun-clone') };
+  assert.equal(await M.main(['rami', '--cartella', schede, '--senza-fetch', '--giorni', '0'], { root: repo, env }), 0);
+  const testo = leggi();
+  assert.match(testo, /^worker\/HNgzAr4lreN25OPInPXq-20261114T060000Z \(#1680\), 1 commit, /m);
+  assert.match(testo, /^claude\/\(nome non mostrato\) @[0-9a-f]{7}, 1 commit, .*: package-lock\.json$/m);
+  assert.doesNotMatch(testo, /#2479/);
+  assert.equal(await M.main(['incroci', '2479', '--cartella', schede, '--senza-fetch', '--giorni', '0'], { root: repo, env }), 0);
+  assert.doesNotMatch(leggi(), /\(#2479/, 'incroci non fa credere che #2479 abbia già un ramo');
+});
+
 test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o che nessuno li tocca', async (t) => {
   const dir = cartellaTemporanea('manutentore');
   const out = []; const err = [];
@@ -730,28 +761,16 @@ test('senza chiave né biglietto del manutentore non si chiama il server, e si d
   assert.equal(s.corpi.length, 0);
 });
 
-test('l\'indicazione dell\'owner va in coda al taccuino con la data, senza perdere il resto', () => {
-  const r = M.conIndicazione('stato: N 4\n\nproblemi: nessuno\n\n', '  priorità a ciò che\ncambia la grafica ', '2026-10-31');
-  assert.equal(r.testo, 'stato: N 4\n\nproblemi: nessuno\n\nIndicazione dell\'owner (2026-10-31): priorità a ciò che cambia la grafica\n');
-  assert.equal(M.conIndicazione('', 'prima', '2026-10-31').testo, 'Indicazione dell\'owner (2026-10-31): prima\n');
-  assert.equal(M.conIndicazione('x', '   ').ok, false);
-  assert.match(M.giornoDi(Date.parse('2026-10-31T23:30:00Z')), /^2026-11-01$/, 'il giorno è quello italiano');
+test('il giorno del contesto è quello italiano', () => {
+  assert.match(M.giornoDi(Date.parse('2026-10-31T23:30:00Z')), /^2026-11-01$/);
 });
 
-test('indicazione con la chiave: se il taccuino cambia in mezzo lo rilegge e riscrive, con la versione letta', async (t) => {
-  let versione = 3;
-  const s = serverFinto(t, {
-    taccuino: () => [200, { ok: true, testo: `voce ${versione}`, versione }],
-    'taccuino.scrivi': (b) => {
-      if (b.dati.versione === 3) { versione = 4; return [409, { ok: false, reason: 'taccuino_cambiato', detail: 'alla 4' }]; }
-      return [200, { ok: true, versione: 5 }];
-    },
-  });
+test('indicazione con la chiave: la manda al server, che la accoda come quella dell\'owner, senza riscrivere il taccuino (#2340.3)', async (t) => {
+  const s = serverFinto(t, { 'taccuino.indicazione': () => [200, { ok: true, versione: 5 }] });
   assert.equal(await M.main(['indicazione', 'meno', 'riallineamenti'], CHIAVE), 0);
-  const scritture = s.corpi.filter((c) => c.op === 'taccuino.scrivi');
-  assert.equal(scritture.length, 2);
-  assert.equal(scritture[1].dati.versione, 4);
-  assert.match(scritture[1].dati.testo, /^voce 4\n\nIndicazione dell'owner \(\d{4}-\d{2}-\d{2}\): meno riallineamenti\n$/);
+  assert.deepEqual(s.corpi.map((c) => [c.op, c.dati]), [['taccuino.indicazione', { testo: 'meno riallineamenti' }]]);
+  assert.match(s.out.join('\n'), /versione 5/);
+  assert.equal('conIndicazione' in M, false, 'il formato dell\'indicazione non ha una copia nello strumento');
 });
 
 test('il redattore: una promessa su un lavoro che non è nell\'ordine né a 3 si rifiuta, come un link nuovo (#2269)', () => {
@@ -892,9 +911,10 @@ test('a ogni battito e sveglia l\'ordine ha almeno 2×N lavori pronti, la classe
   const ordine = piatto(RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')));
   assert.match(ordine, /\*\*La classe è il primo criterio, non un filtro\.\*\*.*tocca i file probabili di un ramo vivo \(`incroci <N>`\) aspetta.*entra uno di classe più bassa in un'area libera/);
   assert.match(ordine, /Un compito può stare davanti a un feedback/);
-  assert.match(ordine, /\*\*Un lavoro già iniziato non si mette in attesa di un lavoro non iniziato\*\*: finisce da solo/);
-  // La sequenza del server mette i lavori già iniziati davanti all'ordine: il ruolo la dice uguale.
-  assert.match(ordine, /prima le 3, poi i lavori già iniziati, poi l'ordine, poi il resto per urgenza/);
+  assert.match(ordine, /\*\*Un lavoro già iniziato non si mette in attesa di un lavoro non iniziato\*\*: lo tieni nell'ordine, sopra i primi lavori che deve precedere/);
+  // Con un ordine decide il posto, iniziati o nuovi (#2411): il ruolo dice la sequenza del server.
+  assert.match(ordine, /prima le 3 e le risposte dell'owner, poi l'ordine, poi i lavori già iniziati fuori dall'ordine, poi il resto per urgenza/);
+  assert.match(ordine, /primi lavori o già iniziati \(verifica, correzione, controllo\), vanno nella sua sequenza, a qualunque priorità; i lavori già iniziati fuori dall'ordine vengono dopo l'ordine/);
   assert.match(ordine, /\*\*Compiti nell'ordine\.\*\*.*`compito "<titolo>" -`.*\(`C-12`\).*`attesa <N> C-12`.*si scioglie quando il compito chiude/);
   // Il primo mattino toglie dal taccuino le regole sulla rosa.
   assert.match(ruolo, /\*\*Una volta sola\*\* \(#2269, la rosa non c'è più\): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le sue regole/);

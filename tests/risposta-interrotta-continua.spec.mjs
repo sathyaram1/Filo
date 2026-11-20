@@ -114,7 +114,13 @@ test('Home: la riga «interrotta» dentro la bolla ha l\'aspetto di una nota, in
   await casa.locator('#sendBtn').click();
   const nota = casa.locator('.dash-bubble-filo .dash-bubble-interrotta');
   await expect(nota).toHaveText('La risposta si è interrotta qui: ha raggiunto la lunghezza massima.', { timeout: 15_000 });
-  expect(await nota.evaluate((n) => getComputedStyle(n).fontStyle)).toBe('italic');
+  // Una nota: più piccola e più tenue del testo della bolla, dritta perché il corsivo è delle spiegazioni (#2388).
+  const aspetto = await nota.evaluate((n) => {
+    const s = getComputedStyle(n);
+    const b = getComputedStyle(n.closest('.dash-bubble-filo'));
+    return { stile: s.fontStyle, piccola: parseFloat(s.fontSize) < parseFloat(b.fontSize), tenue: s.color !== b.color };
+  });
+  expect(aspetto).toEqual({ stile: 'normal', piccola: true, tenue: true });
   mkdirSync(SHOTS, { recursive: true });
   await casa.locator('.dash-bubble-filo').last().screenshot({ path: `${SHOTS}/1097-home-interrotta-chiaro.png` });
   await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));

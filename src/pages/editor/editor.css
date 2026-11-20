@@ -314,7 +314,7 @@ html, body {
   overflow: hidden; text-overflow: ellipsis;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
-.ed-vh-noprev { color: var(--sn-muted); font-style: italic; }
+.ed-vh-noprev { color: var(--sn-muted); }
 .ed-vh-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .ed-vh-more { width: 100%; margin-top: 10px; }
 

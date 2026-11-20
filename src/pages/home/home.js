@@ -512,6 +512,9 @@
 
   let openMenu = null;
   let fuocoPrimaDelMenu = null;
+  // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2586).
+  let scorsoDopo = () => true;
+  function onMenuScroll(e) { if (scorsoDopo(e)) closeCtxMenu(); }
   function closeCtxMenu() {
     if (!openMenu) return;
     const eraDentro = openMenu.contains(document.activeElement);
@@ -519,7 +522,7 @@
     openMenu = null;
     document.removeEventListener('mousedown', onOutsideClick, true);
     document.removeEventListener('keydown', onMenuKeydown, true);
-    window.removeEventListener('scroll', closeCtxMenu, true);
+    window.removeEventListener('scroll', onMenuScroll, true);
     window.removeEventListener('resize', closeCtxMenu);
     if (eraDentro && fuocoPrimaDelMenu && document.contains(fuocoPrimaDelMenu)) {
       try { fuocoPrimaDelMenu.focus(); } catch (_) {}
@@ -566,6 +569,7 @@
   // `items`: [{ label, run }]; `campo`: un campo da scrivere al posto delle voci (il nome di una categoria nuova).
   function openMenuAt(x, y, items, { campo = null } = {}) {
     closeCtxMenu();
+    scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop home-ctxmenu';
     menu.setAttribute('role', campo ? 'dialog' : 'menu');
@@ -602,7 +606,7 @@
     setTimeout(() => {
       if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      window.addEventListener('scroll', closeCtxMenu, true);
+      window.addEventListener('scroll', onMenuScroll, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);
   }

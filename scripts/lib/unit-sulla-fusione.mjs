@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { sommaRiepiloghi, perLaRiga, SOLO, collectTestFiles } from '../run-unit-tests.mjs';
 import { gitIn, refspecMain } from './git-main.mjs';
+import { COMANDI_DI_ACTIONS, senzaComandiDiActions } from './comandi-di-actions.mjs';
 
 // Lo stesso di SN_NOVITA_FUSIONE.FILE: lo controlla tests/unit/unitSullaFusione.test.mjs.
 export const FILE_NOVITA = 'src/shared/patchNotes.js';
@@ -373,7 +374,7 @@ export function fileDellaChiave(chiave) {
   return f && f !== '?' && !assoluto(f) && !f.split('/').includes('..') ? f : '';
 }
 
-export const COMANDI_DI_ACTIONS = Object.freeze(['GITHUB_OUTPUT', 'GITHUB_ENV', 'GITHUB_PATH', 'GITHUB_STATE', 'GITHUB_STEP_SUMMARY']);
+export { COMANDI_DI_ACTIONS };
 
 /**
  * `npm run test:unit` dell'albero provato, con l'uscita su file; con `file`, solo quei file (la riprova dei rossi).
@@ -387,8 +388,7 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
   const fd = openSync(log, 'w');
   // Lanciata da dentro un `node --test`, questa variabile farebbe dei test provati dei figli suoi: niente rapporti.
   // I file dei comandi di Actions no: il codice provato scriverebbe l'esito della propria prova (#2225).
-  const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
-  for (const k of COMANDI_DI_ACTIONS) delete env[k];
+  const { NODE_TEST_CONTEXT: _figlio, ...env } = senzaComandiDiActions(process.env);
   // I file li sceglie la prova (tutti, o `file`): la regola del PC dell'owner non li riduce (unit-sul-pc.mjs).
   env.FILO_UNIT_LONTANE = '0';
   let r;

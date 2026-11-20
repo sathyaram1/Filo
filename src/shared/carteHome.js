@@ -20,17 +20,29 @@
     },
     {
       id: 'rapide', titolo: 'Impostazioni rapide', icona: 'options', url: 'filo://preferences/preferences.html',
-      nomi: ['impostazioni rapide', 'rapide', 'impostazioni', 'preferenze rapide'],
+      nomi: ['impostazioni rapide', 'rapide', 'preferenze rapide'],
     },
   ];
 
-  // Le app che una carta non ce l'hanno: in «altro» restano un'icona.
+  // Le app che una carta non ce l'hanno: in «altro» restano un tasto.
   const APP = [
-    { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html' },
-    { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html' },
+    { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html', nomi: ['aperti per dopo', 'per dopo', 'perdopo', 'salvati per dopo'] },
+    // Niente «download» fra i nomi: a parole quello è lo scaricamento a sinistra.
+    { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html', nomi: ['tasto dei download', 'tasto download', 'pagina dei download', 'app dei download'] },
     // L'id resta quello della Cronologia, che il quaderno sostituisce (#872): le disposizioni salvate lo citano.
-    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html' },
-    { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html' },
+    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html', nomi: ['memorie', 'quaderno', 'quaderno delle memorie', 'cronologia'] },
+    { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html', nomi: ['bacheca', 'segnalazioni'] },
+  ];
+  // Con la Bacheca in pausa (#1592) il suo tasto porta alle sole segnalazioni dell'utente: così lo vedono la home e
+  // l'agente.
+  const SEGNALAZIONI = { id: 'bacheca', titolo: 'Segnalazioni', icona: 'feedback', url: 'filo://board/board.html#segnalazioni' };
+  // I tasti di «altro» (#2372): le app, la ricerca nel filo e i comandi che stavano in alto a destra. Il «+» non è un
+  // tasto: è fisso e tiene quelli fuori vista. `fuori`: di serie sta nel «+».
+  const TASTI = [
+    { id: 'cerca', titolo: 'Cerca nel filo', icona: 'search', nomi: ['cerca', 'cerca nel filo', 'ricerca', 'ricerca nel filo', 'lente'] },
+    ...APP,
+    { id: 'impostazioni', titolo: 'Impostazioni', icona: 'options', comando: 'settings', nomi: ['impostazioni', 'opzioni', 'ingranaggio', 'menu delle impostazioni'] },
+    { id: 'profilo', titolo: 'Profilo', icona: 'user', comando: 'account', fuori: true, nomi: ['profilo', 'account', 'accedi', 'avatar'] },
   ];
 
   const VERSIONE = 1;
@@ -41,25 +53,38 @@
   const TETTO_CHIAVE = 200;
 
   const IDS = CARTE.map((c) => c.id);
+  const ID_TASTI = TASTI.map((t) => t.id);
   const carta = (id) => CARTE.find((c) => c.id === id) || null;
+  const tasto = (id) => TASTI.find((t) => t.id === id) || null;
+  // Chi può avere una lettera del doppio tocco (#2372): i tasti, e le carte che aprono un'app («Filo ti suggerisce» non
+  // ha dove portare). La chiedono il salvataggio, le Preferenze, il tasto destro e la home che la esegue.
+  const conLettera = () => [...TASTI, ...CARTE.filter((c) => c.url)];
+  const prendeLettera = (id) => conLettera().find((t) => t.id === id) || null;
   const lista = (v) => (Array.isArray(v) ? v : []);
   const unici = (arr) => [...new Set(arr)];
   const chiaveValida = (k) => typeof k === 'string' && k.length > 0 && k.length <= TETTO_CHIAVE;
 
   function predefinita() {
-    return { versione: VERSIONE, destra: IDS.slice(), tolte: [], sinistra: [], nascoste: [] };
+    return normalizza({});
   }
 
-  // Una carta che il catalogo non conosceva quando l'utente ha salvato compare in fondo a destra: tolta è
-  // solo quella che l'utente ha tolto.
+  // Una carta o un tasto che il catalogo non conosceva quando l'utente ha salvato compare in fondo, o nel «+» se di
+  // serie sta lì: tolto è solo quello che l'utente ha tolto.
   function normalizza(raw) {
     const r = raw && typeof raw === 'object' ? raw : {};
     const tolte = unici(lista(r.tolte).filter((id) => IDS.includes(id)));
     const destra = unici(lista(r.destra).filter((id) => IDS.includes(id) && !tolte.includes(id)));
     for (const id of IDS) if (!destra.includes(id) && !tolte.includes(id)) destra.push(id);
+    const riposti = unici(lista(r.riposti).filter((id) => ID_TASTI.includes(id)));
+    const tasti = unici(lista(r.tasti).filter((id) => ID_TASTI.includes(id) && !riposti.includes(id)));
+    for (const t of TASTI) {
+      if (tasti.includes(t.id) || riposti.includes(t.id)) continue;
+      if (t.fuori) riposti.push(t.id);
+      else tasti.push(t.id);
+    }
     const sinistra = unici(lista(r.sinistra).filter(chiaveValida)).slice(0, TETTO_ORDINE);
     const nascoste = unici(lista(r.nascoste).filter(chiaveValida)).slice(-TETTO_NASCOSTE);
-    return { versione: VERSIONE, destra, tolte, sinistra, nascoste };
+    return { versione: VERSIONE, destra, tolte, tasti, riposti, sinistra, nascoste };
   }
 
   function senzaAccenti(s) {
@@ -67,18 +92,23 @@
   }
 
   function pulisciNome(nome) {
-    return senzaAccenti(nome).replace(/^(la|il|lo|le|i|gli|l')\s*/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
+    // L'articolo vuole lo spazio dopo (o l'apostrofo): «impostazioni» non comincia con «i».
+    return senzaAccenti(nome).replace(/^(?:(?:la|il|lo|le|i|gli)\s+|l'\s*)/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
   }
 
-  // Il nome come lo dice l'utente («la carta dei mazzi», «Editor») → id del catalogo, o null.
-  // `esatto`: niente nomi contenuti nella frase («il file scaricato» non è l'Editor).
+  // Il nome come lo dice l'utente («la carta dei mazzi», «Editor», «il tasto delle impostazioni») → id del catalogo
+  // delle carte o dei tasti, o null. `esatto`: niente nomi contenuti nella frase («il file scaricato» non è l'Editor).
+  // Un tasto si riconosce solo dai suoi nomi: il titolo «Download» a parole è lo scaricamento a sinistra.
   function risolvi(nome, { esatto = false } = {}) {
-    const s = pulisciNome(nome);
+    const intero = pulisciNome(nome);
+    const s = intero.replace(/^tasto\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
     if (!s) return null;
     if (IDS.includes(s)) return s;
     for (const c of CARTE) if (senzaAccenti(c.titolo) === s || c.nomi.includes(s)) return c.id;
+    for (const t of TASTI) if (t.nomi.includes(s) || t.nomi.includes(intero)) return t.id;
     if (esatto) return null;
     for (const c of CARTE) if (c.nomi.some((n) => s.includes(n))) return c.id;
+    for (const t of TASTI) if (t.nomi.some((n) => s.includes(n))) return t.id;
     return null;
   }
 
@@ -102,15 +132,30 @@
   const scadenza = (t) => { const v = Date.parse(t && t.endsAt); return Number.isFinite(v) ? v : Infinity; };
   const nomeTimer = (t) => t.label || (t.kind === 'alarm' ? 'Sveglia' : 'Timer');
 
-  // Le carte di sinistra nell'ordine in cui si vedono, senza le nascoste: i Crediti e ciò che suona in cima, poi
-  // le altre nell'ordine dell'utente (le nuove davanti, nell'ordine di Filo: lavori, scaricamenti in corso, timer
-  // per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce. `chat`: la
-  // conversazione di chi guarda.
-  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false, chat = null } = {}, layout, ora = Date.now()) {
+  // Le chiavi delle carte che un avviso può nominare per farsi assorbire (#2390): chi avvisa le chiede qui, dove
+  // nascono le carte, e chi le riceve le controlla con `cartaDiAvviso`.
+  const chiaveTimer = (id) => `timer:${id}`;
+  const chiaveDownload = (id) => `download:${id}`;
+  const CARTA_DI_AVVISO = new RegExp(`^(${[chiaveTimer(''), chiaveDownload('')].join('|')})[A-Za-z0-9_-]{1,80}$`);
+  const cartaDiAvviso = (k) => (typeof k === 'string' && CARTA_DI_AVVISO.test(k) ? k : '');
+
+  // Gli avvisi volati nella colonna della home (#2390) stanno in cima, i più recenti per primi, finché li si chiude.
+  // Quello che racconta una cosa che ha già la sua carta non è una carta in più: è quella.
+  function avvisiVolati(cornice, chiavi) {
+    return lista(cornice).filter((a) => a && a.id && !(a.carta && chiavi.has(a.carta))).map((a) => ({
+      chiave: `cornice:${a.id}`, tipo: 'cornice', titolo: String(a.testo || a.titolo || 'avviso'), ref: a, fissa: true,
+    }));
+  }
+
+  // Le carte di sinistra nell'ordine in cui si vedono, senza le nascoste: gli avvisi volati, i Crediti e ciò che
+  // suona in cima, poi le altre nell'ordine dell'utente (le nuove davanti, nell'ordine di Filo: lavori, scaricamenti
+  // in corso, timer per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce.
+  // `chat`: la conversazione di chi guarda; `cornice`: gli avvisi volati nella colonna della sua finestra.
+  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false, chat = null, cornice = [] } = {}, layout, ora = Date.now()) {
     const nascoste = new Set(normalizza(layout).nascoste);
     const voce = (chiave, tipo, titolo, ref) => ({ chiave, tipo, titolo, ref });
-    const vT = (t) => voce(`timer:${t.id}`, t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
-    const vD = (r) => voce(`download:${r.id}`, 'download', r.filename || 'download', r);
+    const vT = (t) => voce(chiaveTimer(t.id), t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
+    const vD = (r) => voce(chiaveDownload(r.id), 'download', r.filename || 'download', r);
     // `fissa`: sta in cima per regola, quindi né si sposta né la si scavalca (menu, trascinamento, chat).
     const cima = [];
     if (crediti && !nascoste.has('crediti')) cima.push(voce('crediti', 'crediti', 'Crediti', null));
@@ -125,7 +170,8 @@
       ...vis.filter((r) => !DOWNLOAD_ATTIVI.includes(r.state)).map(vD),
     ].filter((v) => !nascoste.has(v.chiave));
     const perChiave = new Map(resto.map((v) => [v.chiave, v]));
-    return [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
+    const voci = [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
+    return [...avvisiVolati(cornice, new Set(voci.map((v) => v.chiave))), ...voci];
   }
 
   // La pagina di Filo a cui porta un avviso (#855), scritta dal main in `action.apri`: solo un indirizzo filo://, e
@@ -142,7 +188,7 @@
   function nascosteSinistra(dati, layout, ora = Date.now()) {
     const l = normalizza(layout);
     const nascoste = new Set(l.nascoste);
-    return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => nascoste.has(v.chiave));
+    return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => v.tipo !== 'cornice' && nascoste.has(v.chiave));
   }
 
   // Il primo incontro (#1661): finché l'accoglienza non si è chiusa la home tiene solo la colonna di sinistra, se la
@@ -161,6 +207,9 @@
     timer: ['timer'], sveglia: ['sveglia', 'sveglie'], download: ['scaricamento', 'scaricamenti', 'download', 'file scaricato'],
     avviso: ['avviso', 'avvisi', 'notifica', 'notifiche'], lavoro: ['lavoro', 'lavori', 'comando'], crediti: ['crediti'],
   };
+  // Per chi parla, un avviso volato nella colonna è un avviso come gli altri.
+  const STESSO_NOME = { avviso: ['avviso', 'cornice'] };
+  const diTipo = (tipo) => (v) => (STESSO_NOME[tipo] || [tipo]).includes(v.tipo);
   // Le carte di sinistra che l'utente intende con un nome («l'avviso del backup», «gli avvisi», la chiave della
   // carta). `perTipo`: il nome era solo il tipo, quindi valgono tutte quelle di quel tipo. `tipo`: il nome ne
   // nomina uno, quindi la carta cercata è di sinistra anche se non si trova.
@@ -173,12 +222,12 @@
     const s = pulisciNome(raw).replace(/^(de(i|gli|ll[ae']?|l)|di)\s*/, '');
     if (!s) return { voci: [], perTipo: false, tipo: null };
     for (const [tipo, nomi] of Object.entries(TIPI_SINISTRA)) {
-      if (nomi.includes(s)) return { voci: tutte.filter((v) => v.tipo === tipo), perTipo: true, tipo };
+      if (nomi.includes(s)) return { voci: tutte.filter(diTipo(tipo)), perTipo: true, tipo };
     }
     const tit = (v) => senzaAccenti(v.titolo);
     const parole = s.split(/[^a-z0-9]+/).filter((w) => w.length > 2);
     const tipo = (Object.entries(TIPI_SINISTRA).find(([, nomi]) => nomi.some((n) => parole.includes(n) || s.includes(`${n} `))) || [null])[0];
-    const candidate = tipo ? tutte.filter((v) => v.tipo === tipo) : tutte;
+    const candidate = tipo ? tutte.filter(diTipo(tipo)) : tutte;
     let trovate = candidate.filter((v) => tit(v) === s);
     if (!trovate.length) trovate = candidate.filter((v) => tit(v).length > 1 && (tit(v).includes(s) || s.includes(tit(v))));
     if (!trovate.length) {
@@ -211,6 +260,23 @@
 
   const uguali = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+  // Le stesse mosse delle carte, sui tasti di «altro»: «togli» lo mette nel «+», «aggiungi» lo rimette in vista.
+  // → [layout, errore?]
+  function mossaTasto(l, tipo, id, verso, rif) {
+    if (tipo === 'togli') return [{ ...l, tasti: l.tasti.filter((x) => x !== id), riposti: [...l.riposti.filter((x) => x !== id), id] }];
+    if (tipo === 'aggiungi') {
+      const dove = verso === 'cima' ? l.tasti.filter((x) => x !== id)[0] ?? null : rif;
+      return [{ ...l, tasti: inserisci(l.tasti, id, dove), riposti: l.riposti.filter((x) => x !== id) }];
+    }
+    if (tipo === 'sposta') {
+      if (!l.tasti.includes(id)) return [l, 'il tasto è nel «+»: prima va rimesso in vista'];
+      const dove = verso ? primaDa(l.tasti, id, verso) : rif;
+      if (dove === undefined) return [l, 'verso sconosciuto'];
+      return [{ ...l, tasti: inserisci(l.tasti, id, dove) }];
+    }
+    return [l, 'mossa sconosciuta'];
+  }
+
   // Una mossa → { layout, cambiato, errore? }. Una mossa che non si può fare dice perché e lascia tutto com'era.
   function applica(raw, mossa) {
     const prima = normalizza(raw);
@@ -235,9 +301,11 @@
       if (!ordine.length) return fine(prima, 'ordine vuoto');
       return fine({ ...prima, sinistra: unici([...ordine, ...prima.sinistra]) });
     }
-    const id = IDS.includes(m.carta) ? m.carta : risolvi(m.carta);
+    const perId = (x) => ([...IDS, ...ID_TASTI].includes(x) ? x : risolvi(x));
+    const id = perId(m.carta);
     if (!id) return fine(prima, 'carta sconosciuta');
-    const rif = m.prima == null ? null : (IDS.includes(m.prima) ? m.prima : risolvi(m.prima));
+    const rif = m.prima == null ? null : perId(m.prima);
+    if (ID_TASTI.includes(id)) return fine(...mossaTasto(prima, tipo, id, m.verso, ID_TASTI.includes(rif) ? rif : null));
     if (tipo === 'togli') {
       return fine({ ...prima, destra: prima.destra.filter((x) => x !== id), tolte: [...prima.tolte, id] });
     }
@@ -268,13 +336,16 @@
     const l = normalizza(raw);
     return {
       destra: l.destra.map((id) => carta(id).titolo),
-      altro: l.tolte.map((id) => carta(id).titolo),
+      tasti: l.tasti.map((id) => tasto(id).titolo),
+      // Nel «+»: le carte tolte e i tasti messi via.
+      altro: [...l.tolte.map((id) => carta(id).titolo), ...l.riposti.map((id) => tasto(id).titolo)],
     };
   }
 
   global.SN_CARTE_HOME = {
-    CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
-    carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
+    CARTE, APP, TASTI, SEGNALAZIONI, IDS, ID_TASTI, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
+    carta, tasto, conLettera, prendeLettera, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
     downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso, primoIncontro, homeRidotta,
+    chiaveTimer, chiaveDownload, cartaDiAvviso,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

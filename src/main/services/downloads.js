@@ -599,13 +599,17 @@ function avvisaNonRiuscito(rec) {
 }
 
 // #2390 — la carta della home che racconta lo stesso scaricamento: lì la home fa notare lei invece dell'avviso.
-const cartaDi = (rec) => (rec && rec.id ? { carta: `download:${rec.id}` } : {});
+function cartaDi(rec) {
+  if (!rec || !rec.id) return {};
+  if (!globalThis.SN_CARTE_HOME) require('../../shared/carteHome.js');
+  return { carta: globalThis.SN_CARTE_HOME.chiaveDownload(rec.id) };
+}
 
 function shellToast(text, opts, scope = '') {
   try {
     for (const win of windowsOf(scope)) {
       if (!win._filoTabs) continue;
-      try { win.webContents.send('shell:toast', { text, opts }); } catch (_) {}
+      try { require('./avvisoFinestra').allaCornice(win.webContents, { text, opts }); } catch (_) {}
     }
   } catch (_) {}
 }
@@ -717,9 +721,9 @@ function annunciaPartenza(rec, webContents) {
       let url = '';
       try { url = (attiva && (attiva.view.webContents.getURL() || attiva.url)) || ''; } catch (_) { url = (attiva && attiva.url) || ''; }
       if (!win || PAGINE_CHE_LO_MOSTRANO.test(url)) return;
-      win.webContents.send('shell:toast', {
+      require('./avvisoFinestra').allaCornice(win.webContents, {
         text: `Scaricamento avviato: ${shortName(rec.filename)}`,
-        opts: { ...chiaveAvviso(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
+        opts: { ...chiaveAvviso(rec), ...cartaDi(rec), durationSec: 5, tipo: 'download_avviato', indirizzo: rec.url, actions: [{ label: 'Vedi nella home', apriHome: true }] },
       });
     } catch (_) {}
   }, ANNUNCIO_MS);
@@ -777,6 +781,10 @@ function completa(rec) {
   persist();
   broadcast('done', rec);
   contaFine(rec);
+  annunciaArrivato(rec);
+}
+
+function annunciaArrivato(rec) {
   if (!scopeOf(rec) && daRaccontare(rec, utenteDavanti())) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
@@ -856,11 +864,17 @@ function senzaNome(rec, esito) {
     if (avvisatoSenzaNome) return;
     avvisatoSenzaNome = true;
   }
+  // Una frase che nomina Crediti o Opzioni porta il tasto per andarci, in evidenza (#1344.2).
+  let pagina = null;
+  try { pagina = esito.rimedio ? globalThis.SN_CHAT_ERRORS.rimedioPagina(esito.rimedio) : null; } catch (_) {}
   shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${esito.frase || 'Rinomina non riuscita'}`, {
-    durationSec: 10,
+    durationSec: pagina ? 15 : 10,
     tipo: 'download_senza_nome',
     indirizzo: rec.url,
-    actions: [{ label: 'Dai un nome', rinominaDownloadId: rec.id }],
+    actions: [
+      ...(pagina ? [{ label: pagina.label, apriFilo: pagina.url }] : []),
+      { label: 'Dai un nome', rinominaDownloadId: rec.id },
+    ],
   }, '');
 }
 
@@ -909,7 +923,8 @@ async function rimettiNome(id, scope = '') {
   if (!rec.nomeOriginale) return { ok: false, frase: 'Ha già il nome con cui era arrivato' };
   const r = await require('./nomiFile').rinomina(rec.savePath, rec.nomeOriginale, { esatto: true });
   if (!r.ok) return { ok: false, frase: r.frase };
-  return { ok: true, nome: r.nome, cambiato: !!r.cambiato };
+  // `indirizzo`: l'avviso che ne nasce nella cornice se ne va con le pagine del sito, come «Nome dato» (#1561.6).
+  return { ok: true, nome: r.nome, cambiato: !!r.cambiato, indirizzo: rec.url || '' };
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
@@ -1142,6 +1157,8 @@ function finalizeManual(rec, state, savePath) {
   // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina. Un video in streaming fa
   // eccezione (#1488): ci mette minuti, e la fine si dice nella finestra, dovunque sia l'utente in quel momento.
   if (rec.via === 'streaming') annunciaStreaming(rec, state);
+  else if (rec._annuncia && state === 'completed') annunciaArrivato(rec);
+  else if (rec._annuncia && state === 'interrupted') { contaNonRiuscito(rec); avvisaNonRiuscito(rec); }
   return marca;
 }
 
@@ -1162,8 +1179,9 @@ function annunciaStreaming(rec, state) {
 
 // `webContents`: la scheda da cui parte, per aprire la domanda nella sua finestra.
 // `via: 'streaming'` (#1488): la voce la riempie salvaVideoStreaming.js, e «Riprova» passa da lui. `riusa`: l'id della
-// voce chiusa da riempire di nuovo, quella su cui l'utente ha premuto «Riprova».
-function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents, via = '', riusa = '' } = {}) {
+// voce chiusa da riempire di nuovo, quella su cui l'utente ha premuto «Riprova». `pagina` e `sessione` valgono senza
+// scheda (il «Riprova» di riprovaConPagina.js); `annuncia`: arrivo e fallimento si dicono come per un link.
+function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents, via = '', riusa = '', pagina = '', sessione = null, annuncia = false } = {}) {
   const vecchia = riusa ? records.get(riusa) : null;
   const id = vecchia && !NON_TERMINAL.has(vecchia.state) && !liveManual.has(riusa) && !liveItems.has(riusa) ? vecchia.id : uuid();
   const nome = safeName(filename || 'download');
@@ -1179,7 +1197,8 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     site: marca(() => ESE().sito(indirizzo), ''),
     servedBy: marca(() => ESE().servitoDa(indirizzo, servedFrom), ''),
     _servito: String(servedFrom || indirizzo),
-    _pagina: paginaDi(webContents),
+    _pagina: paginaDi(webContents) || String(pagina || ''),
+    _annuncia: !!annuncia,
     mime: '',
     totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
     receivedBytes: 0,
@@ -1191,7 +1210,7 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     canResume: false,
     canPause: false,
     _scope: scope || '',
-    _sessione: webContents && !webContents.isDestroyed?.() ? webContents.session : null,
+    _sessione: webContents && !webContents.isDestroyed?.() ? webContents.session : sessione,
     via: via === 'streaming' ? 'streaming' : '',
     nota: '',
   };
@@ -1276,6 +1295,12 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       rec.filename = n;
       rec.exe = marca(() => ESE().eEseguibile(n), rec.exe);
       broadcast('progress', rec);
+    },
+    // Chi ha servito i byte dopo i rimandi, saputo solo alla risposta (#588.3).
+    servito(u) {
+      if (rec._final || !u) return;
+      rec._servito = String(u);
+      rec.servedBy = marca(() => ESE().servitoDa(indirizzo, u), rec.servedBy);
     },
     // Il paese da cui il lavoro è uscito (#2301): «Riprova» esce di nuovo da lì, anche a scheda chiusa o dopo un riavvio.
     paese(p) {
@@ -1381,38 +1406,6 @@ function refererPer(paginaDelClic, verso) {
   } catch (_) { return ''; }
 }
 
-// Chromium scarta il Referer passato fra le intestazioni di downloadURL, e senza i siti che danno il file solo a chi
-// arriva dalla loro pagina rifiutano «Riprova»: lo presenta l'unico onBeforeSendHeaders della sessione (cookies.js),
-// alla richiesta di «Riprova» e ai suoi rimandi.
-const refererAttesi = new Map();   // indirizzo → [{ ses, pagina }]
-const refererInCorso = new Map();  // id della richiesta → pagina del clic
-function attendiReferer(indirizzo, ses, pagina) {
-  if (!pagina) return;
-  refererAttesi.set(indirizzo, (refererAttesi.get(indirizzo) || []).concat({ ses, pagina }));
-}
-function ritiraReferer(indirizzo, ses) {
-  const coda = refererAttesi.get(indirizzo);
-  if (!coda) return;
-  const i = coda.findIndex((x) => x.ses === ses);
-  if (i >= 0) coda.splice(i, 1);
-  if (!coda.length) refererAttesi.delete(indirizzo);
-}
-function refererDaPresentare(details, ses) {
-  if (!details || !details.url) return '';
-  let pagina = refererInCorso.get(details.id);
-  if (!pagina) {
-    const coda = refererAttesi.get(details.url);
-    const i = coda ? coda.findIndex((x) => x.ses === ses) : -1;
-    if (i < 0) return '';
-    pagina = coda.splice(i, 1)[0].pagina;
-    if (!coda.length) refererAttesi.delete(details.url);
-    // Tetto: è solo il filo fra una richiesta e i suoi rimandi.
-    if (refererInCorso.size > 64) refererInCorso.delete(refererInCorso.keys().next().value);
-    refererInCorso.set(details.id, pagina);
-  }
-  return refererPer(pagina, details.url);
-}
-
 // Chiave ambito+indirizzo → voci che aspettano il loro will-download. Un tentativo che non parte entro il tempo torna
 // «non riuscito», con «Riprova» di nuovo.
 const riprove = new Map();
@@ -1452,7 +1445,7 @@ function riprova(id, scope = '') {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco', ...elenco(scope) };
   // Un secondo clic mentre il primo sta già ripartendo non è un errore da dire.
-  if (rec._riprovaTimer || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, ...elenco(scope) };
+  if (rec._riprovaTimer || liveManual.has(rec.id) || (liveItems.has(rec.id) && rec.state === 'progressing')) return { ok: true, ...elenco(scope) };
   // Un video in streaming non ha un file da riscaricare: si rifà il salvataggio dalla pagina (#1488), anche da una
   // voce riuscita («Ri-scarica»), che resta com'è mentre ne nasce una nuova.
   if (rec.via === 'streaming' && !NON_TERMINAL.has(rec.state)) {
@@ -1477,6 +1470,12 @@ function riprova(id, scope = '') {
   if (!ses || typeof ses.downloadURL !== 'function') {
     return { ok: false, error: 'Non sono riuscito a far ripartire lo scaricamento', ...elenco(scope) };
   }
+  // Con la pagina da cui partiva, i byte li prende il main (#1684.1): a un download partito da qui Chromium toglie il
+  // Referer da ogni strada (intestazioni di downloadURL, onBeforeSendHeaders), e i siti protetti rispondono 403.
+  if (rec._pagina) {
+    require('./riprovaConPagina').riprova({ id: rec.id, scope: scopeOf(rec), ses, indirizzo, pagina: rec._pagina, nome: rec.filename });
+    return { ok: true, ...elenco(scope) };
+  }
   const k = chiaveRiprova(scope, indirizzo);
   riprove.set(k, (riprove.get(k) || []).concat(rec.id));
   // La riga riparte subito: il server può metterci un attimo a rispondere, e un clic senza effetto sembra rotto.
@@ -1487,7 +1486,6 @@ function riprova(id, scope = '') {
     rec._riprovaTimer = null;
     const coda = riprove.get(k);
     if (coda) { const i = coda.indexOf(rec.id); if (i >= 0) coda.splice(i, 1); if (!coda.length) riprove.delete(k); }
-    ritiraReferer(indirizzo, ses);
     if (!records.has(rec.id) || liveItems.has(rec.id) || rec.state !== 'progressing') return;
     rec.state = 'interrupted';
     rec.endedAt = new Date().toISOString();
@@ -1498,11 +1496,9 @@ function riprova(id, scope = '') {
   persist();
   broadcast('progress', rec);
   try {
-    attendiReferer(indirizzo, ses, rec._pagina);
     ses.downloadURL(indirizzo);
   } catch (_) {
     clearTimeout(rec._riprovaTimer); rec._riprovaTimer = null;
-    ritiraReferer(indirizzo, ses);
     prendiRiprova(scope, indirizzo);
     rec.state = 'interrupted';
     rec.endedAt = new Date().toISOString();
@@ -1532,7 +1528,6 @@ async function trascina(wc, id, scope = '') {
 
 async function init() {
   try { electron().app.on('before-quit', () => { uscendo = true; }); } catch (_) {}
-  try { require('./cookies').presentaReferer(refererDaPresentare); } catch (_) {}
   await loadHistory();
   // Nessuna attesa sopravvive a un riavvio (loadHistory le chiude): quello che
   // resta in quarantena è orfano, e un programma orfano non deve restare su
@@ -1583,6 +1578,37 @@ function remove(id, scope = '') {
 // Messaggio unico: barra in alto e pagina elenco devono dirlo con le stesse parole.
 const MISSING_TEXT = 'Il file non c’è più: forse è stato spostato o cancellato';
 const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostata o cancellata';
+const CERCATO_TROPPO_TEXT = 'Il file non è più dov’era, e non l’ho trovato nelle cartelle solite';
+
+// #473 — un file spostato si cerca al clic, prima di dirlo sparito: trovato, la voce punta al posto nuovo e l'avviso
+// dice dove. Risolve true se il file ora c'è, false se no, 'scaduto' se la ricerca ha passato il tetto.
+function ritrova(rec) {
+  if (!rec || rec.state !== 'completed' || !rec.savePath) return Promise.resolve(false);
+  if (rec._cercando) return rec._cercando;
+  const prima = rec.savePath;
+  const R = require('./ritrovaFile');
+  let app = null;
+  try { app = electron().app; } catch (_) {}
+  const solite = app ? R.radiciSolite(app) : [];
+  const dov = path.dirname(prima);
+  const nota = solite.find((r) => stessoPercorso(r.dir, dov));
+  const radici = [{ dir: downloadsDir(), nome: 'Download' }, { dir: dov, nome: nota ? nota.nome : path.basename(dov) }, ...solite];
+  rec._cercando = R.cerca(path.basename(prima), rec.totalBytes || rec.receivedBytes, radici).then((esito) => {
+    rec._cercando = null;
+    if (!esito.trovato) return esito.scaduto ? 'scaduto' : false;
+    // Mentre si cercava la voce può essere stata tolta, o il file rimesso dov'era.
+    if (!records.has(rec.id) || rec.savePath !== prima) return fileExists(rec.savePath);
+    forgetExists(prima);
+    rec.savePath = esito.trovato;
+    rec.filename = path.basename(esito.trovato);
+    forgetExists(esito.trovato);
+    persist();
+    broadcast('renamed', rec);
+    shellToast(`Trovato in ${esito.dove}: ${shortName(rec.filename)}`, { durationSec: 8, tipo: 'file_ritrovato' }, scopeOf(rec));
+    return true;
+  }, () => { rec._cercando = null; return false; });
+  return rec._cercando;
+}
 
 // #588 — risposta alla domanda "questo programma lo scarico?". `allow` viene da
 // un clic dell'utente: un no cancella il file dalla quarantena, un sì lo fa
@@ -1650,9 +1676,13 @@ function apriScaricato(rec, opts) {
   // dell'apertura non è affidabile su tutte le piattaforme.
   forgetExists(rec.savePath);
   if (!rec.savePath || !fileExists(rec.savePath)) {
-    // La voce è appena diventata «sparita»: le superfici aperte la attenuano senza ricaricare.
-    broadcast('missing', rec);
-    return { ok: false, missing: true, error: MISSING_TEXT };
+    const sparito = (scaduto) => {
+      // La voce è appena diventata «sparita»: le superfici aperte la attenuano senza ricaricare.
+      broadcast('missing', rec);
+      return { ok: false, missing: true, error: scaduto ? CERCATO_TROPPO_TEXT : MISSING_TEXT };
+    };
+    if (rec.state !== 'completed' || !rec.savePath) return sparito(false);
+    return ritrova(rec).then((c) => (c === true ? apriScaricato(rec, opts) : sparito(c === 'scaduto')));
   }
   // #588 — l'UNICA porta verso shell.openPath: aprire un programma è eseguirlo,
   // e qui non si passa senza una seconda risposta. Il gate sta nel main perché
@@ -1682,12 +1712,15 @@ function apriScaricato(rec, opts) {
   } catch (e) { return { ok: false, error: e?.message || 'apertura fallita' }; }
 }
 
-function openFolder(id, scope = '') {
+function openFolder(id, scope = '', opts = {}) {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
   if (!rec.savePath) return { ok: false, missing: true, error: MISSING_TEXT };
   forgetExists(rec.savePath);
   const here = fileExists(rec.savePath);
+  if (!here && rec.state === 'completed' && !opts.cercato) {
+    return ritrova(rec).then((c) => openFolder(id, scope, { cercato: true, scaduto: c === 'scaduto' }));
+  }
   if (!here) broadcast('missing', rec);
   try {
     if (here) { electron().shell.showItemInFolder(rec.savePath); return { ok: true }; }
@@ -1696,15 +1729,16 @@ function openFolder(id, scope = '') {
     const dir = path.dirname(rec.savePath);
     let dirThere = false;
     try { dirThere = fs.existsSync(dir); } catch (_) {}
-    if (!dirThere) return { ok: false, missing: true, missingFolder: true, error: MISSING_FOLDER_TEXT };
+    if (!dirThere) return { ok: false, missing: true, missingFolder: true, error: opts.scaduto ? CERCATO_TROPPO_TEXT : MISSING_FOLDER_TEXT };
     const r = electron().shell.openPath(dir);
-    // ok:true + missing:true = «cartella aperta, ma il file dentro non c'è più».
+    // ok:true + missing:true = «cartella aperta, ma il file dentro non c'è più»; `avviso` lo dice alle superfici.
     // Se la cartella c'è e il sistema non l'ha aperta è un'altra storia, e va detta com'è.
+    const aperta = { ok: true, missing: true, avviso: `${opts.scaduto ? CERCATO_TROPPO_TEXT : 'Il file non c’è più'}: ho aperto la cartella dov’era` };
     const done = (msg) => (msg
       ? { ok: false, missing: true, error: 'Non è stato possibile aprire la cartella' }
-      : { ok: true, missing: true });
+      : aperta);
     if (r && typeof r.then === 'function') return r.then(done);
-    return { ok: true, missing: true };
+    return aperta;
   } catch (e) { return { ok: false, error: e?.message || 'apertura cartella fallita' }; }
 }
 
@@ -1756,6 +1790,7 @@ module.exports = {
   downloadsDir,
   uniquePath,
   safeName,
+  refererPer,
   marcaOrigine,
   list,
   elenco,

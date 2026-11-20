@@ -83,6 +83,8 @@
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
   // l'avesse incollato; le immagini arrivate dal disco ricordano il loro.
   let pendingFiles = [];
+  // Le impostazioni come le ha la home: la pausa della ricerca e le lettere del doppio tocco le leggono da qui.
+  let impostazioniHome = null;
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
   // #892.5 — svuotato e riportato con Annulla, un testo incollato lo resta: la regola è dell'Aiuto e della home insieme.
@@ -106,6 +108,7 @@
   //   SN_DASH_CARTE       le carte ai lati e «altro» (#870)
   //   SN_DASH_BARRA_SITI  la barra dei siti e la chat ripiegata (#1803)
   //   SN_DASH_SISTEMA     ora, batteria, rete e Bluetooth in fondo alla colonna destra (#873)
+  //   SN_DASH_TASTIERA    un campo solo che prende la battitura, e il doppio tocco di una lettera (#2372)
   //
   // Lo stato che due parti condividono non si copia: si chiede a chi lo
   // possiede — la cartella del terminale al terminale, "sto inviando" a questo
@@ -182,6 +185,9 @@
     vaiA: (o) => Coda.vaiA(o),
     modificabile: (b) => composizioni.has(b),
     modifica: (b) => modificaMessaggio(b),
+    campoCambiato: () => aggiornaTasto(),
+    daFuori: () => testoDaFuori,
+    segnaDaFuori: () => { testoDaFuori = true; ricordaDaFuori(inputEl.value); },
   });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
@@ -200,7 +206,13 @@
     conversa: () => body.dataset.state === 'thread',
   });
   const Cerca = self.SN_DASH_CERCA;
-  Cerca.init({ send, coda: Coda, input: $('cercaFilo') });
+  // La ricerca prende la colonna destra dal suo tasto (#2372): chiusa, il fuoco torna nel campo della chat.
+  Cerca.init({
+    send, coda: Coda, host: $('cercaFilo'), colonna: $('right'), chat: inputEl, bubblesEl,
+    pausaMs: () => self.SN_CONST.opzioniRicercaFilo(impostazioniHome && impostazioniHome.ricercaFilo).pausaMs,
+    // A chat ripiegata il risultato non si vedrebbe: la chat si riapre.
+    mostraFilo: () => self.SN_DASH_BARRA_SITI?.perInvio?.(),
+  });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -343,7 +355,7 @@
     loadDashboard: () => loadDashboard(),
     // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
     rispondi: (testo) => {
-      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length) return false;
+      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length || Rispondi.commenti()) return false;
       submitMessage(testo);
       return true;
     },
@@ -357,11 +369,20 @@
     onSuggestionClick: (s, vicino, posizione) => onSuggestionClick(s, vicino, posizione),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
     iconaDelSito: (url, opz) => iconaDelSito(url, opz),
+    apriRicerca: () => Cerca.apri(),
+    decoraProfilo: (btn, ic) => decoraProfilo(btn, ic),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
     // Il lavoro che si vede già al centro è quello che gira in questa scheda: la stessa conversazione, continuata in una
     // scheda nuova (#869), lì non lo mostra.
     chatCorrente: () => (sending ? chatId : null),
+  });
+  const Tastiera = self.SN_DASH_TASTIERA;
+  Tastiera.init({
+    send, input: inputEl, dash: $('dash'),
+    campo: () => (Cerca.aperta() ? $('cercaInput') : null),
+    impostazioni: () => impostazioniHome,
+    usa: (id) => Carte.usa(id),
   });
   // La barra dei siti e la freccia che ripiega la chat (#1803).
   const BarraSiti = self.SN_DASH_BARRA_SITI;
@@ -532,8 +553,9 @@
       const archiviati = esiti.length && !dopo ? Att.esitiArchiviati(esiti, { chat: m.chat || '' }) : { righe: null, nota: null };
       // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
-      if (text.trim() || fotoViste.length || archiviati.righe) {
-        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser, fonti: isUser ? null : m.fonti });
+      const immaginiRisposta = !isUser && Array.isArray(m.immagini) ? m.immagini : null;
+      if (text.trim() || fotoViste.length || archiviati.righe || (immaginiRisposta && immaginiRisposta.length)) {
+        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser, fonti: isUser ? null : m.fonti, immagini: immaginiRisposta });
         if (isUser && Array.isArray(m.schede) && m.schede.length && window.SN_SCHEDE_IN_CHAT) {
           window.SN_SCHEDE_IN_CHAT.nellaBolla(b, text, m.schede, azioniGettone);
         }
@@ -617,9 +639,10 @@
   function rigaDiStoria(m, { quante, guardate, types, esiti = [] }) {
     const text = String(m.text || '');
     if (m.role === 'user') {
+      const citate = m.rispostaA ? Rispondi.perLoStorico(Rispondi.dalFilo(m.rispostaA)) : null;
       return {
         role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
-        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
+        ...(citate ? { rispostaA: citate } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
       };
     }
     return {
@@ -922,7 +945,7 @@
   }
 
   // ===== Bolle conversazione =====
-  function makeBubble({ role, text, pending = false, markdown = false, fonti = null }) {
+  function makeBubble({ role, text, pending = false, markdown = false, fonti = null, immagini = null }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
     // I collegamenti di una frase di Filo hanno il verdetto della porta: senza, il clic e il tasto destro chiedono l'OK (#1505).
@@ -933,7 +956,7 @@
     // #162 — testo vuoto (Filo ha solo eseguito un'azione, es. aperto un link):
     // niente nodo di testo, la bolla conterrà solo i chip d'azione. Marchiamo
     // la bolla così il CSS può stringere i margini quando è "solo azioni".
-    if (text) setBubbleText(div, text, markdown, fonti);
+    if (text || (markdown && Array.isArray(immagini) && immagini.length)) setBubbleText(div, text, markdown, fonti, immagini);
     else div.classList.add('dash-bubble-actions-only');
     return div;
   }
@@ -941,10 +964,12 @@
   // #418 — per le risposte di Filo la formattazione leggera condivisa, per il resto testo
   // letterale. I link sono già filtrati da SN_MARKDOWN: nessuno punta alle pagine interne.
   // `fonti`: le etichette che il main ha controllato per questa risposta (#2383); dal solo testo non ne nasce nessuna.
-  function setBubbleText(el, text, markdown, fonti = null) {
+  // `immagini`: le gallerie controllate dal main (#2272), al loro posto nel testo.
+  function setBubbleText(el, text, markdown, fonti = null, immagini = null) {
     Rispondi.ricorda(el, text);
-    if (markdown && text && self.SN_MARKDOWN) {
-      el.innerHTML = self.SN_MARKDOWN.render(text, { fonti });
+    const conImmagini = Array.isArray(immagini) && immagini.length > 0;
+    if (markdown && (text || conImmagini) && self.SN_MARKDOWN) {
+      el.innerHTML = self.SN_MARKDOWN.render(text, { fonti, immagini });
       el.classList.add('dash-bubble-md');
       // La riga «interrotta» la scrive il main dentro la risposta: si legge come nota, non come parole del modello.
       const ultimo = el.lastElementChild;
@@ -954,10 +979,23 @@
     }
   }
 
+  // La risposta mentre arriva si legge già formattata (#2388): un marcatore di spiegazione non si vede fra graffe.
+  function scriviInDiretta(el, text) {
+    if (text && self.SN_MARKDOWN) {
+      el.innerHTML = self.SN_MARKDOWN.render(text);
+      el.classList.add('dash-bubble-md');
+    } else {
+      el.textContent = text || '';
+      el.classList.remove('dash-bubble-md');
+    }
+  }
+
   // Un solo listener delegato: i link di Filo aprono una NUOVA SCHEDA invece di navigare via la
   // pagina interna.
   // L'etichetta di una fonte apre la pagina sulla frase dalla stessa porta dei collegamenti della chat (#2383).
   self.SN_FONTI_CITATE?.aggancia(document, (url, el) => apriProposta(url, el));
+  // Le immagini delle risposte (#2272): clic per ingrandire, il carosello scorre, la pagina d'origine dalla stessa porta.
+  self.SN_IMMAGINI_RISPOSTA?.aggancia(document, { apriPagina: (url, el) => apriProposta(url, el), ingrandisci: (src, _img, fila) => openLightbox(src, fila) });
 
   bubblesEl.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
@@ -967,6 +1005,14 @@
     e.preventDefault();
     e.stopPropagation();
     send({ type: MSG.OPEN_URL, url, via: 'chat' });
+  });
+
+  // #2388 — le spiegazioni al passaggio, anche nelle conversazioni delle app sulla home; «Spiegami di più» va alla
+  // chat della home solo dalle sue bolle.
+  self.SN_SPIEGAZIONI?.attacca(document.body, {
+    chiedi: (testo) => submitMessage(testo, { soloTesto: true }),
+    puoChiedere: (parola) => bubblesEl.contains(parola),
+    apriLink: (url) => send({ type: MSG.OPEN_URL, url, via: 'chat' }),
   });
 
   // ===== Invio messaggio =====
@@ -979,6 +1025,8 @@
   // secondo prima vale più di un'etichetta precisa un secondo dopo.
   const START_LABELS = {
     CERCA_WEB: 'Cerco sul web…',
+    IMMAGINI_WEB: 'Cerco le immagini…',
+    GENERA_IMMAGINE: 'Disegno l\'immagine…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
     LEGGI_PAGINA: 'Leggo una pagina…',
@@ -991,9 +1039,12 @@
     RIPRENDI_AUDIO: 'Faccio ripartire la musica…',
     PAUSA_AUDIO: 'Metto in pausa…',
     MOSTRA_SCHEDA: 'Ti porto sulla scheda…',
+    SALVA_PER_DOPO: 'Salvo la pagina per dopo…',
+    CERCA_IMMAGINE: 'Cerco l\'immagine…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
+    LEGGI_MEMORIA: 'Rileggo la memoria…',
     TOGLI_PERMESSO_SITO: 'Tolgo un permesso…',
     ESEGUI_COMANDO: 'Eseguo un comando…',
     TIMER: 'Avvio un timer…',
@@ -1013,6 +1064,7 @@
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
     ORDINA_DESKTOP: 'Sistemo le icone del desktop…',
+    BLOCCA_PC: 'Blocco il computer…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
     RIMEDIO_CREDITI: 'Guardo i crediti…',
     PULSANTE_PREFERENZE: 'Uso le Preferenze…',
@@ -1096,13 +1148,21 @@
     let streamedText = '';
     // La risposta scritta nei giri di soli bottoni (#1167) resta in testa alla bolla: i giri dopo scrivono sotto.
     let rispostaPrima = '';
+    // Lo stesso testo coi marcatori, e le azioni finite del turno con le loro foto: un turno fermato o fallito a metà
+    // ridisegna le foto della parte già scritta (#2272).
+    let rispostaPrimaGrezza = '';
+    const azioniDelTurno = [];
     let giroIniziato = false;
     const unisci = (...parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
-    // I marcatori delle fonti non si vedono mentre arrivano: l'etichetta la mette la risposta finale, controllata (#2383).
-    const senzaMarcatori = (t) => (globalThis.SN_FONTI_CITATE ? globalThis.SN_FONTI_CITATE.nascondi(t) : String(t || ''));
-    const testoDelGiro = () => senzaMarcatori(globalThis.SN_CALC
+    // I marcatori di fonti e immagini non si vedono mentre arrivano: li disegna la risposta finale, controllata (#2383, #2272).
+    const senzaMarcatori = (t) => {
+      const f = globalThis.SN_FONTI_CITATE ? globalThis.SN_FONTI_CITATE.nascondi(t) : String(t || '');
+      return globalThis.SN_IMMAGINI_RISPOSTA ? globalThis.SN_IMMAGINI_RISPOSTA.nascondi(f) : f;
+    };
+    const testoGrezzoDelGiro = () => (globalThis.SN_CALC
       ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
       : streamedText);
+    const testoDelGiro = () => senzaMarcatori(testoGrezzoDelGiro());
     const bollaDellaRisposta = () => {
       if (!streamBubble) {
         streamBubble = document.createElement('div');
@@ -1123,7 +1183,7 @@
         if (data.reset) {
           // Fallback provider a metà: butta ciò che il giro aveva già messo a schermo, non accodare.
           streamedText = '';
-          if (streamBubble) streamBubble.textContent = rispostaPrima;
+          if (streamBubble) scriviInDiretta(streamBubble, rispostaPrima);
           return;
         }
         if (!data.delta || turno.fermato) return;
@@ -1135,7 +1195,7 @@
         streamedText += data.delta;
         // Il marker del conto si vede già come numero mentre scorre: la
         // risposta finale lo avrà risolto nel main, e le due non devono differire.
-        bollaDellaRisposta().textContent = rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro();
+        scriviInDiretta(bollaDellaRisposta(), rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro());
         followBottomIfNear();
       });
     }
@@ -1145,11 +1205,12 @@
     // Il testo di un giro di soli bottoni resta nella bolla; quello degli altri giri va nel blocco.
     const chiudiGiro = (data) => {
       if (data.risposta) {
+        rispostaPrimaGrezza = unisci(rispostaPrimaGrezza, data.text || testoGrezzoDelGiro());
         rispostaPrima = unisci(rispostaPrima, data.text ? senzaMarcatori(data.text) : testoDelGiro());
-        bollaDellaRisposta().textContent = rispostaPrima;
+        scriviInDiretta(bollaDellaRisposta(), rispostaPrima);
       } else if (streamBubble && rispostaPrima) {
-        pending.aggiungiNota(testoDelGiro());
-        streamBubble.textContent = rispostaPrima;
+        pending.aggiungiNota(self.SN_MARKDOWN?.testo ? self.SN_MARKDOWN.testo(testoDelGiro()) : testoDelGiro());
+        scriviInDiretta(streamBubble, rispostaPrima);
       } else if (streamBubble) {
         if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
         streamBubble = null;
@@ -1172,6 +1233,7 @@
           pending.working(progressLabelFor(data.type, data.fatti, data.totali, data.dettaglio));
         } else if (data.kind === 'done') {
           const a = data.action;
+          if (a && a._output && data.kept !== false) azioniDelTurno.push(a);
           if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
           if (a && data.kept !== false) {
             if (Att.tellActionInActivity(pending, a) && a._callId) shown.add(a._callId);
@@ -1236,7 +1298,10 @@
     // suo esito arriva nel blocco, che si chiude allora (patterns/il-filo-dell-attesa.md).
     const r = await Promise.race([inviato, turno.fermata]);
     if (turno.fermato) {
-      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, testoDelGiro()) });
+      const chiusa = apriTurnoFermato({
+        pending, streamBubble, streamedText: unisci(rispostaPrima, testoDelGiro()),
+        grezzo: unisci(rispostaPrimaGrezza, testoGrezzoDelGiro()), azioni: azioniDelTurno,
+      });
       turno.voce = chiusa.entry;
       const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown, chat: msg.chatId }); });
       return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura, _chat: msg.chatId };
@@ -1249,7 +1314,9 @@
       // dice sotto che il lavoro dopo non è riuscito. Il testo a metà del giro fallito invece se ne va.
       if (rispostaPrima && streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
-        setBubbleText(streamBubble, rispostaPrima, true);
+        const conFoto = giaScrittaConFoto(rispostaPrimaGrezza, azioniDelTurno);
+        if (conFoto) setBubbleText(streamBubble, conFoto.text, true, conFoto.fonti, conFoto.immagini);
+        else setBubbleText(streamBubble, rispostaPrima, true);
         Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: chiudiConversazione, activity: pending, shown, chat: msg.chatId });
         streamBubble = null;
       }
@@ -1343,9 +1410,9 @@
       if (r.notaRisposta) pending.dropNote(r.notaRisposta);
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
-        if (r.text) {
+        if (r.text || (Array.isArray(r.immagini) && r.immagini.length)) {
           // #418 — a fine turno il testo grezzo dello streaming diventa la risposta formattata.
-          setBubbleText(streamBubble, r.text, true, r.fonti);
+          setBubbleText(streamBubble, r.text || '', true, r.fonti, r.immagini);
           filoBubble = streamBubble;
         } else {
           // Il testo si è svuotato (es. reset non recuperato): niente bolla vuota.
@@ -1356,7 +1423,7 @@
       } else {
         // Il testo uguale all'ultima nota (formato vecchio) non resta anche nel blocco.
         if (r.text && !r.notaRisposta) pending.dropNote(r.text);
-        filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true, fonti: r.fonti });
+        filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true, fonti: r.fonti, immagini: r.immagini });
         bubblesEl.appendChild(filoBubble);
       }
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
@@ -1365,7 +1432,7 @@
       Att.renderActions(filoBubble, r.actions || [], { onAck: chiudiConversazione, autoConfirm: true, activity: pending, shown, chat: msg.chatId });
       // Un turno di sole azioni raccontate nel blocco (un timer avviato, e
       // niente da dire) non lascia una bolla vuota sotto.
-      if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
+      if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions, .filo-galleria') && !(filoBubble.textContent || '').trim()) {
         filoBubble.remove();
       }
       // #629 — la chiave OpenRouter dell'utente è stata rifiutata e ha
@@ -1392,6 +1459,7 @@
       if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
       if (Array.isArray(r.linkDaConfermare) && r.linkDaConfermare.length) entry.linkDaConfermare = r.linkDaConfermare;
       if (Array.isArray(r.fonti) && r.fonti.length) entry.fonti = r.fonti;
+      if (Array.isArray(r.immagini) && r.immagini.length) entry.immagini = r.immagini;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
@@ -1415,18 +1483,24 @@
   }
 
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
-  async function submitMessage(text, { daModello = false } = {}) {
-    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
-    await inviaComposto(prendiComposizione(text), { daModello });
+  // `soloTesto`: parte solo `text`, e la bozza nella barra (testo, allegati, citazione) resta dov'è.
+  async function submitMessage(text, { daModello = false, soloTesto = false } = {}) {
+    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0 && (soloTesto || !Rispondi.commenti())) || sending) return;
+    const c = soloTesto && text ? composizione(text) : prendiComposizione(text);
+    await inviaComposto(c, { daModello });
   }
   // Quello che parte col messaggio, preso dalla barra che si svuota. `scritto`, `file` e `percorsi` servono a
   // rimetterlo nella barra com'era (un seguito che non parte, #1296).
   const DOMANDA_SOLO_IMMAGINI = 'Descrivi questa immagine.';
   const domandaDi = (c) => c.text || DOMANDA_SOLO_IMMAGINI;
   function prendiComposizione(text) {
+    // Le citazioni nel campo, coi loro commenti: le parole del messaggio diventano tutti i commenti, in ordine (#2346).
+    const conCitate = Rispondi.prendi(String(text || ''));
+    if (conCitate) text = conCitate.testo;
     // Un messaggio che non viene dalla casella (una scelta cliccata, l'avviso di un sito) è scritto lo stesso.
-    const scritto = inputEl.value.trim() ? inputEl.value : String(text || '');
-    const incollato = testoDaFuori;
+    const scritto = conCitate ? conCitate.testo : inputEl.value.trim() ? inputEl.value : String(text || '');
+    // Un commento incollato sotto una citazione vale come il campo incollato: il messaggio è testo di altri (#1840).
+    const incollato = testoDaFuori || !!(conCitate && conCitate.daFuori);
     const immagini = pendingImages.slice();
     const file = pendingFiles.slice();
     const percorsi = new Map(immagini.filter((d) => percorsiImmagini.has(d)).map((d) => [d, percorsiImmagini.get(d)]));
@@ -1440,10 +1514,15 @@
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
-    const citata = Rispondi.prendi();
+    const citata = conCitate ? conCitate.citate : null;
     const schede = Gettoni ? Gettoni.schede() : [];
     if (Gettoni) Gettoni.svuota();
-    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata, schede };
+    return composizione(text, { immagini, daFuori, scritto, incollato, file, percorsi, citata, schede });
+  }
+  // La forma di un messaggio, in un posto solo: la barra la riempie, «Spiegami di più» (#2388) la manda col solo testo.
+  function composizione(text, parti = {}) {
+    const t = String(text || '');
+    return { text: t, immagini: [], daFuori: false, scritto: t, incollato: false, file: [], percorsi: new Map(), citata: null, schede: [], ...parti };
   }
   function bollaUtente(c) {
     const userBubble = makeBubble({ role: 'user', text: c.text });
@@ -1473,9 +1552,8 @@
     }
     let scritto = righe.join('\n');
     if (foto.length && scritto.trim() === DOMANDA_SOLO_IMMAGINI) scritto = '';
-    const c = Rispondi.dalFilo(m.rispostaA);
-    const citata = c && !c.manca ? { ...c, scritto: c.testo } : null;
-    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata };
+    const citate = Rispondi.dalFilo(m.rispostaA).filter((c) => !c.manca);
+    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata: citate.length ? citate : null };
   }
   // Il messaggio già nel campo (un secondo clic, un doppio clic) non si rimette una seconda volta: ci si torna sopra.
   let rimesso = null;
@@ -1585,7 +1663,7 @@
   // Mentre Filo lavora il posto dell'invio lo prende un quadrato, e Invio da tastiera fa la stessa cosa. Fermato, lo
   // stesso posto offre di riprendere finché l'utente non scrive altro. Racconto: patterns/il-filo-dell-attesa.md.
   function aggiornaTasto() {
-    const vuoto = !inputEl.value.trim() && !pendingImages.length && !pendingFiles.length;
+    const vuoto = !inputEl.value.trim() && !pendingImages.length && !pendingFiles.length && !Rispondi.commenti();
     const quadrato = sending || (ripresa && vuoto && appenaFermato());
     const modo = ripresa && vuoto && !quadrato ? 'riprendi' : 'invia';
     if (sendBtn.dataset.modo !== modo) {
@@ -1818,7 +1896,10 @@
   // immagini, documenti e citazione. Vale per il seguito che non parte (#1296) e per «Chat nuova» (#1596).
   function rimettiNellaCasella(tornati) {
     if (!tornati.length) return;
-    const testi = tornati.map((c) => String(c.scritto || '').trim()).filter(Boolean);
+    // Le citazioni tornano con la prima composizione che ne ha, se intanto l'utente non ne ha scelte altre: ognuna col
+    // suo commento, e l'ultimo nel campo.
+    const conCitate = Rispondi.inCorso() ? null : tornati.find((c) => c.citata);
+    const testi = tornati.map((c) => (c === conCitate ? Rispondi.rimetti(c.citata, c.scritto) : String(c.scritto || '').trim())).filter(Boolean);
     const bozza = inputEl.value.trim() ? [inputEl.value] : [];
     inputEl.value = [...testi, ...bozza].join('\n');
     if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
@@ -1832,9 +1913,6 @@
     }
     for (const [d, p] of bozzaImmagini) addPendingImage(d, p);
     for (const p of bozzaFile) addPendingFile(p);
-    // Nel campo sta una citazione sola: torna quella del primo, se intanto l'utente non ne ha scelta un'altra.
-    const citata = tornati.find((c) => c.citata);
-    if (citata && !Rispondi.inCorso()) Rispondi.rimetti(citata.citata);
     autoGrowInput();
     Comandi.updateInputClass();
     aggiornaTasto();
@@ -1857,16 +1935,22 @@
   if (!self.SN_VOCI_PAGINA.includes(vociSeguito)) self.SN_VOCI_PAGINA.push(vociSeguito);
   // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
   // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
-  function apriTurnoFermato({ pending, streamBubble, streamedText }) {
+  function apriTurnoFermato({ pending, streamBubble, streamedText, grezzo = '', azioni = [] }) {
     const turn = pending.endTurn();
-    const parziale = String(streamedText || '').trim();
+    const conFoto = streamBubble ? giaScrittaConFoto(grezzo, azioni) : null;
+    const parziale = conFoto ? conFoto.text : String(streamedText || '').trim();
     const entry = { role: 'filo', text: parziale, actions: [], interrotto: true, fermato: true };
+    if (conFoto) {
+      entry.immagini = conFoto.immagini;
+      if (conFoto.fonti.length) entry.fonti = conFoto.fonti;
+    }
     if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
     threadHistory.push(entry);
     let host = streamBubble;
     if (host) {
       host.classList.remove('dash-bubble-streaming');
-      if (parziale) setBubbleText(host, parziale, true);
+      if (conFoto) setBubbleText(host, conFoto.text, true, conFoto.fonti, conFoto.immagini);
+      else if (parziale) setBubbleText(host, parziale, true);
     } else {
       host = makeBubble({ role: 'filo', text: '' });
       host.hidden = true;
@@ -1877,6 +1961,14 @@
     nota.textContent = parziale ? 'Fermato a metà della risposta.' : globalThis.SN_CHAT_ERRORS.FERMATO_PRIMA;
     bubblesEl.appendChild(nota);
     return { entry, host, nota, parziale };
+  }
+  // La parte già scritta di un turno finito prima del tempo (#2272): le foto trovate o create nel turno al posto dei loro
+  // marcatori, con le regole della risposta finita (src/shared/immaginiRisposta.js). null se il turno non ne ha.
+  function giaScrittaConFoto(grezzo, azioni) {
+    const I = self.SN_IMMAGINI_RISPOSTA;
+    if (!I || !Array.isArray(azioni) || !azioni.length) return null;
+    const c = I.controllaConFonti(String(grezzo || ''), azioni);
+    return c.immagini.length ? c : null;
   }
   // Il main ha finito il turno fermato: le azioni fatte restano (righe e bottoni) e lo storico le sa.
   function chiudiTurnoFermato(r, { entry, host, nota, parziale }, { pending, shown, chat = '' }) {
@@ -1889,8 +1981,9 @@
       delete entry.fermato;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
       if (Array.isArray(r.fonti) && r.fonti.length) entry.fonti = r.fonti;
+      if (Array.isArray(r.immagini) && r.immagini.length) entry.immagini = r.immagini;
       host.hidden = false;
-      setBubbleText(host, r.text, true, r.fonti);
+      setBubbleText(host, r.text, true, r.fonti, r.immagini);
       nota.remove();
       if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
     }
@@ -2166,13 +2259,17 @@
     document.body.appendChild(lightboxEl);
     return lightboxEl;
   }
-  function openLightbox(src) {
+  // `fila`: le foto dello stesso carosello (#2272), che le frecce della tastiera scorrono restando ingrandite.
+  let filaLightbox = [];
+  function openLightbox(src, fila = null) {
     const el = ensureLightbox();
     el.querySelector('img').src = src;
+    filaLightbox = Array.isArray(fila) && fila.length > 1 && fila.includes(src) ? fila.slice() : [];
     el.classList.add('open');
   }
   function closeLightbox() {
     if (!lightboxEl) return;
+    filaLightbox = [];
     lightboxEl.classList.remove('open');
     const img = lightboxEl.querySelector('img');
     if (img) img.removeAttribute('src');
@@ -2189,6 +2286,13 @@
     if (e.key === 'Escape' && lightboxEl?.classList.contains('open')) {
       e.preventDefault();
       closeLightbox();
+      return;
+    }
+    if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && filaLightbox.length && lightboxEl?.classList.contains('open')) {
+      e.preventDefault();
+      const n = filaLightbox.length;
+      const i = filaLightbox.indexOf(lightboxEl.querySelector('img').getAttribute('src'));
+      openLightbox(filaLightbox[(Math.max(0, i) + (e.key === 'ArrowRight' ? 1 : n - 1)) % n], filaLightbox);
     }
   });
 
@@ -2196,12 +2300,12 @@
     e.preventDefault();
     // Mentre Filo lavora l'invio non ha tasto (c'è il quadrato): arriva qui solo dal microfono, e fa quello di Invio.
     if (sending) {
-      if (inputEl.value.trim() || pendingImages.length || pendingFiles.length) accodaSeguito();
+      if (inputEl.value.trim() || pendingImages.length || pendingFiles.length || Rispondi.commenti()) accodaSeguito();
       return;
     }
     const text = inputEl.value.trim();
     // Il secondo colpo di chi ha appena fermato (clic o Invio) non riprende: il menu, scelta deliberata, sì.
-    if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { if (!appenaFermato()) riprendi(); return; }
+    if (!text && pendingImages.length === 0 && pendingFiles.length === 0 && !Rispondi.commenti()) { if (!appenaFermato()) riprendi(); return; }
     if (await comandoLocale(text, { incollato: testoDaFuori })) { if (!inputEl.value) testoDaFuori = false; return; }
     submitMessage(text);
   });
@@ -2209,6 +2313,15 @@
   async function comandoLocale(text, { incollato = false } = {}) {
     Comandi.lasciaNonRisolto();
     Coda.fineRisali();
+    // «cerca nel filo X» apre la stessa ricerca del suo tasto (#2372), con X già scritto.
+    const cerca = !incollato && text.match(/^(?:cerca|cercami|trova|trovami|ricerca)\s+(?:nel\s+filo\b[\s:,]*(.*)|(.+?)\s+nel\s+filo[.!?]*)$/i);
+    if (cerca) {
+      inputEl.value = '';
+      autoGrowInput();
+      Comandi.updateInputClass();
+      Cerca.apri((cerca[1] || cerca[2] || '').trim());
+      return true;
+    }
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -2233,7 +2346,7 @@
       if (e.repeat) return;
       // Mentre Filo lavora, con qualcosa nella casella Invio manda un seguito (#1296); a casella vuota è il quadrato.
       if (sending) {
-        if (inputEl.value.trim() || pendingImages.length || pendingFiles.length) accodaSeguito();
+        if (inputEl.value.trim() || pendingImages.length || pendingFiles.length || Rispondi.commenti()) accodaSeguito();
         else if (!quadratoAppena()) fermaTurno();
         return;
       }
@@ -2446,6 +2559,7 @@
       // che lo aspettava parte qui, non alla prossima scheda.
       Accoglienza.maybeOpenOnboardingLater().catch(() => {});
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
+      if (msg.settings) impostazioniHome = msg.settings;
       applySavedTheme().catch(() => {});
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
       if (msg.settings) BarraSiti.applicaImpostazioni(msg.settings);
@@ -2487,51 +2601,28 @@
 
 
   // ===== Bootstrap =====
-  // ===== Profilo e impostazioni in alto a destra =====
-  // Dove ogni app li mette (SPEC home). Red-team, Home, Cronologia e App stanno solo nella barra laterale (#871).
-  // Ogni click aziona il comando REALE della shell via MSG.SHELL_ACTION, che apre il suo menu nativo.
-  let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
-
-  function renderControls() {
-    const host = $('dashControls');
-    if (!host) return;
-    const ICONS = self.SN_ICONS || {};
-    const items = [
-      { command: 'settings', icon: 'options', label: 'Impostazioni' },
-      { command: 'account', icon: 'user', label: 'Profilo' },
-    ];
-    host.replaceChildren();
-    accountCtrlBtn = null;
-    for (const it of items.filter(Boolean)) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'dash-ctrl';
-      btn.dataset.command = it.command;
-      btn.setAttribute('aria-label', it.label);
-      btn.title = it.label;
-      const svg = typeof ICONS[it.icon] === 'function' ? ICONS[it.icon](18) : '';
-      btn.innerHTML = svg || it.label.charAt(0);
-      btn.addEventListener('click', () => {
-        if (typeof it.action === 'function') it.action();
-        else if (it.url) send({ type: MSG.OPEN_URL, url: it.url });
-        else {
-          // Il menu della shell si apre sotto l'icona, ovunque la metta la colonna destra (#1491).
-          const r = btn.getBoundingClientRect();
-          send({ type: MSG.SHELL_ACTION, command: it.command, anchor: { x: r.left, y: r.bottom } });
-        }
-      });
-      host.appendChild(btn);
-      if (it.command === 'account') accountCtrlBtn = btn;
-    }
-    refreshAccountControl();
+  // ===== Il tasto del Profilo =====
+  // È un tasto di «altro» come gli altri (#2372): lo disegna dashboard-carte.js, qui gli si mette la foto. Il clic
+  // aziona il comando REALE della shell via MSG.SHELL_ACTION, che apre il suo menu nativo.
+  let accountCtrlBtn = null; // il tasto del profilo, se è disegnato (anche nel «+»)
+  let accountIco = null;
+  let ultimoProfilo;
+  function decoraProfilo(btn, ic) {
+    accountCtrlBtn = btn;
+    accountIco = ic;
+    if (ultimoProfilo !== undefined) applyAccountProfile(ultimoProfilo);
   }
 
   // L'icona profilo mostra la foto Google quando sei loggato, con fallback all'icona utente. Lo
   // stato auth vive nel main: ci si iscrive a `auth_changed` per aggiornarla dal vivo.
   function applyAccountProfile(profile) {
-    if (!accountCtrlBtn) return;
+    ultimoProfilo = profile || null;
+    // Il tasto ridisegnato arriva qui prima di entrare nella pagina: la foto la prende lo stesso.
+    if (!accountCtrlBtn || !accountIco) return;
+    const btn = accountCtrlBtn;
+    const ico = accountIco;
     const ICONS = self.SN_ICONS || {};
-    const userIcon = typeof ICONS.user === 'function' ? ICONS.user(18) : '';
+    const userIcon = typeof ICONS.user === 'function' ? ICONS.user(20) : '';
     // La foto è la copia che il main tiene nella cartella dati (#1273): un indirizzo di rete qui non si carica.
     if (profile && /^filo:\/\/icone\//.test(profile.picture || '')) {
       const name = profile.name || (profile.email || '').split('@')[0] || 'Account';
@@ -2540,17 +2631,17 @@
       img.alt = '';
       img.referrerPolicy = 'no-referrer';
       // Se la copia non si legge ripieghiamo sull'icona utente.
-      img.onerror = () => { accountCtrlBtn.innerHTML = userIcon; };
+      img.onerror = () => { ico.innerHTML = userIcon; };
       img.src = profile.picture;
-      accountCtrlBtn.replaceChildren(img);
-      accountCtrlBtn.classList.add('signed-in');
-      accountCtrlBtn.title = profile.email ? `${name} — ${profile.email}` : name;
-      accountCtrlBtn.setAttribute('aria-label', `Account: ${name}`);
+      ico.replaceChildren(img);
+      btn.classList.add('signed-in');
+      btn.title = profile.email ? `${name} — ${profile.email}` : name;
+      btn.setAttribute('aria-label', `Profilo: ${name}`);
     } else {
-      accountCtrlBtn.innerHTML = userIcon;
-      accountCtrlBtn.classList.remove('signed-in');
-      accountCtrlBtn.title = profile ? 'Profilo' : 'Accedi';
-      accountCtrlBtn.setAttribute('aria-label', profile ? 'Profilo' : 'Accedi');
+      ico.innerHTML = userIcon;
+      btn.classList.remove('signed-in');
+      btn.title = profile ? 'Profilo' : 'Accedi';
+      btn.setAttribute('aria-label', profile ? 'Profilo' : 'Accedi');
     }
   }
 
@@ -2558,6 +2649,7 @@
     try {
       const r = await send({ type: MSG.AUTH_STATUS });
       Comandi.setOwner(r && r.signedIn && r.isAdmin);
+      if (r && r.signedIn && r.profile) applyAccountProfile(r.profile);
     } catch (_) {
       Comandi.setOwner(false);
     }
@@ -2915,7 +3007,9 @@
       const k = self.SN_THEME_TOKENS ? self.SN_THEME_TOKENS.motionFactor(document) : 1;
       if (reduce || !k) return;
       const n = Math.max(1, Math.round(Number(amount) || 0));
-      const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
+      // Il profilo nel «+» chiuso non si vede: i crediti volano lì.
+      const visibile = (n) => { const r = n && n.isConnected ? n.getBoundingClientRect() : null; return r && r.width ? r : null; };
+      const target = visibile(accountCtrlBtn) || visibile($('altroPiu'));
       const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
       const ty = target ? target.top + target.height / 2 : 26;
       const ox = window.innerWidth / 2;
@@ -3109,10 +3203,11 @@
   }
 
   (async function init() {
-    renderControls();
+    refreshAccountControl();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
+      impostazioniHome = settings || null;
       Sistema.applicaImpostazioni(settings);
       BarraSiti.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);

@@ -164,8 +164,10 @@ const CONTENT_DIR = path.join(__dirname, '..', 'content');
 function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo riquadri] constants.js', e); }
   try { require(path.join(SHARED_DIR, 'immaginiChat.js')); } catch (e) { console.error('[Filo riquadri] immaginiChat.js', e); }
+  try { require(path.join(SHARED_DIR, 'allegatiSegnalazione.js')); } catch (e) { console.error('[Filo riquadri] allegatiSegnalazione.js', e); }
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo riquadri] contenutoEsterno.js', e); }
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo riquadri] filoUi.js', e); }
+  try { require(path.join(SHARED_DIR, 'fontGenerico.js')); } catch (e) { console.error('[Filo riquadri] fontGenerico.js', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo riquadri] i18n.js', e); }
   try { require(path.join(SHARED_DIR, 'clipboardHistory.js')); } catch (e) { console.error('[Filo riquadri] clipboardHistory.js', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo riquadri] messages.js', e); }
@@ -182,6 +184,7 @@ function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo riquadri] nomiSito.js', e); }
   try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo riquadri] wallet.js', e); }
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo riquadri] filoMarkdown.js', e); }
+  try { require(path.join(SHARED_DIR, 'spiegazioni.js')); } catch (e) { console.error('[Filo riquadri] spiegazioni.js', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo riquadri] linkSospetto.js', e); }
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo riquadri] themeTokens.js', e); }
   try { require(path.join(SHARED_DIR, 'suggerimento.js')); } catch (e) { console.error('[Filo riquadri] suggerimento.js', e); }
@@ -201,6 +204,7 @@ function loadContentScripts() {
   try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo riquadri] vistoDavvero.js', e); }
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo riquadri] menu.js', e); }
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo riquadri] highlight.js', e); }
+  try { require(path.join(SHARED_DIR, 'immaginePrincipale.js')); } catch (e) { console.error('[Filo riquadri] immaginePrincipale.js', e); }
   try { require(path.join(CONTENT_DIR, 'aiutoPagina.js')); } catch (e) { console.error('[Filo riquadri] aiutoPagina.js', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo riquadri] sidebar.js', e); }
   try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo riquadri] coerenza.js', e); }
@@ -222,6 +226,8 @@ function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo riquadri] voceChat.js', e); }
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo riquadri] tts.js', e); }
   try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo riquadri] editBox.js', e); }
+  try { require(path.join(SHARED_DIR, 'trascrizioneRighe.js')); } catch (e) { console.error('[Filo riquadri] trascrizioneRighe.js', e); }
+  try { require(path.join(CONTENT_DIR, 'trascrizione.js')); } catch (e) { console.error('[Filo riquadri] trascrizione.js', e); }
   try { require(path.join(CONTENT_DIR, 'actions.js')); } catch (e) { console.error('[Filo riquadri] actions.js', e); }
   try { require(path.join(CONTENT_DIR, 'menuIcons.js')); } catch (e) { console.error('[Filo riquadri] menuIcons.js', e); }
   try { require(path.join(CONTENT_DIR, 'content.js')); } catch (e) { console.error('[Filo riquadri] content.js', e); }

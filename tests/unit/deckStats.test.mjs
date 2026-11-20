@@ -275,6 +275,38 @@ test('describeConditions: le condizioni dette a parole, la partita sempre', () =
   assert.equal(S.describeConditions({ mulligans: 2, extraDraws: 3 }),
     'partita a più giocatori; mulligan non contati: dimmi che mano terresti; 3 pescate extra');
   assert.deepEqual(S.DEFAULT_KEEP, [{ tag: S.LAND_TAG, n: 2 }]);
+  // #791.1: una mano da tenere detta senza il numero conta un mulligan, e lo dice.
+  assert.equal(S.describeConditions({ keep: [{ tag: 'terre', n: 3 }] }),
+    'partita a più giocatori; fino a 1 mulligan se la mano non ha almeno 3 terre');
+});
+
+// #791.1: una metà del mulligan senza l'altra non sparisce in silenzio.
+test('resolveConditions: completa la metà del mulligan che manca, o la segna non contata', () => {
+  const only = (c, o) => { const r = S.resolveConditions(c, o); return { m: r.mulligans, keep: r.keep, unc: r.mulliganUncounted }; };
+  assert.deepEqual(only({ keep: [{ tag: 'Terre', n: 3 }] }), { m: S.DEFAULT_MULLIGANS, keep: [{ tag: 'terre', n: 3 }], unc: false });
+  assert.equal(S.DEFAULT_MULLIGANS, 1);
+  // Un numero senza la mano: con le terre fra le categorie parte da DEFAULT_KEEP…
+  assert.deepEqual(only({ mulligans: 2 }, { categories: ['ramp', 'Terre'] }), { m: 2, keep: [{ tag: 'terre', n: 2 }], unc: false });
+  // …senza (il riquadro, o un mazzo senza terre) resta non contato.
+  assert.deepEqual(only({ mulligans: 2 }), { m: 2, keep: [], unc: true });
+  assert.deepEqual(only({ mulligans: 2 }, { categories: ['ramp'] }), { m: 2, keep: [], unc: true });
+  // Le due metà dette restano come sono.
+  assert.deepEqual(only({ mulligans: 3, keep: [{ tag: 'ramp', n: 1 }] }, { categories: ['terre', 'ramp'] }), { m: 3, keep: [{ tag: 'ramp', n: 1 }], unc: false });
+  assert.deepEqual(only({}), { m: 0, keep: [], unc: false });
+});
+
+test('simulate: una mano da tenere senza il numero di mulligan ne conta uno', () => {
+  const library = [
+    ...Array.from({ length: 36 }, () => ['terre']),
+    ...Array.from({ length: 63 }, () => []),
+  ];
+  const want = [{ tag: 'terre', n: 3 }];
+  const keep = [{ tag: 'terre', n: 3 }];
+  const base = S.simulate({ library, want, turn: 3, iterations: 40000, seed: 2 });
+  const soloMano = S.simulate({ library, want, turn: 3, keep, iterations: 40000, seed: 2 });
+  const uno = S.simulate({ library, want, turn: 3, mulligans: 1, keep, iterations: 40000, seed: 2 });
+  assert.equal(soloMano.hits, uno.hits);
+  assert.ok(soloMano.probability > base.probability + 0.03, `mano da tenere ${soloMano.probability} vs nessuna ${base.probability}`);
 });
 
 test('simulate: il mulligan con regola di keep alza la probabilità', () => {

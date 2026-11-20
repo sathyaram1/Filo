@@ -51,7 +51,7 @@
 //   node scripts/dispatch.mjs --rimetti-lockfile        # dopo il setup, prima del rebase
 //   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--domanda <file.json>] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-pulizia <id> [--ticket <b>]
-//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--domanda <file.json>] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--domanda <file.json>] [--prova <cartella>] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
@@ -75,7 +75,7 @@ import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  prepareBranch, newWorkBranch, tentativiPrecedenti, ramoLegatoDaRiprendere, chiudiTentativi, chiudiSuperatiOvunque, allineaAMain, withCheckpoint,
+  prepareBranch, newWorkBranch, tentativiPrecedenti, ramoLegatoDaRiprendere, allineaAMain, withCheckpoint,
   lastCheckpoint, clearRejects, headSha, currentBranch,
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
@@ -88,7 +88,7 @@ import {
   proveScritteDa, puliziaDelPass, rigaNumerata, rilieviMessiDaParte, ROSSO_ATTESO_CHIUSO, testiDelleProve, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
-import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
+import { avvisoForzatura, installa as installaCecita } from './lib/orchestratore-cieco.mjs';
 import { accendi as accendiClone, cloneDelGiro, preparaIntestazione, preparaPerIlGiro, rilancia } from './lib/worker-nel-clone.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
@@ -433,10 +433,12 @@ export const OPZIONI_REGISTRAZIONE = {
   // Perché il correttore è stato chiamato (SPEC-RIDISEGNO-LAVORO.md §3, regola 4): senza, la consegna non parte.
   '--motivo': { tipo: 'testo', comandi: ['--record-fixed'], manca: 'il motivo della correzione ("conflitto: <file>", "prove rosse: <prove>", "ripresa" o "altro: <testo>")' },
   '--ferma': { tipo: 'bandiera', comandi: ['--record-fixed'] },
+  // La cartella della prova da utente, allegata al report (#2539).
+  '--prova': { tipo: 'cartella', comandi: ['--record-fixed'] },
   // La sessione accesa per UN feedback (SPEC-RIDISEGNO-LAVORO.md § 2): riceve il ruolo della sessione, non dell'orchestratore.
   '--feedback': { tipo: 'testo', comandi: ['--preflight'], manca: 'il numero del feedback' },
 };
-const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
+const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '', cartella: ' <cartella>' };
 
 /**
  * Anche come `--opzione=valore`, la forma del canale. PURA. `error`: valore mancante o storto, opzione
@@ -466,6 +468,10 @@ export function leggiOpzioniRegistrazione(list) {
       const estensione = (/\.\w+(?=>)/.exec(forma || '') || ['.md'])[0];
       if (!file || SEMBRA_OPZIONE(file)) return no(`${nome} vuole il percorso di un file subito dopo di sé (un ${estensione} scritto prima): non ho consegnato niente.`);
       valori[nome] = file;
+    } else if (tipo === 'cartella') {
+      const dir = String(v ?? '').trim();
+      if (!dir || SEMBRA_OPZIONE(dir)) return no(`${nome} vuole la cartella della prova da utente subito dopo di sé (tests/agent/.out/prova-…): non ho consegnato niente.`);
+      valori[nome] = dir;
     } else {
       // Un'opzione al posto della frase vuol dire frase dimenticata: presa per frase, il comando o
       // l'identificativo sparivano dalla riga.
@@ -490,9 +496,10 @@ export function leggiOpzioniRegistrazione(list) {
  * Il payload della consegna «corretto», con la domanda se c'è. `sha`: la punta della cartella, che il registro del
  * ramo confronta con quella che troverà dopo (#1148; senza, il server segna il buco). PURA.
  */
-export function fixedPayload({ report, frase, branch, ferma, sha, domanda, motivo, riallineamento } = {}) {
+export function fixedPayload({ report, frase, branch, ferma, sha, domanda, motivo, riallineamento, prova } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
   if (domanda && typeof domanda === 'object') p.domanda = domanda;
+  if (prova && typeof prova === 'object') p.prova = prova;
   if (ferma === true) p.stop = true;
   if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
   if (motivo && typeof motivo === 'object' && motivo.tipo) p.motivo = motivo;
@@ -531,12 +538,14 @@ export function esitoRiallineamento(confronto, motivo) {
   // I conflitti dichiarati contano quanto quelli che dice git: un conflitto in un file di codice chiede la verifica.
   const dichiarati = motivo && Array.isArray(motivo.file) ? motivo.file : [];
   const conflitti = [...new Set([...(confronto.conflitti || []), ...dichiarati])];
-  const { giro, codice } = regola(confronto.file, { conflitti });
+  const { giro, codice, proveRosse } = regola(confronto.file, { conflitti, motivo });
   const elenco = (l) => `${l.slice(0, 5).join(', ')}${l.length > 5 ? ', …' : ''}`;
   const toccati = [...new Set([...confronto.file, ...conflitti])];
-  const righe = [giro === 'nessuno'
-    ? `Riallineamento pulito${toccati.length ? ` (toccati solo file di servizio: ${elenco(toccati)})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
-    : `Il riallineamento tocca ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${elenco(codice)}): serve la verifica intera.`];
+  const righe = [proveRosse
+    ? 'Riallineamento per prove rosse: serve la verifica, che le rilancia e ne fa un rilievo per il correttore del giro dopo.'
+    : giro === 'nessuno'
+      ? `Riallineamento pulito${toccati.length ? ` (toccati solo file di servizio: ${elenco(toccati)})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
+      : `Il riallineamento tocca ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${elenco(codice)}): serve la verifica intera.`];
   const taciuti = motivo && motivo.tipo === 'conflitto' ? (confronto.conflitti || []).filter((f) => !dichiarati.includes(f)) : [];
   if (taciuti.length) righe.push(`Git trova in conflitto anche ${elenco(taciuti)}, che il motivo non nomina: il server confronta da sé, e nel report va cosa hai toccato lì.`);
   return { riallineamento: { fileRiscritti: confronto.file, fileInConflitto: confronto.conflitti || [], giro }, riga: righe.join(' ') };
@@ -1818,9 +1827,12 @@ export function fixedReplyText(id, reply, conDomanda = false) {
   if (reply && reply.outcome === 'provvisoria') return `stato ${id}: consegnato, torna in coda per la verifica. La domanda ${reply.domanda || ''} non ferma il lavoro: vale la consigliata finché l'owner non risponde.`;
   // Un server che non ferma su una domanda che blocca rimette in coda: dirlo, o chi ha chiesto crede di essersi fermato.
   if (conDomanda) return `stato ${id}: ATTENZIONE, la consegna portava una domanda ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La domanda è consegnata lo stesso.`;
+  // Dopo un riallineamento decide il server, non la riga stampata prima della consegna: si dice la sua decisione.
+  if (reply && reply.giro === 'nessuno') return `stato ${id}: consegnato; il server non chiede un giro nuovo di verifica, il lavoro passa al controllo di sicurezza o alla fusione`;
+  if (reply && reply.giro === 'pieno') return `stato ${id}: consegnato; il server chiede la verifica del riallineamento, torna in coda per la verifica`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
-async function recordFixed(id, report = '', frase = '', ferma = false, domanda = null, motivo = null) {
+async function recordFixed(id, report = '', frase = '', ferma = false, domanda = null, motivo = null, cartellaProva = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
@@ -1895,9 +1907,15 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
     for (const riga of sped.righe || []) process.stderr.write(`${riga}\n`);
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: `consegna non registrata: si ferma, e il ramo${sped.branch ? ` '${sped.branch}'` : ''} non è su origin (${sped.reason}). Chi riprende cercherebbe il lavoro su un ramo che non lo ha: sistema la causa e rilancia lo stesso comando, o dichiaralo come guasto nel rilascio.` };
   }
+  // Per ultima, come sul canale: le schermate salgono nel deposito solo per una consegna che parte.
+  const pa = cartellaProva ? await import('./lib/prova-allegata.mjs') : null;
+  const prova = pa ? await pa.provaDaAllegare(cartellaProva) : null;
+  if (prova && !prova.ok) return { rejected: true, formatRejected: true, message: prova.errore };
   const sent = await deliverToChannel('fixed', fixedPayload({
     report, frase, branch: next.branch || '', ferma, sha: puntaDellaCartella(), domanda, motivo, riallineamento: esito.riallineamento,
+    prova: prova && prova.prova,
   }));
+  if (prova && sent.outcome === 'ok') process.stderr.write(`${pa.testoProvaConsegnata(prova.prova, sent.prova)}\n`);
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
@@ -2200,7 +2218,7 @@ export function usageText() {
     '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
     '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
     '                         più tardi, per una prova dimenticata, il commit è l\'ultimo e da solo',
-    '  --record-fixed    <id> "<report>" [--frase "…"] [--domanda <file.json>] [--ticket <b>]',
+    '  --record-fixed    <id> "<report>" [--frase "…"] [--domanda <file.json>] [--prova <cartella>] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
     '                         la nota dice cosa hai controllato e cosa hai trovato;',
@@ -2438,17 +2456,7 @@ function positionOnBranch(bucket) {
     checkpoint,
   });
   if (!res.ok) return res;
-  if (precedenti.superati && precedenti.superati.length) {
-    const c = chiudiTentativi({ root: ROOT, rami: precedenti.superati });
-    process.stderr.write(c.ok
-      ? `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${c.chiusi.join(', ')}\n`
-      : `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH} rimasti su origin (${precedenti.superati.join(', ')}): ${c.errore}\n`);
-  }
-  if (isNew) {
-    const o = chiudiSuperatiOvunque({ root: ROOT, mainBranch: MAIN_BRANCH, num: bucket.num, id: bucket.id });
-    if (o.chiusi.length) process.stderr.write(`[dispatch] tentativi di altri feedback superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${o.chiusi.join(', ')}\n`);
-    if (!o.ok) process.stderr.write(`[dispatch] i tentativi superati degli altri feedback restano su origin per adesso: ${o.errore}\n`);
-  }
+  // I superati restano su origin: dalla cloud una cancellazione prende 403, li toglie la potatura del server (#2518).
   const ripartito = !!sorgente && res.base === `origin/${sorgente.ramo}`;
   if (ripartito) {
     const scelto = sorgente;
@@ -2983,8 +2991,8 @@ if (isMainModule) {
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;
       const [, id, ...rest] = conBiglietto(argv);
-      if (!id) { console.error('Uso: --record-fixed <id> "report" [--motivo "…" (obbligatorio per il correttore)] [--frase "…"] [--domanda <file.json>]'); process.exit(1); }
-      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--motivo "…", --frase "…", --domanda <file.json> e --ferma')); process.exit(1); }
+      if (!id) { console.error('Uso: --record-fixed <id> "report" [--motivo "…" (obbligatorio per il correttore)] [--frase "…"] [--domanda <file.json>] [--prova <cartella>]'); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--motivo "…", --frase "…", --domanda <file.json>, --prova <cartella> e --ferma')); process.exit(1); }
       const senza = fermaSenzaDomanda(ferma, opz['--domanda']);
       if (senza) { console.error(senza); process.exit(1); }
       // La frase è la riga in chiaro per chi ha mandato il feedback; il resto è il report per l'owner,
@@ -2994,7 +3002,7 @@ if (isMainModule) {
       // Un'altra cosa coi trattini davanti finirebbe sepolta nel report cifrato (#565).
       const altra = rest.find((a) => sembraOpzioneNelReport(a));
       if (altra) {
-        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --motivo "…", --frase "…", --domanda <file.json> e --ferma; il resto è il report, un testo solo fra virgolette.`);
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --motivo "…", --frase "…", --domanda <file.json>, --prova <cartella> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
       }
       // Anche di qui esce un esito — il lavoro torna in coda a un'altra
@@ -3012,7 +3020,7 @@ if (isMainModule) {
       const siFerma = !!(domanda && domanda.blocca !== false);
       const motivo = motivoDellaConsegna(opz['--motivo'], readMarker(ROOT)?.role, { siFerma });
       if (!motivo.ok) { console.error(`${motivo.errore} Non ho consegnato niente.`); process.exit(1); }
-      const s = await recordFixed(id, report, frase, ferma, domanda, motivo.motivo);
+      const s = await recordFixed(id, report, frase, ferma, domanda, motivo.motivo, typeof opz['--prova'] === 'string' ? opz['--prova'] : '');
       if (s.rejected) esciRespinto(s);
       console.log(fixedReplyText(id, s.reply, ferma || !!domanda));
       process.exit(0);
@@ -3116,6 +3124,8 @@ if (isMainModule) {
             ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', clone: cartellaCloneServer(), strumenti: tools, progetto: ROOT })
             : { ok: true, saltato: true };
           if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
+          const forzatura = avvisoForzatura();
+          if (forzatura) console.error(`[dispatch] ATTENZIONE: ${forzatura}`);
           if (!cieco.ok) {
             console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
             process.exit(3);

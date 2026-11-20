@@ -315,7 +315,39 @@ function dalMenu(s, canale, a, b) {
     if (scelta) { try { scelta(typeof a === 'string' ? a : ''); } catch (_) {} }
   } else if (canale === 'popup-menu:close') {
     if (s.aperto && a === s.giro) chiudi(s);
+  } else if (canale === 'popup-menu:fuori') {
+    if (!s.aperto || a !== s.giro) return;
+    const win = s.win;
+    const cb = win && !win.isDestroyed() ? win.getContentBounds() : null;
+    chiudi(s);
+    if (cb && b && typeof b === 'object') ripetiSullaBarra(s.parent, cb.x + Number(b.x), cb.y + Number(b.y), Number(b.tasto));
   }
+}
+
+// Il clic caduto sul bordo del menu arriva a Filo dov'è stato dato, come in Chrome: la barra delle schede è sua. Sopra
+// una pagina no: un clic vero dato a un sito è un gesto regalato (patterns/un-clic-vero-dato-a-una-pagina-e-un-gesto-regalato.md).
+function ripetiSullaBarra(parent, sx, sy, tasto) {
+  if (!parent || parent.isDestroyed() || !Number.isFinite(sx) || !Number.isFinite(sy)) return;
+  const cb = parent.getContentBounds();
+  const x = Math.round(sx - cb.x);
+  const y = Math.round(sy - cb.y);
+  if (x < 0 || y < 0 || x >= cb.width || y >= cb.height) return;
+  let coperta = false;
+  try {
+    for (const v of parent.contentView.children) {
+      if (typeof v.getVisible === 'function' && !v.getVisible()) continue;
+      const r = v.getBounds();
+      if (r.width > 0 && r.height > 0 && x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) { coperta = true; break; }
+    }
+  } catch (_) { coperta = true; }
+  if (coperta) return;
+  const button = tasto === 2 ? 'right' : tasto === 1 ? 'middle' : 'left';
+  const wc = parent.webContents;
+  try {
+    wc.sendInputEvent({ type: 'mouseMove', x, y });
+    wc.sendInputEvent({ type: 'mouseDown', x, y, button, clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x, y, button, clickCount: 1 });
+  } catch (_) {}
 }
 
 function mostra(s) {
@@ -456,6 +488,12 @@ const SCRIPT_MENU = `(() => {
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('[data-v]');
     if (b && api) api.select(b.dataset.v, giro);
+  });
+  // Il bordo trasparente dell'ombra non è del menu: il clic lì è per quello che si vede sotto (#2382).
+  document.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('.menu')) return;
+    e.preventDefault();
+    if (api && api.fuori) api.fuori(giro, e.clientX, e.clientY, e.button);
   });
   document.addEventListener('mousemove', (e) => {
     const b = e.target.closest && e.target.closest('button.item');

@@ -1,17 +1,25 @@
 // Cercare nel filo dalla home senza passare dalla chat (#869): parole nei messaggi, nelle pagine visitate e nel contenuto
-// delle schede chiuse. Un messaggio porta al suo punto del filo, una pagina si riapre. Cosa trova lo decide il main
-// (src/shared/filoCoda.js); non tocca il DOM al caricamento.
+// delle schede chiuse. Il suo tasto (#2372) le dà la colonna destra: il risultato sotto il puntatore o le frecce si
+// mostra al centro, una pagina si riapre. Cosa trova lo decide il main (src/shared/filoCoda.js); non tocca il DOM al caricamento.
 (function (global) {
   'use strict';
 
   const { MSG } = global.SN_MSG;
   let d = null;
+  let host = null;
   let campo = null;
   let pannello = null;
   let giro = 0;
   let attesa = null;
   let voci = [];
   let scelta = -1;
+  let aperta = false;
+  // Il centro segue la ricerca finché l'utente non lo scorre a mano: da lì lo muovono solo puntatore e frecce.
+  let manuale = false;
+  let ultimaBattuta = 0;
+  let seguiTimer = null;
+  let mostrato = null;
+  let passaggio = null;
   // La ricerca in corso, per i contatori (#1461): dall'apertura del pannello alla scelta, la posizione della voce, o niente.
   let sessione = null;
   function contaRicerca(evento) {
@@ -67,16 +75,69 @@
     return `${giorno} ${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`.trim();
   }
 
-  function chiudi({ svuota = false } = {}) {
+  // Svuota i risultati; la colonna resta alla ricerca finché non la si chiude.
+  function svuotaRisultati() {
     contaCorrente();
     if (sessione && !sessione.scelto) contaRicerca({ esito: 'vuota' });
     sessione = null;
+    clearTimeout(seguiTimer);
     pannello.hidden = true;
     pannello.replaceChildren();
     voci = [];
     scelta = -1;
+    mostrato = null;
     campo.setAttribute('aria-expanded', 'false');
-    if (svuota) campo.value = '';
+  }
+
+  // Il tasto la apre: la colonna diventa la ricerca e il fuoco va nel suo campo. `q`: la frase chiesta a parole.
+  function apri(q) {
+    if (!host) return;
+    if (!aperta) {
+      aperta = true;
+      manuale = false;
+      host.hidden = false;
+      if (d.colonna) d.colonna.classList.add('in-ricerca');
+    }
+    if (typeof q === 'string' && q.trim()) {
+      campo.value = q.trim();
+      ultimaBattuta = Date.now();
+      cerca().catch(() => {});
+    }
+    campo.focus({ preventScroll: true });
+  }
+  // Esc o il tasto la chiudono: la colonna torna com'era e si riscrive nella chat.
+  function chiudi() {
+    if (!aperta) return;
+    aperta = false;
+    clearTimeout(attesa);
+    ++giro;
+    svuotaRisultati();
+    campo.value = '';
+    host.hidden = true;
+    if (d.colonna) d.colonna.classList.remove('in-ricerca');
+    if (d.coda.richiudiPagine) d.coda.richiudiPagine();
+    if (d.chat) d.chat.focus({ preventScroll: true });
+  }
+
+  // Il risultato al centro: un messaggio al suo punto del filo, una pagina sulla sua riga di pagine.
+  function mostra(b) {
+    const r = b && b._risultato;
+    if (!r || r.k === 'significato' || r.k === 'nascosta' || mostrato === b) return;
+    mostrato = b;
+    if (d.mostraFilo) d.mostraFilo();
+    if (r.k === 'pagina') { if (d.coda.vaiAPagina) d.coda.vaiAPagina({ url: r.url, ts: r.ts }).catch(() => {}); return; }
+    // La riga di pagine aperta da un risultato di prima si richiude anche passando a un messaggio.
+    if (d.coda.richiudiPagine) d.coda.richiudiPagine();
+    d.coda.vaiA({ chat: r.chat, i: r.i, app: !!r.app, ts: r.ts }).catch(() => {});
+  }
+  // Dopo una pausa nello scrivere il centro va sul primo risultato, il più probabile.
+  function seguiDopoLaPausa() {
+    clearTimeout(seguiTimer);
+    if (manuale || !voci.length) return;
+    const pausa = d.pausaMs ? d.pausaMs() : 500;
+    const primo = voci.find((b) => b._risultato && !['significato', 'nascosta'].includes(b._risultato.k));
+    if (!primo) return;
+    seguiTimer = setTimeout(() => { if (aperta && !manuale && scelta < 0) mostra(primo); }, Math.max(0, ultimaBattuta + pausa - Date.now()));
   }
 
   function voce(r) {
@@ -103,11 +164,14 @@
     b.append(ic, corpo, el('span', 'dash-cerca-quando', quando(r.ts)));
     b._risultato = r;
     b.addEventListener('mousedown', (e) => e.preventDefault());
-    b.addEventListener('click', () => { apri(r).catch(() => {}); });
+    b.addEventListener('click', () => { usa(r).catch(() => {}); });
+    // Un passaggio veloce sopra l'elenco non trascina il centro avanti e indietro.
+    b.addEventListener('mouseenter', () => { clearTimeout(passaggio); passaggio = setTimeout(() => mostra(b), 90); });
+    b.addEventListener('mouseleave', () => clearTimeout(passaggio));
     return b;
   }
 
-  async function apri(r) {
+  async function usa(r) {
     if (r.k === 'significato') return significato(r);
     const i = voci.findIndex((v) => v._risultato === r);
     if (sessione) {
@@ -129,7 +193,8 @@
       if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
       return;
     }
-    chiudi();
+    mostrato = null;
+    if (d.mostraFilo) d.mostraFilo();
     await d.coda.vaiA({ chat: r.chat, i: r.i, app: !!r.app, ts: r.ts });
   }
 
@@ -137,9 +202,10 @@
   async function rimetti(r) {
     const res = await d.send({ type: MSG.FILO_CHAT_NASCONDI, id: r.chat, nascosta: false });
     if (!res || !res.ok) return;
-    chiudi();
     if (d.coda.rimettiChat) await d.coda.rimettiChat(r.chat);
+    if (d.mostraFilo) d.mostraFilo();
     await d.coda.vaiA({ chat: r.chat, i: r.i, ts: r.ts });
+    if (aperta && campo.value.trim().length >= 2) await cerca();
   }
 
   async function togli(r) {
@@ -163,7 +229,7 @@
     b.title = 'Trova anche le pagine che parlano di questo con altre parole';
     b._risultato = { k: 'significato', q, el: b };
     b.addEventListener('mousedown', (e) => e.preventDefault());
-    b.addEventListener('click', () => { apri(b._risultato).catch(() => {}); });
+    b.addEventListener('click', () => { usa(b._risultato).catch(() => {}); });
     return b;
   }
 
@@ -232,12 +298,14 @@
       sessione = { t0: Date.now(), scelto: false };
       contaRicerca({ esito: 'aperta' });
     }
+    mostrato = null;
+    seguiDopoLaPausa();
   }
 
   async function cerca() {
     const q = campo.value.trim();
     const mio = ++giro;
-    if (q.length < 2) { chiudi(); return; }
+    if (q.length < 2) { svuotaRisultati(); return; }
     const res = await d.send({ type: MSG.FILO_CERCA, q });
     if (mio !== giro || !res || !res.ok) return;
     disegna(res, q);
@@ -271,6 +339,8 @@
     scelta = (i + voci.length) % voci.length;
     voci.forEach((b, j) => b.classList.toggle('scelta', j === scelta));
     voci[scelta].scrollIntoView({ block: 'nearest' });
+    clearTimeout(seguiTimer);
+    mostra(voci[scelta]);
   }
 
   function vociMenu(target) {
@@ -283,31 +353,40 @@
     const r = b._risultato;
     if (r.k === 'nascosta') {
       return [
-        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { apri(r).catch(() => {}); } },
+        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { usa(r).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
       ];
     }
     if (r.k === 'pagina') {
       const dove = global.SN_FILO_CODA.daAprire(r);
       return [
-        { type: 'item', icon: icona('globe', 16), label: dove && dove.sito ? 'Apri il sito' : 'Riapri la pagina', onClick: () => { apri(r).catch(() => {}); } },
+        { type: 'item', icon: icona('globe', 16), label: dove && dove.sito ? 'Apri il sito' : 'Riapri la pagina', onClick: () => { usa(r).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: dove && dove.sito ? 'Copia l’indirizzo del sito' : 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(dove && dove.sito ? dove.url : r.url).catch(() => {}); } },
         { type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => { togli(r).catch(() => {}); } },
       ];
     }
     return [
-      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', azione: 'chat-archive', onClick: () => { apri(r).catch(() => {}); } },
+      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', azione: 'chat-archive', onClick: () => { usa(r).catch(() => {}); } },
       { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
     ];
   }
 
   function init(deps) {
     d = deps;
-    const host = deps.input;
+    host = deps.host;
     if (!host) return;
-    const box = el('label', 'dash-cerca-campo');
-    const ic = el('span', 'dash-cerca-lente');
-    ic.innerHTML = icona('search', 14);
+    // Non un <label>: il clic sul riquadro premerebbe la lente, che chiude.
+    const box = el('div', 'dash-cerca-campo');
+    box.addEventListener('mousedown', (e) => { if (e.target === box) { e.preventDefault(); campo.focus(); } });
+    // La lente è il tasto della ricerca rimasto in cima alla colonna: un clic la chiude, come Esc.
+    const ic = el('button', 'dash-cerca-lente');
+    ic.type = 'button';
+    ic.id = 'cercaChiudi';
+    ic.title = 'Chiudi la ricerca';
+    ic.setAttribute('aria-label', 'Chiudi la ricerca');
+    ic.setAttribute('aria-pressed', 'true');
+    ic.innerHTML = icona('search', 16);
+    ic.addEventListener('click', (e) => { e.preventDefault(); chiudi(); });
     campo = el('input', 'dash-cerca-input');
     campo.id = 'cercaInput';
     campo.type = 'search';
@@ -323,21 +402,31 @@
     pannello.hidden = true;
     host.append(box, pannello);
     campo.addEventListener('input', () => {
+      ultimaBattuta = Date.now();
+      clearTimeout(seguiTimer);
       clearTimeout(attesa);
       attesa = setTimeout(() => { cerca().catch(() => {}); }, 180);
     });
     // Col pannello ancora aperto (il fuoco torna da un menu) la scelta fatta con le frecce resta dov'era.
     campo.addEventListener('focus', () => { if (pannello.hidden && campo.value.trim().length >= 2) cerca().catch(() => {}); });
-    // Il menu di un risultato aperto da tastiera tiene il pannello: chiuso lui, il fuoco torna nel campo.
-    campo.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== campo && !document.activeElement?.closest?.('.sn-menu')) chiudi(); }, 150); });
+    // Esc chiude anche col fuoco su un risultato o sulla lente.
+    host.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !aperta) return;
+      e.preventDefault();
+      e.stopPropagation();
+      chiudi();
+    });
+    // Lo scorrimento a mano del centro ferma il centro che segue la battitura.
+    for (const n of [d.bubblesEl].filter(Boolean)) {
+      for (const ev of ['wheel', 'touchstart', 'pointerdown']) n.addEventListener(ev, () => { if (aperta) { manuale = true; clearTimeout(seguiTimer); } }, { passive: true });
+    }
     campo.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); chiudi({ svuota: true }); campo.blur(); }
-      else if (e.key === 'ArrowDown') { e.preventDefault(); evidenzia(scelta + 1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); evidenzia(scelta + 1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); evidenzia(scelta - 1); }
       else if (e.key === 'Enter') {
         e.preventDefault();
         const b = voci[scelta >= 0 ? scelta : 0];
-        if (b) apri(b._risultato).catch(() => {});
+        if (b) usa(b._risultato).catch(() => {});
       }
     });
     // Il risultato scelto con le frecce ha il suo menu anche da tastiera (#1295): Shift+F10 nel campo apre quello, non
@@ -353,7 +442,21 @@
     });
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
+    // La C del doppio Ctrl (#2377): nella home la apre il comando, da un'altra scheda si arriva con ?cerca.
+    try {
+      global.chrome.runtime.onMessage.addListener((m) => {
+        if (m && m.type === MSG.SHORTCUT_TRIGGERED && m.command === 'cerca-nel-filo') apri();
+      });
+    } catch (_) {}
+    try {
+      const u = new URL(global.location.href);
+      if (u.searchParams.has('cerca')) {
+        u.searchParams.delete('cerca');
+        global.history.replaceState(global.history.state, '', u.pathname + u.search + u.hash);
+        apri();
+      }
+    } catch (_) {}
   }
 
-  global.SN_DASH_CERCA = { init };
+  global.SN_DASH_CERCA = { init, apri, chiudi, aperta: () => aperta };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

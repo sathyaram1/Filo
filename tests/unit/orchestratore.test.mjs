@@ -558,6 +558,7 @@ test('derivatiDaAprire: raggruppati come sul server, e mai due volte', () => {
   const d = derivatiDaAprire(p, der);
   assert.deepEqual(d.map((x) => x.titolo), ['esterno uno', 'vicino B', 'scelta C?', 'Rilievi rimasti del lavoro locale #7']);
   assert.deepEqual(d.map((x) => x.priorita), [null, null, 1, 1], 'gli esterni nascono senza priorità; un 2 nasce a 1: la 2 la mette solo il manutentore');
+  assert.deepEqual(d.map((x) => x.aspetta), [null, null, 7, 7], 'gli interni aspettano la fusione del lavoro locale, gli esterni no (#2554)');
   assert.match(d[0].testo, /lavoro locale #7 \(ramo claude\/sette\)/);
   assert.match(d[0].testo, /- \[e\] esterno uno/);
   assert.match(d[3].testo, /- \[2i\] interno A\n- \[1i\] interno zero/);
@@ -1002,8 +1003,9 @@ test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso
   assert.equal(await apriDerivatiDi(dep, p), 0);
   assert.deepEqual(righe, ['altro lavoro Z', 'altro lavoro W', 'altro lavoro W', 'altro lavoro W']);
   // L'esterno nasce senza priorità (#2339): «--priorita null» farebbe respingere il feedback dallo strumento.
-  assert.equal(comandi[0], '- --non-locale');
-  assert.equal(comandi[1], '- --non-locale --priorita 1');
+  assert.equal(comandi[0], '- --non-locale', 'un esterno sta già su main: parte subito');
+  // Un interno verte sul codice del ramo (#2554): nessuna routine lo prende prima che il lavoro sia fuso.
+  assert.equal(comandi[1], '- --non-locale --priorita 1 --aspetta 7');
   assert.equal(await apriDerivatiDi(dep, p, { derivati: 'nessuno' }), 0);
 });
 

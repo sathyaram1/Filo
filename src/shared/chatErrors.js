@@ -632,7 +632,29 @@
     return [prima, t].filter(Boolean).join(' ');
   }
 
+  // Da un errore del main, quello che serve a rimedioPagina: viaggia nella risposta al posto dell'errore.
+  function perIlRimedio(e) {
+    const W = global.SN_WALLET;
+    const rifiutata = Boolean(e && (e.keyRefused || (W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e))));
+    return { code: (e && e.code) || '', keyRefused: rifiutata, ...(e && e.reason === 'crediti' ? { reason: 'crediti' } : {}) };
+  }
+
+  // La voce naturale che non risponde (#1344.1, #1344.2): la frase già scritta per l'utente o quella della chiave
+  // rifiutata; '' per un guasto qualunque, che ogni superficie dice a modo suo. `rimedio` dà il tasto della pagina.
+  const CODICI_SINTESI_SCRITTI = [...CODICI_GIA_SCRITTI, 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
+  function sintesiNonRiuscita(res) {
+    const r = res || {};
+    const rimedio = { code: r.errorCode || '', keyRefused: !!r.keyRefused, ...(r.reason === 'crediti' ? { reason: 'crediti' } : {}) };
+    if (CODICI_SINTESI_SCRITTI.includes(r.errorCode) && r.error) return { frase: String(r.error), rimedio };
+    if (r.keyRefused) {
+      const e = fromResponse({ error: r.error, status: r.status, provider: r.provider, userMessage: r.userMessage, keyRefused: true }, '');
+      return { frase: sentence(e), rimedio };
+    }
+    return { frase: '', rimedio };
+  }
+
   global.SN_CHAT_ERRORS = {
+    perIlRimedio, sintesiNonRiuscita,
     friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, fraseTagliata, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, involucroIntero, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, FERMATO_QUI, FERMATO_PRIMA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
     MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,

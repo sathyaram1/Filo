@@ -49,7 +49,10 @@ accende. Il gesto voleva dire «guarda questa», e andava perso.
   home le immagini non si salvano: il messaggio resta, anche senza testo, e dice quante erano.
 - **Fila delle schede e barra laterale** prendono il rilascio nel loro documento (`src/renderer/rilascio.js`) e lo
   mandano al main, che legge dal disco solo immagini e solo per loro (`src/main/rilascioNellaChat.js`), e le consegna
-  alla scheda davanti con `CHAT_ALLEGA`.
+  alla scheda davanti con `CHAT_ALLEGA`. Sopra una scheda, fra due o sul «+» vince il collegamento che il
+  trascinamento porta (#2393, `src/renderer/link-su-scheda.js`): la miniatura di un video porta anche il file
+  dell'immagine, ma l'utente sta scegliendo dove aprirla, come in Chrome. Sulla parte vuota della fila l'immagine resta
+  della chat.
 - **Nella home il campo si accende** mentre un file passa sopra la pagina: si vede dove andrà a finire.
 
 Prove: `tests/rilascio-nella-chat.spec.mjs` (trascinamento vero via DevTools, `Input.dispatchDragEvent`) e

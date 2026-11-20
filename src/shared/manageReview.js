@@ -83,22 +83,25 @@
   function restaLocale(fb, { lavoriServer } = {}) {
     const r = fb && fb.restaLocale;
     if (lavoriServer === false) return null;
-    if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status)) return null;
+    if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !statoCheAspetta(normalizeStatus(fb).status)) return null;
     const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
     if (!motivi.length) return null;
-    const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m, fb.branch)))];
-    return { motivi, sblocchi, atMs: Number(r.atMs) || 0 };
+    const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m, motivi)))];
+    // Il perché scritto dal server (#2235, #2565: anche il motivo del buco del registro), testo e basta.
+    const cause = (Array.isArray(r.cause) ? r.cause : []).map((c) => String(c || '').trim()).filter(Boolean);
+    return { motivi, sblocchi, cause, atMs: Number(r.atMs) || 0 };
   }
-  // Nessun motivo del fermo passa da solo (#2036.1): uno sporco non torna pulito, un registro bucato lo sana solo
-  // l'owner, la fiducia la dà lui. Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
-  function sbloccoFermo(motivo, ramo) {
+  // Nessun motivo del fermo che resta passa da solo (#2036.1): uno sporco non torna pulito, la fiducia la dà l'owner, e
+  // il buco che la sanatoria toglie la coda lo toglie prima di segnare il fermo (#2565), ma solo su un feedback fidato.
+  // Ogni motivo dice il gesto che lo toglie; uno sconosciuto non promette niente.
+  function sbloccoFermo(motivo, motivi = []) {
     const m = String(motivo || '').toLowerCase();
     if (/sporc/.test(m)) return 'Quello che ha scritto un biglietto sporco non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.';
     if (/ramo|registro/.test(m)) {
-      const server = /server/.test(m);
-      const nome = String(ramo || '').trim() || '<ramo>';
-      return `Il ramo${server ? ' del server' : ''} non risulta pulito: se è un buco del registro lo togli con la sanatoria dal tuo PC, `
-        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, «Dichiara fidato com’è» nel dettaglio, dopo averlo letto.`;
+      const ramo = `Il ramo${/server/.test(m) ? ' del server' : ''} non risulta pulito`;
+      const feedbackNonFidato = (Array.isArray(motivi) ? motivi : []).some((x) => String(x || '').trim().toLowerCase() === 'feedback non fidato');
+      if (feedbackNonFidato) return `${ramo}: un buco che la sanatoria toglie lo toglie la coda da sé quando segni fidato il feedback; per il resto, se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.`;
+      return `${ramo} e la sanatoria non lo copre: se l’hai letto, «Dichiara fidato com’è» nel dettaglio lo fa ripartire.`;
     }
     if (/domand/.test(m) && /fidat/.test(m)) return 'Una domanda di questo feedback non è fidata: riparte quando la segni fidata in Domande, dopo averla letta.';
     if (/fidat/.test(m)) return 'Il feedback non è fidato: riparte quando lo segni fidato, dopo averlo letto.';
@@ -600,39 +603,37 @@
     // Il segno dei lavori server non sposta di scheda (#1575): lo dice l'etichetta «server» sulla riga.
     // Chi aspetta un feedback non ancora fuso (#903), o una domanda aperta che lo ferma (#1577), la coda non lo dà a
     // nessuno: sta fra quelli che aspettano.
-    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && (aspettaAncora(fb, opts) || fermoSuDomanda(fb))) return 'waiting';
+    if (tab === 'queue' && statoCheAspetta(status) && (aspettaAncora(fb, opts) || fermoSuDomanda(fb))) return 'waiting';
     return tab;
   }
 
-  // Le attese che aprono una domanda (functions/src/domande/attese.js): mai i blocchi di sicurezza né `fidato`.
-  const ATTESE_CON_DOMANDA = {
-    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa', 'guasto'],
-    aligned: ['origine_chiusa', 'origine_mancante'],
-  };
-  const DOMANDA_ID_RE = /^D-[1-9]\d{0,8}$/;
+  // «Aspetta una domanda» è SN_DOMANDE.domandaCheAspetta (src/shared/domande.js): lo stesso conto del server (#2193.1).
+  function DOM() {
+    if (!global.SN_DOMANDE && typeof require === 'function') require('./domande.js');
+    const m = global.SN_DOMANDE;
+    if (!m) throw new Error('SN_DOMANDE mancante: carica shared/domande.js prima di manageReview.js');
+    return m;
+  }
 
   /** Le domande aperte che fermano questo feedback in coda (#1577): le scrive il server in `domandeBloccanti`. PURA. */
   function domandeBloccantiDi(fb) {
-    const l = fb && fb.domandeBloccanti;
-    return Array.isArray(l) ? l.map(String).filter((id) => DOMANDA_ID_RE.test(id)) : [];
+    return DOM().domandeBloccantiDi(fb);
   }
   function fermoSuDomanda(fb) {
-    return !!fb && !statusUnreadable(fb) && STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status) && domandeBloccantiDi(fb).length > 0;
+    return !!fb && statoCheAspetta(normalizeStatus(fb).status) && !!aspettaDomanda(fb);
   }
 
   /** L'id della domanda che questo feedback aspetta (`D-12`), o '': quella della sua attesa, o la prima che lo ferma in coda. PURA. */
   function aspettaDomanda(fb) {
     if (!fb || statusUnreadable(fb)) return '';
-    if (fermoSuDomanda(fb)) return domandeBloccantiDi(fb)[0];
-    const id = String(fb.domandaId || '');
-    if (!DOMANDA_ID_RE.test(id)) return '';
     const { status, statusReason } = normalizeStatus(fb);
-    const motivi = ATTESE_CON_DOMANDA[status];
-    return motivi && motivi.includes(String(statusReason || '')) ? id : '';
+    return DOM().domandaCheAspetta({ status, statusReason, domandaId: fb.domandaId, domandeBloccanti: fb.domandeBloccanti });
   }
 
   // Gli stati in cui la coda delle routine darebbe lavoro: lì le attese contano (functions/src/routine/waits.js).
-  const STATI_CHE_ASPETTANO = ['todo', 'revision_capability', 'revision_security'];
+  function statoCheAspetta(status) {
+    return DOM().STATI_CHE_ASPETTANO.includes(status);
+  }
   // `opts.trovaAtteso(id)` → il documento dell'aspettato, se la pagina lo conosce. Senza il modulo nessuna attesa.
   function aspettaAncora(fb, opts) {
     const A = global.SN_FB_ATTESE;
@@ -857,6 +858,8 @@
         acts[0].primary = false;
         acts.push(lavoroServer);
       }
+      // Una bocciatura del controllo di sicurezza torna a chi corregge, col commento come istruzione (#2575).
+      else if (status === 'design' && statusReason === 'secaudit') Object.assign(acts[0], { label: 'Rimanda in correzione', correzione: true });
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
       // ancora classificato: le conferme possibili sono DUE, non una.
@@ -1756,12 +1759,12 @@
   }
 
   // Una pratica chiusa col lavoro in main (#2193): le sue fusioni approvate e non avvenute sono superate, anche se il ramo
-  // fuso è un altro. Fusione registrata = la versione che la contiene, la chiusura «già su main», o una richiesta fusa.
+  // fuso è un altro. Il conto è SN_FB_ATTESE.lavoroSuMain (src/shared/feedbackAttese.js), lo stesso del server.
   function lavoroInMain(fb, recent) {
-    const { status, statusReason } = normalizeStatus(fb);
-    if (status !== 'done' && status !== 'archived') return false;
-    if (String((fb && fb.resolvedInVersion) || '').trim()) return true;
-    return status === 'done' && (statusReason === 'gia_risolto' || recent.some((r) => r && r.used === true && r.outcome === 'merged'));
+    if (!global.SN_FB_ATTESE && typeof require === 'function') require('./feedbackAttese.js');
+    const A = global.SN_FB_ATTESE;
+    if (!A) throw new Error('SN_FB_ATTESE mancante: carica shared/feedbackAttese.js prima di manageReview.js');
+    return A.lavoroSuMain(statusUnreadable(fb) ? fb : Object.assign({}, fb, normalizeStatus(fb)), recent);
   }
 
   // Perché una fusione non ha chiesto, nel quadrato: lo stesso conto dell'elenco «Fuse senza chiedere» (#743.1).
@@ -1799,7 +1802,8 @@
     const f = (opts && opts.fusioni && typeof opts.fusioni === 'object') ? opts.fusioni : {};
     const lista = (k) => (Array.isArray(f[k]) ? f[k] : []).filter((r) => richiestaDiQuesto(r, fb));
     const pending = lista('pending');
-    const failed = lavoroInMain(fb, lista('recent')) ? [] : lista('failed');
+    const nonAvvenute = lista('failed');
+    const failed = nonAvvenute.length && lavoroInMain(fb, lista('recent')) ? [] : nonAvvenute;
     const preapproved = lista('preapproved');
     const { status, statusReason } = normalizeStatus(fb);
 
@@ -2246,7 +2250,16 @@
     };
   }
 
+  // «Rimanda in correzione» (#2575) ha la stessa forma in Gestione e nella pagina dei feedback: senza testo il primo
+  // gesto arma l'avviso, il secondo manda lo stesso. Prova: tests/manage-rimanda-correzione.spec.mjs.
+  const CORREZIONE = Object.freeze({
+    segnaposto: 'Cosa correggere: il testo arriva a chi corregge…',
+    avviso: 'Senza testo chi riprende non saprà cosa correggere: scrivilo qui, o premi di nuovo per mandarlo così.',
+    etichettaSenzaTesto: 'Manda lo stesso',
+  });
+
   global.SN_MANAGE_REVIEW = {
+    CORREZIONE,
     normalizeStatus,
     tastoFrase,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi

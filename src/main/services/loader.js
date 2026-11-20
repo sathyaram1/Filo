@@ -16,6 +16,7 @@ require(path.join(SHARED, 'contenutoEsterno.js'));
 // Il marchio della UI di Filo dentro le pagine web: serve ai content script,
 // ma sta fra i moduli condivisi e segue l'ordine di tutti gli altri.
 require(path.join(SHARED, 'filoUi.js'));
+require(path.join(SHARED, 'fontGenerico.js')); // #1342 — carattere scelto → famiglia generica, per i riquadri sui siti
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
 // Cronologia appunti: la chiave di una voce e i testi delle sue azioni, uguali
@@ -75,6 +76,8 @@ require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'sistema.js'));
 require(path.join(SHARED, 'filoState.js'));
 require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalogo e mosse (logica pura)
+require(path.join(SHARED, 'doppioTocco.js')); // #2372 — lettere col doppio tocco nella home (logica pura, dopo carteHome)
+require(path.join(SHARED, 'doppioCtrl.js')); // #2377 — il doppio Ctrl e le sue lettere (logica pura, dopo carteHome)
 require(path.join(SHARED, 'barraSiti.js')); // #1803 — barra dei siti della nuova scheda: voci e mosse (logica pura)
 // #525 — archivio delle chat con Filo: titoli, tipi, ricerca (logica pura).
 // Va PRIMA di services/filoChats.js, che ci si appoggia per scrivere.
@@ -87,6 +90,7 @@ require(path.join(SHARED, 'filoAccaduti.js'));  // #1561 — cosa di azioni, sis
 require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come righe ripiegate del filo (logica pura)
 require(path.join(SHARED, 'filoCoda.js'));  // #869 — la home come coda del filo: righe, pezzi, ricerca (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
+require(path.join(SHARED, 'immaginePrincipale.js'));  // #2371 — l'immagine della pagina che cercano Aiuto e chat
 require(path.join(SHARED, 'filoTrattoVivo.js'));  // #1562 — il CONTESTO dell'utente fotografato e quello che succede fra i messaggi (logica pura)
 require(path.join(SHARED, 'filoCompattazione.js'));  // #1563 — la compattazione del filo a livelli (logica pura)
 require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni
@@ -119,6 +123,7 @@ require(path.join(SHARED, 'urlExfil.js'));
 require(path.join(SHARED, 'pavimento.js')); // #1589 — cosa non esce mai verso un modello, a nessun livello (dopo guardianoStatico)
 require(path.join(SHARED, 'sitiComuni.js')); // #553 — gli indirizzi che il modello può scrivere a memoria
 require(path.join(SHARED, 'fontiCitate.js')); // #2383 — le fonti citate nelle risposte, controllate (dopo sitiComuni)
+require(path.join(SHARED, 'immaginiRisposta.js')); // #2272 — le immagini nelle risposte, controllate (dopo fontiCitate)
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
 require(path.join(SHARED, 'codaAdattiva.js'));  // #1118 — lavori in parallelo che rallentano ai 429: prima del cancello dei modelli

@@ -170,5 +170,8 @@ test('i motivi della dettatura, i suoi invii e i codici della lettura sono quell
   for (const i of invii) assert.ok(C.INVII_DETTATURA.includes(i), `«${i}» non è in INVII_DETTATURA`);
   const scritti = globalThis.SN_CHAT_ERRORS.CODICI_GIA_SCRITTI.filter((c) => c !== 'FEEDBACK_READ_DENIED');
   for (const c of [...scritti, 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN']) assert.ok(C.CODICI_LETTURA.includes(c), c);
-  assert.match(tts, /'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'/, 'la lettura spiega ancora le due voci');
+  // Il perché della lettura lo compone sintesiNonRiuscita (#1344.2): lì stanno anche i due codici della voce.
+  assert.match(tts, /CE\.sintesiNonRiuscita\(res\)/, 'la lettura spiega il perché con sintesiNonRiuscita');
+  assert.match(leggi('src', 'shared', 'chatErrors.js'), /CODICI_SINTESI_SCRITTI = \[\.\.\.CODICI_GIA_SCRITTI, 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'\]/,
+    'la lettura spiega ancora le due voci');
 });

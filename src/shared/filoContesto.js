@@ -25,7 +25,9 @@
   // ma dentro il tetto in token: al più un quarto, e la finestra si stringe di quanto prendono.
   const MESSAGGI_DELLA_CHAT = 20;
   const QUOTA_RIPRESI = 0.25;
-  const CARATTERI_PER_TOKEN = 3.5;
+  // Tarata sul contatore di Anthropic, il fornitore il cui listino cambia a 100.000 token: le misure stanno nella
+  // sentinella tests/unit/tettiDelContesto.test.mjs (#2473). Un modello che conta meno token finisce solo un po' prima.
+  const CARATTERI_PER_TOKEN = 2;
   // Oltre il tetto il taglio scende un quarto sotto: i turni dopo trovano lo stesso inizio, e la cache lo riusa.
   const RIENTRO = 0.75;
   // Le immagini mandate in chat tornano col loro messaggio finché vive come una lettura (#1166). Una foto pesa per i
@@ -98,6 +100,13 @@
 
   function stimaToken(testo) {
     return Math.ceil(String(testo == null ? '' : testo).length / CARATTERI_PER_TOKEN);
+  }
+  // Il tetto in token vale per la richiesta intera (#2473.1): al tratto resta quello che istruzioni, strumenti e CONTESTO
+  // (`fissi`) lasciano, mai meno del minimo del campo. Senza, quando la compattazione non parte, si passava il listino.
+  function tettoDelTratto(token, fissi = 0) {
+    const t = Number(token);
+    const f = Number(fissi) > 0 ? Number(fissi) : 0;
+    return Number.isFinite(t) ? Math.max(Math.min(t, LIMITI.token[0]), t - f) : t;
   }
 
   // Un contenuto a parti (testo e immagini): le immagini contano per quello che costano, non per i caratteri del data URL.
@@ -221,7 +230,31 @@
       return `(l'utente risponde al testo arrivato ${r.esterno}${dove}${come})`;
     }
     const t = String(r.testo == null ? '' : r.testo).trim();
-    return t ? `(l'utente risponde ${di}${dove}: «${t}»)` : `(l'utente risponde ${di}${dove})`;
+    const cosa = !r.passo ? di : r.role === 'user' ? 'a un passo di un suo messaggio' : 'a un passo del tuo messaggio';
+    return t ? `(l'utente risponde ${cosa}${dove}: «${t}»)` : `(l'utente risponde ${cosa}${dove})`;
+  }
+
+  // Le parole dell'utente con le citazioni al loro posto (#2346): citazione, commento, citazione, commento. `pos` dice
+  // dove comincia il commento di ogni citazione; una senza `pos` (quelle di sempre) apre il messaggio.
+  function conCitazioni(testo, citate) {
+    const t = String(testo == null ? '' : testo);
+    const lista = (Array.isArray(citate) ? citate : citate ? [citate] : []).filter((c) => c && typeof c === 'object');
+    if (!lista.length) return t;
+    const ordinate = lista
+      .map((c, k) => ({ c, k, pos: Math.min(Number.isInteger(c.pos) && c.pos > 0 ? c.pos : 0, t.length) }))
+      .sort((x, y) => x.pos - y.pos || x.k - y.k);
+    const out = [];
+    let da = 0;
+    for (const { c, pos } of ordinate) {
+      const prima = t.slice(da, pos).trim();
+      if (prima) out.push(prima);
+      const nota = notaRisposta(c);
+      if (nota) out.push(nota);
+      da = pos;
+    }
+    const resto = t.slice(da).trim();
+    if (resto) out.push(resto);
+    return out.join('\n');
   }
 
   // Una risposta di Filo riletta altrove vale la classe peggiore che la sua chat aveva letto (#1508); una salvata prima
@@ -288,11 +321,11 @@
     const daFuori = daFuoriIl(m);
     const testo = daFuori ? '' : (intero ? String(m.text == null ? '' : m.text) : tienilo(m.text, tetto, m.chat));
     if (m.role === 'user') {
-      const nota = notaRisposta(m.rispostaA);
+      const corpo = conCitazioni(testo, m.rispostaA);
       const pre = String(preambolo || '').trim();
       const detto = pre
-        ? `${intestazione(m.ts, m.chat)}\n${pre}\n${nota ? `${nota}\n` : ''}${testo}`.trim()
-        : `${intestazione(m.ts, m.chat)} ${nota ? `${nota}\n` : ''}${testo}`.trim();
+        ? `${intestazione(m.ts, m.chat)}\n${pre}\n${corpo}`.trim()
+        : `${intestazione(m.ts, m.chat)} ${corpo}`.trim();
       const note = (Array.isArray(dopo) ? dopo : []).map((x) => String(x || '').trim()).filter(Boolean);
       const quante = numeroImmagini(m);
       if (!quante) return { role: 'user', content: note.length ? `${detto}\n\n${note.join('\n\n')}` : detto };
@@ -365,10 +398,12 @@
   // torna com'era invece di accorciarsi. `dopo` ({ da, a }): il pezzo di filo compattato (SPEC-CONTESTO § La
   // compattazione): il tratto non comincia prima di `a`, e i messaggi fra `da` e `a` non tornano nemmeno come conversazione
   // ripresa, li dicono le righe delle ore. `senzaEsiti`: oltre il listino di Haiku gli esiti dei turni passati escono per primi, e la risposta lo dice.
+  // `fissi`: i token che la richiesta porta oltre al tratto (tettoDelTratto); l'ancora resta legata a `token`.
   function finestra(messaggi, {
-    ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
+    ora = Date.now(), giorni, token, fissi = 0, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
     preambolo = null, note = null, giro = null, salta = null, intero = null, dopo = null, senzaEsiti = false,
   } = {}) {
+    const tettoTratto = tettoDelTratto(token, fissi);
     const lista0 = Array.isArray(messaggi) ? messaggi : [];
     const lista = typeof salta === 'function' ? lista0.filter((m) => !salta(m)) : lista0;
     const n = lista.length;
@@ -493,8 +528,8 @@
     let ripresi = riprendi();
     let totale = 0;
     for (let i = inizio; i < n; i++) totale += pesa(i);
-    if (totale + ripresi.peso > token) {
-      while (inizio < n && totale + ripresi.peso > token * RIENTRO) {
+    if (totale + ripresi.peso > tettoTratto) {
+      while (inizio < n && totale + ripresi.peso > tettoTratto * RIENTRO) {
         totale -= pesa(inizio);
         if (riprese.has(lista[inizio].chat)) { mieDavanti++; ripresi = riprendi(); }
         inizio++;
@@ -573,6 +608,27 @@
       .sort((a, b) => b.score - a.score)
       .slice(0, max)
       .sort((a, b) => Date.parse(a.tratto.ts) - Date.parse(b.tratto.ts));
+  }
+
+  // Due frasi qualunque nella stessa lingua stanno già a 0,4-0,6 di coseno, e quanto dipende dal modello (#2369): un
+  // ricordo vale se si stacca dalla mediana della domanda su tutti gli scambi. Sotto gli 8 confronti la mediana non
+  // dice il rumore: null, e decide il ricordo per parole. Misure: patterns/il-ricordo-si-stacca-dal-rumore.md.
+  const MARGINE_RICORDO = 0.25;
+  const MIN_CONFRONTI_RICORDO = 8;
+  function ricordiPerVicinanza(punteggi) {
+    const validi = (Array.isArray(punteggi) ? punteggi : []).filter((p) => p && p.tratto && Number.isFinite(Number(p.score)));
+    if (validi.length < MIN_CONFRONTI_RICORDO) return null;
+    const ordinati = validi.map((p) => Number(p.score)).sort((a, b) => a - b);
+    const meta = ordinati.length >> 1;
+    const fondo = ordinati.length % 2 ? ordinati[meta] : (ordinati[meta - 1] + ordinati[meta]) / 2;
+    return scegliRicordi(validi, { soglia: Math.max(SOGLIA_RICORDO, fondo + MARGINE_RICORDO) });
+  }
+
+  // «ciao», «ok grazie»: senza un argomento non c'è niente da ripescare, e i vettori avvicinerebbero l'ultimo saluto.
+  function domandaConArgomento(domanda) {
+    const CA = global.SN_CHAT_ARCHIVE;
+    if (!CA) return true;
+    return CA.terminiCheDistinguono(CA.paroleDi(domanda), domanda).some((p) => !diCortesia(p));
   }
 
   // Senza vettori il ricordo va per parole, che è una prova debole: servono almeno due parole rare nelle conversazioni
@@ -928,11 +984,12 @@
   }
 
   global.SN_FILO_CONTESTO = {
-    TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
-    TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta,
+    TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, tettoDelTratto, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
+    TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta, conCitazioni,
     tetti, numeroIn, NUMERI_DEI_TETTI, campoDelTetto, numeroDelTetto, limitiAiCampi, stimatoreSoglia, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, ESTERNO_RACCONTO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,
-    provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
+    provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo,
+    MARGINE_RICORDO, MIN_CONFRONTI_RICORDO, ricordiPerVicinanza, domandaConArgomento, rendiRicordi,
     troppoLungo, tettoDopoRifiuto, rifiutaImmagini, pianoDellaCache, richiesta, indiceDellaDomanda, rendiMessaggio: rendi, conGiro,
     RILETTURA_MIN, capRilettura, rilettureDopoRifiuto, giaDavanti, senzaCancellati, ricordoComeAzione,
     eccessoNellaFinestra, MARGINE_PAGINE, eccessoDopoRifiuto, PAGINA_MIN, PESO_RIMANDO, pagineDaTenere, frasePagineLasciate,

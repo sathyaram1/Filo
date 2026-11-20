@@ -103,18 +103,27 @@ export function rigaScheda(s, f = {}) {
   return `${pezzi} — ${unaRiga(s.titolo_breve)}: ${unaRiga(s.riassunto)}${file}`;
 }
 
+/**
+ * id → numero dalle sole voci dell'indice che hanno l'id (le schede del server e i non fidati possono non averlo): una
+ * chiave `undefined` darebbe l'ultimo numero a ogni ramo che non è un tentativo (#2480). PURA.
+ */
+export function numeroPerId(indice) {
+  return new Map((indice || []).filter((f) => f && f.id && f.num).map((f) => [String(f.id), String(f.num)]));
+}
+
 /** I rami dei worker (`worker/<id del feedback>-<ora>`) prendono il numero dall'indice, davanti ai citati. PURA. */
 export function conNumeri(rami, indice) {
-  const perId = new Map((indice || []).map((f) => [f.id, f.num]));
+  const perId = numeroPerId(indice);
   return (rami || []).map((r) => {
-    const n = perId.get((leggiTentativo(r.ramo) || {}).id);
+    const t = leggiTentativo(r.ramo);
+    const n = t ? perId.get(t.id) : undefined;
     return n ? { ...r, feedback: [n, ...(r.feedback || []).filter((x) => x !== n)] } : r;
   });
 }
 
 /** { N: id } dall'indice, per leggere su main le fusioni «merge-gate: #N» dei worker (ramiInCorso). PURA. */
 export function numeriDellIndice(indice) {
-  return Object.fromEntries((indice || []).filter((f) => f && f.id && f.num).map((f) => [String(f.num), String(f.id)]));
+  return Object.fromEntries([...numeroPerId(indice)].map(([id, n]) => [n, id]));
 }
 
 /**
@@ -263,7 +272,7 @@ const STATI_CHE_FERMANO = Object.freeze({ aperta: 'aspetta l\'owner', in_smistam
  * feedback dell'ordine: il manutentore le vede, non le smista (lo fa il compito «Gestisci la domanda»). PURA.
  */
 export function righeDomandeFerme(domande, { indice = [], ordine = [], quando = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ') } = {}) {
-  const numDi = new Map((indice || []).map((f) => [f.id, String(f.num)]));
+  const numDi = numeroPerId(indice);
   const nellOrdine = new Set((ordine || []).map(String));
   const voci = [];
   for (const d of Array.isArray(domande) ? domande : []) {
@@ -931,30 +940,13 @@ async function prioritaAttuali(cred, ...nums) {
   });
 }
 
-/** Il giorno in Italia (YYYY-MM-DD), quello che il server scrive accanto a un'indicazione. PURA. */
+/** Il giorno in Italia (YYYY-MM-DD), come lo scrive il server. PURA. */
 export function giornoDi(ms = Date.now()) {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
 }
 
-/** Il taccuino con l'indicazione dell'owner in coda, datata come la scrive il server (ownerManutentore). PURA. */
-export function conIndicazione(taccuino, testo, giorno) {
-  const t = unaRiga(testo);
-  if (!t) return { ok: false, motivo: 'l\'indicazione è un testo non vuoto' };
-  return { ok: true, testo: `${String(taccuino || '').replace(/\s+$/, '')}\n\nIndicazione dell'owner (${giorno}): ${t}\n`.replace(/^\n+/, '') };
-}
-
-/** Indicazione con la chiave: rilettura e riscrittura, di nuovo se nel frattempo il taccuino è cambiato. */
-async function indicazioneConChiave(cred, testo) {
-  for (let i = 0; i < 3; i++) {
-    const t = await chiama(cred, 'taccuino');
-    if (t.ok === false) return t;
-    const n = conIndicazione(t.testo, testo, giornoDi());
-    if (!n.ok) return { ok: false, reason: 'malformed', detail: n.motivo };
-    const w = await chiama(cred, 'taccuino.scrivi', { testo: n.testo, versione: Number(t.versione) || 0 });
-    if (w.ok !== false || w.reason !== 'taccuino_cambiato') return w;
-  }
-  return { ok: false, reason: 'taccuino_cambiato', detail: 'il taccuino è cambiato tre volte mentre lo riscrivevo: riprova' };
-}
+// Dove e come l'indicazione entra nel taccuino lo decide solo il server, per l'owner e per la chiave (#2340.3).
+const indicazioneConChiave = (cred, testo) => chiama(cred, 'taccuino.indicazione', { testo });
 
 // ── Le novità (§ 8) ─────────────────────────────────────────────────────────
 

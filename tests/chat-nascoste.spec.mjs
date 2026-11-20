@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState } from './helpers/confirm.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const HOME = 'filo://newtab/';
 
@@ -108,9 +109,9 @@ test('«cancella questa chat» la nasconde: esce dal filo e da Filo, la ricerca 
 
   // Una home nuova non la disegna; la ricerca nel filo la trova a parte, e un clic la rimette al suo posto.
   const home = await openTab(HOME);
-  await expect(home.locator('#cercaInput')).toBeVisible({ timeout: 15_000 });
+  await expect((await campoRicerca(home))).toBeVisible({ timeout: 15_000 });
   await expect(home.locator(`.dash-bubble[data-chat="${nascosta.id}"]`)).toHaveCount(0);
-  await home.locator('#cercaInput').fill('respiro');
+  await (await campoRicerca(home)).fill('respiro');
   const voce = home.locator('#cercaRisultati .dash-cerca-nascosta');
   await expect(voce).toHaveCount(1, { timeout: 10_000 });
   await expect(home.locator('#cercaRisultati')).toContainText('In una conversazione nascosta');
@@ -373,9 +374,9 @@ test('il menu di un risultato della ricerca nel filo si apre da tastiera, e il p
   await modello(app, { titoli: { Epicuro: 'Epicuro' } });
   await chatPronta(app, 'c-epicuro', 'Parliamo di Epicuro e del piacere');
   const home = await openTab(HOME);
-  await home.locator('#cercaInput').fill('Epicuro');
+  await (await campoRicerca(home)).fill('Epicuro');
   await expect(home.locator('#cercaRisultati .dash-cerca-msg').first()).toBeVisible({ timeout: 10_000 });
-  await home.locator('#cercaInput').press('ArrowDown');
+  await (await campoRicerca(home)).press('ArrowDown');
   await home.keyboard.press('Shift+F10');
   await expect(menuDi(home).pannelli).toBeVisible({ timeout: 5_000 });
   await expect.poll(() => fuoco(home)).toBe('menu:Vai a questo punto del filo');
@@ -482,7 +483,7 @@ test('le nascoste si vedono tutte: Filo le elenca senza una loro parola, la home
   expect(((await cercaComeFilo(app, 'la chat sull’orto che avevo nascosto')).output.nascoste || []).map((x) => x.id)).toEqual(['c-orto']);
 
   const home = await openTab(HOME);
-  const campo = home.locator('#cercaInput');
+  const campo = (await campoRicerca(home));
   await expect(campo).toBeVisible({ timeout: 15_000 });
   await campo.evaluate((el) => {
     const v = (window.SN_VOCI_PAGINA || []).flatMap((f) => f(el) || []).find((x) => x.label === 'Mostra le conversazioni nascoste');

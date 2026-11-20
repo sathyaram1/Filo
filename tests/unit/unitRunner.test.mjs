@@ -523,7 +523,8 @@ test('una copia del lanciatore senza il suo reporter gira lo stesso, col tetto d
     delete env.FILO_UNIT_DIR;
     const r = spawnSync(process.execPath, [join(casa, 'scripts', 'run-unit-tests.mjs')], { env, cwd: casa, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /^ok 1 - base$/m);
+    // Il reporter di serie di node: TAP fino al 22, spec dal 23 anche fuori dal terminale.
+    assert.match(r.stdout, /^(ok 1 - base|✔ base \(.*\))$/m);
   } finally {
     togliCartella(casa);
   }
@@ -726,7 +727,8 @@ test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
   const dir = cartellaTemporanea('filo-appeso-');
   try {
     writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';\ntest('appeso', async () => { setInterval(() => {}, 1000); await new Promise(() => {}); });\n");
-    const env = { ...process.env, FILO_UNIT_DIR: dir };
+    // Da Node 24 il tetto della prova non chiude un file col timer acceso: lo chiude la guardia, qui accorciata.
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '20000' };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts', 'run-unit-tests.mjs'), '--test-timeout=1500'],
       { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });

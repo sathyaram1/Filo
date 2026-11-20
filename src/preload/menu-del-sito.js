@@ -143,6 +143,10 @@ function sorgenteSonda(nome) {
 })();`;
 }
 
+// Un tasto destro dato prima che il menu di Filo ascolti si rigioca entro questo tempo; più tardi il menu
+// comparirebbe quando l'utente non lo aspetta più (riquadri in page-preload.js, pagine filo:// in internal-preload.js).
+const RIGIOCO_MS = 3000;
+
 // La copia inerte di un tasto destro, da consegnare al menu di Filo dopo che l'evento è finito: consegnato,
 // composedPath() torna vuoto, quindi l'elemento vero (anche dentro uno shadow root) si fotografa subito.
 function copiaDelClic(e) {
@@ -282,4 +286,4 @@ function crea({ webFrame, riserva = () => {}, finestra = globalThis.window, nome
   };
 }
 
-module.exports = { crea, copiaDelClic, sorgenteSonda, VICINO_PX, ATTESA_MS };
+module.exports = { crea, copiaDelClic, sorgenteSonda, VICINO_PX, ATTESA_MS, RIGIOCO_MS };

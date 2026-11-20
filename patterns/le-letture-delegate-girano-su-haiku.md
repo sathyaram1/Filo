@@ -24,7 +24,11 @@ non spegne un FORCE che arriva dall'ambiente del processo. Nel contenitore
 cloud delle routine FORCE arriva così, dalle variabili dell'ambiente cloud:
 finché c'è, il `lettore` gira su Opus come prima, e lo stesso vale per il
 modello per fase che il gancio mette sul lancio dei worker. Toglierla è un
-passo dell'owner.
+passo dell'owner. Finché c'è, il preflight lo stampa e il rapporto di fine
+sessione lo scrive nelle note, insieme al modello e allo sforzo dei turni del
+worker quando non sono quelli decisi dal server (#2553). Lo sforzo deciso
+arriva anche con FORCE acceso: misurato il 18 novembre su un worker con la
+definizione a `xhigh` e il server a `high`, turni tutti `high`.
 
 ## La misura (#2122, 16 novembre 2026)
 

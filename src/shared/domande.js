@@ -66,9 +66,13 @@
   const FEEDBACK_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
   // Chi conosce il feedback solo per numero lo scrive col cancelletto («#1736», «#831.2»): il server lo traduce
   // nell'id all'ingresso (traduciNumeri), quindi una domanda salvata porta sempre l'id. Senza cancelletto è un id.
-  const NUMERO_IN_AZIONE_RE = /^#([1-9]\d{0,8})(?:\.([1-9]\d{0,5}))?$/;
+  // La forma del numero è una sola, quella delle attese (#2229.3): '' se non è un numero.
+  function numeroScritto(v) {
+    if (typeof v !== 'string' || v.charAt(0) !== '#' || !global.SN_FB_ATTESE) return '';
+    return global.SN_FB_ATTESE.normalizzaNumero(v);
+  }
   const PARAMETRI = Object.freeze({
-    feedbackId: (v) => typeof v === 'string' && (FEEDBACK_ID_RE.test(v) || NUMERO_IN_AZIONE_RE.test(v)),
+    feedbackId: (v) => typeof v === 'string' && (FEEDBACK_ID_RE.test(v) || !!numeroScritto(v)),
     valorePriorita: (v) => Number.isInteger(v) && v >= 0 && v <= 3,
     chiave: (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHIAVI_AUTOMAZIONE, v),
     valoreBooleano: (v) => typeof v === 'boolean',
@@ -173,6 +177,10 @@
     if (!id || id.length > TETTI.idCollegamento || !/^[A-Za-z0-9._/#~-]+$/.test(id)) {
       return no('domanda_non_valida', `collegamento ${i + 1}: l'id manca, ha caratteri non ammessi o supera ${TETTI.idCollegamento} caratteri`);
     }
+    // Un feedback che la Gestione non sa aprire sarebbe un collegamento muto (#2229.1): o l'id, o il numero da tradurre.
+    if (c.tipo === 'feedback' && !FEEDBACK_ID_RE.test(id) && !numeroScritto(id)) {
+      return no('domanda_non_valida', `collegamento ${i + 1}: un feedback si nomina con l'id o col numero («#1736», «#831.2»)`, { campo: `collegamenti[${i}].id` });
+    }
     return { ok: true, collegamento: { tipo: c.tipo, id } };
   }
 
@@ -273,6 +281,10 @@
       const r = testoFacoltativo(input, campo, TETTI[campo]);
       if (!r.ok) return r;
       testi[campo] = campo === 'gruppo' ? r.valore.trim() : r.valore;
+    }
+    // Il titolo (dieci parole) non dice dove e come: senza i passi l'owner trova una cosa da fare che non sa fare (#2229.3).
+    if (fare && !testi.problema.trim()) {
+      return no('problema_mancante', 'un «da fare» porta in «problema» i passi concreti e dove farli: il titolo dice solo di cosa si parla', { campo: 'problema' });
     }
     const grezze = input.opzioni == null ? [] : input.opzioni;
     if (!Array.isArray(grezze)) return no('domanda_non_valida', '«opzioni» deve essere un elenco', { campo: 'opzioni' });
@@ -490,38 +502,41 @@
     return `${nome}: ${detta.charAt(0).toLocaleLowerCase('it')}${detta.slice(1)}`;
   }
 
-  /** I numeri («1736», «831.2») scritti col cancelletto al posto dell'id nelle azioni, senza doppioni. PURA. */
+  const numeroDiAzione = (o) => (isOggetto(o) && isOggetto(o.azione) ? numeroScritto(o.azione.feedbackId) : '');
+  const numeroDiCollegamento = (c) => (isOggetto(c) && c.tipo === 'feedback' ? numeroScritto(c.id) : '');
+  const elenco = (domanda, campo) => (isOggetto(domanda) && Array.isArray(domanda[campo]) ? domanda[campo] : []);
+
+  /** I numeri («1736», «831.2») scritti col cancelletto al posto dell'id in azioni e collegamenti, senza doppioni. PURA. */
   function numeriDaTradurre(domanda) {
     const out = [];
-    for (const o of isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : []) {
-      const f = isOggetto(o) && isOggetto(o.azione) ? o.azione.feedbackId : null;
-      const m = typeof f === 'string' ? NUMERO_IN_AZIONE_RE.exec(f) : null;
-      const n = m ? (m[2] ? `${m[1]}.${m[2]}` : m[1]) : '';
+    for (const n of [...elenco(domanda, 'opzioni').map(numeroDiAzione), ...elenco(domanda, 'collegamenti').map(numeroDiCollegamento)]) {
       if (n && !out.includes(n)) out.push(n);
     }
     return out;
   }
 
   /**
-   * La domanda coi numeri delle azioni tradotti negli id: `ids` è { '1736': '<id>' } (lo legge il server). Un numero
-   * che non c'è si rifiuta col numero. PURA: non tocca la domanda in ingresso.
+   * La domanda coi numeri di azioni e collegamenti tradotti negli id: `ids` è { '1736': '<id>' } (lo legge il server).
+   * Un numero che non c'è si rifiuta col numero. PURA: non tocca la domanda in ingresso.
    */
   function traduciNumeri(domanda, ids) {
     const mappa = isOggetto(ids) ? ids : {};
     const mancanti = numeriDaTradurre(domanda).filter((n) => !(ha(mappa, n) && FEEDBACK_ID_RE.test(String(mappa[n]))));
     if (mancanti.length) {
-      return no('feedback_inesistente', `nessun feedback col numero ${mancanti.map((n) => `#${n}`).join(', ')}: controlla il numero nelle azioni`,
-        { campo: 'opzioni', numeri: mancanti });
+      const inAzione = elenco(domanda, 'opzioni').some((o) => mancanti.includes(numeroDiAzione(o)));
+      return no('feedback_inesistente', `nessun feedback col numero ${mancanti.map((n) => `#${n}`).join(', ')}: controlla il numero nelle azioni e nei collegamenti`,
+        { campo: inAzione ? 'opzioni' : 'collegamenti', numeri: mancanti });
     }
-    if (!isOggetto(domanda) || !Array.isArray(domanda.opzioni)) return { ok: true, domanda };
-    const opzioni = domanda.opzioni.map((o) => {
-      const f = isOggetto(o) && isOggetto(o.azione) ? o.azione.feedbackId : null;
-      const m = typeof f === 'string' ? NUMERO_IN_AZIONE_RE.exec(f) : null;
-      if (!m) return o;
-      const n = m[2] ? `${m[1]}.${m[2]}` : m[1];
-      return Object.assign({}, o, { azione: Object.assign({}, o.azione, { feedbackId: String(mappa[n]) }) });
+    if (!numeriDaTradurre(domanda).length) return { ok: true, domanda };
+    const opzioni = elenco(domanda, 'opzioni').map((o) => {
+      const n = numeroDiAzione(o);
+      return n ? Object.assign({}, o, { azione: Object.assign({}, o.azione, { feedbackId: String(mappa[n]) }) }) : o;
     });
-    return { ok: true, domanda: Object.assign({}, domanda, { opzioni }) };
+    const collegamenti = elenco(domanda, 'collegamenti').map((c) => {
+      const n = numeroDiCollegamento(c);
+      return n ? Object.assign({}, c, { id: String(mappa[n]) }) : c;
+    });
+    return { ok: true, domanda: Object.assign({}, domanda, { opzioni, collegamenti }) };
   }
 
   function rangoPriorita(p) {
@@ -624,6 +639,32 @@
     return m ? Number(m[1]) : null;
   }
 
+  // «La pratica aspetta una domanda», un conto solo per la Gestione e per il server (#2193.1). Fermano un lavoro in
+  // coda le domande in `domandeBloccanti` (#1577); una fermata la sua `domandaId`, se è un'attesa che ne apre una.
+  const STATI_CHE_ASPETTANO = Object.freeze(['todo', 'revision_capability', 'revision_security']);
+  const ATTESE_CON_DOMANDA = Object.freeze({
+    design: Object.freeze(['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa', 'guasto']),
+    aligned: Object.freeze(['origine_chiusa', 'origine_mancante']),
+  });
+  /** Le domande aperte che il server ha scritto come fermo del lavoro (`domandeBloccanti`), solo id validi. PURA. */
+  function domandeBloccantiDi(fb) {
+    const l = fb && fb.domandeBloccanti;
+    return Array.isArray(l) ? l.map(String).filter((id) => ID_RE.test(id)) : [];
+  }
+  /**
+   * L'id della domanda che la pratica aspetta (`D-12`), o ''. `fb.status` e `fb.statusReason` già in chiaro e
+   * canonici: chi ha lo stato illeggibile non chiede. PURA.
+   */
+  function domandaCheAspetta(fb) {
+    if (!fb) return '';
+    const status = String(fb.status || '');
+    const bloccanti = domandeBloccantiDi(fb);
+    if (bloccanti.length && STATI_CHE_ASPETTANO.includes(status)) return bloccanti[0];
+    const id = String(fb.domandaId || '');
+    const motivi = ATTESE_CON_DOMANDA[status];
+    return ID_RE.test(id) && motivi && motivi.includes(String(fb.statusReason || '')) ? id : '';
+  }
+
   // «Discutiamone» (SPEC-SEDI §4.5): con la parola d'ordine «owner non fidato» davanti, una sola incollata apre la
   // sessione cloud con tutto quello che serve; senza, resta la riga per una sessione locale.
   function rigaDiscuti(id) { return `Discutiamo la domanda ${id}`; }
@@ -637,9 +678,10 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    TIPI_DOMANDA, PULSANTI_DA_FARE, daFare, etichettaOpzione, numeriDaTradurre, traduciNumeri,
+    TIPI_DOMANDA, PULSANTI_DA_FARE, daFare, etichettaOpzione, numeroScritto, numeriDaTradurre, traduciNumeri,
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, assorbitaIn, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
     AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
+    STATI_CHE_ASPETTANO, ATTESE_CON_DOMANDA, domandeBloccantiDi, domandaCheAspetta,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

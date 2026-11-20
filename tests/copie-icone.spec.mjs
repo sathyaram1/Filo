@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
@@ -267,7 +268,7 @@ test.describe('dal proxy', () => {
       const home = await openTab('filo://newtab/');
       const chip = await rigaDiChat(home, 'riga-proxy', `http://dal-proxy.test:${siti.porta}/altra`);
       await expect(chip.locator('img')).toHaveAttribute('src', /^data:image\/png;base64,/, { timeout: 10_000 });
-      await home.locator('#cercaInput').fill('Pagina dal proxy');
+      await (await campoRicerca(home)).fill('Pagina dal proxy');
       const trovata = home.locator('.dash-cerca-pagina', { hasText: 'Pagina dal proxy' });
       await expect(trovata).toBeVisible({ timeout: 10_000 });
       await trovata.click();

@@ -867,9 +867,17 @@
       if (lunga) return { ok: false, errore: `Una voce del motivo supera i 300 caratteri: "${lunga.slice(0, 40)}…".` };
       return { ok: true, motivo: { tipo, [campo]: voci } };
     };
-    const pezzi = (sep) => resto.split(sep).map((s) => s.trim()).filter(Boolean);
+    const pezzi = (sep, da = resto) => da.split(sep).map((s) => s.trim()).filter(Boolean);
     if (MOTIVI_CORRETTORE[tipo] === 'file') {
-      return /^nessuno$/i.test(resto) ? { ok: true, motivo: { tipo, file: [] } } : elenco('file', pezzi(/[,\s]+/));
+      // Fra parentesi c'è una nota, non dei file: «a, b (ramo del server)» contava tre file di codice in più, e un giro
+      // di verifica che non serviva (#2498). La nota resta nel motivo.
+      const note = [];
+      const nomi = resto.replace(/\(([^()]*)(?:\)|$)/g, (_, n) => { if (n.trim()) note.push(n.trim()); return ' '; }).trim();
+      const nota = note.join('; ');
+      if (nota.length > MAX_TESTO_MOTIVO) return { ok: false, errore: `La nota del motivo è lunga ${nota.length} caratteri, il massimo è ${MAX_TESTO_MOTIVO}.` };
+      const r = /^nessuno$/i.test(nomi) ? { ok: true, motivo: { tipo, file: [] } } : elenco('file', pezzi(/[,\s]+/, nomi));
+      if (r.ok && nota) r.motivo.testo = nota;
+      return r;
     }
     if (MOTIVI_CORRETTORE[tipo] === 'prove') return elenco('prove', pezzi(/\s*,\s*/));
     if (resto.length > MAX_TESTO_MOTIVO) return { ok: false, errore: `Il motivo è lungo ${resto.length} caratteri, il massimo è ${MAX_TESTO_MOTIVO}.` };
@@ -881,7 +889,7 @@
   function testoMotivo(m) {
     if (!m || !m.tipo) return '';
     const nome = m.tipo === 'prove-rosse' ? 'prove rosse' : m.tipo;
-    if (Array.isArray(m.file)) return `${nome}: ${m.file.length ? m.file.join(', ') : 'nessuno'}`;
+    if (Array.isArray(m.file)) return `${nome}: ${m.file.length ? m.file.join(', ') : 'nessuno'}${m.testo ? ` (${m.testo})` : ''}`;
     if (Array.isArray(m.prove)) return `${nome}: ${m.prove.join(', ')}`;
     return m.testo ? `${nome}: ${m.testo}` : nome;
   }
@@ -889,14 +897,25 @@
   /**
    * Dopo un riallineamento, dai file in cui la modifica del ramo è cambiata e da quelli che erano in conflitto con main:
    * tutti di servizio (o nessuno) → niente giro nuovo, bastano le prove del server; uno di codice → verifica intera,
-   * c'è logica che nessuno ha guardato. Un elenco che manca vale come codice: nel dubbio si verifica.
+   * c'è logica che nessuno ha guardato. Un elenco che manca vale come codice: nel dubbio si verifica. Un riallineamento
+   * per prove rosse (`opz.motivo`) vuole sempre la verifica, qualunque file tocchi (`riallineamentoPerProveRosse`).
    */
   function giroDopoRiallineamento(fileRiscritti, opz) {
     const conflitti = opz && opz.conflitti !== undefined ? opz.conflitti : [];
-    if (!Array.isArray(fileRiscritti) || !Array.isArray(conflitti)) return { giro: 'pieno', codice: null };
+    const rosse = riallineamentoPerProveRosse(opz && opz.motivo);
+    if (!Array.isArray(fileRiscritti) || !Array.isArray(conflitti)) return Object.assign({ giro: 'pieno', codice: null }, rosse ? { proveRosse: true } : {});
     const codice = [...new Set([...fileRiscritti, ...conflitti].map((f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '')))]
       .filter((f) => f && !FILE_DI_SERVIZIO.includes(f)).sort();
+    if (rosse) return { giro: 'pieno', codice, proveRosse: true };
     return { giro: codice.length ? 'pieno' : 'nessuno', codice };
+  }
+
+  /**
+   * Chi riallinea per prove rosse non le corregge (le trova la verifica, le corregge il correttore del giro dopo): a
+   * modifiche identiche saltare la verifica rimanderebbe il ramo al cancello, che le ritroverebbe rosse, senza fine (#2590).
+   */
+  function riallineamentoPerProveRosse(motivo) {
+    return !!(motivo && motivo.tipo === 'prove-rosse');
   }
 
   global.SN_VERIFIER_ROUND = {
@@ -906,7 +925,7 @@
     sedeDi, livelloLetto, livelloMostrato, motivoScalaVecchia, livelloDegliInterni, decisioneFerma, destinatarioDelFermo, bloccaSuUnRilievo, missingCaps, normalizeCaps, normalizeCounts,
     livelloCheLoPaga, decideRound, RILIEVI_CHE_FERMANO, dueDaParteRiga, bilancioPagato, derivedGroups, groupLabel,
     findingTag, formatFinding, formatFindings, hasDecision, roundNote, domandeMancanti, titoloDelDerivato,
-    FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento,
+    FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento, riallineamentoPerProveRosse,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

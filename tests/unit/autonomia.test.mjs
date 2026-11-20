@@ -417,6 +417,7 @@ test('ogni tipo che urlExfil.contestoDaAzioni tratta come non fidato ha una font
     CERCA_SALVATE: { _output: { pagine: [{ url: 'https://x.example/', title: 'x' }] } },
     APRI_SALVATA: { _output: { aperta: true, titolo: 'x', url: 'https://x.example/' } },
     CERCA_WEB: { query: 'x', _output: { results: [{ url: 'https://x.example/', title: 'x' }] } },
+    IMMAGINI_WEB: { query: 'x', _output: { immagini: [{ id: 'i1', src: 'filo://icone/x.png', titolo: 'x', pagina: 'https://x.example/' }] } },
     SCHEDE_CHIUSE: { _output: { schede: [{ id: 'a', url: 'https://x.example/', titolo: 'x', riassunto: 'y' }] } },
     RIAPRI_SCHEDA: { _output: { riaperta: true, titolo: 'x', url: 'https://x.example/' } },
     BLUETOOTH: { _output: { ok: true, cosa: 'bluetooth', elenco: [{ nome: 'Cuffie' }] } },

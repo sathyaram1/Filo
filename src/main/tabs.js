@@ -2,7 +2,7 @@
 // la barra della shell. Qui vivono il loro ciclo di vita, il layout, lo schermo
 // intero, il proxy per scheda e le guardie sulle navigazioni.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen, webFrameMain } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen, webFrameMain, webContents } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
@@ -10,6 +10,7 @@ const Sito = require('../shared/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const { testoDellaRichiesta, corpoDa, LIMITE_CORPO } = require('./services/testoInviato');
 const ProxyTab = require('./services/proxyTab');
+const TrascrizioneYoutube = require('./services/trascrizioneYoutube');
 const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
@@ -19,6 +20,10 @@ const { installZoom, zoomDaTasto } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const { installRestaConnesso } = require('./tabs/tabRestaConnesso');
 const Permessi = require('./services/permessiPagine');
+// Caricati qui e non alla prima vista (#2136): una valutazione dell'ispettore (le prove) entra anche a metà del codice
+// sincrono, e un modulo caricato dentro `_makeView` lì si trova ancora senza esportazioni.
+const Downloads = require('./services/downloads');
+const ReteDiCasa = require('./services/homeNetwork');
 const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
 const { navigazioneVersoFilo, paginaDeiBloccati } = require('./services/navigazioneVersoFilo');
 const MenuDiRiserva = require('./menuDiRiserva');
@@ -91,6 +96,8 @@ const HOVER_INPUT_TYPES = new Set([
 const gestoPerIlFilo = (tab) => Math.max(tab._userInputAt || 0, tab._gestoFiloAt || 0);
 // Il salto dalla pagina d'errore al sito è un «Riprova» premuto se arriva entro questo tempo da un input vero (#1469).
 const RIPROVA_GESTO_MS = 5_000;
+// Il focus chiesto dalla pagina che tiene la finestra arriva subito dopo il suo clic (#737.8, richiamataDallaPagina).
+const RICHIAMO_DA_FOCUS_MS = 1500;
 
 // #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
 // conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
@@ -715,8 +722,14 @@ class TabManager {
   // Quanta shell resta scoperta dalla vista attiva. Serve a ritagliare lo
   // scatto della barra quando si annota tutta l'app col disegno.
   topChromeHeight() {
-    if (this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili)) return 0;
+    if (this._corniceSalita()) return 0;
     return this.chromeCompact ? this.tabRowHeight : this.shellHeight;
+  }
+
+  // A schermo intero la cornice sale, salvo con le schede scese dal bordo alto o con una domanda che aspetta sopra la
+  // pagina (topInset: a schermo intero lo chiede solo una domanda): coperta dalla pagina, nessuno la vedrebbe (#2595).
+  _corniceSalita() {
+    return !!this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili) && !(this.topInset > 0);
   }
 
   setTopInset(px) {
@@ -945,11 +958,11 @@ class TabManager {
     // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
     // L'incognito ha il suo ambito: le sue voci non vanno su disco.
     try {
-      require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
+      Downloads.attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
     } catch (_) {}
     installaPermessi(view.webContents.session);
     Permessi.seguiGesti(view.webContents);
-    require('./services/homeNetwork').attach(view.webContents.session);
+    ReteDiCasa.attach(view.webContents.session);
     return view;
   }
 
@@ -1161,6 +1174,7 @@ class TabManager {
       const wc = view.webContents;
       AzioniContate.scheda(wc);
       wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id, { daSola: true }); }));
+      wc.on('did-start-navigation', (e) => this._chiestaPerNome(tab, wc, e));
     }
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
@@ -2892,6 +2906,8 @@ class TabManager {
   // laterale aperta da tastiera (#871 giro 9). `tab` è la scheda su cui agire. true = preso.
   tastoDelBrowser(input, tab) {
     if (!input || !tab) return false;
+    // La tastiera può restare un attimo su una scheda di dietro che si carica (#871.5): i tasti valgono per quella davanti.
+    if (tab.id !== this.activeId && this.tabs.includes(tab)) tab = this.tabs.find((t) => t.id === this.activeId) || tab;
     // I tasti di chi arriva da un altro browser, per nome (#1468): anche quelli che Filo non usa.
     if (input.type === 'keyDown') Strade.misura('tasto', input, { incognito: this.incognito });
     // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
@@ -2943,8 +2959,7 @@ class TabManager {
     // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
     // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
     // europei serve a digitare caratteri mentre si scrive nella pagina.
-    // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
-    // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
+    // `tab` è la scheda davanti, quella che l'utente sta guardando.
     if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
       const k = String(input.key || '').toLowerCase();
       const conta = (azione, fn) => { AzioniContate.azione(azione, fn, { incognito: !!this.win._filoIncognito }); return true; };
@@ -3109,11 +3124,11 @@ class TabManager {
   }
 
 
-  // Altezza di chrome riservata in alto: 0 a tutto schermo (salvo le schede scese dal bordo alto), solo la fila di tab
+  // Altezza di chrome riservata in alto: 0 a tutto schermo (vedi _corniceSalita), solo la fila di tab
   // se in chrome compatto (barra indirizzi nascosta), altrimenti l'intera shell.
   // A questo si somma l'eventuale topInset dei dropdown.
   _altezzaCornice() {
-    if (this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili)) return 0;
+    if (this._corniceSalita()) return 0;
     return (this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset;
   }
 
@@ -3336,6 +3351,10 @@ class TabManager {
     });
     collegaScorciatoie(wc, () => this.win);
     this._sbGuardiaTastiera(tab, wc);
+    // Una scheda di dietro che si carica si prende la tastiera da sola (#871.5): torna a quella davanti.
+    wc.on('focus', () => setImmediate(() => {
+      if (tab.id !== this.activeId && tab.view.webContents === wc && this.tabs.includes(tab)) this._tastieraAllaSchedaAttiva();
+    }));
     this._sbSeguiPuntatore(tab, wc);
     this.riquadri.segui(wc);
     wc.on('before-input-event', (event, input) => {
@@ -3614,6 +3633,7 @@ class TabManager {
         Strade.misura('caricata', tab);
       }
       this.visite.caricata(wc);
+      TrascrizioneYoutube.precarica(wc, wc.getURL());
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
@@ -3750,6 +3770,8 @@ class TabManager {
       if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true, gesto: gestoPerIlFilo(tab), chiave: tab });
       if (isMainFrame === true) this._accessoDopoCarico(tab);
       if (isMainFrame === true) segnaPagina(tab, url);
+      // YouTube passa da un video all'altro senza ricaricare: anche qui la pagina del video nuovo è pronta.
+      if (isMainFrame === true) TrascrizioneYoutube.precarica(wc, url);
     });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
@@ -3957,7 +3979,10 @@ class TabManager {
           createWindow: (options) => {
             // Un collegamento (Maiuscolo+clic, target=_blank) non dà una finestra da tenere: la scheda carica da sé.
             if (!options.webContents) { daLei(this.openTab(url, opzioni)); return undefined; }
-            daLei(this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } }));
+            const id = this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } });
+            daLei(id);
+            const tenuta = this.tabs.find((t) => t.id === id);
+            if (tenuta) Object.assign(tenuta, { _nomeFinestra: details.frameName || '', _chiestaDa: wc, _adottataAlle: Date.now() });
             return options.webContents;
           },
         };
@@ -3980,6 +4005,48 @@ class TabManager {
     let storia = 1;
     try { storia = wc.navigationHistory.length(); } catch (_) {}
     if (tab._openedByLink || storia <= 1) this.closeTab(tab.id, { daSola: true });
+  }
+
+  // La finestra tenuta dalla pagina, riempita da un'altra scheda col clic (un target o window.open con lo stesso nome),
+  // torna davanti come nei browser; senza clic resta dietro (#737.8).
+  _chiestaPerNome(tab, wc, e) {
+    if (!e || !e.isMainFrame || e.isSameDocument || !e.initiator || this.activeId === tab.id || !this.tabs.includes(tab)) return;
+    // La prima navigazione è l'apertura stessa, già davanti o dietro come ha chiesto il clic (Ctrl+clic: dietro).
+    let aperta = '';
+    try { aperta = wc.getURL(); } catch (_) {}
+    if (!aperta) return;
+    let da = null;
+    try { da = webContents.fromFrame(e.initiator); } catch (_) {}
+    let chiede = '';
+    try { chiede = e.initiator.url; } catch (_) {}
+    if (da && da !== wc) this._richiamata(tab, da, chiede);
+  }
+
+  // Le richieste che non caricano una pagina nuova (un collegamento a un'ancora, window.open senza indirizzo, focus) le
+  // segnala il preload (#737.8): `nome` dalla pagina che chiede, null dalla finestra stessa a cui hanno chiesto focus.
+  richiamataDallaPagina(wc, frame, nome) {
+    if (nome == null) {
+      const tab = this.tabs.find((t) => t.view.webContents === wc);
+      // Il focus non dice chi l'ha chiesto: vale solo a ridosso del clic sulla pagina che la tiene, non quello che la
+      // finestra si dà da sé più tardi (in Chromium serve il gesto di chi chiama).
+      if (tab && tab._chiestaDa && !(frame && frame.parent)) this._richiamata(tab, tab._chiestaDa, '', RICHIAMO_DA_FOCUS_MS);
+      return;
+    }
+    const tab = this.tabs.find((t) => t._chiestaDa === wc && t._nomeFinestra === nome);
+    let chiede = '';
+    try { chiede = (frame && frame.url) || ''; } catch (_) {}
+    if (tab) this._richiamata(tab, wc, chiede);
+  }
+
+  // Torna davanti se la chiede, col clic che la pagina ha ricevuto, la scheda che l'utente sta guardando; la finestra
+  // nata da quello stesso clic resta dove l'ha messa l'apertura (Ctrl+clic: dietro).
+  _richiamata(tab, da, chiede, entro) {
+    if (this.activeId === tab.id || !this.tabs.includes(tab)) return;
+    const attiva = this.tabs.find((t) => t.id === this.activeId);
+    if (!attiva || attiva.view.webContents !== da) return;
+    const t = Permessi.gestoPerRichiamare(da, chiede, entro);
+    if (!t || (tab._adottataAlle || 0) >= t) return;
+    this.activate(tab.id);
   }
 
   // Una scheda proxata ha la partizione sua, e in privacy ogni sito la sua: lì la finestra non può restare alla pagina.

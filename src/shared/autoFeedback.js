@@ -139,6 +139,109 @@
   // o un errore di parsing.
   const MIN_HOWTO_REPLY_LENGTH = 80;
 
+  // #2348 — si segnala solo se l'utente ha CHIESTO qualcosa: su una riflessione o una discussione ogni proposta è falsa.
+  // Un verbo di comando in testa a una frase (imperativo, o seconda persona: «mi salvi la pagina?»), o una richiesta
+  // cortese seguita da un infinito. Sentinella: tests/unit/autoFeedbackRichiesta.test.mjs.
+  const VERBI_DI_COMANDO = [
+    'apri', 'riapri', 'chiudi', 'richiudi', 'metti', 'rimetti', 'togli', 'leva', 'passa', 'passi', 'vai', 'torna', 'torni',
+    'salva', 'salvi', 'cerca', 'cerchi', 'trova', 'trovi', 'mostra', 'mostri', 'fai', 'fammi', 'fammelo', 'fammela', 'fallo',
+    'falla', 'dammi', 'dammelo', 'dammela', 'cambia', 'cambi',
+    'imposta', 'imposti', 'attiva', 'attivi', 'disattiva', 'disattivi', 'accendi', 'spegni', 'sposta', 'sposti', 'aggiungi',
+    'rimuovi', 'cancella', 'cancelli', 'elimina', 'elimini', 'scrivi', 'riscrivi', 'manda', 'mandi', 'invia', 'invii',
+    'porta', 'porti', 'riporta', 'ingrandisci', 'rimpicciolisci', 'zooma', 'traduci', 'copia', 'copi', 'incolla',
+    'scarica', 'scarichi', 'stampa', 'stampi', 'blocca', 'blocchi', 'sblocca', 'ricarica', 'ricarichi', 'riavvia',
+    'aggiorna', 'segna', 'ricorda', 'leggi', 'rileggi', 'riassumi', 'prendi', 'crea', 'crei', 'ordina', 'riordina',
+    'organizza', 'sistema', 'archivia', 'ripristina', 'annulla', 'rifai', 'ripeti', 'avvia', 'ferma', 'riproduci',
+    'riprendi', 'alza', 'abbassa', 'silenzia', 'condividi', 'rinomina', 'sostituisci', 'correggi', 'controlla',
+    'calcola', 'converti', 'genera', 'seleziona', 'evidenzia', 'collega', 'scollega', 'accedi', 'esci', 'entra',
+    'carica', 'allega', 'usa', 'tieni', 'lascia', 'avvisa', 'sveglia', 'programma', 'svuota', 'pulisci', 'nascondi',
+    'fissa', 'sgancia', 'duplica', 'esporta', 'importa', 'installa', 'disinstalla', 'ascolta',
+  ];
+  const ENCLITICHE = '(?:mi|ti|ci|vi|si|lo|la|li|le|ne|gli|glie(?:lo|la|li|le|ne)|me(?:lo|la|li|le|ne)|te(?:lo|la|li|le|ne)|ce(?:lo|la|li|le|ne))?';
+  // Niente «sì», «no» né «si»: un «si passa» impersonale non è un comando.
+  const RIEMPITIVI = '(?:(?:ok|okay|dai|allora|ora|adesso|poi|e|ma|ecco|filo|bene|perfetto|grazie|ciao|scusa|ehi|hey|per favore|perfavore|per piacere|ti prego|subito|anche|invece|pure|mi|ci|me lo|me la|ce lo|ce la)\\s+)*';
+  const COMANDO_RE = new RegExp(`^${RIEMPITIVI}(?:${VERBI_DI_COMANDO.join('|')})${ENCLITICHE}(?![a-z])`);
+  // Un infinito di fare, non di dire o di capire: chi chiede di spiegare vuole parole, non un'azione.
+  const INFINITO_DI_FARE = '(?!(?:dir|spiegar|raccontar|descriver|chiarir|capir|saper|conoscer|pensar|parlar|discuter|rifletter|ragionar|creder|esser|aver)[a-z]*(?![a-z]))'
+    + '[a-z]{2,}(?:are|ere|ire|rre|(?:ar|er|ir|ur|or|ar)(?:mi|ti|ci|vi|lo|la|li|le|ne|gli|melo|mela|meli|mele|celo|cela|glielo|gliela))(?![a-z])';
+  // «Non riesco a tradurre la pagina» chiede anche lui che la cosa si faccia (#474).
+  const RICHIESTA_CORTESE_RE = new RegExp('\\b(?:puoi|potresti|riesci a|riusciresti a|sapresti|ti dispiace(?:rebbe)?|vorrei|voglio|mi serve|mi servirebbe|ho bisogno di'
+    + '|non (?:riesco a|riesco|e possibile|si puo|sai|posso))\\s+(?:[a-z\']+\\s+){0,2}?'
+    + INFINITO_DI_FARE);
+  const RICHIESTA_CHE_RE = /\b(?:vorrei|voglio|mi piacerebbe|ho bisogno|mi serve) che\b/;
+  // Senza punto di domanda valgono solo gli attacchi che non aprono mai una riflessione.
+  const INTERROGATIVI_RE = /^(?:(?:e|ma|ok|allora|filo|scusa)\s+)*(?:quant[aeio]|qual[ei]|mi dici|dimmi|elenca|elencami)(?![a-z])/;
+
+  function frasiDi(text) {
+    return normalizzaDomanda(text).split(/[\n.!;:,]+|\?+/).map((s) => s.trim()).filter(Boolean);
+  }
+
+  function chiedeAzione(text) {
+    const norm = normalizzaDomanda(text);
+    if (RICHIESTA_CORTESE_RE.test(norm) || RICHIESTA_CHE_RE.test(norm)) return true;
+    return frasiDi(text).some((f) => COMANDO_RE.test(f));
+  }
+
+  // Una domanda di parere («non trovi strano…?», «secondo te…?», «…, no?») è discussione, non una richiesta (#2371).
+  const PARERE_RE = new RegExp('^(?:(?:e|ma|ok|allora|filo|scusa|pero)\\s+)*(?:secondo te|per te|tu che|che ne (?:pensi|dici)'
+    + '|cosa ne (?:pensi|dici)|che dici|pensi che|credi che|dici che|non (?:trovi|credi|pensi|ti sembra|ti pare|sei d\'accordo'
+    + '|e vero|e cosi|e strano)|trovi (?:che|anche|giusto|normale|strano)|ti sembra|ti pare|ti piace|sei d\'accordo|e normale'
+    + '|e strano|ha senso|avrebbe senso|giusto|vero|no|o no|dico bene|o sbaglio)(?![a-z])');
+  const PARERE_OVUNQUE_RE = /\b(?:secondo (?:te|me)|per te|che ne (?:pensi|dici)|cosa ne (?:pensi|dici))\b/;
+
+  function domandeDi(text) {
+    return (normalizzaDomanda(text).match(/[^.!?\n;]*\?/g) || []).map((s) => s.replace(/\?+$/, '').trim()).filter(Boolean);
+  }
+  const diParere = (q) => PARERE_OVUNQUE_RE.test(q) || q.split(/[,:]/).some((c) => PARERE_RE.test(c.trim()));
+
+  // Una domanda che chiede un dato («quanti crediti ho?»): una richiesta anche lei, ma di sapere, non di fare.
+  function chiedeInformazione(text) {
+    if (domandeDi(text).some((q) => !diParere(q))) return true;
+    return frasiDi(text).some((f) => INTERROGATIVI_RE.test(f));
+  }
+
+  // Senza «?» una domanda si riconosce dalla parola che la apre; chiedere di spiegare, o dire di non aver capito, è una
+  // domanda anche quella (#2349: «ho letto quel feedback e non l'ho capito»).
+  const APRE_DOMANDA_RE = /^(?:(?:e|ma|ok|allora|filo|scusa|poi|invece|pero)\s+)*(?:perch|cos[aei']|che cos|come\b|dove\b|quando\b|chi\b|quant[aeio]|qual|mi dici|dimmi|elenca|spiega|mi spieg|raccontami)/;
+  const SPIEGAZIONE_RE = /\b(?:spiegami|spiegamel[aoie]|spiegaci|mi spieghi|me l[oa] spieghi|raccontami|mi racconti)\b|\bnon (?:l'|lo |la |li |le |ti |ci )?(?:ho (?:ben )?capit[oaie]|capisco)\b|\bnon (?:mi )?e chiar[oa]\b/;
+
+  // Una domanda che non è il comando stesso («metti il tema scuro. Cos'è quel feedback?», «apri youtube, quanti video ho
+  // visto?»): un'azione secca non le risponde (#2349). «Puoi mettere il tema scuro?» è un comando, non una domanda in più.
+  // Sbagliare per eccesso costa una chiamata al modello in più; per difetto, una domanda senza risposta.
+  // Senza un comando la domanda è la richiesta stessa, e l'azione scelta le risponde: «dov'è la ricevuta?» col file
+  // mostrato chiude il turno (#1130).
+  function domandaOltreAlComando(text) {
+    const norm = normalizzaDomanda(text);
+    if (SPIEGAZIONE_RE.test(norm)) return true;
+    if (!chiedeAzione(text)) return false;
+    return norm.split(/(?<=[.!?\n;])\s*/).map((s) => s.trim()).filter(Boolean).some((f) => {
+      const corpo = f.replace(/[.!?;\s]+$/, '');
+      const parti = corpo.split(/[,:]|\s+(?:e|ma|poi)\s+/).map((s) => s.trim()).filter(Boolean);
+      if (!chiedeAzione(corpo)) return /\?\s*$/.test(f) || parti.some((p) => APRE_DOMANDA_RE.test(p));
+      return parti.slice(1).some((p) => APRE_DOMANDA_RE.test(p));
+    });
+  }
+
+  // La voce del manifesto ha uno strumento della chat che la comanda? (capabilities.js, mappa STRUMENTO: SOLO_A_MANO
+  // vuol dire nessuno). Una voce senza dichiarazione conta come senza strumento.
+  function haStrumento(cap) {
+    if (!cap) return false;
+    const Caps = global.SN_CAPABILITIES;
+    const s = cap.strumento !== undefined ? cap.strumento : (Caps && Caps.STRUMENTO ? Caps.STRUMENTO[cap.id] : undefined);
+    if (!s) return false;
+    return !(Caps && s === Caps.SOLO_A_MANO);
+  }
+
+  function voceDi(id, capabilities) {
+    return Array.isArray(capabilities) ? capabilities.find((c) => c && c.id === id) || null : null;
+  }
+
+  function categoriaDi(cap) {
+    const Caps = global.SN_CAPABILITIES;
+    const cat = cap && cap.category;
+    return (Caps && Caps.CATEGORIES && Caps.CATEGORIES[cat]) || cat || '';
+  }
+
   // Parole troppo comuni per identificare una capacità.
   const TITLE_STOPWORDS = new Set([
     'una', 'uno', 'del', 'della', 'delle', 'dei', 'degli', 'dal', 'dalla',
@@ -231,22 +334,40 @@
       || guessCapabilityId(replyNorm, capabilities);
   }
 
-  // Ritorna { kind, capabilityId?, genericDesc }, kind fra 'capability-gap', 'complaint' e
+  // Una funzione del manifesto senza strumento, spiegata o rifiutata invece di farla.
+  function nonAzionabile(cap) {
+    const titolo = String(cap.title || cap.id);
+    const categoria = categoriaDi(cap);
+    return {
+      kind: 'capability-uncommandable',
+      capabilityId: cap.id,
+      capabilityTitle: titolo,
+      categoria,
+      genericDesc: `Funzione esistente che l'assistente non sa azionare: «${titolo}» (${cap.id}${categoria ? `, ${categoria}` : ''}). `
+        + 'L\'utente gli ha chiesto di farla e l\'assistente, senza uno strumento che la comandi, gli ha spiegato come farla a mano.',
+    };
+  }
+
+  // Ritorna { kind, capabilityId?, capabilityTitle?, categoria?, genericDesc }, kind fra 'capability-gap', 'complaint' e
   // 'capability-uncommandable'. `userMessage` serve ai segnali, mai a finire nel feedback.
   function analyzeReply(textReply, actions, userMessage, capabilities) {
     const reply = String(textReply || '');
     if (reply.length < MIN_REPLY_LENGTH) return { kind: null };
+    const user = String(userMessage || '');
+    const azione = chiedeAzione(user);
+    // Niente richiesta, niente segnalazione: una discussione non ha una cosa mancata da riferire (#2348).
+    if (!azione && !chiedeInformazione(user)) return { kind: null };
 
     const replyNorm = normalize(reply);
 
     const hasNotCapable = NOT_CAPABLE_PHRASES.some((p) => replyNorm.includes(p));
     if (hasNotCapable) {
-      const capabilityId = guessCapabilityId(replyNorm, capabilities);
-      // Descrizione generica derivata dall'id, non dal testo utente:
-      const genericDesc = capabilityId
-        ? `Richiesta di funzione non disponibile: ${capabilityId}`
-        : 'Richiesta di funzione non disponibile in Filo';
-      return { kind: 'capability-gap', capabilityId, genericDesc };
+      const capabilityId = guessCapabilityId(replyNorm, capabilities) || matchCapabilityByWords(user, reply, capabilities);
+      const cap = capabilityId ? voceDi(capabilityId, capabilities) : null;
+      // Una voce del manifesto non è mai una funzione mancante (#2364). Senza strumento, ed era una richiesta di farla, è
+      // una funzione che l'assistente non sa azionare; con lo strumento, o chiesta come dato, non c'è niente da segnalare.
+      if (cap) return !haStrumento(cap) && azione ? nonAzionabile(cap) : { kind: null };
+      return { kind: 'capability-gap', capabilityId: null, genericDesc: 'Richiesta di funzione non disponibile in Filo' };
     }
 
     const hasComplaint = COMPLAINT_PHRASES.some((p) => replyNorm.includes(p));
@@ -257,14 +378,10 @@
       };
     }
 
-    const uncommandable = detectUncommandable(reply, replyNorm, userMessage, actions, capabilities);
-    if (uncommandable) {
-      return {
-        kind: 'capability-uncommandable',
-        capabilityId: uncommandable,
-        genericDesc: `Funzione esistente che l'assistente non sa azionare: ${uncommandable}`,
-      };
-    }
+    if (!azione) return { kind: null };
+    const uncommandable = detectUncommandable(reply, replyNorm, user, actions, capabilities);
+    const cap = uncommandable ? voceDi(uncommandable, capabilities) : null;
+    if (cap && !haStrumento(cap)) return nonAzionabile(cap);
 
     return { kind: null };
   }
@@ -309,7 +426,7 @@
         .replace(/[^a-z0-9-]/g, '-');
       return {
         text: String(analysis.genericDesc || 'Funzione esistente che l\'assistente non sa azionare').slice(0, 500),
-        name: `Non azionabile dall'assistente: ${analysis.capabilityId || 'sconosciuta'}`.slice(0, 100),
+        name: `Non azionabile dall'assistente: ${analysis.capabilityTitle || analysis.capabilityId || 'sconosciuta'}`.slice(0, 100),
         clientId: `auto:capability-gap:${capId}`,
         capabilityGapId: capId,
         source: 'auto:capability-uncommandable',
@@ -317,6 +434,18 @@
     }
 
     return null;
+  }
+
+  // L'invio anonimo parte al più una volta per voce e per versione di Filo (#2371: tre segnalazioni uguali in nove
+  // minuti). Regola pura: il registro `{ versione, chiavi }` lo tiene su disco src/main/services/autoFeedbackInviati.js.
+  function chiaveInvio(analysis) {
+    return `${analysis && analysis.kind}:${(analysis && analysis.capabilityId) || '-'}`;
+  }
+  function primoInvio(registro, versione, chiave) {
+    const v = String(versione || '');
+    const chiavi = registro && registro.versione === v && Array.isArray(registro.chiavi) ? registro.chiavi : [];
+    if (chiavi.includes(chiave)) return { invia: false, registro: { versione: v, chiavi } };
+    return { invia: true, registro: { versione: v, chiavi: [...chiavi, chiave] } };
   }
 
   // Proposta in chat (#360): a differenza di compose() questo testo CITA la richiesta
@@ -370,11 +499,13 @@
     }
 
     if (analysis.kind === 'capability-uncommandable') {
+      // La funzione per nome (#2348): una proposta che non la nomina non si capisce.
+      const funzione = analysis.capabilityTitle ? `«${analysis.capabilityTitle}»` : 'questa cosa';
       const parts = [`Ho chiesto a Filo: "${asked}"`];
       parts.push(admitted
-        ? `Filo sa fare questa cosa, ma l'assistente non l'ha fatta: mi ha spiegato come farla a mano ("${admitted}")`
-        : 'Filo sa fare questa cosa, ma l\'assistente non l\'ha fatta: mi ha spiegato come farla a mano.');
-      parts.push('Mi piacerebbe poterla chiedere all\'assistente e basta.');
+        ? `Filo sa fare ${funzione}, ma l'assistente non ha uno strumento per farlo e mi ha spiegato come farlo a mano ("${admitted}")`
+        : `Filo sa fare ${funzione}, ma l'assistente non ha uno strumento per farlo e mi ha spiegato come farlo a mano.`);
+      parts.push('Mi piacerebbe poterlo chiedere all\'assistente e basta.');
       return {
         type: 'INVIA_FEEDBACK',
         testo: parts.join('\n').slice(0, 1500),
@@ -430,6 +561,11 @@
     _MANUAL_HOWTO_PHRASES: MANUAL_HOWTO_PHRASES,
     _matchCapabilityByWords: matchCapabilityByWords,
     _isHowtoQuestion: isHowtoQuestion,
+    chiedeAzione,
+    chiedeInformazione,
+    domandaOltreAlComando,
+    chiaveInvio,
+    primoInvio,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

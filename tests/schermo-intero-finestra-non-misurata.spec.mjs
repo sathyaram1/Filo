@@ -6,22 +6,16 @@ import { test, expect } from './fixtures/electron.mjs';
 import { copertura, vistaAvviso } from './helpers/avvisoSito.mjs';
 import { chiedi } from './helpers/chatFinta.mjs';
 import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
+import { serviSiti } from './helpers/reteChiusa.mjs';
 
 const VERDE = [0x12, 0xab, 0x34];
 const SELETTORE = 'Una finestra o lo schermo, scelti da te nel selettore del sistema';
 
 async function servi(app, pagine) {
-  await app.evaluate(({ session, net }, pg) => {
-    const risposta = (req) => {
-      const u = new URL(req.url);
-      const p = pg[u.hostname + u.pathname];
-      if (p) return new Response(p.corpo, { headers: { 'content-type': p.tipo } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
-    };
-    try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
-    session.defaultSession.protocol.handle('https', risposta);
+  await serviSiti(app, pagine, { schemi: ['https'] });
+  await app.evaluate(() => {
     globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
-  }, pagine);
+  });
 }
 
 async function superaAvvisoSeCe(app) {

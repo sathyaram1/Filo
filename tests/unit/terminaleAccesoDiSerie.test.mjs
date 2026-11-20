@@ -46,6 +46,10 @@ test('il livello di un comando viene solo da cmdClassify, qualunque cosa dica il
   }
   // Cancellare senza cestino è un «per sempre», come ELIMINA_FILE (#1840).
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build', ...finti }), 4);
+  // Allineare due cartelle come robocopy /MIR, sul Mac e su Linux (#1909.5).
+  for (const comando of ['rsync -a --delete vuota/ ~/Documenti/', 'robocopy vuota C:\\Users\\u\\Documenti /MIR']) {
+    assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando, ...finti }), 4, comando);
+  }
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'comandoinventato', ...finti }), 3);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'df -h' }), 1);
 });

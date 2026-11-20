@@ -733,6 +733,7 @@
   function runProb() {
     const runId = ++probRunId;
     const out = $('probResult');
+    $('probMullNote').hidden = !Stats.resolveConditions(probConditions()).mulliganUncounted;
     const want = probWants();
     if (!want.length) {
       out.textContent = 'Scegli almeno una categoria.';
@@ -1109,14 +1110,25 @@
 
   // Prosa con [[Nome Carta]] → span hoverable (§3.5). I nomi già risolti rinascono col loro
   // data-card-id dopo un rerender: senza, click ed evidenziazione smettevano di funzionare.
+  function cartaHtml(name) {
+    const known = proseIdByName.get(String(name).toLowerCase());
+    const card = known && cardsById[known];
+    const title = card ? ` title="${esc(`${card.name} — ${card.typeLine}`)}"` : '';
+    return `<span class="dk-prose-card" data-card-name="${esc(name)}"${known ? ` data-card-id="${esc(known)}"` : ''}${title}>${esc(name)}</span>`;
+  }
   function proseHtml(text) {
-    return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => {
-      if (seg.type !== 'card') return esc(seg.text);
-      const known = proseIdByName.get(String(seg.name).toLowerCase());
-      const card = known && cardsById[known];
-      const title = card ? ` title="${esc(`${card.name} — ${card.typeLine}`)}"` : '';
-      return `<span class="dk-prose-card" data-card-name="${esc(seg.name)}"${known ? ` data-card-id="${esc(known)}"` : ''}${title}>${esc(seg.name)}</span>`;
-    }).join('');
+    return window.SN_SCRYFALL_Q.proseSegments(text).map((seg) => (seg.type !== 'card' ? esc(seg.text) : cartaHtml(seg.name))).join('');
+  }
+  // La risposta della chat ha la formattazione e le spiegazioni al passaggio di ogni chat di Filo (#2388); le carte
+  // [[…]] passano intatte dal renderer, che le lascia escapate (le riapre il suo disescapa), e diventano span dopo.
+  function rispostaHtml(text) {
+    const Md = window.SN_MARKDOWN;
+    if (!Md) return `<p class="dk-msg-text">${proseHtml(text)}</p>`;
+    const html = Md.render(text).replace(/\[\[([^[\]<>]+)\]\]/g, (m, nome) => {
+      const n = Md.disescapa(nome).trim();
+      return n ? cartaHtml(n) : m;
+    });
+    return `<div class="dk-msg-text dk-md">${html}</div>`;
   }
 
   // Ragionamento del modello (#331): aperto mentre Filo pensa (si vede scorrere in diretta),
@@ -1142,7 +1154,7 @@
       ? `Controllo una per una le ${n(p.total)} carte trovate…`
       : 'Cerco le carte su Scryfall…';
     const pct = Math.round((done / p.total) * 100);
-    return `${p.reply ? `<p class="dk-msg-text">${proseHtml(p.reply)}</p>` : ''}
+    return `${p.reply ? rispostaHtml(p.reply) : ''}
       <div class="dk-msg-pending dk-progress" role="status">
         <span>${esc(label)}</span><span class="dk-progress-n">${n(done)} di ${n(p.total)}</span>
         <span class="dk-progress-bar" aria-hidden="true"><span style="width:${pct}%"></span></span>
@@ -1169,7 +1181,7 @@
     // Anche da sola: il tetto finito nel ragionamento prima di una parola lascia solo la nota, e «Continua» (#1302).
     const interrotta = !!CE?.eFraseInterrotta?.(righe[righe.length - 1]);
     const testo = interrotta ? righe.slice(0, -1).join('\n') : m.reply;
-    if (testo) parts.push(`<p class="dk-msg-text">${proseHtml(testo)}</p>`);
+    if (testo) parts.push(rispostaHtml(testo));
     if (interrotta) {
       parts.push(`<div class="dk-msg-pending">${esc(righe[righe.length - 1])}</div>`);
       if (isLast) parts.push('<button class="dk-retry" data-continua="1" title="Continua la risposta da dove si è interrotta">Continua</button>');
@@ -2564,6 +2576,8 @@
       window.SN_VOCI_PAGINA = Array.isArray(window.SN_VOCI_PAGINA) ? window.SN_VOCI_PAGINA : [];
       if (!window.SN_VOCI_PAGINA.includes(vociMessaggio)) window.SN_VOCI_PAGINA.push(vociMessaggio);
     }
+    // #2388 — le spiegazioni al passaggio; «Spiegami di più» è una domanda nuova nella chat del mazzo.
+    window.SN_SPIEGAZIONI?.attacca(log, { chiedi: (testo) => sendChat(testo) });
     // Tasto destro su un risultato o su un nome citato (§8.3): le stesse azioni della carta, compreso il commander.
     log.addEventListener('contextmenu', async (e) => {
       const sum = e.target.closest('[data-toggle-list]');

@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MARCA_PARTE } from './unit-fusione-azione.mjs';
-import { COMANDI_DI_ACTIONS, TETTO_ROSSI } from './lib/unit-sulla-fusione.mjs';
+import { TETTO_ROSSI } from './lib/unit-sulla-fusione.mjs';
+import { prendiComandiDiActions, senzaComandiDiActions } from './lib/comandi-di-actions.mjs';
 import { verdetto } from './suite-verdict.mjs';
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -82,9 +83,7 @@ export function provaSpec({ root, ramo, main, spec, noti = [], lancia = lanciaPl
 
 /** L'ambiente degli spec provati: senza i file dei comandi di Actions, come per gli unit (#2225). PURA. */
 export function ambienteDegliSpec(env, out) {
-  const e = { ...env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ELECTRON_DISABLE_SANDBOX: '1' };
-  for (const k of COMANDI_DI_ACTIONS) delete e[k];
-  return e;
+  return { ...senzaComandiDiActions(env), PLAYWRIGHT_JSON_OUTPUT_NAME: out, ELECTRON_DISABLE_SANDBOX: '1' };
 }
 
 function lanciaPlaywright(root, file) {
@@ -109,14 +108,16 @@ function leggiNoti(strumenti) {
 }
 
 function main() {
+  // Prima di qualunque figlio: anche la fusione di prova esegue codice del ramo (hook e filtri di git) (#2558).
+  const { GITHUB_OUTPUT: uscita } = prendiComandiDiActions();
   const a = leggiArgomenti(process.argv.slice(2));
   const campo = a.errori.length
     ? { ramo: a.ramo, main: a.main, esito: 'non_provata', motivo: a.errori.join('; ').slice(0, 300) }
     : provaSpec({ root: resolve(a.root), ramo: a.ramo, main: a.main, spec: a.spec, noti: leggiNoti(resolve(fileURLToPath(import.meta.url), '..', '..')) });
   const json = JSON.stringify(campo);
   console.log(`${MARCA_PARTE} spec ${json}`);
-  if (process.env.GITHUB_OUTPUT) {
-    try { appendFileSync(process.env.GITHUB_OUTPUT, `campo=${json}\n`, 'utf8'); } catch (e) {
+  if (uscita) {
+    try { appendFileSync(uscita, `campo=${json}\n`, 'utf8'); } catch (e) {
       console.error(`spec-fusione-azione: non riesco a scrivere l'esito della parte (${e.message})`);
       process.exit(2);
     }

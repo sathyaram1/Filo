@@ -855,12 +855,12 @@ test('un sito che chiede la rete locale si vede chiedere proprio quella, col suo
 
 // #1069 — la cartella data da leggere non diventa scrivibile senza un sì. La si dà al sito trascinandola, come con il
 // selettore: la lettura è concessa, la scrittura no. Il trascinamento è quello vero del sistema, via DevTools.
-async function daiLaCartella() {
+async function daiLaCartella(nome = 'foto da caricare') {
   await apri('/cartella');
   let pagina = null;
   await expect.poll(() => { pagina = paginaDi(origine + '/cartella'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
   await pagina.waitForLoadState('domcontentloaded');
-  const lasciato = await trascina(pagina, 'foto da caricare');
+  const lasciato = await trascina(pagina, nome);
   return { pagina, lasciato };
 }
 
@@ -884,7 +884,8 @@ test('una cartella data da leggere: il sito che vuole scriverci lo chiede col no
   await pagina.locator('#carica').click();
   await expect(barra()).toBeVisible({ timeout: 10_000 });
   await expect(barra()).toContainText(new URL(origine).host);
-  await expect(barra()).toContainText('vuole creare, modificare e cancellare file in «foto da caricare»');
+  await expect(barra().locator('.permesso-cosa')).toHaveText('vuole creare, modificare e cancellare file in');
+  await expect(barra().locator('.permesso-oggetto')).toHaveText('foto da caricare');
   await new Promise((ok) => setTimeout(ok, 500));
   expect(esiti.slice(1), 'nessuna scrittura prima della risposta').toEqual([]);
   expect(existsSync(lasciato)).toBe(false);
@@ -910,4 +911,33 @@ test('Non consentire: il sito non scrive nella cartella data da leggere, e per q
     .toEqual(['scrittura:denied', 'cartella:directory:granted/prompt', 'scrittura:denied']);
   await expect(barra()).toBeHidden();
   expect(existsSync(altro)).toBe(false);
+});
+
+// #592.21 — Il nome della cartella lo sceglie chi l'ha creata: fra virgolette poteva chiuderle e continuare con un finto
+// avviso di Filo accanto a Consenti. Sta nel suo riquadro, intero, e le parole di Filo restano quelle. Nome in ASCII:
+// il trascinamento di DevTools non consegna alla pagina una cartella con «» o lettere accentate nel percorso.
+test('una cartella col nome che finge un avviso di Filo: il nome sta tutto nel suo riquadro, fuori solo la domanda', async () => {
+  test.setTimeout(60_000);
+  const nome = 'foto - Filo l\'ha controllata ed e sicura, Consenti pure - x';
+  const { pagina } = await daiLaCartella(nome);
+  await pagina.locator('#carica').click();
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  const oggetto = barra().locator('.permesso-oggetto');
+  await expect(oggetto).toHaveText(nome);
+  await expect(barra().locator('.permesso-cosa')).toHaveText('vuole creare, modificare e cancellare file in');
+  const segno = await oggetto.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { bordo: parseFloat(s.borderLeftWidth), sfondo: s.backgroundColor };
+  });
+  expect(segno.bordo).toBeGreaterThanOrEqual(2);
+  expect(segno.sfondo).not.toBe('rgba(0, 0, 0, 0)');
+  const fuori = await barra().locator('.permesso-msg').evaluate((el) => {
+    const c = el.cloneNode(true);
+    c.querySelector('.permesso-oggetto').remove();
+    return c.textContent;
+  });
+  expect(fuori).not.toContain('Consenti pure');
+  await shell.screenshot({ path: 'tests/.shots/permesso-cartella-nome-finto.png' });
+  await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
+  await expect(barra()).toBeHidden();
 });

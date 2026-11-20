@@ -16,6 +16,7 @@
 
   const tabsEl = document.getElementById('tabs');
   const newBtn = document.getElementById('tab-new');
+  window.SN_LINK_SU_SCHEDA?.ascolta(document, { fila: tabsEl.closest('.tab-row'), schede: tabsEl, nuova: newBtn, manda: api.linkSuScheda });
   if (newBtn) newBtn.dataset.tip = `Nuova scheda (${tasto('Ctrl+T')})`;
   // #871 — la maniglia apre e chiude la barra laterale; un clic altrove nella fila la chiude.
   const manigliaBarra = document.getElementById('barra-maniglia');
@@ -542,6 +543,8 @@
     api.onBroadcast((m) => {
       const tipo = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
       if (m && m.type === tipo) quadratoPerSchermoIntero(!!m.fullscreen);
+      const alBordo = globalThis.SN_MSG?.MSG?.WINDOW_AT_SCREEN_EDGE || 'window_at_screen_edge';
+      if (m && m.type === alBordo) document.documentElement.toggleAttribute('data-schede-al-bordo', !!m.alBordo);
     });
   }
 
@@ -751,7 +754,11 @@
   // lo prova. La linguetta segue il puntatore con un transform e i nodi non si spostano fino al rilascio; fuori dalla
   // fila la scheda va a chi sta sotto il puntatore (una chat di Filo, un campo di testo), via main (#2084).
   let drag = null; // { id, el, startX, startY, moved, posti, da, a, fuori, pointerId }
-  let suppressClickId = null; // id della tab il cui prossimo click va ignorato
+  // Il clic da ignorare è solo quello del gesto che ha trascinato: tenuto oltre, mangiava il clic dopo sulla
+  // stessa scheda quando il rilascio non era caduto su di lei (portata fuori, Esc, finestra lasciata) (#2382).
+  let gestoStriscia = 0;
+  let clicZittito = null; // { id, gesto }
+  const zittisciClic = (id) => { clicZittito = { id, gesto: gestoStriscia }; };
   let ultimoPointerId = null;
   const SOGLIA_TRASCINAMENTO = 4;
   // Oltre questo margine sopra o sotto la fila la scheda esce dalla barra: tirando un po' storto si riordina ancora.
@@ -851,7 +858,7 @@
     drag = null;
     smonta(d);
     if (!d.moved) return;
-    suppressClickId = d.id;
+    zittisciClic(d.id);
     tabsEl.classList.remove('riordino');
     for (const p of d.posti) p.el.style.transform = '';
     if (ridisegnoRimandato) render();
@@ -887,8 +894,7 @@
     drag = null;
     smonta(d);
     if (!d.moved) return;
-    // Il click che segue il mouseup non deve riattivare/spostare la tab.
-    suppressClickId = d.id;
+    zittisciClic(d.id);
     if (d.fuori) {
       tabsEl.classList.remove('riordino');
       for (const p of d.posti) p.el.style.transform = '';
@@ -903,6 +909,8 @@
     assesta(d, dx);
     // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
     if (d.a !== d.da) { ridisegnoRimandato = false; api.tabs.move(d.id, d.a); }
+    // Lasciata al suo posto è un clic con la mano che ha tremato oltre la soglia: la scheda si apre (#2382).
+    else if (d.id !== state.activeId) api.tabs.activate(d.id);
     // Una scheda trascinata nella striscia, per i contatori (#1471): dove è finita, mai quale.
     try {
       Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
@@ -926,7 +934,7 @@
       render();
     }, 0);
   }
-  tabsEl.addEventListener('mousedown', () => { premutoSullaStriscia = true; }, true);
+  tabsEl.addEventListener('mousedown', () => { premutoSullaStriscia = true; gestoStriscia++; }, true);
   window.addEventListener('mouseup', rilascioStriscia, true);
   window.addEventListener('blur', rilascioStriscia);
 
@@ -1469,7 +1477,10 @@
     close.className = 'close';
     if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
     else close.textContent = '×';
-    el.append(ico, title, close);
+    const cima = document.createElement('span');
+    cima.className = 'tab-cima';
+    cima.setAttribute('aria-hidden', 'true');
+    el.append(ico, title, close, cima);
     el._parti = { ico, title, close, paese: null, audio: null, permessi: null };
     return el;
   }
@@ -1649,16 +1660,33 @@
     openTabContextMenu(s.t, e.clientX, e.clientY);
   });
   tabsEl.addEventListener('pointerdown', (e) => { ultimoPointerId = e.pointerId; });
+  // La X premuta: il clic arriva alla scheda se fra pressione e rilascio la mano scivola appena fuori dal tondo,
+  // e la apriva invece di chiuderla (#2382). Vale il rilascio vicino alla X; più lontano il gesto è annullato.
+  const MARGINE_CROCE = 8;
+  let crocePremuta = null; // { id, r, gesto }
   tabsEl.addEventListener('mousedown', (e) => {
     const s = schedaDellEvento(e);
+    const x = s && e.button === 0 ? e.target.closest('.close') : null;
+    crocePremuta = x ? { id: s.t.id, r: x.getBoundingClientRect(), gesto: gestoStriscia } : null;
     if (s) startTabDrag(e, s.t, s.el);
   });
   tabsEl.addEventListener('click', (e) => {
+    const croce = crocePremuta && crocePremuta.gesto === gestoStriscia ? crocePremuta : null;
+    crocePremuta = null;
+    if (croce) {
+      const { r } = croce;
+      const vicino = e.clientX >= r.left - MARGINE_CROCE && e.clientX <= r.right + MARGINE_CROCE
+        && e.clientY >= r.top - MARGINE_CROCE && e.clientY <= r.bottom + MARGINE_CROCE;
+      if (vicino && state.tabs.some((t) => t.id === croce.id)) api.tabs.close(croce.id, 'pulsante_x');
+      return;
+    }
     const s = schedaDellEvento(e);
     if (!s) return;
     if (e.target.closest('.close')) { api.tabs.close(s.t.id, 'pulsante_x'); return; }
     if (e.target.closest('.tab-alert')) { api.tabs.setMuted(s.t.id); return; }
-    if (suppressClickId === s.t.id) { suppressClickId = null; return; }
+    const zitto = clicZittito && clicZittito.gesto === gestoStriscia ? clicZittito : null;
+    clicZittito = null;
+    if (zitto && zitto.id === s.t.id) return;
     api.tabs.activate(s.t.id);
   });
   tabsEl.addEventListener('auxclick', (e) => {
@@ -1803,6 +1831,7 @@
         id: c.dataset.nid || '',
         testo: testoDi(c),
         azioni: azioniDi(c),
+        indirizzo: c.dataset.indirizzo || '',
         icona: c.dataset.icona || '',
         titolo: c.dataset.titolo || '',
         carta: c.dataset.carta || '',
@@ -1952,15 +1981,19 @@
       }
       if (mosse) disponi();
     }
-    // Entrando nella home quelli che restavano finché li si chiude prendono il tempo di lettura, uscendo lo perdono.
+    // Entrando nella home quelli che restavano finché li si chiude prendono il tempo di lettura, uscendo lo perdono;
+    // quello di una cosa che lì ha la sua carta lascia subito l'angolo, come se fosse nato nella home (#2390.1).
     function cambiaLuogo() {
       const ora = inHome();
       if (ora === eraHome) return;
       eraHome = ora;
+      let mosse = false;
       for (const c of vive()) {
+        if (ora && davanti && c.dataset.carta) { delete c.dataset.attesa; colloca(c); mosse = true; continue; }
         if (c.dataset.attesa === '1' || c._durata > 0) continue;
         avviaTempo(c, c._durata);
       }
+      if (mosse) disponi();
     }
     // Come è uscita di scena (#1470): il tipo e l'esito, mai il testo né l'etichetta del pulsante.
     function contaUscita(card, esito) {
@@ -2101,7 +2134,7 @@
     // `carta`: la carta della home che racconta già la stessa cosa (timer:<id>, download:<id>); `icona` e `titolo`
     // per la carta e la notifica del sistema; `uid`: lo stesso avviso mandato dal main a più finestre.
     function segni(card, opts) {
-      const carta = typeof opts.carta === 'string' && /^(timer|download):[A-Za-z0-9_-]{1,80}$/.test(opts.carta) ? opts.carta : '';
+      const carta = window.SN_CARTE_HOME.cartaDiAvviso(opts.carta);
       if (carta) card.dataset.carta = carta; else delete card.dataset.carta;
       card.dataset.icona = FORMA.icona({ icona: opts.icona, carta, errore: !!opts.errore });
       if (typeof opts.titolo === 'string' && opts.titolo.trim()) card.dataset.titolo = opts.titolo.trim().slice(0, 80);
@@ -2149,7 +2182,7 @@
     return api.downloads.openFolder(id, luogo).then((res) => {
       if (!res) return;
       if (res.ok === false) { avvisoErrore(res.error || 'Non è stato possibile aprire la cartella', 'cartella_non_aperta'); return; }
-      if (res.missing) avvisoErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto');
+      if (res.missing && res.avviso) avvisoErrore(res.avviso, 'file_non_aperto');
     }).catch(() => {});
   }
 
@@ -2278,7 +2311,7 @@
             return {
               label: a.label,
               onClick: () => api.downloads.rimettiNome(id, 'notifica').then((r) => {
-                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`, { tipo: 'nome_rimesso' });
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`, { tipo: 'nome_rimesso', indirizzo: r.indirizzo || '' });
                 else avvisoErrore((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima', 'nome_non_rimesso');
               }).catch(() => {}),
             };
@@ -2382,6 +2415,24 @@
       if (panelOpen) renderPanel();
     }
 
+    // A schermo intero il pannello resta solo finché porta una domanda: il solo elenco farebbe scendere la pagina
+    // sotto un riquadro vuoto a ogni sguardo alle schede (#2387). L'elenco sta nella home e nella pagina Download.
+    let schermoIntero = false;
+    const portaUnaDomanda = () => !!chiusura || domandeApri.size > 0
+      || Array.from(dls.values()).some((r) => r.state === 'pending');
+    function chiudiSeSoloElenco() {
+      if (panelOpen && schermoIntero && !portaUnaDomanda()) { closePanel(); return true; }
+      return false;
+    }
+    if (typeof api.onBroadcast === 'function') {
+      api.onBroadcast((m) => {
+        const tipo = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
+        if (!m || m.type !== tipo) return;
+        schermoIntero = !!m.fullscreen;
+        chiudiSeSoloElenco();
+      });
+    }
+
     function ensurePanel() {
       if (panel) return panel;
       panel = document.createElement('div');
@@ -2445,6 +2496,7 @@
 
     function renderPanel() {
       ensurePanel();
+      if (chiudiSeSoloElenco()) return;
       const list = panel.querySelector('#dl-panel-list');
       const all = Array.from(dls.values()).sort((a, b) => {
         // Le domande in cima, poi gli attivi, poi per data d'inizio decrescente.
@@ -3191,10 +3243,11 @@
       msg.append(chi, ' ', testo);
       if (cosa.nome) {
         // Un nome lunghissimo non spinge giù la pagina di righe: si accorcia in mezzo, l'estensione resta, intero al passaggio.
+        // Il nome lo sceglie chi ha creato il file: sta nel suo riquadro, non fra virgolette che può chiudere da sé (#592.21).
         const n = document.createElement('strong');
         n.className = 'permesso-oggetto';
         const c = Array.from(cosa.nome);
-        n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
+        n.textContent = c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome;
         n.dataset.tip = String(cosa.percorso || cosa.nome);
         msg.append(' ', n);
       }

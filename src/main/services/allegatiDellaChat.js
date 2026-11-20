@@ -15,7 +15,11 @@ const MIME = Object.freeze({
   txt: 'text/plain', log: 'text/plain', md: 'text/markdown', markdown: 'text/markdown', csv: 'text/csv',
   tsv: 'text/tab-separated-values', json: 'application/json', yml: 'application/x-yaml', yaml: 'application/x-yaml',
   pdf: 'application/pdf',
+  avif: 'image/avif', jfif: 'image/jpeg', ico: 'image/x-icon', heic: 'image/heic', heif: 'image/heif',
+  tif: 'image/tiff', tiff: 'image/tiff',
 });
+const tettoLettura = () => (globalThis.SN_CONST && globalThis.SN_CONST.ALLEGATI_CHAT
+  && globalThis.SN_CONST.ALLEGATI_CHAT.tettoLetturaByte) || 64 * 1024 * 1024;
 
 async function conversazione(chatId) {
   const Chats = globalThis.SN_FILO_CHATS;
@@ -27,12 +31,16 @@ async function conversazione(chatId) {
   return { messaggi: (conFoto && conFoto.messages) || [], fotoDi: (m) => m.fotoInMemoria || null };
 }
 
-// Un file della conversazione letto dal disco, col tetto controllato PRIMA di leggerlo.
+// Un file della conversazione letto dal disco, col tetto controllato PRIMA di leggerlo. Un'immagine oltre il tetto o
+// fuori elenco (una foto del telefono, un AVIF) parte solo ridisegnata dal riquadro di conferma (#1664): qui non c'è
+// un canvas. Finché non lo è, porta il suo problema.
 async function leggiFile(v) {
   const Tipi = globalThis.SN_FEEDBACK_ATTACH;
-  const genere = Tipi ? Tipi.classify({ name: v.nome, type: '' }) : null;
-  if (!genere) return { ...v, problema: 'tipo di file non ammesso' };
   const ext = path.extname(v.nome).slice(1).toLowerCase();
+  const fuoriElenco = !!(Tipi && ((Tipi.RIDISEGNABILI_EXT && Tipi.RIDISEGNABILI_EXT.has(ext))
+    || (Tipi.NON_APRIBILI_EXT && Tipi.NON_APRIBILI_EXT.has(ext))));
+  const genere = (Tipi ? Tipi.classify({ name: v.nome, type: '' }) : null) || (fuoriElenco ? 'image' : null);
+  if (!genere) return { ...v, problema: 'tipo di file non ammesso' };
   const type = MIME[ext] || 'application/octet-stream';
   const tipo = genere === 'image' ? 'immagine' : 'file';
   if (!path.isAbsolute(v.percorso)) return { ...v, tipo, type, problema: 'non si trova più sul computer' };
@@ -40,10 +48,13 @@ async function leggiFile(v) {
   try { st = await fs.promises.stat(v.percorso); } catch (_) { return { ...v, tipo, type, problema: 'non si trova più sul computer' }; }
   if (!st.isFile()) return { ...v, tipo, type, problema: 'non è un file' };
   const tetto = AS().limiti().byte;
-  if (st.size > tetto) return { ...v, tipo, type, byte: st.size, problema: AS().problemaDi({ ...v, dataUrl: 'x', byte: st.size }) };
+  const troppo = AS().problemaDi({ ...v, dataUrl: 'x', byte: st.size });
+  const daPreparare = tipo === 'immagine' && (st.size > tetto || fuoriElenco);
+  if (st.size > (daPreparare ? tettoLettura() : tetto)) return { ...v, tipo, type, byte: st.size, problema: troppo };
   try {
     const buf = await fs.promises.readFile(v.percorso);
-    return { ...v, tipo, type, byte: buf.length, dataUrl: `data:${type};base64,${buf.toString('base64')}` };
+    const letta = { ...v, tipo, type, byte: buf.length, dataUrl: `data:${type};base64,${buf.toString('base64')}` };
+    return daPreparare ? { ...letta, daPreparare: true, problema: st.size > tetto ? troppo : 'formato da ridisegnare' } : letta;
   } catch (_) {
     return { ...v, tipo, type, problema: 'non si legge' };
   }

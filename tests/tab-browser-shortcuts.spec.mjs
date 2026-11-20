@@ -65,6 +65,40 @@ test('Ctrl+W da una pagina web chiude la scheda corrente', async ({ app, openTab
   expect(after.count).toBe(before.count - 1);
 });
 
+// #871.5 — una scheda di dietro che si carica si prende la tastiera da sola: la tastiera torna a quella davanti, e un
+// Ctrl+W arrivato a lei intanto chiude quella davanti, che è quella che l'utente guarda.
+test('la tastiera presa da una scheda di dietro torna a quella davanti, e Ctrl+W chiude quella davanti', async ({ app, openTab, testServer }) => {
+  await openTab(testServer.html('<title>UNO</title><h1 id="ok">1</h1>'));
+  const page2 = await openTab(testServer.html('<title>DUE</title><h1 id="ok">2</h1>'));
+  await page2.waitForSelector('#ok');
+  const { davanti, dietro } = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const tm = w._filoTabs;
+    w.focus();
+    tm.tabs.find((x) => x.id === tm.activeId).view.webContents.focus();
+    return { davanti: tm.activeId, dietro: tm.tabs.find((x) => x.title === 'UNO').id };
+  });
+  const tastiera = () => app.evaluate(({ BrowserWindow, webContents }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs;
+    const col = webContents.getFocusedWebContents();
+    return (tm.tabs.find((x) => x.view.webContents === col) || {}).id || null;
+  });
+  await expect.poll(tastiera).toBe(davanti);
+
+  await app.evaluate(({ BrowserWindow }, id) => {
+    BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.tabs.find((x) => x.id === id).view.webContents.focus();
+  }, dietro);
+  await expect.poll(tastiera).toBe(davanti);
+
+  await app.evaluate(({ BrowserWindow }, id) => {
+    const wc = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.tabs.find((x) => x.id === id).view.webContents;
+    wc.focus();
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'W', modifiers: ['control'] });
+  }, dietro);
+  await expect.poll(() => tabsInfo(app).then((i) => i.ids.includes(davanti))).toBe(false);
+  expect((await tabsInfo(app)).ids).toContain(dietro);
+});
+
 test('Ctrl+L da una pagina web apre la home (dove si digita l\'indirizzo)', async ({ app, openTab, testServer }) => {
   const page = await openTab(testServer.html('<title>SITO</title><h1 id="ok">x</h1>'));
   await page.waitForSelector('#ok');

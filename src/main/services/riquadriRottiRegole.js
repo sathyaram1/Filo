@@ -199,10 +199,11 @@ function messaggi({ immagine, sito }) {
 }
 
 // Il nome del modello si mostra solo se è il nome del sito stesso: un riquadro che si fa chiamare «Banca» resta il
-// suo sito, e instagram-accesso.xyz non diventa Instagram.
+// suo sito, e instagram-accesso.xyz non diventa Instagram. Fra le lettere del sito solo uno spazio, un punto o un
+// trattino: il nome sta nelle frasi di Filo, e virgolette, a capo o lettere di altri alfabeti ci scriverebbero (#592.21).
 function nomeConfermato(nome, sito) {
   const n = String(nome || '').trim();
-  if (!n || n.length > 30 || /[<>"{}]/.test(n)) return null;
+  if (!n || n.length > 30 || !/^[A-Za-z0-9]+(?:[ .-][A-Za-z0-9]+)*$/.test(n)) return null;
   const chiave = n.toLowerCase().replace(/[^a-z0-9]/g, '');
   const nomeSito = String(sito || '').toLowerCase().split('.')[0].replace(/[^a-z0-9]/g, '');
   return chiave.length >= 2 && chiave === nomeSito ? n : null;

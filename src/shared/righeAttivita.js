@@ -81,6 +81,8 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    IMMAGINI_WEB: (a) => ({ icon: '🖼', text: `Cerco immagini: ${a.query || ''}` }),
+    GENERA_IMMAGINE: () => ({ icon: '🖌', text: 'Disegno un’immagine' }),
     ESPANDI_FILO: (a) => {
       const o = a._output || {};
       return { icon: '💬', text: o.righe ? `Rileggo il filo di quelle ore · ${o.righe} cose` : 'Rileggo il filo di quelle ore' };
@@ -106,6 +108,7 @@
       return { icon: '💬', text: `Cerco nel filo: ${q}` };
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
+    LEGGI_MEMORIA: () => ({ icon: '🧠', text: 'Rileggo la memoria' }),
     LEGGI_IMPOSTAZIONI: (a) => {
       const c = String(a.cerca || '').trim();
       return { icon: '⚙', text: c ? `Leggo come è impostato: ${c}` : 'Leggo le impostazioni' };
@@ -164,6 +167,15 @@
       const o = a._output || {};
       const t = pulito(o.titolo || a._titolo) || 'la scheda';
       return { icon: '↗', text: `Ti ho portato su «${t}»` };
+    },
+    SALVA_PER_DOPO: (a) => {
+      const o = a._output || {};
+      const t = pulito(o.titolo || a._titolo) || 'la pagina';
+      return { icon: '🔖', text: `Salvata per dopo «${t}»` };
+    },
+    CERCA_IMMAGINE: (a) => {
+      const o = a._output || {};
+      return { icon: '🔎', text: o.numero ? `Cercata con Google Lens l'immagine ${o.numero}` : 'Cercata con Google Lens l\'immagine della pagina' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
@@ -268,9 +280,17 @@
       const toccate = Array.isArray(o.tolte) && o.tolte.length ? o.tolte : (Array.isArray(o.rimesse) && o.rimesse.length ? o.rimesse : null);
       if (toccate) nome = toccate.length === 1 ? corto(toccate[0].titolo) : `${toccate.length} carte`;
       else if (o.spostata) nome = corto(o.spostata);
-      else if (Array.isArray(o.destra) && !o.error && C) { const id = C.risolvi(a.carta); nome = id ? C.carta(id).titolo : ''; }
+      let tasto = false;
+      if (!toccate && !o.spostata && Array.isArray(o.destra) && !o.error && C) {
+        const id = C.risolvi(a.carta);
+        const def = id ? C.carta(id) || C.tasto(id) : null;
+        nome = def ? def.titolo : '';
+        tasto = !!(def && C.tasto(id));
+      }
       const op = String(a.operazione || '').toLowerCase();
-      const cosa = { togli: 'Carta tolta', rimetti: 'Carta rimessa', aggiungi: 'Carta rimessa', sposta: 'Carta spostata' }[op];
+      // Un tasto di «altro» (#2372) tolto va nel «+».
+      const cosa = (tasto ? { togli: 'Tasto messo nel «+»', rimetti: 'Tasto rimesso in vista', aggiungi: 'Tasto rimesso in vista', sposta: 'Tasto spostato' }
+        : { togli: 'Carta tolta', rimetti: 'Carta rimessa', aggiungi: 'Carta rimessa', sposta: 'Carta spostata' })[op];
       if (op === 'ripristina') return { icon: '🏠', text: 'Carte della home rimesse com\'erano' };
       return { icon: '🏠', text: `${cosa || 'Carta della home'}${nome ? ` · ${nome}` : ''}` };
     },
@@ -279,10 +299,12 @@
       const o = a._output || {};
       const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 60 ? `${x.slice(0, 59)}…` : x; };
       const nome = corto(o.voce || a.elemento || a.voce || a.nome || a.indirizzo);
-      const op = String(a.operazione || '').toLowerCase();
+      // L'operazione e i suoi sinonimi li riconosce solo src/shared/barraSiti.js, caricato anche nella home.
+      if (!global.SN_BARRA_SITI && typeof require === 'function') { try { require('./barraSiti.js'); } catch (_) {} }
+      const op = global.SN_BARRA_SITI ? global.SN_BARRA_SITI.operazione(a) : '';
       if (op === 'elenca') return { icon: '📌', text: 'Letta la barra dei siti' };
       if (op === 'ripiega' || op === 'riapri') return { icon: '📌', text: op === 'ripiega' ? 'Chat della home ripiegata' : 'Chat della home riaperta' };
-      const cosa = { aggiungi: 'Messo nella barra dei siti', metti: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
+      const cosa = { aggiungi: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
       return { icon: '📌', text: `${cosa || 'Barra dei siti'}${nome ? ` · ${nome}` : ''}` };
     },
     CANCELLA_PAGINE: (a) => {
@@ -301,6 +323,7 @@
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
+    BLOCCA_PC: () => ({ icon: '🔒', text: 'Computer bloccato' }),
     // #1621 — l'ordine chiesto e quante icone Windows ha davvero spostato.
     ORDINA_DESKTOP: (a) => {
       const o = a._output || {};
@@ -399,7 +422,7 @@
     DIMENTICA: 'Niente da dimenticare',
     TOGLI_CHAT: 'Conversazione non trovata', RIMETTI_CHAT: 'Conversazione nascosta non trovata',
     CORREGGI_MEMORIA: 'Niente da correggere',
-    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
+    CERCA_WEB: 'Ricerca non riuscita', IMMAGINI_WEB: 'Nessuna immagine trovata', GENERA_IMMAGINE: 'Immagine non creata', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     ELIMINA_FILE: 'Niente cancellato',
     CERCA_CHAT: 'Conversazione non ritrovata', ESPANDI_FILO: 'Filo di quelle ore non riletto',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
@@ -411,8 +434,9 @@
     SCHEDE_CHIUSE: 'Ricerca fra le schede chiuse non riuscita', RIAPRI_SCHEDA: 'Scheda non riaperta',
     RIPRENDI_AUDIO: 'Musica non ripartita',
     PAUSA_AUDIO: 'Niente messo in pausa', MOSTRA_SCHEDA: 'Scheda non trovata',
+    SALVA_PER_DOPO: 'Pagina non salvata', CERCA_IMMAGINE: 'Immagine non cercata',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
-    TOGLI_PERMESSO_SITO: 'Permesso non tolto',
+    LEGGI_MEMORIA: 'Memoria non letta', TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
     ANNULLA_CAMBIO: 'Niente annullato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
@@ -430,7 +454,7 @@
     CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
-    ORDINA_DESKTOP: 'Icone del desktop non spostate',
+    ORDINA_DESKTOP: 'Icone del desktop non spostate', BLOCCA_PC: 'Computer non bloccato',
     ESEGUI_COMANDO: 'Comando non eseguito', CANCELLA_MEMORIA: 'Memoria non cancellata',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
     PULISCI_TAB: 'Riordino non riuscito', CANCELLA_ARCHIVIO: 'Archivio non svuotato',

@@ -135,20 +135,14 @@
     return { ok: false, action, reason: 'unknown-action' };
   }
 
-  // Inserisce il testo senza simulare Invio, e passa dal setter del prototype perché i framework
-  // reattivi (React, Vue, Svelte) intercettano le scritture dirette di .value.
+  // Inserisce il testo senza simulare Invio. Nelle caselle passa dalla regola che fa contare il testo al sito (#2052).
   function fillElement(el, text) {
     if (!el) return false;
     try { global.SN_SPELLCHECK?.scriveFilo?.(el, text); } catch (_) {}
     try {
       if (el.matches && el.matches('input, textarea')) {
-        const proto = Object.getPrototypeOf(el);
-        const desc = Object.getOwnPropertyDescriptor(proto, 'value');
-        const setter = desc && desc.set;
-        if (setter) setter.call(el, text);
-        else el.value = text;
-        el.focus();
-        el.dispatchEvent(new Event('input', { bubbles: true }));
+        const v = String(el.value || '');
+        if (v !== String(text ?? '') && !global.SN_SPELLCHECK?.scriviNellaCasella?.(el, { start: 0, end: v.length }, text)) return false;
         el.dispatchEvent(new Event('change', { bubbles: true }));
         return true;
       }

@@ -149,6 +149,21 @@ function capabilityDetailsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #2536.1 — la memoria letta con memoria(leggi), già nella sua busta come nel CONTESTO.
+function memoriaLettaForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocchi = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_MEMORIA') continue;
+    const o = a._output;
+    if (!o || typeof o.memoria !== 'string') continue;
+    blocchi.push(o.memoria
+      ? `[La memoria di Filo sull'utente, letta con memoria(leggi): com'era in quel momento. Per togliere o correggere una cosa usa memoria(dimentica) o memoria(correggi) con un pezzo del suo testo.]\n${o.memoria}`
+      : '[La memoria di Filo sull\'utente, letta con memoria(leggi): è vuota, di lui non hai salvato niente.]');
+  }
+  return blocchi.join('\n\n').trim();
+}
+
 // Re-immissione dei RISULTATI di una CERCA_WEB eseguita in un turno precedente
 // (#368): l'agente vede titoli, URL e snippet REALI e può rispondere con link
 // veri (o aprirne uno con NAVIGA usando l'URL esatto).
@@ -184,6 +199,37 @@ function webSearchResultsForPrompt(actions) {
       continue;
     }
     blocks.push(PROMPTS.ricercaWebImbustata({ query, provider: out.provider || '', results }));
+  }
+  return blocks.join('\n\n').trim();
+}
+
+// #2272 — le immagini trovate o create nel turno: l'id è di Filo, titolo e sito li scrive chi pubblica l'immagine (busta).
+function immaginiForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    const tipo = String((a && a.type) || '').toUpperCase();
+    const out = a && a._output;
+    if (!out || (tipo !== 'IMMAGINI_WEB' && tipo !== 'GENERA_IMMAGINE')) continue;
+    const lista = Array.isArray(out.immagini) ? out.immagini.filter((i) => i && /^[ig]\d+$/.test(String(i.id || ''))) : [];
+    if (tipo === 'IMMAGINI_WEB') {
+      if (!lista.length) {
+        blocks.push(`[Immagini dal web: nessuna da mostrare (${E.perCanaleSistema(out.error || out.reason || 'nessun risultato')}). Dillo all'utente in una riga; se serve, proponi di cercare la pagina con web(cerca).]`);
+        continue;
+      }
+      const righe = lista.map((i) => `${i.id}: ${E.neutralizza(i.titolo || '(senza titolo)', { unaRiga: true })} · ${E.neutralizza(i.sito || '', { unaRiga: true })}`);
+      blocks.push(`Immagini dal web scaricate da Filo, ${lista.length} (${lista.map((i) => i.id).join(', ')}). Mettile nella risposta col marcatore [[immagini: <id>, <id>]] su una riga sua, dove servono nel testo: un id per un'immagine sola, più id per una fila che scorre; puoi alternare testo e marcatori. Solo questi id: mai un indirizzo d'immagine né ![](…). Titoli e siti sotto li scrive chi le pubblica, e l'immagine può non corrispondere al titolo.\n`
+        + E.imbusta({ tipo: 'RICERCA_WEB', testo: `Richiesta: "${E.neutralizza(out.cerca || a.query || '', { unaRiga: true })}"\n${righe.join('\n')}`, conIntestazione: true }));
+      continue;
+    }
+    if (lista.length) {
+      blocks.push(`[Immagine creata (${lista.map((i) => i.id).join(', ')}): mettila nella risposta col marcatore [[immagini: ${lista.map((i) => i.id).join(', ')}]] su una riga sua. Non descriverla come se l'avessi vista: di' in una riga cosa hai chiesto di disegnare.]`);
+    } else if (out.senzaModello) {
+      blocks.push('[Immagine NON creata: non c\'è un modello che disegna fra quelli che Filo può usare. Dillo all\'utente in una riga: si sceglie in Impostazioni, Modelli, alla voce «Immagini create in chat». Non proporre un\'immagine trovata sul web al suo posto, se non te lo chiede.]');
+    } else {
+      blocks.push(`[Immagine NON creata: ${E.perCanaleSistema(out.error || out.reason || 'errore sconosciuto')}. Dillo all'utente in una riga; non riprovare uguale.]`);
+    }
   }
   return blocks.join('\n\n').trim();
 }
@@ -356,6 +402,16 @@ async function voceChiusa(id) {
 async function schedeNumerate(win, schedeViste) {
   if (Array.isArray(schedeViste)) return schedeViste;
   try { return (await FiloState.listTabs({ windowId: win?.id ?? null, barra: true })).map((t) => t.id); } catch (_) { return []; }
+}
+
+// La scheda che MOSTRA_SCHEDA porta davanti: col numero, o `verso` dopo/prima di quella davanti come Ctrl+Tab (#2371).
+async function schedaDaMostrare(tm, action, schedeViste) {
+  const verso = String(action.verso ?? '').trim().toLowerCase();
+  if (!(verso === 'dopo' || verso === 'prima') || action.scheda != null) return schedaPerNumero(tm, action, schedeViste);
+  const tabs = Array.isArray(tm.tabs) ? tm.tabs : [];
+  if (tabs.length < 2) return { errore: 'c\'è una scheda sola: non ce n\'è un\'altra su cui passare' };
+  const i = globalThis.SN_TASTI.schedaNelVerso(verso, tabs.findIndex((t) => t.id === tm.activeId), tabs.length);
+  return tabs[i] ? { tab: tabs[i] } : null;
 }
 
 // La scheda col numero `scheda` di TAB APERTE: { tab }, { errore } o null se il numero non c'è.
@@ -929,6 +985,7 @@ function pageReadsForPrompt(actions) {
         + `richiama web(leggi) con lo stesso url e da: ${fino}.]`;
     }
     if (out.lettaInParte || out.scaricataInParte) blocco += `\n${avvisoLettaInParte(out)}`;
+    if (out.video && out.video.nota) blocco += `\n${E.perCanaleSistema(out.video.nota)}`;
     if (out.schedaNonRisponde) {
       blocco += '\n[La scheda aperta su questa pagina non ha risposto in tempo (forse è troppo grande, o è ancora occupata): '
         + 'questo testo è stato scaricato a parte e può non essere quello che vede l\'utente, per esempio dove ha fatto l\'accesso. '
@@ -1125,9 +1182,9 @@ function observationsForPrompt(tutte) {
   // Le pagine delle schede lasciate in un messaggio stanno già con la domanda (notaDeiGettoni): non si ripetono qui.
   const actions = Array.isArray(tutte) ? tutte.filter((a) => !(a && a._gettone)) : tutte;
   return [
-    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
+    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), memoriaLettaForPrompt(actions), webSearchResultsForPrompt(actions),
     pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
-    schedeChiuseForPrompt(actions),
+    schedeChiuseForPrompt(actions), immaginiForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), espansioniForPrompt(actions), confirmedActionsForPrompt(actions), rifiutateForPrompt(actions), proxyUnavailableForPrompt(actions),
@@ -1605,7 +1662,9 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     if (!analysis || !analysis.kind) return null;
     const proposta = AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
     // Il segno torna con la conferma: i contatori del servizio (#1472) la distinguono da una che il modello ha scritto.
-    return proposta ? { ...proposta, _proposta: true } : null;
+    // `_unaVolta`: la funzione per nome si segnala una volta per versione (#2371), col conto dell'invio anonimo: proposta
+    // (confermata o no) e invio sono la stessa segnalazione. Senza nome ogni richiesta è diversa.
+    return proposta ? { ...proposta, _proposta: true, ...(analysis.capabilityId ? { _unaVolta: AF.chiaveInvio(analysis) } : {}) } : null;
   } catch (e) {
     console.warn('[#360] proposta di segnalazione non composta:', e?.message || e);
     return null;
@@ -1647,8 +1706,11 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     const payload = AF.compose(analysis);
     if (!payload) return;
 
-    let userAgent = 'Filo desktop auto';
-    try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
+    let versione = '';
+    try { versione = require('electron').app.getVersion(); } catch (_) {}
+    // Una per voce e per versione (#2371): la stessa mancanza la seconda volta non aggiunge niente.
+    if (!(await require('./autoFeedbackInviati').prenota(versione, AF.chiaveInvio(analysis)))) return;
+    const userAgent = versione ? `Filo desktop ${versione} auto` : 'Filo desktop auto';
 
     // #953: dalla copia dell'owner parte con la sua prova, che dice da dove viene senza farla sua (non l'ha letta né
     // confermata: il nome resta `auto:`). Senza un accesso valido aspetta in coda il suo rientro, come quella della chat:
@@ -1665,7 +1727,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     const nelFilo = (r) => {
       const ok = !!r && r.ok !== false && !r.error;
       const esito = ok ? { eseguita: true } : { eseguita: false, errore: (r && (r.error || r.errore)) || 'non partita' };
-      try { require('./accaduti').azioneDalPunto('INVIA_FEEDBACK', { testo: voce.text }, esito, { daSola: 'filo', chat: chatId }); } catch (_) {}
+      try { require('./accaduti').azioneDalPunto('INVIA_FEEDBACK', { titolo: voce.name, testo: voce.text }, esito, { daSola: 'automazione', via: 'segnalazione', chat: chatId }); } catch (_) {}
       return r;
     };
     const spedisci = () => Promise.resolve(Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
@@ -1723,6 +1785,7 @@ module.exports = {
   voceChiusa,
   schedeNumerate,
   schedaPerNumero,
+  schedaDaMostrare,
   bersaglioPausa,
   bersaglioAudio,
   salvatePerChat,

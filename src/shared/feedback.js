@@ -824,6 +824,10 @@
       // L'impronta del biglietto della sessione locale (#1148): il server ne legge la fiducia alla nascita.
       const biglietto = opts && typeof opts.bigliettoLocale === 'string' && /^[0-9a-f]{64}$/.test(opts.bigliettoLocale) ? opts.bigliettoLocale : '';
       if (biglietto) doc.fields.bigliettoLocale = toFsValue(biglietto);
+      // Il biglietto che non può dare fiducia dà almeno il segno riservato, e quello rimasto sul PC si dichiara (#2027.4).
+      const delSegno = opts && typeof opts.bigliettoDelSegno === 'string' && /^[0-9a-f]{64}$/.test(opts.bigliettoDelSegno) ? opts.bigliettoDelSegno : '';
+      if (delSegno && !biglietto) doc.fields.bigliettoDelSegno = toFsValue(delSegno);
+      if (opts && opts.riservatoDichiarato === true) doc.fields.riservatoDichiarato = toFsValue(true);
       if (localOnly) {
         doc.fields.localOnly = toFsValue({
           by: String(localOnly.by || '').slice(0, 120),
@@ -849,6 +853,8 @@
         authRefused = res.status;
         delete doc.fields.senderProof;
         delete doc.fields.bigliettoLocale;
+        delete doc.fields.bigliettoDelSegno;
+        delete doc.fields.riservatoDichiarato;
         delete doc.fields.priority;
         delete doc.fields.priorityManual;
         res = null;

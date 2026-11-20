@@ -73,6 +73,14 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   `broadcastToFiloPages` una funzione dell'ambito, non un messaggio unico.
 - **Una voce dentro una carta ha il suo tasto destro.** Un documento, un mazzo, un suggerimento: «Apri» quella
   voce e «Apri nel filo» con la sua frase; il menu della carta resta sul resto della carta.
+- **I tasti di «altro» si compongono, il «+» no (#2372).** Ricerca nel filo, app, Impostazioni e Profilo sono tasti
+  dello stesso catalogo (`TASTI`), con le stesse mosse delle carte: `togli` li mette nel «+», `aggiungi` li rimette
+  davanti a un altro tasto, `sposta` li riordina; la disposizione li tiene in `tasti` e `riposti`. Il «+» non è un
+  tasto: sta in fondo, non si trascina e non ha mosse, perché è la strada di ritorno garantita. Aperto, mostra tutto
+  quello che è fuori vista (tasti messi via, carte tolte, carte di sinistra nascoste). A parole un tasto si riconosce
+  solo dai suoi `nomi`, mai dal titolo: «Download» detto in chat è lo scaricamento a sinistra.
+- **La ricerca prende la colonna, non un livello sopra.** Il tasto della ricerca la ridisegna (campo in cima,
+  risultati sotto) e la lente in cima è il tasto stesso che la chiude; il risultato scelto si mostra al centro, nel filo.
 - **Una carta nuova si aggiunge al catalogo.** `CARTE` e `APP` in `src/shared/carteHome.js`: chi aveva
   già salvato una disposizione la ritrova in fondo a destra, perché tolte sono solo quelle tolte da lui.
   Colori e misure passano dai token `--dash-*`

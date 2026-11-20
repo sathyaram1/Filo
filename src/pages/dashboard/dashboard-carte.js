@@ -140,7 +140,7 @@
     // Una sveglia che si ripete: «Ferma» la zittisce per oggi, togliere la carta la toglie del tutto.
     const togli = timerMsg(rep || !t.ringing ? MSG.FILO_DELETE_TIMER : MSG.FILO_STOP_TIMER_ALARM, t.id);
     const base = {
-      chiave: `timer:${t.id}`, tipo: sveglia ? 'sveglia' : 'timer', icona: sveglia ? 'alarm' : 'timer',
+      chiave: C.chiaveTimer(t.id), tipo: sveglia ? 'sveglia' : 'timer', icona: sveglia ? 'alarm' : 'timer',
       titolo: nome, togli, chat: t.chat || null, suona: !!t.ringing,
       etichettaTogli: sveglia ? 'Togli la sveglia' : 'Togli il timer',
     };
@@ -198,8 +198,8 @@
     const nome = r.filename || 'download';
     const pct = percento(r);
     const base = {
-      chiave: `download:${r.id}`, tipo: 'download', icona: 'download', titolo: nome,
-      togli: () => muovi({ tipo: 'nascondi', chiave: `download:${r.id}` }), etichettaTogli: 'Togli dalla home',
+      chiave: C.chiaveDownload(r.id), tipo: 'download', icona: 'download', titolo: nome,
+      togli: () => muovi({ tipo: 'nascondi', chiave: C.chiaveDownload(r.id) }), etichettaTogli: 'Togli dalla home',
       esterno: 'download',
       altreVoci: [{ etichetta: 'Mostra nei Download', fai: () => apri(URL_SCARICAMENTI) }],
     };
@@ -245,6 +245,7 @@
       etichetta: 'Cartella',
       fai: () => d.send({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id }).then((res) => {
         if (res && res.ok === false) avvisoErrore(res.error || 'La cartella non si apre', 'cartella_non_aperta');
+        else if (res && res.missing && res.avviso) avvisoErrore(res.avviso, 'file_non_aperto');
         caricaDownloads();
       }),
     };
@@ -377,42 +378,37 @@
   // ===== Gli avvisi della barra volati qui (#2390) =====
   // Il modello sta nella shell della finestra: la carta ne mostra testo e azioni, e ogni gesto torna a lei.
   const TITOLO_DA_ICONA = { warning: 'Avviso', download: 'Scaricamento', timer: 'Timer', alarm: 'Sveglia' };
-  function cartaCornice(a) {
+  // `volati`: quelli nella colonna adesso, che «Chiudi tutti» toglie insieme.
+  function cartaCornice(a, volati) {
     const allaShell = (azione) => () => d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: a.id, azione });
     const chiudi = allaShell('chiudi');
     const azioni = (a.azioni || []).map((etichetta, i) => ({ etichetta, fai: allaShell(String(i)) })).filter((x) => x.etichetta);
+    const chiudiTutti = () => { for (const x of volati) d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: x.id, azione: 'chiudi' }); };
+    // Il tasto destro è quello dell'avviso nell'angolo: le voci le decide il modulo condiviso.
+    const menu = global.SN_FORMA_AVVISO.menu({ azioni: a.azioni, indirizzo: a.indirizzo, quante: volati.length })
+      .map((v) => v && { etichetta: v.etichetta, fai: v.azione === 'chiudi-tutti' ? chiudiTutti : allaShell(v.azione) });
     return {
       chiave: `cornice:${a.id}`, tipo: 'cornice', icona: a.icona || 'bell',
       titolo: a.titolo || TITOLO_DA_ICONA[a.icona] || 'Filo', stato: a.testo, lungo: true,
       principale: azioni[0] ? { ...azioni[0], forte: true } : { etichetta: 'Chiudi', fai: chiudi },
       secondaria: azioni[0] ? (azioni[1] || { etichetta: 'Chiudi', fai: chiudi }) : null,
-      // Come «Chiudi tutti» della pila nell'angolo: più avvisi volati qui si tolgono con un gesto.
-      altreVoci: dati.cornice.length > 1
-        ? [...azioni.slice(2), { etichetta: 'Chiudi tutti gli avvisi', fai: () => { for (const x of dati.cornice) d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: x.id, azione: 'chiudi' }); } }]
-        : azioni.slice(2),
+      menu,
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: a.testo,
     };
   }
-  // Un avviso che racconta una cosa che ha già la sua carta non diventa una carta in più: la home fa notare quella,
-  // e solo se si vede (in una home dietro un'altra scheda l'avviso aspetta, senza doppioni).
+  // Un avviso che racconta una cosa che ha già la sua carta non diventa una carta in più (SN_CARTE_HOME.sinistra non
+  // lo mette): la home fa notare quella, e solo se si vede (in una home dietro un'altra scheda l'avviso aspetta).
   const assorbiti = new Set();
-  function separaCornice(chiavi) {
-    const nuove = [];
-    const da = [];
-    for (const a of dati.cornice) {
-      if (a.carta && chiavi.has(a.carta)) {
-        if (document.visibilityState === 'visible' && !assorbiti.has(a.id)) { assorbiti.add(a.id); da.push(a); }
-        continue;
-      }
-      nuove.push(a);
-    }
+  function assorbi(chiavi) {
+    const da = dati.cornice.filter((a) => a.carta && chiavi.has(a.carta) && !assorbiti.has(a.id));
+    if (document.visibilityState !== 'visible') return;
     for (const a of da) {
+      assorbiti.add(a.id);
       d.send({ type: MSG.AVVISI_COLONNA_AZIONE, id: a.id, azione: 'assorbi' });
       // Al giro dopo: il timer che suona arriva un attimo dopo il suo avviso e rifà la carta.
       setTimeout(() => fattiNotare(a.carta), 400);
     }
-    return nuove;
   }
   const movimentoRidotto = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
   function durataMoto(ms) {
@@ -485,23 +481,20 @@
   // L'ordine (urgenza di Filo, poi quello dell'utente) lo decide il modulo condiviso: la chat lo legge uguale.
   const PER_TIPO = {
     crediti: () => cartaCrediti(), timer: cartaTimer, sveglia: cartaTimer, download: cartaDownload,
-    avviso: cartaAvviso, lavoro: cartaLavoro,
+    avviso: cartaAvviso, lavoro: cartaLavoro, cornice: cartaCornice,
   };
   function datiSinistra() {
     return {
       timers: dati.timers, notifiche: dati.notifiche, downloads: dati.downloads, lavori: dati.lavori,
-      crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(),
+      crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(), cornice: dati.cornice,
     };
   }
-  // Gli avvisi volati qui stanno in cima, i più recenti per primi, e lì restano finché li si chiude.
   function carteSinistra() {
     programmaLavori();
     const voci = C.sinistra(datiSinistra(), layout);
-    const cornice = separaCornice(new Set(voci.map((v) => v.chiave)));
-    return [
-      ...cornice.map((a) => Object.assign(cartaCornice(a), { fissa: true })),
-      ...voci.map((v) => Object.assign(PER_TIPO[v.tipo](v.ref), { fissa: !!v.fissa })),
-    ];
+    assorbi(new Set(voci.map((v) => v.chiave)));
+    const volati = voci.filter((v) => v.tipo === 'cornice').map((v) => v.ref);
+    return voci.map((v) => Object.assign(PER_TIPO[v.tipo](v.ref, volati), { fissa: !!v.fissa }));
   }
 
   // ===== Le carte di destra =====
@@ -676,8 +669,7 @@
   // La carta di una funzione in pausa non c'è, né a destra né fra le tolte: la disposizione salvata resta com'è.
   const inPausa = (id) => id === 'mazzi' && !dati.aperte.mazzi;
   // Con la Bacheca in pausa l'app porta alle sole segnalazioni dell'utente, che restano sue. Il nome corto sta nella cella.
-  const SEGNALAZIONI = { id: 'bacheca', titolo: 'Segnalazioni', icona: 'feedback', url: 'filo://board/board.html#segnalazioni' };
-  const appVisibili = () => C.APP.map((a) => (a.id === 'bacheca' && !dati.aperte.bacheca ? SEGNALAZIONI : a));
+  const appVisibili = () => C.APP.map((a) => (a.id === 'bacheca' && !dati.aperte.bacheca ? C.SEGNALAZIONI : a));
 
   function carteDestra() {
     return ((layout && layout.destra) || []).filter((id) => !inPausa(id)).map((id) => {
@@ -841,68 +833,212 @@
     ordine.forEach((art, i) => { if (host.children[i] !== art) host.insertBefore(art, host.children[i] || null); });
   }
 
-  // ===== «altro»: le app senza carta, e le carte tolte =====
-  // Si rifà solo quando cambiano le carte tolte: il conto alla rovescia ridisegna la home ogni secondo.
-  // Una carta di sinistra tolta (i Crediti, uno scaricamento) sta qui come quelle di destra: si rimette da sola.
+  // ===== «altro»: i tasti, e il «+» coi tasti e le carte fuori vista (#2372) =====
+  // Si rifà solo quando cambia quello che mostra: il conto alla rovescia ridisegna la home ogni secondo.
+  // Nel «+» stanno i tasti messi via, le carte tolte e quelle di sinistra nascoste: ognuno si rimette da solo.
   const ICONA_SINISTRA = { crediti: 'credits', download: 'download', lavoro: 'sparkles', timer: 'timer', sveglia: 'alarm', avviso: 'bell' };
   let formaAltro = '';
+  let fuoriAperto = false;
+  const Tocco = () => global.SN_DOPPIO_TOCCO;
+  const letteraDi = (id) => (Tocco() ? Tocco().diTasto(dati.impostazioni && dati.impostazioni.doppioTocco, id) : null);
+  // Il tasto come si vede: la Bacheca in pausa porta alle Segnalazioni.
+  function tastoVisto(id) {
+    if (id === 'bacheca' && !dati.aperte.bacheca) return { ...C.tasto(id), ...C.SEGNALAZIONI, nomi: [] };
+    return C.tasto(id);
+  }
+  // Clic e Invio su un tasto, ovunque stia (colonna, «+», doppio tocco).
+  function usaTasto(id, ancora) {
+    const t = tastoVisto(id);
+    if (!t) return;
+    if (id === 'cerca') { if (d.apriRicerca) d.apriRicerca(); return; }
+    if (t.url) { apri(t.url); return; }
+    if (t.comando) {
+      // Il menu della shell si apre sotto il tasto, ovunque l'utente l'abbia messo (#1491).
+      // Dal «+» chiuso o dal doppio tocco il tasto non si vede: il menu si apre sotto il «+».
+      const visto = (n) => { const r = n && n.isConnected ? n.getBoundingClientRect() : null; return r && r.width ? r : null; };
+      const r = visto(ancora) || visto(altroEl && altroEl.querySelector('#altroPiu'));
+      d.send({ type: MSG.SHELL_ACTION, command: t.comando, ...(r ? { anchor: { x: r.left, y: r.bottom } } : {}) });
+    }
+  }
+  const etichettaUso = (t) => (t.id === 'cerca' ? 'Cerca nel filo' : t.comando ? t.titolo : `Apri ${t.titolo}`);
+
+  function voceAltro(v, dove) {
+    const cella = el('div', 'dash-altro-cella');
+    const b = el('button', 'dash-altro-app');
+    b.type = 'button';
+    b.dataset.id = v.id;
+    if (v.tolta) b.dataset.tolta = '1';
+    if (v.tasto) b.dataset.tasto = '1';
+    const ic = icona(v.icona, 20);
+    b.appendChild(ic);
+    b.appendChild(el('span', 'dash-altro-nome', v.titolo));
+    const l = v.tasto || v.url ? letteraDi(v.id) : null;
+    const uso = v.tasto ? etichettaUso(v) : v.url ? `Apri ${v.titolo}` : 'Rimetti nella home';
+    b.title = l ? `${uso} · ${l.lettera}${l.lettera}` : uso;
+    b.setAttribute('aria-label', v.titolo);
+    const rimetti = () => muovi(v.sinistra ? { tipo: 'mostra', chiave: v.id } : { tipo: 'aggiungi', carta: v.id });
+    b.addEventListener('click', () => {
+      contaGesto('carta_home', { carta: v.id, colonna: 'altro', come: 'clic' });
+      if (v.tasto) usaTasto(v.id, b);
+      else if (v.url) apri(v.url);
+      else rimetti();
+    });
+    b.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      contaGesto('carta_home', { carta: v.id, colonna: 'altro', come: 'tasto_destro' });
+      apriMenu(e.clientX, e.clientY, vociAltro(v, dove, b, rimetti));
+    });
+    b.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const r = b.getBoundingClientRect();
+        apriMenu(r.left + 12, r.bottom, vociAltro(v, dove, b, rimetti));
+      } else if (e.key === 'Delete' && dove === 'vista') { e.preventDefault(); muovi({ tipo: 'togli', carta: v.id }); }
+    });
+    cella.appendChild(b);
+    b.draggable = true;
+    b.addEventListener('dragstart', (e) => {
+      chiudiMenu();
+      presa = { chiave: v.id, colonna: dove === 'vista' ? 'tasti' : 'altro', sinistra: !!v.sinistra, tasto: !!v.tasto, el: b };
+      trascinando = true;
+      b.classList.add('presa');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('application/x-filo-carta', v.id);
+      e.dataTransfer.setData('text/plain', v.titolo);
+      global.SN_GESTI?.marca(e.dataTransfer, 'carta_home');
+    });
+    b.addEventListener('dragend', (e) => { contaFine(e); fineTrascinamento(); });
+    if (dove === 'fuori') {
+      const piu = el('button', 'dash-altro-rimetti', '+');
+      piu.type = 'button';
+      piu.title = v.tasto ? 'Rimetti in vista' : 'Rimetti nella home';
+      piu.setAttribute('aria-label', `Rimetti ${v.titolo} ${v.tasto ? 'in vista' : 'nella home'}`);
+      piu.addEventListener('click', (e) => { e.stopPropagation(); rimetti(); });
+      cella.appendChild(piu);
+    }
+    if (v.id === 'profilo' && d.decoraProfilo) d.decoraProfilo(b, ic);
+    return cella;
+  }
+
+  function vociAltro(v, dove, b, rimetti) {
+    const menu = [];
+    if (v.tasto) menu.push({ etichetta: etichettaUso(v), fai: () => usaTasto(v.id, b) });
+    else if (v.url) menu.push({ etichetta: `Apri ${v.titolo}`, fai: () => apri(v.url) });
+    if (dove === 'vista') {
+      const fratelli = [...altroEl.querySelectorAll('.dash-altro-griglia.vista .dash-altro-app[data-tasto="1"]')];
+      const at = fratelli.indexOf(b);
+      if (at > 0) menu.push({ etichetta: 'Sposta prima', fai: () => muovi({ tipo: 'sposta', carta: v.id, prima: fratelli[at - 1].dataset.id }) });
+      if (at >= 0 && at < fratelli.length - 1) menu.push({ etichetta: 'Sposta dopo', fai: () => muovi({ tipo: 'sposta', carta: v.id, prima: fratelli[at + 2] ? fratelli[at + 2].dataset.id : null }) });
+      menu.push({ etichetta: 'Metti nel «+»', fai: () => muovi({ tipo: 'togli', carta: v.id }) });
+    } else {
+      menu.push({ etichetta: v.tasto ? 'Rimetti in vista' : 'Rimetti nella home', fai: rimetti });
+    }
+    const lettera = vociLettera(v.id, v.titolo);
+    if (lettera.length) menu.push(null, ...lettera);
+    return menu;
+  }
+
+  // ===== Le lettere del doppio tocco, dal tasto destro di un tasto o di una carta =====
+  function vociLettera(id, titolo) {
+    if (!Tocco() || !C.prendeLettera(id)) return [];
+    const l = letteraDi(id);
+    if (!l) return [{ etichetta: 'Assegna una lettera', fai: () => aspettaLettera(id, titolo) }];
+    return [
+      { etichetta: `Cambia lettera (${l.lettera}${l.lettera})`, fai: () => aspettaLettera(id, titolo) },
+      { etichetta: 'Togli la lettera', fai: () => scriviImpostazione({ doppioTocco: { lettere: Tocco().togli(dati.impostazioni && dati.impostazioni.doppioTocco, l.lettera).lettere } }) },
+    ];
+  }
+  // La lettera si sceglie premendola: la prossima battuta, Esc o un clic altrove lasciano tutto com'era.
+  let attesaLettera = null;
+  function fineAttesaLettera() {
+    if (!attesaLettera) return;
+    global.removeEventListener('keydown', attesaLettera.tasto, true);
+    global.removeEventListener('mousedown', attesaLettera.fine, true);
+    global.removeEventListener('blur', attesaLettera.fine);
+    attesaLettera = null;
+  }
+  function aspettaLettera(id, titolo) {
+    fineAttesaLettera();
+    avviso(`Premi la lettera per «${titolo}»`);
+    const tasto = (e) => {
+      if (['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock'].includes(e.key)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      fineAttesaLettera();
+      if (e.key === 'Escape') { avviso('Lettera non cambiata'); return; }
+      const l = !e.ctrlKey && !e.metaKey && !e.altKey ? Tocco().lettera(e.key) : '';
+      if (!l) { avviso('Serve una lettera: niente è cambiato'); return; }
+      const r = Tocco().assegna(dati.impostazioni && dati.impostazioni.doppioTocco, l, { tasto: id });
+      if (r.rifiuto) { avviso(r.rifiuto); return; }
+      scriviImpostazione({ doppioTocco: { lettere: r.lettere } });
+      avviso(Tocco().conPrima(`«${l}${l}» nella home: ${titolo}`, r));
+    };
+    attesaLettera = { tasto, fine: () => fineAttesaLettera() };
+    global.addEventListener('keydown', tasto, true);
+    // Il clic che ha scelto la voce del menu è già passato: il prossimo chiude l'attesa.
+    setTimeout(() => {
+      if (!attesaLettera || attesaLettera.tasto !== tasto) return;
+      global.addEventListener('mousedown', attesaLettera.fine, true);
+      global.addEventListener('blur', attesaLettera.fine);
+    }, 0);
+  }
+
   function disegnaAltro() {
-    const tolte = ((layout && layout.tolte) || []).filter((id) => !inPausa(id)).map((id) => ({ ...C.carta(id), tolta: true }));
+    const l = layout || C.predefinita();
+    const vista = l.tasti.map((id) => ({ ...tastoVisto(id), tasto: true }));
+    const tasti = l.riposti.map((id) => ({ ...tastoVisto(id), tasto: true, tolta: true }));
+    const tolte = (l.tolte || []).filter((id) => !inPausa(id)).map((id) => ({ ...C.carta(id), tolta: true }));
     const sinistre = C.nascosteSinistra(datiSinistra(), layout).map((v) => ({
       id: v.chiave, titolo: v.tipo === 'crediti' ? 'Crediti' : v.titolo, icona: ICONA_SINISTRA[v.tipo] || 'bell',
       url: v.tipo === 'crediti' ? URL_CREDITI : null, tolta: true, sinistra: true,
     }));
-    const voci = [...sinistre, ...tolte, ...appVisibili()];
-    const f = voci.map((v) => `${v.id}:${v.tolta ? 1 : 0}:${v.titolo}`).join(',');
+    const fuori = [...sinistre, ...tolte, ...tasti];
+    const lettere = JSON.stringify((dati.impostazioni && dati.impostazioni.doppioTocco && dati.impostazioni.doppioTocco.lettere) || []);
+    const f = [fuoriAperto, lettere, ...vista.map((v) => `${v.id}:${v.titolo}`), '|', ...fuori.map((v) => `${v.id}:${v.titolo}`)].join(',');
     if (f === formaAltro && altroEl.childElementCount) return;
     formaAltro = f;
+    const fuoco = document.activeElement && altroEl.contains(document.activeElement)
+      ? { id: document.activeElement.dataset.id, piu: document.activeElement.id === 'altroPiu' } : null;
     altroEl.replaceChildren();
-    const tit = el('div', 'dash-altro-tit', 'altro');
-    altroEl.appendChild(tit);
-    const griglia = el('div', 'dash-altro-griglia');
-    for (const v of voci) {
-      const cella = el('div', 'dash-altro-cella');
-      const b = el('button', 'dash-altro-app');
-      b.type = 'button';
-      b.dataset.id = v.id;
-      if (v.tolta) b.dataset.tolta = '1';
-      b.appendChild(icona(v.icona, 20));
-      b.appendChild(el('span', 'dash-altro-nome', v.titolo));
-      b.title = v.tolta ? (v.url ? `Apri ${v.titolo}` : 'Rimetti nella home') : `Apri ${v.titolo}`;
-      const rimetti = () => muovi(v.sinistra ? { tipo: 'mostra', chiave: v.id } : { tipo: 'aggiungi', carta: v.id });
-      b.addEventListener('click', () => {
-        if (v.url) { contaGesto('carta_home', { carta: v.id, colonna: 'altro', come: 'clic' }); apri(v.url); } else rimetti();
-      });
-      b.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        contaGesto('carta_home', { carta: v.id, colonna: 'altro', come: 'tasto_destro' });
-        const menu = [];
-        if (v.url) menu.push({ etichetta: `Apri ${v.titolo}`, fai: () => apri(v.url) });
-        if (v.tolta) menu.push({ etichetta: 'Rimetti nella home', fai: rimetti });
-        apriMenu(e.clientX, e.clientY, menu);
-      });
-      cella.appendChild(b);
-      if (v.tolta) {
-        b.draggable = true;
-        b.addEventListener('dragstart', (e) => {
-          presa = { chiave: v.id, colonna: 'altro', sinistra: !!v.sinistra, el: b };
-          trascinando = true;
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('application/x-filo-carta', v.id);
-          e.dataTransfer.setData('text/plain', v.titolo);
-          global.SN_GESTI?.marca(e.dataTransfer, 'carta_home');
-        });
-        b.addEventListener('dragend', (e) => { contaFine(e); fineTrascinamento(); });
-        const piu = el('button', 'dash-altro-rimetti', '+');
-        piu.type = 'button';
-        piu.title = 'Rimetti nella home';
-        piu.setAttribute('aria-label', `Rimetti ${v.titolo} nella home`);
-        piu.addEventListener('click', (e) => { e.stopPropagation(); rimetti(); });
-        cella.appendChild(piu);
-      }
-      griglia.appendChild(cella);
-    }
+    altroEl.appendChild(el('div', 'dash-altro-tit', 'altro'));
+    const griglia = el('div', 'dash-altro-griglia vista');
+    for (const v of vista) griglia.appendChild(voceAltro(v, 'vista'));
+    // Il «+» è fisso: non si trascina, non si toglie, e sta sempre in fondo.
+    const cellaPiu = el('div', 'dash-altro-cella');
+    const piu = el('button', 'dash-altro-app dash-altro-piu');
+    piu.type = 'button';
+    piu.id = 'altroPiu';
+    piu.draggable = false;
+    piu.setAttribute('aria-expanded', fuoriAperto ? 'true' : 'false');
+    piu.setAttribute('aria-controls', 'altroFuori');
+    piu.setAttribute('aria-label', 'Fuori vista');
+    piu.title = fuori.length ? `Fuori vista: ${fuori.map((v) => v.titolo).join(', ')}` : 'Fuori vista';
+    piu.appendChild(icona('plus', 20));
+    piu.appendChild(el('span', 'dash-altro-nome', fuori.length ? String(fuori.length) : ' '));
+    piu.addEventListener('click', () => { fuoriAperto = !fuoriAperto; disegnaAltro(); });
+    piu.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      apriMenu(e.clientX, e.clientY, [
+        { etichetta: fuoriAperto ? 'Chiudi i tasti fuori vista' : 'Mostra i tasti fuori vista', fai: () => { fuoriAperto = !fuoriAperto; disegnaAltro(); } },
+        { etichetta: 'Rimetti le carte com’erano', fai: () => muovi({ tipo: 'ripristina' }) },
+      ]);
+    });
+    cellaPiu.appendChild(piu);
+    griglia.appendChild(cellaPiu);
     altroEl.appendChild(griglia);
+    const pannello = el('div', 'dash-altro-fuori');
+    pannello.id = 'altroFuori';
+    pannello.hidden = !fuoriAperto;
+    if (fuori.length) {
+      const g = el('div', 'dash-altro-griglia');
+      for (const v of fuori) g.appendChild(voceAltro(v, 'fuori'));
+      pannello.appendChild(g);
+    } else pannello.appendChild(el('div', 'dash-altro-vuoto', 'niente fuori vista'));
+    altroEl.appendChild(pannello);
+    if (fuoco) {
+      const n = fuoco.piu ? piu : altroEl.querySelector(`.dash-altro-app[data-id="${CSS.escape(fuoco.id || '')}"]`);
+      if (n) n.focus({ preventScroll: true });
+    }
   }
 
   let trascinando = false;
@@ -922,6 +1058,8 @@
   // ===== Menu del tasto destro =====
   function vociMenu(art) {
     const c = art._carta;
+    // Un avviso volato ha il menu che aveva nell'angolo; in più solo quello che ogni carta della home sa fare.
+    if (c.menu) return [...c.menu, null, { etichetta: 'Apri nel filo', fai: () => apriNelFilo(art) }];
     const voci = [];
     if (c.principale) voci.push({ etichetta: c.principale.etichetta, fai: () => c.principale.fai() });
     if (c.secondaria) voci.push({ etichetta: c.secondaria.etichetta, fai: () => c.secondaria.fai() });
@@ -932,6 +1070,8 @@
     const at = fratelli.indexOf(art);
     if (at > 0) voci.push({ etichetta: 'Sposta su', fai: () => spostaCarta(art, -1) });
     if (at >= 0 && at < fratelli.length - 1) voci.push({ etichetta: 'Sposta giù', fai: () => spostaCarta(art, 1) });
+    // La lettera del doppio tocco di una carta che apre un'app (#2372); «Togli» resta l'ultima voce.
+    if (art.dataset.colonna === 'destra') voci.push(...vociLettera(art.dataset.chiave, c.titolo));
     if (c.togli) voci.push({ etichetta: c.etichettaTogli || 'Togli', fai: () => c.togli() });
     return voci;
   }
@@ -1032,8 +1172,9 @@
   function fineTrascinamento() {
     if (presa && presa.el) presa.el.classList.remove('presa');
     presa = null;
-    for (const n of document.querySelectorAll('.dash-carta.sopra-prima, .dash-carta.sopra-dopo')) n.classList.remove('sopra-prima', 'sopra-dopo');
+    for (const n of document.querySelectorAll('.sopra-prima, .sopra-dopo')) n.classList.remove('sopra-prima', 'sopra-dopo');
     if (altroEl) altroEl.classList.remove('bersaglio');
+    for (const n of document.querySelectorAll('.dash-altro-piu.bersaglio')) n.classList.remove('bersaglio');
     trascinando = false;
     if (daRidisegnare) { daRidisegnare = false; disegna(); }
   }
@@ -1075,7 +1216,7 @@
   function ammessa(host) {
     if (!presa) return false;
     const daAltro = presa.colonna === 'altro';
-    if (host === tieniEl) return presa.colonna === 'destra' || (daAltro && !presa.sinistra);
+    if (host === tieniEl) return presa.colonna === 'destra' || (daAltro && !presa.sinistra && !presa.tasto);
     return host === accadeEl && ((presa.colonna === 'sinistra' && !presa.fissa) || (daAltro && presa.sinistra));
   }
   function agganciaColonna(host) {
@@ -1111,21 +1252,60 @@
       e.preventDefault();
       apriMenu(e.clientX, e.clientY, [{ etichetta: 'Rimetti le carte com’erano', fai: () => muovi({ tipo: 'ripristina' }) }]);
     });
+    // Dove va quello che si lascia qui: sul «+» o fra quelli fuori vista lo si mette via; fra i tasti in vista un tasto
+    // prende il posto davanti a cui lo si lascia; una carta lasciata altrove in «altro» va nel «+» come prima.
+    const dove = (e) => {
+      if (!presa) return null;
+      const t = e.target && e.target.closest ? e.target : null;
+      const nelPiu = t && (t.closest('.dash-altro-piu') || t.closest('#altroFuori'));
+      if (nelPiu) return presa.colonna === 'destra' || presa.colonna === 'tasti' ? { via: true, el: altroEl.querySelector('#altroPiu') } : null;
+      const griglia = t && t.closest('.dash-altro-griglia.vista');
+      if (griglia && (presa.colonna === 'tasti' || (presa.colonna === 'altro' && presa.tasto))) return { tasti: griglia };
+      return presa.colonna === 'destra' ? { via: true, el: null } : null;
+    };
+    const pulisci = () => {
+      for (const n of altroEl.querySelectorAll('.sopra-prima, .sopra-dopo, .bersaglio')) n.classList.remove('sopra-prima', 'sopra-dopo', 'bersaglio');
+      altroEl.classList.remove('bersaglio');
+    };
     altroEl.addEventListener('dragover', (e) => {
-      if (!presa || presa.colonna !== 'destra') return;
+      const b = dove(e);
+      if (!b) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      altroEl.classList.add('bersaglio');
+      pulisci();
+      if (b.via) (b.el || altroEl).classList.add('bersaglio');
+      else {
+        const s = bersaglioTasti(b.tasti, e);
+        if (s.segno) s.segno.classList.add(s.dove === 'dopo' ? 'sopra-dopo' : 'sopra-prima');
+      }
     });
-    altroEl.addEventListener('dragleave', (e) => { if (!altroEl.contains(e.relatedTarget)) altroEl.classList.remove('bersaglio'); });
+    altroEl.addEventListener('dragleave', (e) => { if (!altroEl.contains(e.relatedTarget)) pulisci(); });
     altroEl.addEventListener('drop', (e) => {
-      if (!presa || presa.colonna !== 'destra') return;
+      const b = dove(e);
+      if (!b) return;
       e.preventDefault();
       contaRilascio(e, 'altro_home');
-      const chiave = presa.chiave;
+      const { chiave, colonna } = presa;
+      const s = b.tasti ? bersaglioTasti(b.tasti, e) : null;
       fineTrascinamento();
-      muovi({ tipo: 'togli', carta: chiave });
+      if (b.via) muovi({ tipo: 'togli', carta: chiave });
+      else if (colonna === 'tasti') muovi({ tipo: 'sposta', carta: chiave, prima: s.prima });
+      else muovi({ tipo: 'aggiungi', carta: chiave, prima: s.prima });
     });
+  }
+  // Fra i tasti in vista: lasciato sopra un tasto, chi va avanti gli passa dopo, chi torna indietro o arriva dal «+» gli
+  // passa davanti. Il «+» resta in fondo.
+  function bersaglioTasti(griglia, e) {
+    const tutti = [...griglia.querySelectorAll('.dash-altro-app[data-tasto="1"]')];
+    const altri = tutti.filter((n) => !presa || n !== presa.el);
+    const sotto = altri.find((n) => { const r = n.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
+    if (sotto) {
+      const avanti = presa && tutti.includes(presa.el) && tutti.indexOf(presa.el) < tutti.indexOf(sotto);
+      if (avanti) { const dopo = altri[altri.indexOf(sotto) + 1]; return { prima: dopo ? dopo.dataset.id : null, segno: sotto, dove: 'dopo' }; }
+      return { prima: sotto.dataset.id, segno: sotto, dove: 'prima' };
+    }
+    const ultimo = altri[altri.length - 1] || null;
+    return { prima: null, segno: ultimo, dove: 'dopo' };
   }
 
   // Clic e Invio fanno la stessa cosa. A sinistra la carta è una conversazione che Filo ha cominciato: si apre nel
@@ -1253,7 +1433,14 @@
     apriMenu,
     avviso,
     aperta: (nome) => dati.aperte[nome] === true,
-    setVive({ timers, notifiche }) {
+    // Il doppio tocco (#2372): un tasto fa quello che fa il suo clic, una carta apre la sua app.
+    usa(id) {
+      const x = C.prendeLettera(id);
+      if (!x) return false;
+      if (C.tasto(id)) usaTasto(id, altroEl && altroEl.querySelector(`.dash-altro-app[data-id="${CSS.escape(id)}"]`));
+      else apri(x.url);
+      return true;
+    },    setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];
       disegna();

@@ -22,7 +22,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta, clicca, scrivi, tastoSullaScheda, paginaDellAiuto } from './helpers/riquadri.mjs';
+import { statoDi, conta, clicca, scrivi, tastoSullaScheda, paginaDellAiuto, paginaDelloStrato } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 
@@ -835,9 +835,14 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
   await page.mouse.move(300, 140, { steps: 5 });
   await page.mouse.move(500, 180, { steps: 5 });
   await page.mouse.up();
-  await expect.poll(avvisi, { timeout: 30_000 }).toContain('Testo trascritto e copiato');
+  // Il testo letto sta nel riquadro di Trascrivi, nello strato sopra la scheda (#2374): letto, si chiude.
+  const strato = await paginaDelloStrato(app, page);
+  await expect(strato.locator('.sn-tr-overlay')).toBeVisible({ timeout: 30_000 });
+  await expect(strato.locator('.sn-tr-overlay .sn-rinomina-rotella')).toHaveCount(0, { timeout: 30_000 });
   await expect.poll(avvisi, { timeout: 10_000 }).toContain(RIGA);
   expect(seen.completions.slice(prima).map((c) => c.key).slice(0, 2)).toEqual([OWN_KEY, PERSONAL_KEY]);
+  await strato.keyboard.press('Escape');
+  await expect(strato.locator('.sn-tr-overlay')).toHaveCount(0);
 
   // «spiega» dopo: la riga sta nel riquadro, e la frase non torna in un secondo avviso.
   await page.evaluate(() => {
@@ -1038,6 +1043,82 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   await clicca(app, page, '.sn-popup .sn-popup-close');
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
+});
+
+// #662.1: l'avviso del ripiego vale come detto quando una pagina in vista lo prende, non quando parte. Nel contenitore
+// la finestra non ha mai il fuoco e Playwright lo finge sulla pagina: lo si toglie nel mondo dei content script (999),
+// come quando si passa a un'altra applicazione; tornando la pagina riceve il fuoco.
+const fuocoSullaPagina = (app, url, si) => app.evaluate(async ({ webContents }, { u, s }) => {
+  const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+  const torna = s ? 'window.dispatchEvent(new Event(\'focus\'));' : '';
+  return wc.executeJavaScriptInIsolatedWorld(999, [{ code: `Document.prototype.hasFocus = () => ${s}; ${torna} 1` }]);
+}, { u: url, s: si });
+
+test('(X) selezionare un testo e passare a un’altra applicazione con la chiave propria rifiutata: l’avviso aspetta e compare al ritorno, e «Trascrivi» dopo non lo ripete', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Scansione</title>'
+    + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da trascrivere</p>');
+  const avvisi = await osservaAvvisi(page);
+  const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
+  const quante = async () => (await avvisi()).split(RIGA).length - 1;
+
+  const prima = seen.completions.length;
+  await selezionaColMouse(page, '#t');
+  await fuocoSullaPagina(app, page.url(), false);
+  await expect.poll(() => seen.completions.slice(prima).map((c) => c.key).join(','), { timeout: 15_000 })
+    .toContain(`${OWN_KEY},${PERSONAL_KEY}`);
+  await page.waitForTimeout(7000);
+  expect(await quante(), 'fuori da Filo nessuno l’ha visto').toBe(0);
+
+  await fuocoSullaPagina(app, page.url(), true);
+  await expect.poll(quante, { timeout: 8_000 }).toBe(1);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'tests/.shots/662.1-avviso-al-ritorno.png' }).catch(() => {});
+  await page.evaluate(() => window.getSelection().removeAllRanges());
+
+  // Detto adesso, davanti agli occhi: «Trascrivi» pagata allo stesso modo resta nei dieci minuti.
+  const primaT = seen.completions.length;
+  await premiNellaBarra(app, 'transcribe');
+  await expect(page.locator('.sn-region-overlay')).toBeVisible({ timeout: 10000 });
+  await page.mouse.move(30, 100);
+  await page.mouse.down();
+  await page.mouse.move(300, 140, { steps: 5 });
+  await page.mouse.move(500, 180, { steps: 5 });
+  await page.mouse.up();
+  const strato = await paginaDelloStrato(app, page);
+  await expect(strato.locator('.sn-tr-overlay')).toBeVisible({ timeout: 30_000 });
+  await expect(strato.locator('.sn-tr-overlay .sn-rinomina-rotella')).toHaveCount(0, { timeout: 30_000 });
+  expect(seen.completions.slice(primaT).map((c) => c.key).slice(0, 2)).toEqual([OWN_KEY, PERSONAL_KEY]);
+  await page.waitForTimeout(6000);
+  expect(await quante()).toBe(1);
+});
+
+test('(Y) «Traduci la pagina» mentre si è in un’altra applicazione, con la chiave propria rifiutata: l’avviso compare al ritorno, una volta', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><html lang="en"><meta charset="utf-8"><title>Article</title>'
+    + '<p id="p1">The quick brown fox jumps over the lazy dog, again and again, in the morning light.</p>');
+  const avvisi = await osservaAvvisi(page);
+  const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
+  const quante = async () => (await avvisi()).split(RIGA).length - 1;
+  const prima = seen.completions.length;
+  await fuocoSullaPagina(app, page.url(), false);
+  await premiNellaBarra(app, 'translate');
+  await expect.poll(() => seen.completions.slice(prima).some((c) => c.key === PERSONAL_KEY), { timeout: 30_000 }).toBe(true);
+  await page.waitForTimeout(8000);
+  expect(await quante(), 'fuori da Filo nessuno l’ha visto').toBe(0);
+
+  await fuocoSullaPagina(app, page.url(), true);
+  await expect.poll(quante, { timeout: 8_000 }).toBe(1);
+  await page.waitForTimeout(6000);
+  expect(await quante()).toBe(1);
 });
 
 // ── Il registro d'uso (#1601) ────────────────────────────────────────────────

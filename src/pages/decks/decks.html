@@ -18,6 +18,8 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
+  <script src="filo://shared/filoMarkdown.js"></script>
+  <script src="filo://shared/spiegazioni.js"></script>
   <script src="filo://shared/paneLayout.js"></script>
   <script src="filo://shared/decks.js"></script>
   <script src="filo://shared/deckStats.js"></script>
@@ -210,6 +212,9 @@
     }
     .dk-msg-bot { align-self: stretch; }
     .dk-msg-text { white-space: pre-wrap; overflow-wrap: break-word; margin: 0 0 4px; }
+    .dk-msg-text.dk-md { white-space: normal; }
+    .dk-md p, .dk-md ul, .dk-md ol { margin: 0 0 6px; }
+    .dk-md ul, .dk-md ol { padding-left: 20px; }
     .dk-msg-pending, .dk-msg-error { color: var(--sn-muted); font-size: 12px; }
     /* Fase della ricerca mentre Filo lavora: frase, conteggio e una barra sottile d'accento. */
     .dk-progress { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
@@ -223,7 +228,7 @@
       transition: width calc(.18s * var(--sn-motion, 1)) ease;
     }
     /* Carta che il giudice non ha potuto guardare: nome attenuato e un ? col suo perché al passaggio. */
-    .dk-row-unchecked .dk-row-name { color: var(--sn-muted); font-style: italic; }
+    .dk-row-unchecked .dk-row-name { color: var(--sn-muted); }
     .dk-row-flag {
       flex: 0 0 auto; font-size: 11px; font-weight: 600; color: var(--sn-accent);
       padding: 0 3px; border-radius: 4px; cursor: help;
@@ -254,7 +259,7 @@
     .dk-cot-body {
       margin-top: 3px; max-height: 180px; overflow: auto;
       white-space: pre-wrap; overflow-wrap: break-word;
-      font-style: italic; user-select: text;
+      user-select: text;
     }
     /* Nomi carta fuori dalle righe (prosa [[...]] §3.5, commander nell'intestazione): span hoverable. */
     .dk-prose-card {
@@ -706,6 +711,9 @@
                   <div class="dk-prob-actions">
                     <span class="dk-prob-result" id="probResult" aria-live="polite"></span>
                   </div>
+                  <p class="dk-stat-sub" id="probMullNote" hidden>
+                    Mulligan non contati: scegli nella colonna «per tenere» che mano terresti.
+                  </p>
                   <p class="dk-stat-sub" id="probHint" hidden>
                     Tagga le carte del mazzo per avere più categorie oltre alle terre.
                   </p>

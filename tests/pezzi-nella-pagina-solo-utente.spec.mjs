@@ -38,18 +38,25 @@ test('la conferma di «Salva per dopo»: premuta dal codice della pagina non apr
 
 test('trascrivi una parte della pagina: il riquadro lo sceglie il mouse dell\'utente, non il codice della pagina', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
-  await nelMondoDiFilo(app, page, () => {
-    window.__trascrizioni = 0;
-    const M = globalThis.SN_MSG.MSG;
-    const A = globalThis.SN_CONST.ACTIONS;
-    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (m, ...r) => {
-      if (m && m.type === M.AI_REQUEST && m.action === A.TRANSCRIBE_IMAGE) { window.__trascrizioni++; return Promise.resolve({ ok: true, text: 'Un testo da trascrivere' }); }
-      return orig(m, ...r);
-    };
-    return true;
+  // La lettura parte dal riquadro di Trascrivi, nello strato sopra la scheda (#2374): si conta nel main.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.TRANSCRIBE_IMAGE]: 'gemma' }, modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__trascrizioni = 0;
+    const P = globalThis.SN_PROVIDERS;
+    for (const k of ['completeWithFallback', 'streamCompleteWithFallback']) {
+      const vero = P[k];
+      P[k] = async (o) => {
+        if (!JSON.stringify(o.messages || '').includes('Trascrivi ESATTAMENTE il testo')) return vero(o);
+        globalThis.__trascrizioni++;
+        return { text: '{"righe":[{"testo":"Un testo da trascrivere","x1":0,"y1":0,"x2":1000,"y2":1000}]}', model: 'finto', provider: 'finto', costEur: 0, usage: {} };
+      };
+    }
   });
-  const trascrizioni = () => nelMondoDiFilo(app, page, () => window.__trascrizioni);
+  const trascrizioni = () => app.evaluate(() => globalThis.__trascrizioni);
   await premiNellaBarra(app, 'transcribe');
   const overlay = page.locator('.sn-region-overlay');
   await expect(overlay).toBeVisible({ timeout: 10_000 });

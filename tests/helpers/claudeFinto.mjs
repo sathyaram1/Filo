@@ -30,10 +30,13 @@ createInterface({ input: process.stdin }).on('line', (riga) => {
     delete passo.superficie;
   }
   // `seBadge`: l'esito dipende da quello che il modello vede, un badge «superficie:etichetta» che risponde alla regex.
+  // `senzaBadge`: in più, nessun badge risponde a quest'altra (una scheda chiusa non ha più il suo).
   if (passo.seBadge) {
-    passo.esito = badge.some((x) => new RegExp(passo.seBadge, 'i').test(`${x.page}:${x.label}`)) ? 'riuscito' : 'non_riuscito';
+    const c = (re) => badge.some((x) => new RegExp(re, 'i').test(`${x.page}:${x.label}`));
+    passo.esito = c(passo.seBadge) && !(passo.senzaBadge && c(passo.senzaBadge)) ? 'riuscito' : 'non_riuscito';
     passo.perche = `badge: ${badge.map((x) => `${x.page}:${x.label}`).join(' | ').slice(0, 500)}`;
     delete passo.seBadge;
+    delete passo.senzaBadge;
   }
   const result = JSON.stringify({ vedo: `passo finto ${i}`, ...passo });
   scrivi({ type: 'assistant', message: { content: [{ type: 'text', text: result }] } });

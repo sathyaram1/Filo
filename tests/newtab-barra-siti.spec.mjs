@@ -267,8 +267,40 @@ test('#1657 tante voci si raggiungono tutte; Canc toglie; trascinata nel campo s
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).barraSiti.visibile)).toBe(false);
 });
 
-test('#1657 un programma del computer nella barra parte al clic', async ({ app }) => {
-  test.skip(process.platform === 'win32', 'il programma di prova è uno script di shell');
+// Un file vero del disco, lasciato sulla barra come lo lascia il desktop: il File arriva da un campo di scelta (lo
+// stesso oggetto col suo percorso che dà il sistema), il rilascio passa dal gestore della pagina.
+async function lasciaFileSullaBarra(page, percorso) {
+  await page.evaluate(() => {
+    const i = Object.assign(document.createElement('input'), { type: 'file', id: '__fileDelDesktop' });
+    i.style.display = 'none';
+    document.body.appendChild(i);
+  });
+  await page.setInputFiles('#__fileDelDesktop', percorso);
+  await page.evaluate(() => {
+    const campo = document.getElementById('__fileDelDesktop');
+    const dt = new DataTransfer();
+    dt.items.add(campo.files[0]);
+    campo.remove();
+    const riga = document.getElementById('barraRiga');
+    const r = riga.getBoundingClientRect();
+    const o = { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 40, clientY: r.top + r.height / 2 };
+    riga.dispatchEvent(new DragEvent('dragover', o));
+    riga.dispatchEvent(new DragEvent('drop', o));
+  });
+}
+// Un collegamento trascinato da un'altra finestra (un altro browser, un documento): arriva come text/uri-list.
+const lasciaCollegamento = (page, url) => page.evaluate((u) => {
+  const dt = new DataTransfer();
+  dt.setData('text/uri-list', `# commento\n${u}`);
+  const riga = document.getElementById('barraRiga');
+  const r = riga.getBoundingClientRect();
+  const o = { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 40, clientY: r.top + r.height / 2 };
+  riga.dispatchEvent(new DragEvent('dragover', o));
+  riga.dispatchEvent(new DragEvent('drop', o));
+}, url);
+
+test('#1657 un programma del computer lasciato sulla barra dal desktop parte al clic', async ({ app }) => {
+  test.skip(process.platform === 'win32', 'il programma di prova è uno script di shell: Windows e Mac li provano gli unit');
   test.setTimeout(60_000);
   const dir = cartellaTemporanea('barra-siti-app');
   const segno = path.join(dir, 'partito.txt');
@@ -276,10 +308,8 @@ test('#1657 un programma del computer nella barra parte al clic', async ({ app }
   fs.writeFileSync(gioco, `#!/bin/sh\necho ok > "${segno}"\n`);
   fs.chmodSync(gioco, 0o755);
   const page = await home(app);
-  // Il rilascio di un file vero dal desktop arriva alla pagina come percorso: qui la stessa mossa che manda la barra.
-  const r = await page.evaluate((percorso) => new Promise((ok) => chrome.runtime.sendMessage(
-    { type: window.SN_MSG.MSG.BARRA_SITI_MODIFICA, mossa: { tipo: 'aggiungi', percorso } }, ok)), gioco);
-  expect(r.ok, r.error).toBe(true);
+  await lasciaFileSullaBarra(page, gioco);
+  await expect.poll(async () => (await salvate(app)).map((v) => v.percorso)).toEqual([gioco]);
   const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="app"]');
   await expect(voce).toHaveAttribute('aria-label', 'Gioco');
   await voce.click();
@@ -288,4 +318,118 @@ test('#1657 un programma del computer nella barra parte al clic', async ({ app }
   const no = await page.evaluate((percorso) => new Promise((ok) => chrome.runtime.sendMessage(
     { type: window.SN_MSG.MSG.BARRA_SITI_AVVIA, id: percorso }, ok)), gioco);
   expect(no.ok).toBe(false);
+  // Un file che non è un programma resta fuori, e lo dice.
+  const nota = path.join(dir, 'nota.txt');
+  fs.writeFileSync(nota, 'ciao');
+  await lasciaFileSullaBarra(page, nota);
+  await expect(page.locator('#dashFlash')).toContainText('programma');
+  expect((await salvate(app)).length).toBe(1);
+});
+
+test('#1803.1 un collegamento lasciato da un\'altra finestra diventa una voce', async ({ app, testServer }) => {
+  test.setTimeout(45_000);
+  const page = await home(app);
+  const url = testServer.html('<title>Da fuori</title><p>x</p>');
+  await lasciaCollegamento(page, url);
+  await expect(page.locator(`#barraSiti .dash-barra-voce[title$="${url}"]`)).toHaveCount(1);
+  expect((await salvate(app)).map((v) => v.url)).toEqual([url]);
+});
+
+test('#1803.1 la Cronologia trascinata sulla barra entra; di nuovo, la voce si illumina e lo dice; una scheda che non è un sito resta fuori e lo dice', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await openTab('filo://history/history.html');
+  const cron = (await schede(shell)).find((t) => String(t.url).startsWith('filo://history'));
+  const casa = (await schede(shell)).find((t) => String(t.url).startsWith('filo://newtab'));
+  await attiva(shell, casa.id);
+  const page = await home(app);
+
+  await lasciaSullaBarra(app, shell, page, cron.id);
+  const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]');
+  await expect(voce).toHaveCount(1, { timeout: 5000 });
+  await expect(voce).toHaveAttribute('aria-label', /Cronologia/);
+  // Le pagine di Filo hanno tutte la stessa icona: la voce mostra la lettera del suo nome.
+  await expect(voce.locator('.dash-barra-lettera')).toHaveText('C');
+  expect((await salvate(app)).map((v) => v.url)).toEqual(['filo://history/history.html']);
+
+  // Di nuovo la stessa: nessuna voce in più, quella che c'è si fa vedere e l'avviso lo dice.
+  await lasciaSullaBarra(app, shell, page, cron.id);
+  await expect(page.locator('#dashFlash')).toContainText('è già nella barra');
+  await expect(voce).toHaveClass(/dash-trovato/);
+  await scatta(page, 'gia-nella-barra');
+  await expect(voce).toHaveCount(1);
+
+  // Il clic porta alla Cronologia (una sola scheda per pagina di Filo: torna davanti quella aperta).
+  const davanti = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x.isDestroyed() && !x._filoIncognito);
+    return w._filoTabs.activeId;
+  });
+  await voce.click();
+  await expect.poll(davanti, { timeout: 8000 }).toBe(cron.id);
+
+  // Una scheda che non è né un sito né una pagina di Filo (qui una vuota, come la consegna il main): resta fuori e lo dice.
+  await attiva(shell, casa.id);
+  const p = await home(app);
+  await p.evaluate(() => {
+    const r = document.getElementById('barraRiga').getBoundingClientRect();
+    window.SN_SCHEDA_TRASCINATA.ricevi({ fase: 'lascia', x: r.left + 40, y: r.top + r.height / 2, scheda: { id: 'x', titolo: 'Vuota', url: 'about:blank', icona: '' } });
+  });
+  await expect(p.locator('#dashFlash')).toContainText('«about:blank» non è l\'indirizzo di un sito');
+  expect((await salvate(app)).length).toBe(1);
+});
+
+test('#1803.1 un server locale scritto nel «+» si apre in http, come dalla navigazione', async ({ app, shell, testServer }) => {
+  test.setTimeout(45_000);
+  const page = await home(app);
+  const url = testServer.html('<title>Server di sviluppo</title><p>in locale</p>');
+  const scritto = url.replace(/^http:\/\//, '');
+  await page.locator('#barraSiti .dash-barra-piu').click();
+  await page.locator('.dash-barra-campo input').fill(scritto);
+  await page.keyboard.press('Enter');
+  const voce = page.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]');
+  await expect(voce).toHaveAttribute('aria-label', '127.0.0.1');
+  expect((await salvate(app)).map((v) => v.url)).toEqual([url]);
+  const aperte = async () => (await schede(shell)).filter((t) => t.url === url).length;
+  await voce.click();
+  await expect.poll(aperte, { timeout: 8000 }).toBe(1);
+});
+
+test('#1803.1 arrivare nella home per leggere una conversazione riapre la chat ripiegata: chat riaperta, punto del filo, intervista', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'La carbonara vuole guanciale e pecorino.' }]);
+  try {
+    await page.locator('#input').fill('come si fa la carbonara?');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'guanciale' })).toBeVisible({ timeout: 10_000 });
+  } finally { await ripristina(app); }
+  const id = await app.evaluate(async () => (await globalThis.SN_IL_FILO.chats()).find((c) => JSON.stringify(c.messages || []).includes('carbonara')).id);
+  const evento = await app.evaluate(async (_e, c) => globalThis.SN_IL_FILO.ultimaDomanda(c), id);
+  expect(evento).toBeTruthy();
+  const ripiegata = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).chatRipiegata);
+  const ripiega = async () => {
+    await imposta(page, { chatRipiegata: true });
+    await expect.poll(ripiegata).toBe(true);
+  };
+
+  // Una chat riaperta dall'archivio: la conversazione si vede, e la chat resta aperta anche nelle altre home.
+  await ripiega();
+  const riaperta = await openTab(`filo://newtab/?chat=${encodeURIComponent(id)}`);
+  await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'guanciale' })).toBeVisible({ timeout: 15_000 });
+  await expect(riaperta.locator('#threadView')).toBeVisible();
+  await expect.poll(ripiegata).toBe(false);
+
+  // Un punto del filo (dal quaderno delle memorie): il messaggio si illumina dove lo si vede.
+  await ripiega();
+  const punto = await openTab(`filo://newtab/?evento=${encodeURIComponent(evento)}`);
+  await expect(punto.locator('.dash-trovato')).toContainText('carbonara', { timeout: 15_000 });
+  await expect(punto.locator('#threadView')).toBeVisible();
+  await expect.poll(ripiegata).toBe(false);
+
+  // L'intervista di benvenuto rifatta dalle Preferenze.
+  await ripiega();
+  await page.evaluate(() => new Promise((ok) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_RESTART_ONBOARDING }, ok)));
+  const intervista = await openTab('filo://newtab/?accoglienza=1');
+  await expect(intervista.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+  await expect(intervista.locator('#threadView')).toBeVisible();
+  await expect.poll(ripiegata).toBe(false);
 });

@@ -107,8 +107,8 @@
   color: var(--sn-fg);
   max-width: 80%;
 }
-.sn-msg-loading { color: var(--sn-muted); font-style: italic; }
-.sn-msg-muted .sn-msg-text { color: var(--sn-muted); font-style: italic; }
+.sn-msg-loading { color: var(--sn-muted); }
+.sn-msg-muted .sn-msg-text { color: var(--sn-muted); }
 .sn-msg-error .sn-msg-text { color: var(--sn-error); }
 
 .sn-msg-rimedio {
@@ -130,8 +130,6 @@
 .sn-toast .sn-msg-rimedio:hover,
 .sn-menu .sn-msg-rimedio:hover { background: rgba(var(--sn-accent-rgb), 0.35); }
 .sn-toast .sn-msg-rimedio { margin-top: 8px; }
-/* Sotto una risposta fermata dal tetto di lunghezza la riga è in corsivo, il tasto no. */
-.sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
 
 /* Comandi di una risposta finita: piccoli e quieti, l'icona allineata al bordo del testo. */
 /* L'etichetta di un tasto sta dopo tutta la riga (Copia, Rispondi): non copre il tasto vicino (#2096). */
@@ -252,7 +250,6 @@
   font-size: 1em;
 }
 .sn-msg-text strong, .sn-menu-inline strong { font-weight: 600; }
-.sn-msg-text em, .sn-menu-inline em { font-style: italic; }
 .sn-msg-text ul, .sn-msg-text ol,
 .sn-menu-inline ul, .sn-menu-inline ol {
   margin: 4px 0 8px 0;
@@ -434,6 +431,29 @@
 }
 .sn-toast.sn-toast-visible:hover { background: var(--sn-hover); }
 
+/* La X di ogni avviso della pila (#1677), come quella delle carte della barra. Nell'avviso a testo sta nell'angolo,
+   nelle pill in coda alla riga. Sotto il puntatore il fondo è già --sn-hover: la X prende l'accento. */
+.sn-toast { position: relative; padding-right: 32px; }
+.sn-toast-x {
+  all: unset;
+  box-sizing: border-box;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--sn-muted);
+  cursor: pointer;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-toast-x::before { content: '×'; font-size: 16px; line-height: 1; }
+.sn-toast-x:hover,
+.sn-toast-x:focus-visible { background: rgba(var(--sn-accent-rgb), 0.35); color: var(--sn-fg); }
+.sn-toast > .sn-toast-x { position: absolute; top: 7px; right: 7px; }
+.sn-save-confirm > .sn-toast-x { margin-right: -6px; }
+
 /* Pill della dettatura: si comporta come un toast ma è interattiva, cliccandola si ferma la registrazione. */
 .sn-dictate-pill {
   flex: none;
@@ -521,3 +541,75 @@
 .sn-popup-body::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 999px; }
 .sn-popup-body::-webkit-scrollbar-thumb:hover { background: var(--sn-accent); }
 .sn-popup-body::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* Trascrivi (#2374): la porzione resta dov'era, il resto si vela come durante la selezione; il testo sopra è
+   trasparente e si vede solo selezionato, come in un PDF. */
+.sn-tr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483640;
+  background: rgba(0, 0, 0, 0.45);
+  outline: none;
+  font-family: var(--sn-font, system-ui, sans-serif);
+}
+.sn-tr-scena {
+  position: absolute;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7), 0 12px 48px rgba(0, 0, 0, 0.4);
+  background: #fff;
+}
+.sn-tr-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+.sn-tr-testo { position: absolute; inset: 0; cursor: text; font-size: 0; line-height: 0; white-space: pre; }
+.sn-tr-riga {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  font-family: system-ui, sans-serif;
+  transform-origin: 0 0;
+  user-select: text;
+  border-radius: 2px;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
+}
+.sn-tr-riga:hover { background: rgba(var(--sn-accent-rgb, 196, 90, 59), 0.08); }
+.sn-tr-riga::selection { background: rgba(var(--sn-accent-rgb, 196, 90, 59), 0.35); color: transparent; }
+.sn-tr-barra {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  font-size: 13px;
+  white-space: nowrap;
+  user-select: none;
+}
+.sn-tr-stato {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  background: var(--sn-overlay-bg, #f8f6f0);
+  color: var(--sn-muted, #6e6b63);
+  border-radius: var(--sn-radius, 10px);
+  box-shadow: var(--sn-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+}
+.sn-tr-stato:empty { display: none; }
+.sn-tr-copia {
+  padding: 8px 14px;
+  border-radius: var(--sn-radius, 10px);
+  border: 1px solid transparent;
+  background: var(--sn-btn-bg, #1a1918);
+  color: var(--sn-btn-fg, #fff);
+  box-shadow: var(--sn-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+  font: inherit;
+  cursor: pointer;
+  transition: opacity calc(0.12s * var(--sn-motion, 1)) ease;
+}
+.sn-tr-copia:hover { opacity: 0.85; }
+.sn-tr-copia:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }

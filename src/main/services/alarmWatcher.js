@@ -71,6 +71,10 @@ async function passata(incognito) {
 }
 
 const chiaveAvviso = (id) => `timer:${id}`;
+function cartaDelTimer(id) {
+  if (!globalThis.SN_CARTE_HOME) require('../../shared/carteHome.js');
+  return globalThis.SN_CARTE_HOME.chiaveTimer(id);
+}
 function ritiraAvviso(chiave) {
   try { require('./avvisoFinestra').ritiraAvviso(chiave); } catch (_) {}
 }
@@ -80,7 +84,7 @@ function avvisa(t, incognito) {
   const testo = sveglia ? `Sveglia${nome}: è ora` : `Timer${nome} scaduto`;
   // La suoneria c'è già (la shell, finché suona): l'avviso non aggiunge il suo tono.
   require('./avvisoFinestra').avvisoNellaFinestra(testo, {
-    tipo: 'timer_scaduto', chiave: chiaveAvviso(t.id), carta: chiaveAvviso(t.id), icona: sveglia ? 'alarm' : 'timer',
+    tipo: 'timer_scaduto', chiave: chiaveAvviso(t.id), carta: cartaDelTimer(t.id), icona: sveglia ? 'alarm' : 'timer',
     durataSec: 0, suono: false, incognito, azioni: [{ label: 'Ferma', fermaTimer: String(t.id) }],
   });
 }

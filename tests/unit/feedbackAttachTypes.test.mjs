@@ -119,14 +119,16 @@ test('il tipo di un allegato è sempre una stringa, anche coi nomi di serie', ()
 });
 
 // #1337.5: una lista sola dei tipi, per il selettore e per il messaggio, in ogni casella che allega.
-test('ACCEPT propone solo i tipi che classify accetta, e ogni casella che allega lo usa', () => {
+test('ACCEPT propone solo i tipi che entrano (anche ridisegnati, #1664), e ogni casella che allega lo usa', () => {
   const A = globalThis.SN_FEEDBACK_ATTACH;
   const voci = A.ACCEPT.split(',');
   assert.ok(!voci.some((v) => v.endsWith('/*')), 'image/* e text/* offrono SVG e HTML, che poi si rifiutano');
   for (const m of [...A.RASTER_IMAGE_MIME, ...A.DOC_MIME]) assert.ok(voci.includes(m), m);
-  for (const e of [...A.IMAGE_EXT, ...A.DOC_EXT]) assert.ok(voci.includes(`.${e}`), e);
-  for (const v of voci.filter((x) => x.startsWith('.'))) assert.ok(A.classify({ name: `a${v}`, type: '' }), v);
-  for (const v of voci.filter((x) => !x.startsWith('.'))) assert.ok(A.classify({ name: 'a', type: v }), v);
+  for (const e of [...A.IMAGE_EXT, ...A.RIDISEGNABILI_EXT, ...A.DOC_EXT]) assert.ok(voci.includes(`.${e}`), e);
+  const ridisegnata = (v) => A.RIDISEGNABILI_EXT.has(v.slice(1)) || v === 'image/avif';
+  for (const v of voci.filter((x) => x.startsWith('.'))) assert.ok(A.classify({ name: `a${v}`, type: '' }) || ridisegnata(v), v);
+  for (const v of voci.filter((x) => !x.startsWith('.'))) assert.ok(A.classify({ name: 'a', type: v }) || ridisegnata(v), v);
+  for (const e of A.NON_APRIBILI_EXT) assert.ok(!voci.includes(`.${e}`), `${e}: il browser non lo apre, il selettore non lo propone`);
   assert.match(A.MESSAGGIO_TIPO, /^Tipo di file non supportato\. Ammessi: /);
   assert.deepEqual(A.LIMITI, { immagini: 5, file: 5, byte: 4 * 1024 * 1024 });
   const radice = join(__dirname, '..', '..');

@@ -435,10 +435,15 @@ sempre, non fonde e passa la pratica all'azione (`result: 'server'`,
   del server). All'emissione una punta oltre l'ultimo sha registrato è un buco,
   salvo che GitHub l'abbia vista arrivare mentre il biglietto dell'ultima voce
   viveva (dalla nascita al rilascio; per un biglietto morto senza rilascio,
-  alla scadenza del suo semaforo, #2021.1): allora è sua, voce `finestra` (#2021).
-  Un registro bucato lo sana solo l'owner (`npm run fiducia:sana -- <ramo>`,
-  che chiama `ownerFiducia` op `sana`), se ogni commit oltre main è nato
-  mentre viveva un biglietto pulito registrato, la stessa finestra. Al passo
+  alla scadenza del suo semaforo, #2021.1): allora è sua, voce `finestra` (#2021),
+  che le consegne dopo contano come controllata (#2565: la spinta del salvataggio
+  arrivata dopo il rilascio non riapre il buco). Un registro bucato si sana se ogni commit oltre main è nato mentre viveva un
+  biglietto pulito registrato, la stessa finestra, e la punta è l'ultimo sha
+  registrato: su un feedback fidato la coda lo fa da sé prima di far nascere
+  un biglietto (#2565), l'owner con `npm run fiducia:sana -- <ramo>`
+  (`ownerFiducia` op `sana`). Il motivo del buco resta nella riga della
+  sanatoria; quello che la sanatoria non copre si legge sulla scheda del
+  lavoro fermo e resta all'owner («Dichiara fidato com'è»). Al passo
   4, se L5 blocca **e** il lavoro è fidato (feedback fidato, registro tutto
   fidato, nessun buco, la punta è l'ultimo sha registrato), il server **non
   apre la richiesta**: fonde lo sha esaminato con la sua identità e registra
@@ -767,7 +772,29 @@ e la prova la dichiarava lui al server. Adesso:
   fonde senza la corsa (verifica e sicurezza l'hanno provato solo su Linux):
   `linux` risponde «main contenuto», `windows` prova il ramo stesso. Un rosso
   `[Windows]` va corretto anche nel riallineamento: la verifica che segue gira
-  su Linux e non lo vedrebbe. Al codice provato non arrivano i file dei comandi di Actions;
+  su Linux e non lo vedrebbe. Al codice del ramo non arrivano i file dei comandi di Actions,
+  in nessun passo: prove, installazione, binario di Electron, checkout e fusioni di prova
+  (#2558; sentinella: `tests/unit/comandiDiActions.test.mjs`). È un recinto contro chi usa
+  le variabili, non un muro: i file stanno in una cartella nota del runner;
+- **perché non serve un muro** (#2587). Nei lavori `linux`, `windows` e `spec` il
+  codice del ramo può tutto (trova i file dei comandi, ha sudo, sostituisce il
+  node dei passi dopo), quindi l'uscita `campo` di quei lavori è un dato del
+  ramo. Un lavoro di prova che carica i rapporti come artefatto, letto da uno
+  senza codice del ramo, non cambia niente: i rapporti li scrivono comunque il
+  runner degli unit e il Playwright del ramo. E il ramo non ha bisogno di
+  falsificare: un verde lo ottiene anche togliendo o cambiando i suoi test, nel
+  diff che verifica e controllo di sicurezza hanno già passato prima della corsa.
+  Quello che conta è che una parte falsificata decida solo l'esito della propria
+  coppia: non cosa si fonde, non altro. Le condizioni, ognuna con la sua
+  sentinella: il lavoro `unit` non tocca il codice del ramo e riceve le parti
+  solo come variabili, nessuna cache, token in sola lettura e nessun segreto
+  (`tests/unit/unitFusioneAzione.test.mjs`); il server legge il registro del
+  solo lavoro `unit`, rifiuta un'altra coppia, rifà da sé ogni campo (esito da
+  elenco, sha, tetti sui rossi, storia) e ricalcola le novità unite invece di
+  prenderle dalla corsa (`functions/test/routine-unit-azione.test.js`,
+  `routine-unit-sulla-fusione.test.js` e `routine-novita-fusione-2543.test.js`
+  in filo-security). Se cade una di
+  queste, il muro torna a servire;
 - **il server si fida solo di quello che legge da GitHub per quella coppia**
   (`src/routine/unitFusione.js`, ogni cinque minuti): una corsa di
   `repository_dispatch` su main col titolo della coppia, conclusa, e nel suo

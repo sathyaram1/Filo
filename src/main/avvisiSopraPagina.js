@@ -12,14 +12,19 @@ const PILA = /^(apri|riduci|chiudi-tutti)$/;
 const ID_SCARICAMENTO = /^[A-Za-z0-9-]{1,64}$/;
 
 const ICONA = /^[a-z][A-Za-z]{0,30}$/;
-const CARTA = /^(timer|download):[A-Za-z0-9_-]{1,80}$/;
-// L'azione dalla home su una carta della colonna (#2390): quelle della vista, più «assorbi» (la home ha già la carta).
-const AZIONE_HOME = /^(chiudi|assorbi|\d{1,2})$/;
+// L'azione dalla home su una carta della colonna (#2390): quelle della vista, «apri» il sito da cui è nata, e
+// «assorbi» (la home ha già la carta).
+const AZIONE_HOME = /^(chiudi|assorbi|apri|\d{1,2})$/;
 
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
 const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)));
 const icona = (v) => (ICONA.test(testo(v)) ? testo(v) : '');
+const sito = (v) => (/^https?:\/\//i.test(testo(v)) ? testo(v) : '');
+function condiviso(nome, file) {
+  if (!globalThis[nome]) require(path.join(__dirname, '..', 'shared', file));
+  return globalThis[nome];
+}
 
 // L'SVG dell'icona lo scrive il main dalla libreria: la vista non carica script d'altre origini.
 function svgIcona(nome) {
@@ -42,19 +47,21 @@ function pulisci(stato) {
       testo: testo(c.testo),
       azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
       chiusa: c.chiusa === true,
-      indirizzo: /^https?:\/\//i.test(testo(c.indirizzo)) ? testo(c.indirizzo) : '',
+      indirizzo: sito(c.indirizzo),
       trascina: ID_SCARICAMENTO.test(testo(c.trascina)) ? testo(c.trascina) : '',
       icona: icona(c.icona),
     }));
+  const CH = condiviso('SN_CARTE_HOME', 'carteHome.js');
   const colonna = (Array.isArray(stato && stato.colonna) ? stato.colonna : [])
     .filter((c) => c && typeof c === 'object' && c.id)
     .map((c) => ({
       id: testo(c.id),
       testo: testo(c.testo),
       azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
+      indirizzo: sito(c.indirizzo),
       icona: icona(c.icona),
       titolo: testo(c.titolo).slice(0, 80),
-      carta: CARTA.test(testo(c.carta)) ? testo(c.carta) : '',
+      carta: CH.cartaDiAvviso(testo(c.carta)),
       vola: Math.max(0, Math.round(Number(c.vola) || 0)),
     }));
   const altre = Math.max(0, Math.min(100000, Math.round(Number(stato && stato.altre) || 0)));
@@ -141,13 +148,22 @@ class AvvisiSopraPagina {
 
   colonna() { return this.stato.colonna; }
 
-  // Un gesto dalla home su una carta della colonna: lo fa la shell, come il clic sulla vista.
+  // Un gesto dalla home su una carta della colonna: lo fa la shell, come il clic sulla vista. Il sito da aprire è
+  // quello che la shell ha dato alla carta, non uno scritto da chi chiede.
   azioneDallaHome(id, azione) {
     const i = testo(id);
     const a = testo(azione);
-    if (!AZIONE_HOME.test(a) || !this.stato.colonna.some((c) => c.id === i)) return false;
+    const carta = this.stato.colonna.find((c) => c.id === i);
+    if (!AZIONE_HOME.test(a) || !carta) return false;
     if (!this.win || this.win.isDestroyed()) return false;
+    if (a === 'apri') return this._apriSito(carta.indirizzo);
     try { this.win.webContents.send('avvisi:azione', { id: i, azione: a }); } catch (_) { return false; }
+    return true;
+  }
+
+  _apriSito(indirizzo) {
+    if (!sito(indirizzo)) return false;
+    try { this.win._filoTabs.openTab(indirizzo); } catch (_) { return false; }
     return true;
   }
 
@@ -272,23 +288,21 @@ class AvvisiSopraPagina {
     const quante = this.stato.carte.filter((c) => !c.chiusa).length + this.stato.altre;
     if (pila ? quante < 2 : !carta) return;
     this._nascondiSuggerimento();
-    const voci = [];
+    let voci;
     if (pila) {
-      voci.push(this.stato.aperta
+      voci = [this.stato.aperta
         ? { label: 'Riduci', action: 'avvisi:riduci' }
-        : { label: 'Mostra tutti', action: 'avvisi:apri' });
+        : { label: 'Mostra tutti', action: 'avvisi:apri' }];
+      if (quante > 1) voci.push({ label: 'Chiudi tutti', action: 'avvisi:chiudi-tutti' });
     } else {
-      voci.push(...carta.azioni.map((label, i) => ({ label, action: `avviso:${i}` })).filter((v) => v.label));
-      // #2390 — «apri»: il sito da cui l'avviso è nato, in una scheda.
-      if (carta.indirizzo) {
-        let host = '';
-        try { host = new URL(carta.indirizzo).hostname.replace(/^www\./, ''); } catch (_) { host = ''; }
-        if (host) voci.push({ label: `Apri ${host}`, action: 'avviso:apri' });
-      }
-      if (voci.length) voci.push({ type: 'separator' });
-      voci.push({ label: 'Chiudi', icon: 'close', action: 'avviso:chiudi' });
+      // #2390 — le stesse voci della carta volata nella home: le decide il modulo condiviso.
+      voci = condiviso('SN_FORMA_AVVISO', 'formaAvviso.js').menu({ azioni: carta.azioni, indirizzo: carta.indirizzo, quante })
+        .map((v) => {
+          if (!v) return { type: 'separator' };
+          const action = v.azione === 'chiudi-tutti' ? 'avvisi:chiudi-tutti' : `avviso:${v.azione}`;
+          return v.icona ? { label: v.etichetta, icon: v.icona, action } : { label: v.etichetta, action };
+        });
     }
-    if (quante > 1) voci.push({ label: 'Chiudi tutti', action: 'avvisi:chiudi-tutti' });
     const b = this.vista.getBounds();
     const { showPopupMenu } = require('./popup-menu');
     showPopupMenu(this.win, voci, b.x + coord(d.x), b.y + coord(d.y), (scelta) => {
@@ -297,7 +311,7 @@ class AvvisiSopraPagina {
       const comando = /^@action:avvisi:([a-z-]+)$/.exec(s);
       if (comando) { this._pila(comando[1]); return; }
       if (s === '@action:avviso:apri') {
-        if (carta && carta.indirizzo) { try { this.win._filoTabs.openTab(carta.indirizzo); } catch (_) {} }
+        if (carta) this._apriSito(carta.indirizzo);
         this.restituisciTastiera();
         return;
       }

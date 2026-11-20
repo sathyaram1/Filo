@@ -14,6 +14,7 @@
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/chatErrors.js"></script>
   <script src="filo://shared/ttsVoices.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
@@ -25,6 +26,10 @@
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/pannelliApp.js"></script>
   <script src="filo://shared/testoDeiCampi.js"></script>
+  <script src="filo://shared/urlNav.js"></script>
+  <script src="filo://shared/carteHome.js"></script>
+  <script src="filo://shared/doppioTocco.js"></script>
+  <script src="filo://shared/doppioCtrl.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
   <script src="filo://shared/cambi.js"></script>
   <script src="filo://shared/menuImpostazioni.js"></script>
@@ -74,7 +79,7 @@
       border-color: var(--sn-accent);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-accent) 22%, transparent);
     }
-    .sc-attesa { color: var(--sn-muted); font-style: italic; }
+    .sc-attesa { color: var(--sn-muted); }
     .sc-ripristina {
       background: transparent;
       border: none;
@@ -309,6 +314,7 @@
         <button type="button" class="sn-btn sn-btn-secondary" id="ttsModelPreview">Ascolta</button>
         <span id="ttsModelVoiceModel" class="sn-muted"></span>
         <span id="ttsModelPreviewStatus" class="sn-muted"></span>
+        <button type="button" class="sn-btn sn-btn-secondary" id="ttsModelPreviewRimedio" hidden></button>
       </div>
       <label for="ttsRate" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Velocità: <span id="ttsRateVal">1.0×</span></label>
       <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1" style="width:100%;max-width:360px;display:block;" />
@@ -444,6 +450,33 @@
       <p class="sn-muted">Su questi siti il tasto destro apre il menu del sito; quello di Filo resta a <span id="menuDelSitoTasto"></span> + tasto destro.</p>
       <div id="menuDelSitoSiti" class="mem-box"></div>
       <span id="menuDelSitoHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+    </section>
+
+    <!-- #2372 — le lettere del doppio tocco: le righe e l'aggiunta le scrive preferences.js. -->
+    <section id="sec-doppio-tocco">
+      <h2>Lettere della home</h2>
+      <p class="sn-muted">Due volte la stessa lettera, come prime battute nel campo della home, aprono quello che le hai dato.</p>
+      <div id="doppioToccoLettere" class="mem-box"></div>
+      <div class="sn-row" style="margin-top:8px;">
+        <input type="text" id="doppioToccoNuova" maxlength="1" placeholder="y" aria-label="Lettera" style="width:48px;text-align:center;" />
+        <input type="text" id="doppioToccoDove" list="doppioToccoTasti" placeholder="youtube.com, Editor, Cerca nel filo…" aria-label="Cosa apre" style="flex:1;min-width:160px;" />
+        <datalist id="doppioToccoTasti"></datalist>
+        <button class="sn-btn sn-btn-secondary" id="doppioToccoAggiungi" type="button">Aggiungi</button>
+        <span id="doppioToccoHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+      </div>
+    </section>
+
+    <!-- #2377 — il doppio Ctrl: acceso e soglia; le lettere si cambiano dal box, il nome del tasto lo scrive preferences.js. -->
+    <section id="sec-doppio-ctrl">
+      <h2>Lettere di Filo</h2>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="doppioCtrlAcceso" />
+          <span>Due tocchi di <span class="tasto-ctrl"></span> aprono le lettere; <span class="tasto-ctrl"></span>, <span class="tasto-ctrl"></span> e una lettera fanno l'azione</span>
+        </label>
+      </div>
+      <label for="doppioCtrlSoglia" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Entro quanto il secondo tocco vale (millisecondi, da 150 a 1.500)</label>
+      <input type="number" id="doppioCtrlSoglia" min="150" max="1500" step="50" style="width:120px;" />
     </section>
 
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">
@@ -590,6 +623,15 @@
         <h2>Schermo intero</h2>
         <label for="avvisoSchermoPienoDurata" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Quanto resta in vista il nome del sito quando una pagina va a schermo intero (millisecondi, da 1.000 a 10.000)</label>
         <input type="number" id="avvisoSchermoPienoDurata" min="1000" max="10000" step="500" style="width:120px;" />
+      </section>
+
+      <!-- #2372 — i tempi della home: il doppio tocco di una lettera e la ricerca nel filo nella colonna destra. -->
+      <section id="sec-home-tempi">
+        <h2>Tempi della home</h2>
+        <label for="doppioToccoSoglia" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Entro quanto la seconda lettera vale come doppio tocco (millisecondi, da 100 a 1.000)</label>
+        <input type="number" id="doppioToccoSoglia" min="100" max="1000" step="50" style="width:120px;" />
+        <label for="ricercaFiloPausa" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa nello scrivere prima che la ricerca nel filo porti il centro sul risultato (millisecondi, da 0 a 3.000)</label>
+        <input type="number" id="ricercaFiloPausa" min="0" max="3000" step="100" style="width:120px;" />
       </section>
 
       <!-- #1803 — colori e misura delle icone stanno nei token estetici qui sotto (barraSiti.*). -->

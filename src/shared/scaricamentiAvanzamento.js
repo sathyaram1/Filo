@@ -60,9 +60,11 @@
     if (sec == null || !Number.isFinite(Number(sec))) return '';
     const s = Math.max(0, Math.round(Number(sec)));
     if (s < 60) return `ancora ${Math.max(1, s)} s`;
-    if (s < 3600) return `ancora ${Math.ceil(s / 60)} min`;
-    const h = Math.floor(s / 3600);
-    const m = Math.round((s % 3600) / 60);
+    // Si arrotonda ai minuti PRIMA di dividere in ore: dopo, 7170 s davano «1 h 60 min».
+    const minuti = s < 3600 ? Math.ceil(s / 60) : Math.round(s / 60);
+    if (minuti < 60) return `ancora ${minuti} min`;
+    const h = Math.floor(minuti / 60);
+    const m = minuti % 60;
     if (h >= 48) return `ancora ${Math.round(s / 86400)} giorni`;
     return m ? `ancora ${h} h ${m} min` : `ancora ${h} h`;
   }

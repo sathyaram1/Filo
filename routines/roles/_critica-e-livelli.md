@@ -24,13 +24,18 @@ non la lancia nessuno: gira in GitHub a ogni fusione su main.
   spec da solo prima di farne un rilievo; in dubbio confronta con `main`:
   `node scripts/spec-su-main.mjs tests/<nome>.spec.mjs` lo corre sul ramo e
   su `origin/main` appena scaricata, senza ripetizioni, e dice di chi è il
-  rosso.
+  rosso, caso per caso. Su main corre la versione del ramo, anche una prova
+  del giro che lì non c'è; uno spec che da una parte non parte non dà
+  verdetto.
 - Un rosso d'ambiente che nel file non c'è non lo aggiungi tu: è un rilievo,
   col caso e il motivo.
 - Nel contenitore delle routine `npx playwright test` si accende da solo lo
   schermo virtuale con la sandbox spenta, come `finish:check`; senza xvfb si
   ferma prima di aprire Electron e lo dice. Quello stop non è un rosso del
-  codice.
+  codice. Con `--workers` > 1 accende uno schermo per lavoratore, così fuoco
+  e menu non passano da una finestra all'altra; la CPU invece resta divisa:
+  un rosso di tempi visto solo con più lavoratori si ripete con
+  `--workers 1` prima di farne un rilievo.
 
 ## La critica
 

@@ -2,13 +2,14 @@
 // come appena installato. Ogni prova guarda le pagine dove l'utente vede i suoi dati e i file della cartella dei dati.
 // Senza il tasto e la cancellazione all'avvio è rossa: memoria, chat, editor, salvati e archivio tornavano tutti.
 
-import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
+import { test, expect, chiudiApp, argomentiScala, aspettaFinestra } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { existsSync, mkdirSync, readFileSync, readdirSync, lstatSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
@@ -28,14 +29,12 @@ async function avvia(userData) {
 async function pagina(app, shell, url) {
   const host = new URL(url).hostname;
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-  await expect.poll(() => app.windows().some((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } }),
-    { timeout: 15_000 }).toBe(true);
-  const page = app.windows().find((w) => new URL(w.url()).hostname === host);
+  const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === host, `nessuna finestra su ${host}`);
   await page.waitForLoadState('domcontentloaded');
   return page;
 }
 
-// Le chiavi di storage.json quando l'avvio si è posato: quelle di un Filo appena installato sono il metro.
+// Le chiavi di storage.json in questo istante, con le scritture in corso già sul disco.
 async function chiaviPosate(app, userData) {
   await app.evaluate(() => globalThis.__filoStorage.whenSettled());
   await app.evaluate(() => globalThis.__filoStorage.flushNow());
@@ -91,7 +90,7 @@ async function nienteInVista(app, shell) {
   await expect(quaderno.locator('.qd-riga', { hasText: 'Marta' })).toHaveCount(0);
   // Chat e schede chiuse stanno nel filo: la ricerca della home non le ritrova.
   const casa = await pagina(app, shell, 'filo://newtab/');
-  await casa.locator('#cercaInput').fill('ZQX');
+  await (await campoRicerca(casa)).fill('ZQX');
   await expect(casa.locator('#cercaRisultati .dash-cerca-niente').first()).toBeVisible({ timeout: 10_000 });
   await expect(casa.locator('#cercaRisultati .dash-cerca-pagina, #cercaRisultati .dash-cerca-msg')).toHaveCount(0);
   const editor = await pagina(app, shell, 'filo://editor/editor.html');
@@ -136,14 +135,8 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
   const zip = join(cartellaTemporanea('filo-cancella-zip-'), 'prima.zip');
   let app = null;
   let shell = null;
+  let metro = null;
   try {
-    // Il metro: un Filo appena installato, lasciato posare.
-    ({ app, shell } = await avvia(vergine));
-    await expect(shell.locator('body')).toBeAttached();
-    await new Promise((r) => setTimeout(r, 1500));
-    const appenaInstallato = await chiaviPosate(app, vergine);
-    await chiudiApp(app);
-
     ({ app, shell } = await avvia(userData));
     await semina(app, shell);
     // Un'identità dei crediti finta: resta, perché la scelta non è spuntata.
@@ -170,8 +163,16 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
     await expect(page.locator('#sec-wipe-hint')).toHaveText('Cancello e riavvio Filo…');
     await aspettaUscita(app);
 
-    ({ app, shell } = await avvia(userData));
-    await expect.poll(() => chiaviPosate(app, userData), { timeout: 15_000 }).toEqual(appenaInstallato);
+    // Il metro è un Filo appena installato acceso nello stesso momento: crediti, contatori, invito e versione vista
+    // l'avvio li scrive secondi dopo, quando capita, e un'istantanea presa prima o dopo non vale come confronto (#2585).
+    [{ app, shell }, metro] = await Promise.all([avvia(userData), avvia(vergine).then((v) => v.app)]);
+    const scarto = async () => {
+      const [dopo, nuovo] = await Promise.all([chiaviPosate(app, userData), chiaviPosate(metro, vergine)]);
+      return { inPiu: dopo.filter((k) => !nuovo.includes(k)), mancano: nuovo.filter((k) => !dopo.includes(k)) };
+    };
+    await expect.poll(scarto, { timeout: 30_000 }).toEqual({ inPiu: [], mancano: [] });
+    await chiudiApp(metro);
+    metro = null;
     expect(contengono(userData, 'ZQX')).toEqual([]);
     expect(existsSync(join(userData, 'cancella-tutto.json'))).toBe(false);
     expect(readdirSync(userData).some((n) => n.startsWith('identity.bin'))).toBe(true);
@@ -180,6 +181,7 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
     const avvisi = async () => (await Promise.all(app.windows().map((w) => w.evaluate(() => document.body?.textContent || '').catch(() => '')))).join('\n');
     await expect.poll(avvisi, { timeout: 15_000 }).toContain('Ho cancellato tutti i dati di Filo');
   } finally {
+    if (metro) await chiudiApp(metro);
     if (app) await chiudiApp(app);
     for (const d of [vergine, userData, dirname(zip)]) togliCartella(d);
   }

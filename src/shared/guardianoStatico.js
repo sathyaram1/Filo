@@ -517,7 +517,7 @@
 
   // Toglie i tratti che le finestre coprono. Posizioni e forma piatta nascono insieme: un carattere che cambia lunghezza
   // quando diventa minuscolo non sposta il taglio.
-  function togliFinestre(t, finestre) {
+  function togliFinestre(t, finestre, segno) {
     const pos = [];
     let piatto = '';
     for (let i = 0; i < t.length; i++) {
@@ -531,7 +531,11 @@
       if (u && i <= u[1]) u[1] = i + FINESTRA; else tratti.push([i, i + FINESTRA]);
     }
     let out = t;
-    for (let k = tratti.length - 1; k >= 0; k--) out = out.slice(0, pos[tratti[k][0]]) + OSCURATO + out.slice(pos[tratti[k][1] - 1] + 1);
+    for (let k = tratti.length - 1; k >= 0; k--) {
+      const a = pos[tratti[k][0]];
+      const b = pos[tratti[k][1] - 1] + 1;
+      out = out.slice(0, a) + segno(out.slice(a, b)) + out.slice(b);
+    }
     return out;
   }
 
@@ -566,13 +570,16 @@
     return out;
   }
 
-  function oscuraTesto(s, chiavi, finestre) {
+  // `segno(tolto)` dà quello che prende il posto del tratto tolto: OSCURATO verso un modello, un segno lungo quanto il
+  // tratto per chi deve sapere dove stava (trattiSegreti).
+  const SEGNO_OSCURATO = () => OSCURATO;
+  function oscuraTesto(s, chiavi, finestre, segno = SEGNO_OSCURATO) {
     // Una foto mandata al modello è pixel, non testo: decodificarla costerebbe e non troverebbe niente.
     if (/^data:image\//i.test(s.slice(0, 16))) return s;
     let t = s;
     for (const c of chiavi) {
-      t = t.split(c.v).join(OSCURATO);
-      t = t.replace(c.re, OSCURATO);
+      t = t.split(c.v).join(segno(c.v));
+      t = t.replace(c.re, (m) => segno(m));
     }
     // Base64 a righe (il comando base64 va a capo ogni 76 caratteri) si legge come un pezzo solo.
     t = t.replace(/[A-Za-z0-9+/=_-]{16,}(?:[ \t]*\r?\n[ \t]*[A-Za-z0-9+/=_-]{4,})+|\S{8,}/g, (tok) => {
@@ -591,7 +598,7 @@
       const righe = tok.split('\n');
       const coda = [];
       while (righe.length > 1 && quanto(righe.slice(0, -1).join('\n')) >= tutto) coda.unshift(righe.pop());
-      return [OSCURATO, ...coda].join('\n');
+      return [segno(righe.join('\n')), ...coda].join('\n');
     });
     // Separatori qualunque fra un carattere e l'altro: si confronta la sola forma alfanumerica e si toglie il tratto originale.
     let piatto = alnumMinuscolo(t);
@@ -602,15 +609,17 @@
           const pos = [];
           for (let i = 0; i < t.length; i++) if (/[A-Za-z0-9]/.test(t[i])) pos.push(i);
           const at = piatto.indexOf(cerca);
-          t = t.slice(0, pos[at]) + OSCURATO + t.slice(pos[at + cerca.length - 1] + 1);
+          const a = pos[at];
+          const b = pos[at + cerca.length - 1] + 1;
+          t = t.slice(0, a) + segno(t.slice(a, b)) + t.slice(b);
           piatto = alnumMinuscolo(t);
         }
       }
     }
-    return haFinestra(piatto, finestre) ? togliFinestre(t, finestre) : t;
+    return haFinestra(piatto, finestre) ? togliFinestre(t, finestre, segno) : t;
   }
 
-  function oscuraSegreti(valore, segreti) {
+  function chiaviDi(segreti) {
     const chiavi = [];
     const finestre = new Set();
     for (const x of Array.isArray(segreti) ? segreti : []) {
@@ -620,6 +629,29 @@
       chiavi.push({ v, norm: p.norm, rov: rovescio(p.norm), nuclei: p.nuclei, re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
       for (const f of finestreSegreto(p)) finestre.add(f);
     }
+    return { chiavi, finestre };
+  }
+
+  // Dove un testo porta un segreto custodito, riconosciuto come lo riconosce oscuraSegreti (anche travestito o senza
+  // prefisso): `[[inizio, fine]]` nel testo originale. Chi avvisa l'utente deve vedere quello che il modello non vede.
+  const SEGNO_TRATTO = '\u0000';
+  function trattiSegreti(testoLetto, segreti) {
+    const s = testo(testoLetto).split(SEGNO_TRATTO).join(' ');
+    const { chiavi, finestre } = chiaviDi(segreti);
+    if (!chiavi.length || !s) return [];
+    const segnato = oscuraTesto(s, chiavi, finestre, (tolto) => SEGNO_TRATTO.repeat(tolto.length));
+    const out = [];
+    for (let i = segnato.indexOf(SEGNO_TRATTO); i >= 0; i = segnato.indexOf(SEGNO_TRATTO, i)) {
+      let j = i;
+      while (segnato[j] === SEGNO_TRATTO) j++;
+      out.push([i, j]);
+      i = j;
+    }
+    return out;
+  }
+
+  function oscuraSegreti(valore, segreti) {
+    const { chiavi, finestre } = chiaviDi(segreti);
     if (!chiavi.length || valore == null) return valore;
     // Lo stesso oggetto quando non c'è niente da togliere: chi lo riceve non paga una copia.
     const giro = (v, n) => {
@@ -639,7 +671,7 @@
 
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
-    segretiNelTesto, oscuraSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
+    segretiNelTesto, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
     sembraPassword,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

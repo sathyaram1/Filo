@@ -60,3 +60,12 @@ test('il tempo che resta si legge senza conti: secondi, minuti, ore', () => {
   assert.equal(A.testoResto(5 * 86400), 'ancora 5 giorni');
   assert.equal(A.testoResto(null), '');
 });
+
+test('#1684.1 — a meno di 30 s da un numero tondo di ore si legge l’ora tonda, mai «60 min»', () => {
+  for (let s = 7170; s <= 7199; s++) assert.equal(A.testoResto(s), 'ancora 2 h', `${s} s`);
+  assert.equal(A.testoResto(7140), 'ancora 1 h 59 min');
+  assert.equal(A.testoResto(3599), 'ancora 1 h');
+  assert.equal(A.testoResto(3600), 'ancora 1 h');
+  assert.equal(A.testoResto(3540), 'ancora 59 min');
+  for (let s = 60; s < 48 * 3600; s += 7) assert.doesNotMatch(A.testoResto(s), /\b60 min/, `${s} s`);
+});

@@ -68,6 +68,13 @@ async function azioneVolumeBluetoothWifi(action, { type }) {
   return { executed: !!r.ok, kept: false, output: r };
 }
 
+// #2377 — la stessa porta della lettera B del doppio Ctrl.
+async function azioneBloccaPc(action) {
+  const B = require('../bloccaComputer');
+  const r = await B.blocca();
+  return { executed: !!r.ok, kept: false, output: r.ok ? { bloccato: true } : { error: B.frase(r.errore) } };
+}
+
 async function azioneOrdinaDesktop(action) {
   const r = await require('../iconeDesktop').ordinaIcone(action);
   return { executed: !!r.ok, kept: false, output: r };
@@ -135,5 +142,6 @@ module.exports = {
   BLUETOOTH: azioneVolumeBluetoothWifi,
   WIFI: azioneVolumeBluetoothWifi,
   ORDINA_DESKTOP: azioneOrdinaDesktop,
+  BLOCCA_PC: azioneBloccaPc,
   COMANDO_FINESTRA: azioneComandoFinestra,
 };

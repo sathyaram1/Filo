@@ -190,7 +190,15 @@
     if (v.riprova) out.riprova = true;
     if (v.no) out.no = true;
     if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
+    if (v.autore === 'segnalazione') out.autore = 'segnalazione';
+    if (typeof v.segnalazione === 'string' && v.segnalazione.trim()) out.segnalazione = v.segnalazione.slice(0, MAX_AZIONE);
     return out;
+  }
+  // Il testo di una segnalazione resta con la sua voce, confermata, rifiutata o in attesa (#2371): l'assistente deve
+  // poterla spiegare anche dopo un no.
+  function segnalazioneDi(type, x) {
+    if (type !== 'INVIA_FEEDBACK' || !x) return '';
+    return typeof x.segnalazione === 'string' ? x.segnalazione : (typeof x.testo === 'string' ? x.testo : '');
   }
   // La conferma ancora da dare (#1685): riaperta, la chat ridisegna il suo bottone con l'azione e la domanda di allora.
   // Solo dati semplici e corti: quello che non ci sta non si ridisegna, e resta la riga.
@@ -239,7 +247,7 @@
         proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
         evento: type === 'EVENTO_CALENDARIO' && x.esito === PROPOSTO && x.evento ? eventoDi(x.evento) : null,
         partita: x.esito === FALLITO && x.partita === true, riprova: x.esito === FALLITO && x.riprova === true,
-        no: x.esito === FALLITO && x.no === true,
+        no: x.esito === FALLITO && x.no === true, autore: x.autore, segnalazione: segnalazioneDi(type, x),
         ...(generica ? {} : bottoneDi(x.esito, type, x.azione, x.conferma)),
       });
     }
@@ -251,7 +259,10 @@
     // Un no alla conferma è un esito: chi rilegge sa che l'utente ha rifiutato, e il modello non la ripropone (#1373).
     if (x._confirm && x._rifiutata) {
       const chiesta = SENZA_TITOLO[type] ? SENZA_TITOLO[type][0] : primaRiga(x._confirm.text) || (L ? frase(L.describe, x) : '');
-      return senzaVuoti({ type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO, no: true });
+      return senzaVuoti({
+        type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO, no: true,
+        autore: x._proposta === true ? 'segnalazione' : '', segnalazione: segnalazioneDi(type, x),
+      });
     }
     // Un pannello che aspetta il clic dell'utente (il riordino, l'elenco da eliminare) non è un'azione fallita.
     let esito = x._domanda && x._executed === false && !x._confirm ? CHIESTO : esitoAzione(x);
@@ -276,6 +287,8 @@
       partita: esito === FALLITO && partita(x),
       // Un no della regola di autonomia: riaperta, la riga dice «Non dimenticato» come il diario in diretta.
       no: esito === FALLITO && !!(o && o.no),
+      // La proposta della segnalazione automatica (#360) non l'ha scritta l'assistente: il modello lo deve sapere (#2371).
+      autore: x._proposta === true ? 'segnalazione' : '', segnalazione: segnalazioneDi(type, x),
       ...(SENZA_TITOLO[type] || !x._confirm ? {} : bottoneDi(esito, type, x, x._confirm, x._domanda)),
     });
   }
@@ -335,6 +348,14 @@
     return { icona: '✓', testo: riga, fallita: false };
   }
 
+  // Il testo di una segnalazione partita o proposta a nome dell'utente, come lo legge il modello (#2371): intero fino a un
+  // tetto largo, e oltre il taglio si dice. Lo usano anche le righe del filo (filoTrattoVivo.js).
+  const TETTO_SEGNALAZIONE = 8000;
+  function testoSegnalazione(n) {
+    const s = String(n || '');
+    return s.length > TETTO_SEGNALAZIONE ? `${s.slice(0, TETTO_SEGNALAZIONE)}… [tagliato qui: ${s.length} caratteri in tutto]` : s;
+  }
+
   // Le voci di un turno come le legge il modello nei turni dopo. Le righe possono ripetere testi scritti da un sito o da
   // un modello (#592.4): una riga sola ciascuna, ripulite, dentro il recinto dei testi salvati.
   function perModello(voci) {
@@ -343,14 +364,23 @@
       const t = E ? E.neutralizza(String(s || ''), { unaRiga: true }) : pulito(s);
       return t.length > max ? `${t.slice(0, max)}…` : t;
     };
+    const segnalazione = (v) => {
+      const t = v.type !== 'INVIA_FEEDBACK' ? ''
+        : typeof v.segnalazione === 'string' ? v.segnalazione : (v.azione && typeof v.azione.testo === 'string' ? v.azione.testo : '');
+      if (!t.trim()) return '';
+      const corpo = testoSegnalazione(campo(t, Infinity));
+      const chi = v.autore === 'segnalazione'
+        ? 'proposta dalla segnalazione automatica di Filo, non da te' : 'proposta da te';
+      return ` (${chi}; testo intero: «${corpo}»)`;
+    };
     const righe = (Array.isArray(voci) ? voci : []).map((v) => {
       if (!v || !v.type) return '';
       const cosa = campo(v.riga) || v.type;
       if (v.type === 'FERMATA') return `- NON fatta, fermata da Filo (un segreto non esce): ${cosa}`;
-      if (v.esito === CHIESTO) return `- NON fatta: chiesta la conferma all'utente, che allora non l'aveva ancora data: ${cosa}`;
-      if (v.esito === FALLITO) return `- NON riuscita: ${cosa}${v.motivo ? ` (perché: ${campo(v.motivo)})` : ''}`;
-      if (v.esito === PROPOSTO) return `- proposta col bottone sotto la risposta: ${cosa}`;
-      return `- fatta: ${cosa}`;
+      if (v.esito === CHIESTO) return `- NON fatta: chiesta la conferma all'utente, che allora non l'aveva ancora data: ${cosa}${segnalazione(v)}`;
+      if (v.esito === FALLITO) return `- NON riuscita: ${cosa}${v.motivo ? ` (perché: ${campo(v.motivo)})` : ''}${segnalazione(v)}`;
+      if (v.esito === PROPOSTO) return `- proposta col bottone sotto la risposta: ${cosa}${segnalazione(v)}`;
+      return `- fatta: ${cosa}${segnalazione(v)}`;
     }).filter(Boolean);
     if (!righe.length) return '';
     const corpo = righe.join('\n');
@@ -368,6 +398,7 @@
   global.SN_ESITO = {
     daRaccontare,
     esitoAzione, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
+    testoSegnalazione,
     unisciDopo, primaRigaConferma: primaRiga, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

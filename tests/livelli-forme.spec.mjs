@@ -409,8 +409,12 @@ test('nel rombo, nel pentagono e nella conversazione il markdown della segnalazi
   expect(await corpo.locator('.mg-liv-testo ul li strong').first().evaluate((e) => Number(getComputedStyle(e).fontWeight))).toBeGreaterThanOrEqual(600);
   await expect(corpo).not.toContainText('**');
   await expect(corpo.locator('.mg-liv-testo p strong')).toHaveText('A.');
-  await expect(corpo.locator('.mg-liv-testo em')).toHaveText('meno');
+  // Il corsivo di Filo è solo delle spiegazioni al passaggio (#2388): l'enfasi del modello si legge dritta.
+  const riga = corpo.locator('.mg-liv-testo p', { hasText: 'invasiva' });
+  await expect(riga).toContainText('la meno invasiva');
   await expect(corpo).not.toContainText('*meno*');
+  expect(await corpo.locator('.mg-liv-testo em, .mg-liv-testo i').count()).toBe(0);
+  expect(await riga.evaluate((p) => getComputedStyle(p).fontStyle)).toBe('normal');
   // Un elenco numerato tiene i numeri: una scelta citata per numero si ritrova.
   await expect(corpo.locator('.mg-liv-testo ol li')).toHaveText(['Primo passo.', 'Secondo passo.']);
   await expect(corpo).toContainText('<b>finto</b> <img src=x');
@@ -887,7 +891,8 @@ test('salto col ramo mosso dopo i controlli: lo dice, non ripropone il salto e l
   await expect(page.locator('#mgToast')).toContainText('commit che nessuno ha letto');
   await expect(page.locator('#mgSideBody')).toContainText('scrive nelle regole del database');
   const rimanda = page.locator('#mgL4RimandaBtn');
-  await expect(rimanda).toHaveText('Rimanda in lavorazione');
+  // Una bocciatura del controllo torna a chi corregge (#2575): la strada porta il nome della correzione.
+  await expect(rimanda).toHaveText('Rimanda in correzione');
   await expect(salta).toHaveCount(0);
   // Un clic in più dove stava il salto non rimanda la pratica.
   expect((await rimanda.boundingBox()).y).toBeGreaterThanOrEqual(dovEra.y + dovEra.height);
@@ -904,6 +909,10 @@ test('salto col ramo mosso dopo i controlli: lo dice, non ripropone il salto e l
     await page.screenshot({ path: `tests/.shots/1040-1-salto-ramo-mosso-${tema}.png` });
   }
 
+  // Senza testo per chi corregge la correzione parte al secondo gesto (#2575).
+  await rimanda.click();
+  await expect(page.locator('#mgAcceptComment')).toHaveClass(/mg-accept-comment--avviso/);
+  expect(await page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta']);
   await rimanda.click();
   await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta', 'feedback_update']);
   expect(await page.evaluate(() => window.__chiamate[1])).toMatchObject({ id: FB_BOCCIATO._id, status: 'todo', reviewDecision: 'accepted' });

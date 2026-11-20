@@ -9,7 +9,7 @@ const { winOf, targetWebTab, nomeDellaScheda } = require('../handlersComuni');
 const { getEffectiveSettings } = require('../impostazioniEffettive');
 const { contaZoomDallaChat, contaPaginaDallaChat } = require('../autonomiaFonti');
 const {
-  schedeChiusePerChat, voceChiusa, schedeNumerate, schedaPerNumero, bersaglioPausa, bersaglioAudio, salvatePerChat,
+  schedeChiusePerChat, voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, bersaglioPausa, bersaglioAudio, salvatePerChat,
   apriPaginaSalvata, leggiPaginaDa, contoRestano,
 } = require('../osservazioniPerModello');
 
@@ -133,6 +133,7 @@ async function azioneSchedeChiuse(action) {
 async function azioneRiapriScheda(action, { sender }) {
   const tm = winOf(sender)?._filoTabs;
   if (!tm) return { executed: false, kept: true, output: { riaperta: false, error: 'nessuna finestra con schede' } };
+  if (!String(action.id ?? '').trim()) return riapriUltima(tm);
   const v = await voceChiusa(action.id);
   if (!v.voce) return { executed: false, kept: true, output: { riaperta: false, trovata: false } };
   const base = { titolo: v.perModello.titolo, url: v.perModello.url, chiusa: v.perModello.chiusa };
@@ -187,11 +188,63 @@ async function azionePausaAudio(action, { sender, schedeViste }) {
 async function azioneMostraScheda(action, { sender, schedeViste }) {
   const tm = winOf(sender)?._filoTabs;
   if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
-  const b = await schedaPerNumero(tm, action, schedeViste);
-  if (!b) return { executed: false, kept: true, output: { error: 'manca il numero della scheda' } };
+  const b = await schedaDaMostrare(tm, action, schedeViste);
+  if (!b) return { executed: false, kept: true, output: { error: 'manca il numero della scheda, o il verso (dopo o prima)' } };
   if (b.errore) return { executed: false, kept: true, output: { error: b.errore } };
   tm.activate(b.tab.id);
   return { executed: true, kept: true, output: { titolo: (await nomeDellaScheda())(b.tab) } };
+}
+
+// «Riapri l'ultima scheda chiusa» (#2371): la stessa pila di Ctrl+Shift+T, in un passo.
+async function riapriUltima(tm) {
+  if (typeof tm.ciSonoChiuse === 'function' && !(await tm.ciSonoChiuse())) {
+    return { executed: false, kept: true, output: { riaperta: false, nessuna: true, error: 'nessuna scheda chiusa da riaprire' } };
+  }
+  const id = await tm.riapriChiusa();
+  const tab = id ? tm.tabs.find((t) => t.id === id) : null;
+  if (!tab) return { executed: false, kept: true, output: { riaperta: false } };
+  return { executed: true, kept: true, output: { riaperta: true, ultima: true, titolo: (await nomeDellaScheda())(tab), url: tab.url || '' } };
+}
+
+// «Salvala per dopo» (#2371): la stessa strada di Alt+S, sulla scheda col numero o su quella web davanti.
+async function azioneSalvaPerDopo(action, { sender, schedeViste }) {
+  const win = winOf(sender);
+  const tm = win && win._filoTabs;
+  if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
+  let tab = null;
+  if (action.scheda != null) {
+    const b = await schedaPerNumero(tm, action, schedeViste);
+    if (!b || b.errore) return { executed: false, kept: true, output: { error: (b && b.errore) || 'numero di scheda non valido' } };
+    tab = b.tab;
+  } else tab = targetWebTab(sender).tab;
+  if (!tab || tab.isInternal || !/^https?:\/\//i.test(tab.url || '')) {
+    return { executed: false, kept: true, output: { error: 'nessuna pagina web da salvare: le schermate di Filo non si salvano per dopo' } };
+  }
+  const titolo = (await nomeDellaScheda())(tab);
+  const r = await require('../../shortcuts').saveForLater(win, tab, { attendiConferma: false });
+  if (!r) return { executed: false, kept: true, output: { error: 'salvataggio già in corso per questa scheda' } };
+  return { executed: true, kept: true, output: { salvata: true, titolo } };
+}
+
+// «Cerca questa immagine» (#2371): la ricerca per immagine dell'Aiuto (Google Lens), su un'immagine scelta da Filo.
+async function azioneCercaImmagine(action, { sender, chatId, schedeViste }) {
+  const win = winOf(sender);
+  const tm = win && win._filoTabs;
+  if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
+  let chat = chatId || '';
+  try { chat = chat || require('../registroCambi').corrente()?.chat || ''; } catch (_) {}
+  const im = await require('../immagineDaCercare').scegli(action, { sender, chatId: chat, schedeViste });
+  if (im.errore) return { executed: false, kept: true, output: { error: im.errore } };
+  const L = globalThis.SN_URL_NAV;
+  let id = null;
+  if (im.url) id = tm.openTab(L.indirizzoRicercaImmagine(im.url), { activate: true, origine: { tipo: 'filo', gesto: true } });
+  else {
+    const invio = L.invioRicercaImmagine(im.dataUrl);
+    if (!invio) return { executed: false, kept: true, output: { error: 'l\'immagine non si legge' } };
+    id = tm.openTab(invio.url, { activate: true, invio, origine: { tipo: 'filo', gesto: true } });
+  }
+  if (!id) return { executed: false, kept: true, output: { error: 'la scheda della ricerca non si è aperta' } };
+  return { executed: true, kept: true, output: { cercata: true, di: im.url ? 'indirizzo' : 'immagine', ...(im.numero ? { numero: im.numero } : {}) } };
 }
 
 async function azioneApriSalvata(action, { sender }) {
@@ -336,6 +389,8 @@ module.exports = {
   RIPRENDI_AUDIO: azioneRiprendiAudio,
   PAUSA_AUDIO: azionePausaAudio,
   MOSTRA_SCHEDA: azioneMostraScheda,
+  SALVA_PER_DOPO: azioneSalvaPerDopo,
+  CERCA_IMMAGINE: azioneCercaImmagine,
   APRI_SALVATA: azioneApriSalvata,
   LEGGI_PAGINA: azioneLeggiPagina,
   PULISCI_TAB: azionePulisciTab,

@@ -439,8 +439,8 @@
     if (role === 'user' && turn.daModello) out.daModello = true;
     // Scritto mentre Filo rispondeva (#1296): sta dentro quel turno, che lo rimanda col suo giro (contestoFilo.js).
     if (role === 'user' && turn.seguito === true) out.seguito = true;
-    // La risposta di Filo a cui il messaggio risponde (#1620): il suo posto nel filo, non una copia.
-    const rispostaA = role === 'user' && global.SN_RISPOSTA_A ? global.SN_RISPOSTA_A.riferimento(turn.rispostaA) : null;
+    // Le risposte (o i loro passi) a cui il messaggio risponde (#1620, #2346): il loro posto nel filo, non una copia.
+    const rispostaA = role === 'user' && global.SN_RISPOSTA_A ? global.SN_RISPOSTA_A.daSalvare(turn.rispostaA) : null;
     if (rispostaA) out.rispostaA = rispostaA;
     // Scritto nell'Aiuto sopra un sito: riletto è testo da fuori (#1508, src/shared/filoContesto.js → daFuoriDi).
     if (role === 'user' && turn.daPagina === true) out.daPagina = true;
@@ -497,6 +497,10 @@
       // Le fonti controllate della risposta (#2383): i campi del controllo, mai il testo delle pagine.
       const F = global.SN_FONTI_CITATE;
       const fonti = F ? F.perIlDisco(turn.fonti, text) : [];
+      // Le immagini della risposta (#2272): rimandi alle copie locali, mai indirizzi del web da caricare.
+      const IR = global.SN_IMMAGINI_RISPOSTA;
+      const immagini = IR ? IR.perIlDisco(turn.immagini, text) : [];
+      if (immagini.length) out.immagini = immagini;
       if (fonti.length) out.fonti = fonti;
       // Com'è andata ogni azione del turno, comprese le fallite e quelle ferme sulla conferma (#1294, #1130.2): `actions`
       // resta il nome di quelle successe, per chi lo legge già così.

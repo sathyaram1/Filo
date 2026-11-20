@@ -69,6 +69,33 @@ test('il fetch del main verso le schede fallisce come senza rete, il resto passa
   assert.deepEqual(righe, ['[test] servizio chiuso: firestore.googleapis.com'], 'avvisa una volta per host');
 });
 
+// #2177: con la chiave finta la chat a copione andava a OpenRouter e a frankfurter.dev, e i tempi del turno cambiavano
+// fra GitHub e il contenitore.
+test('chiusa tutta la rete, il fetch del main resta su questa macchina, anche sotto un finto messo prima', async () => {
+  const chiamate = [];
+  const target = { fetch: async (input) => { chiamate.push(String(input.url || input)); return 'ok'; } };
+  assert.equal(S.chiudiTuttaLaRete(target), false, 'un fetch non avvolto non si dice chiuso');
+  const righe = [];
+  S.chiudiFetch(target, (r) => righe.push(r));
+  const sotto = target.fetch;
+  target.fetch = (u, i) => (String(u).startsWith('https://api.frankfurter.dev/') ? Promise.resolve('cambi finti') : sotto(u, i));
+  assert.equal(await target.fetch('https://openrouter.ai/api/v1/chat/completions'), 'ok', 'prima di chiudere passa');
+  assert.equal(S.chiudiTuttaLaRete(target), true);
+  for (const u of ['https://openrouter.ai/api/v1/chat/completions', 'https://api.frankfurter.dev.esempio.test/x',
+    'http://sito-pubblico.test/', 'https://127.0.0.1.esempio.test/', 'https://[2001:db8::1]/', 'https://10.0.0.2/']) {
+    await assert.rejects(() => target.fetch(u), (e) => e instanceof TypeError && e.message === 'fetch failed', u);
+  }
+  assert.equal(await target.fetch('https://api.frankfurter.dev/v1/latest?base=EUR'), 'cambi finti', 'il finto sopra vince');
+  for (const u of ['http://127.0.0.1:4100/walletState', 'http://localhost:3000/', 'http://[::1]:9/', 'http://app.localhost/', 'data:text/plain,ciao']) {
+    assert.equal(await target.fetch(u), 'ok', u);
+  }
+  await assert.rejects(() => target.fetch(SCHEDE), TypeError, 'i servizi restano chiusi');
+  assert.deepEqual(chiamate, ['https://openrouter.ai/api/v1/chat/completions', 'http://127.0.0.1:4100/walletState',
+    'http://localhost:3000/', 'http://[::1]:9/', 'http://app.localhost/', 'data:text/plain,ciao']);
+  assert.ok(righe.includes('[test] rete chiusa: openrouter.ai'), righe.join('\n'));
+  assert.ok(righe.includes('[test] servizio chiuso: firestore.googleapis.com'), righe.join('\n'));
+});
+
 function sessioneFinta() {
   const ses = { listener: null, registrazioni: 0 };
   ses.webRequest = { onBeforeRequest: (fn) => { ses.registrazioni += 1; ses.listener = fn; }, onCompleted: () => {}, onErrorOccurred: () => {} };

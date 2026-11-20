@@ -41,5 +41,23 @@
     return 'bell';
   }
 
-  global.SN_FORMA_AVVISO = { forma, allaScadenza, tempoNellAngolo, icona, ICONE };
+  // Il tasto destro di un avviso, uguale nell'angolo e nella colonna della home: chi lo disegna traduce solo `azione`
+  // ('0'…'N' i pulsanti, 'apri' il sito da cui è nato, 'chiudi', 'chiudi-tutti' quelli lì accanto); null è il separatore.
+  function sitoDi(indirizzo) {
+    const u = String(indirizzo || '');
+    if (!/^https?:\/\//i.test(u)) return '';
+    try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return ''; }
+  }
+  function menu({ azioni = [], indirizzo = '', quante = 1 } = {}) {
+    const voci = [];
+    (Array.isArray(azioni) ? azioni : []).forEach((etichetta, i) => { if (etichetta) voci.push({ etichetta: String(etichetta), azione: String(i) }); });
+    const sito = sitoDi(indirizzo);
+    if (sito) voci.push({ etichetta: `Apri ${sito}`, azione: 'apri' });
+    if (voci.length) voci.push(null);
+    voci.push({ etichetta: 'Chiudi', azione: 'chiudi', icona: 'close' });
+    if (Number(quante) > 1) voci.push({ etichetta: 'Chiudi tutti', azione: 'chiudi-tutti' });
+    return voci;
+  }
+
+  global.SN_FORMA_AVVISO = { forma, allaScadenza, tempoNellAngolo, icona, menu, sitoDi, ICONE };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

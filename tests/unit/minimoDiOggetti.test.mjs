@@ -35,5 +35,10 @@ test('il conto di oggetti e tipi arriva a chi scrive e a chi verifica', () => {
     assert.match(criterio, /screenshot di prima con quello\s+di dopo/, `${ruolo}: il confronto fra prima e dopo manca`);
     assert.match(criterio, /cosa perde l'utente senza/, `${ruolo}: la domanda per ogni oggetto manca`);
     assert.match(criterio, /rilievo da correggere, non un dubbio/, `${ruolo}: un oggetto senza risposta deve essere un rilievo`);
+    // #2384.1: senza dire da dove viene il prima, ogni verificatore improvvisa e il conto torna un giudizio a occhio.
+    const intero = t.slice(i).split(/\n\s*\n/)[0].replace(/\s+/g, ' ');
+    assert.match(intero, /Il prima è la stessa schermata su `main`, o lo screenshot allegato alla segnalazione/, `${ruolo}: non dice da dove viene il prima`);
+    assert.match(intero, /scripts\/spec-su-main\.mjs tests\/<nome>\.spec\.mjs/, `${ruolo}: non nomina lo strumento che corre la prova su main`);
+    assert.match(intero, /tests\/\.shots\/confronto\//, `${ruolo}: non dice dove restano le immagini`);
   }
 });

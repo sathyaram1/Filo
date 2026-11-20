@@ -321,19 +321,24 @@ dall'owner e dal server. Campi:
   dal suo PC); assente, o `da_decidere`, per una domanda. Un «da fare» sta
   nella stessa lista delle domande, col segno «da fare» accanto a «da
   decidere», e il contatore di Gestione lo conta a parte. `problema` sono i
-  passi e dove si fanno, `contesto` perché serve, i collegamenti il lavoro che
-  aspetta. Ha una o due opzioni senza pro, contro né consiglio: la prima è il
+  passi e dove si fanno, obbligatorio (un «da fare» senza, o coi soli spazi,
+  si rifiuta col campo, #2229.3), `contesto` perché serve, i collegamenti il
+  lavoro che aspetta. Ha una o due opzioni senza pro, contro né consiglio: la prima è il
   pulsante «Fatto», la seconda, facoltativa, «Non lo faccio»; il nome lo dà la
   posizione, l'azione lo segue (`riprendi` o `attendi` sul lavoro che aspetta,
   `archivia`, o `nessuna` quando non aspetta niente, ammessa solo qui). Senza
   consiglio «applica il consiglio» non lo segna mai fatto, e un principio del
   registro non lo chiude (§ 3.5). Chiunque scopra un passo così lo apre come
   «da fare», non lo scrive nel testo o nelle note di un feedback.
-- Nelle azioni `feedbackId` può essere il numero col cancelletto (`#1736`,
-  `#831.2`): il server lo traduce nell'id all'ingresso
+- Nelle azioni `feedbackId`, e nei collegamenti di tipo `feedback` l'`id`, può
+  essere il numero col cancelletto (`#1736`, `#831.2`), nella forma che
+  leggono le attese (`SN_FB_ATTESE.normalizzaNumero`, l'unica: `#1736.0` vale
+  `#1736`): il server lo traduce nell'id all'ingresso
   (`SN_DOMANDE.traduciNumeri`), per i biglietti come per la chiave del
   manutentore e quella owner-non-fidato, e rifiuta col numero quello che non
-  esiste. Una domanda salvata porta sempre l'id.
+  esiste. Una domanda salvata porta sempre l'id. Ogni strada che apre domande
+  passa dalla stessa sequenza di nascita sul server (numeri, peso del blocco,
+  legame, `blocca`; dopo la scrittura riga provvisoria e smistamento).
 - `consiglio`: l'opzione che sceglierebbe chi chiede, e perché.
 - `priorita`: `bloccante`, `importante`, `quando_puoi`.
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
@@ -1077,7 +1082,10 @@ dicono gli esperimenti (§ 4.6).
   l'agente, per regola: un ramo fuso in `main` (nessun commit fuori da `main`),
   fermo da più di 24 ore, che nessun feedback aperto nomina e che è un
   tentativo `worker/*` di un feedback chiuso nato prima della chiusura, oppure
-  un `claude/*` di una sessione locale. Prima di cancellarlo ne salva nome e
+  un `claude/*` di una sessione locale. Toglie anche i tentativi superati: non
+  fusi, di un feedback chiuso, nati prima che il suo lavoro arrivasse su `main`
+  più di 24 ore fa (nessuno li fonderà più; dispatch dalla cloud non può
+  cancellarli, #2518). Prima di cancellarlo ne salva nome e
   sha, così si può ricreare. Per non bloccare la credenziale del cancello
   ne toglie al più 400 a giro (100 al primo), distanziati, e al primo rifiuto
   di GitHub per troppe richieste si ferma: il resto lo conta come rimandato al

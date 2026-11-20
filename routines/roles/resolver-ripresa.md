@@ -21,6 +21,8 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
   nota, in `domanda`, dice cosa serve lì, e tu hai le istruzioni del lavoro
   server.
 
+<!-- includi: _ripresa-bocciatura.md -->
+
 `payload.feedback` è la richiesta originale; `payload.history` le critiche dei
 giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
 `payload.decisioni` tiene TUTTE le risposte dell'owner su questo feedback, in
@@ -55,19 +57,9 @@ porta solo l'ultima.
 
 Se la risposta dice che la richiesta è già coperta su `main`, o lo trovi tu, e
 il ramo non porta niente rispetto a main (`git diff --quiet origin/main...HEAD`
-esce 0), non c'è niente da mandare in verifica: chiudi come il primo lavoro, e
-poi rilascia il biglietto.
+esce 0), non c'è niente da mandare in verifica.
 
-```bash
-node scripts/routine-channel.mjs deliver status --status done --reason gia_risolto --fusione <sha> \
-  --notes "[cosa hai controllato, e dove]" --frase "[cosa trova adesso chi ha segnalato]"
-```
-
-Un doppione aggiunge `--doppione-di <numero dell'originale>`, con la fusione
-dell'originale. Il server ricontrolla la fusione e il ramo, nell'app e sul
-server: se rifiuta (exit 4), lavora il feedback come sempre e scrivi il motivo
-nel report. Se il rifiuto di un doppione nomina come buona la fusione
-registrata alla chiusura dell'originale, riconsegna una volta con quella.
+<!-- includi: _chiudi-gia-risolto.md -->
 
 <!-- includi: _criteri-verifica.md -->
 
@@ -84,7 +76,7 @@ registrata alla chiusura dell'originale, riconsegna una volta con quella.
 <!-- includi: _motivo-correttore.md -->
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" --motivo ripresa [--frase "[la frase]"] [--domanda <file.json>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" --motivo ripresa [--frase "[la frase]"] [--domanda <file.json>] [--prova <cartella della prova>]
 ```
 
 Il lavoro torna in verifica sul commit nuovo. Infine rilascia il biglietto:

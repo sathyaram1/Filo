@@ -40,7 +40,15 @@ Valgono insieme queste regole:
   vale lo stesso per i popup che mostrano un nome scelto da altri (un file
   scaricato, un backup da importare, una conversazione, una categoria): `parti`
   anche lì; e per i pannelli dove si decide senza popup (la richiesta del
-  modello sopra «Elimina definitivamente» dell'archivio), un elemento suo. Il segno del riquadro non può dipendere da un colore che cambia chi
+  modello sopra «Elimina definitivamente» dell'archivio), un elemento suo; anche
+  la barra dei permessi di un sito, col nome di un file o di una cartella.
+  **Un valore che passa i controlli resta del modello** (#592.21): un id di
+  OpenRouter che il listino non conosce, un font, un nome di file accettano
+  virgolette, a capo e frasi. Nel riquadro anche loro, e la frase di Filo
+  intorno (la riga del costo) non li ripete: dice «questo modello» o il posto
+  nella catena. Fra le parole di Filo resta solo un formato che non sa dire
+  frasi (un colore) o un nome che ha solo le lettere del sito. La sentinella
+  prova ogni preferenza coi suoi esempi e la frase finta in coda. Il segno del riquadro non può dipendere da un colore che cambia chi
   scrive il testo: l'accento il modello lo cambia senza chiedere nello stesso
   turno. Per questo il filo a sinistra è per metà colore del testo: chi lo
   spegne spegne anche le parole. Su un sito la pagina riscriveva le variabili,

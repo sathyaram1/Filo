@@ -304,9 +304,10 @@
     const files = [];
     const MAX_FILES = LIMITI.file;
     const MAX_ATTACH_BYTES = LIMITI.byte;
-    // Quello che L0 ha segnato: i pezzi di testo da evidenziare e le immagini da ricontrollare.
+    // Quello che L0 ha segnato: i pezzi di testo da evidenziare, le immagini e i file da ricontrollare.
     let pezziSegnati = [];
     const immaginiSegnate = new Set();
+    const fileSegnati = new Set();
 
     // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
     // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
@@ -527,6 +528,10 @@
         const chip = document.createElement('div');
         chip.className = 'sn-fb-file-chip';
         chip.title = f.name;
+        if (fileSegnati.has(f)) {
+          chip.classList.add('sn-fb-file-chip--l0');
+          chip.title = `${f.name}: da ricontrollare`;
+        }
         const ic = document.createElement('span');
         ic.className = 'sn-fb-file-ic';
         // Icona documento in linea: nel set condiviso non c'è un'icona 'file'.
@@ -542,7 +547,7 @@
         xBtn.className = 'sn-fb-file-x';
         xBtn.setAttribute('aria-label', 'Rimuovi');
         xBtn.textContent = '×';
-        xBtn.addEventListener('click', () => { files.splice(i, 1); bumpSubmissionId(); renderThumbs(); });
+        xBtn.addEventListener('click', () => { files.splice(i, 1); fileSegnati.delete(f); bumpSubmissionId(); renderThumbs(); });
         chip.appendChild(ic);
         chip.appendChild(nameEl);
         chip.appendChild(sizeEl);
@@ -578,15 +583,32 @@
       // Lo spazio in coda tiene l'ultima riga vuota alta quanto quella della casella.
       evidenzeEl.appendChild(document.createTextNode(v.slice(at) + ' '));
       evidenzeEl.parentElement.classList.add('sn-fb-campo--evidenze');
+      allineaEvidenze();
+    }
+    // La barra di scorrimento della casella (Windows, Linux) stringe le sue righe: lo sfondo prende lo stesso margine,
+    // se no va a capo altrove e l'evidenza scivola su un'altra riga.
+    function allineaEvidenze() {
+      if (!evidenzeEl.parentElement.classList.contains('sn-fb-campo--evidenze')) return;
+      const cs = getComputedStyle(textEl);
+      const bordi = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+      const barra = Math.max(0, textEl.offsetWidth - textEl.clientWidth - bordi);
+      evidenzeEl.style.paddingRight = `${(parseFloat(cs.paddingRight) || 0) + barra}px`;
       evidenzeEl.scrollTop = textEl.scrollTop;
     }
     textEl.addEventListener('scroll', () => { evidenzeEl.scrollTop = textEl.scrollTop; });
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(() => allineaEvidenze());
+      ro.observe(textEl);
+      stacchi.push(() => ro.disconnect());
+    }
 
     // L'avviso di L0 sopra la casella: frasi e due strade, correggere o mandarlo com'è.
     function mostraRilettura(r) {
       pezziSegnati = Array.isArray(r?.pezzi) ? r.pezzi.filter((p) => p && typeof p.testo === 'string') : [];
       immaginiSegnate.clear();
       for (const k of Array.isArray(r?.immagini) ? r.immagini : []) if (images[k]) immaginiSegnate.add(images[k]);
+      fileSegnati.clear();
+      for (const k of Array.isArray(r?.allegati) ? r.allegati : []) if (files[k]) fileSegnati.add(files[k]);
       avvisoEl.textContent = '';
       const titolo = document.createElement('div');
       titolo.className = 'sn-fb-l0-titolo';
@@ -615,7 +637,7 @@
           const p = pezziSegnati.find((x) => v.indexOf(x.testo) === primo);
           try { textEl.setSelectionRange(primo, primo + p.testo.length); } catch (_) {}
         } else {
-          thumbsEl.querySelector('.sn-fb-thumb--l0')?.scrollIntoView?.({ block: 'nearest' });
+          thumbsEl.querySelector('.sn-fb-thumb--l0, .sn-fb-file-chip--l0')?.scrollIntoView?.({ block: 'nearest' });
         }
       });
       const manda = document.createElement('button');
@@ -645,19 +667,29 @@
     // null se l'allegato è entrato, sennò { name, reason }.
     const TIPO_NO = 'tipo non supportato';
     const scarto = (f, reason, ripiego) => ({ name: String(f?.name || ripiego), reason });
+    // { file } entro il tetto, { motivo }, o null se non è un'immagine: le regole stanno in src/shared/immaginiChat.js.
+    async function preparaImmagine(blob) {
+      const IC = global.SN_IMMAGINI_CHAT;
+      if (IC && typeof IC.perLaSegnalazione === 'function') return IC.perLaSegnalazione(blob);
+      if (classifyAttachment(blob) !== 'image') return null;
+      return blob.size > MAX_ATTACH_BYTES ? { motivo: 'troppo grande (max 4 MB)' } : { file: blob };
+    }
     async function addImageFromBlob(blob) {
       // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
       // tipo che si spacci per immagine.
       if (!blob) return null;
-      if (classifyAttachment(blob) !== 'image') return scarto(blob, TIPO_NO, 'immagine');
       if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
-      if (blob.size > MAX_ATTACH_BYTES) return scarto(blob, 'troppo grande (max 4 MB)', 'immagine incollata');
-      const dataUrl = await blobToDataUrl(blob);
+      const pronta = await preparaImmagine(blob);
+      if (!pronta) return scarto(blob, TIPO_NO, 'immagine');
+      if (pronta.motivo) return scarto(blob, pronta.motivo, 'immagine incollata');
+      const dataUrl = await blobToDataUrl(pronta.file);
+      // Due gesti di fila: mentre si rimpiccioliva la prima, la seconda può aver preso l'ultimo posto.
+      if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
       // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
       images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
-      return null;
+      return pronta.avviso ? { name: String(blob.name || 'immagine'), avviso: pronta.avviso } : null;
     }
 
     async function addAttachment(file) {
@@ -665,8 +697,8 @@
       // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta
       // «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
       const kind = classifyAttachment(file);
+      if (kind === 'image' || global.SN_IMMAGINI_CHAT?.daRidisegnare?.(file)) return addImageFromBlob(file);
       if (!kind) return scarto(file, TIPO_NO, 'allegato');
-      if (kind === 'image') return addImageFromBlob(file);
       if (files.length >= MAX_FILES) return scarto(file, `oltre i ${MAX_FILES} file ammessi`, 'allegato');
       if (file.size > MAX_ATTACH_BYTES) return scarto(file, 'troppo grande (max 4 MB)', 'allegato');
       const dataUrl = await blobToDataUrl(file);
@@ -684,16 +716,18 @@
     // Tutti gli allegati di un gesto (una scelta, un rilascio, un incolla), poi un messaggio solo per quelli rimasti fuori.
     async function allega(lista, aggiungi = addAttachment) {
       const fuori = [];
+      const avvisi = [];
       for (const f of lista) {
         const no = await aggiungi(f);
-        if (no) fuori.push(no);
+        if (no && no.avviso) avvisi.push(`«${no.name}» ${no.avviso}.`);
+        else if (no) fuori.push(no);
       }
-      if (!fuori.length) { if (lista.length) statusEl.textContent = ''; return; }
+      if (!fuori.length) { if (lista.length) statusEl.textContent = avvisi.join(' '); return; }
       const elenco = Feedback?.fraseAllegatiSaltati ? Feedback.fraseAllegatiSaltati(fuori)
         : fuori.map((f) => `«${f.name}»: ${f.reason}`).join('; ');
       const tipi = fuori.some((f) => f.reason === TIPO_NO)
         ? ` ${(AttachTypes && AttachTypes.AMMESSI) ? `Ammessi: ${AttachTypes.AMMESSI}.` : ATTACH_REJECT_MSG}` : '';
-      statusEl.textContent = `${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`;
+      statusEl.textContent = [`${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`, ...avvisi].join(' ');
     }
 
     function caricaImmagine(src) {

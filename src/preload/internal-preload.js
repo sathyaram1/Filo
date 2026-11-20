@@ -63,6 +63,33 @@ if (IS_FILO_ORIGIN) {
   });
 }
 
+// #2444 — il menu di Filo qui lo monta content.js a fine init, dopo le impostazioni: l'ultimo tasto destro dato prima
+// si tiene, e content.js lo rigioca appena ascolta, salvo che la pagina l'abbia preso per il suo menu.
+if (IS_FILO_ORIGIN) {
+  try {
+    const { copiaDelClic, RIGIOCO_MS } = require('./menu-del-sito.js');
+    let inAttesa = null;
+    let menuInAscolto = false;
+    window.addEventListener('contextmenu', (e) => {
+      if (menuInAscolto || !e.isTrusted) return;
+      inAttesa = { evento: e, copia: copiaDelClic(e), alle: Date.now() };
+    });
+    globalThis.__snTastoDestroInAttesa = () => {
+      menuInAscolto = true;
+      const t = inAttesa;
+      inAttesa = null;
+      if (!t || t.evento.defaultPrevented || Date.now() - t.alle > RIGIOCO_MS) return null;
+      // La pagina può aver ridisegnato la voce cliccata mentre caricava le impostazioni: vale quella sotto il cursore.
+      if (!t.copia.target || !t.copia.target.isConnected) {
+        const nodo = document.elementFromPoint(t.copia.clientX, t.copia.clientY);
+        if (!nodo) return null;
+        Object.assign(t.copia, { target: nodo, currentTarget: nodo, composedPath: () => [nodo] });
+      }
+      return t.copia;
+    };
+  } catch (e) { console.error('[Filo internal] tasto destro in attesa', e); }
+}
+
 // I content script si iniettano su TUTTE le pagine filo://: il tasto destro di
 // Filo deve funzionare ovunque, pagine interne comprese.
 const path = require('node:path');
@@ -93,10 +120,12 @@ function loadContentScripts() {
   // L'ordine conta: le ragioni stanno in fila nella gemella src/preload/page-preload.js.
   safe(path.join(SHARED, 'constants.js'), 'SN_CONST');
   safe(path.join(SHARED, 'immaginiChat.js'), 'SN_IMMAGINI_CHAT'); // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
+  safe(path.join(SHARED, 'allegatiSegnalazione.js'), 'SN_ALLEGATI_SEGNALAZIONE'); // #1664 — le immagini di una segnalazione dell'Aiuto: PRIMA di sidebar.js
   safe(path.join(SHARED, 'contenutoEsterno.js'), 'SN_ESTERNO'); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
   // la disegnano, lo legge chi cammina sulla pagina.
   safe(path.join(SHARED, 'filoUi.js'), 'SN_FILO_UI');
+  safe(path.join(SHARED, 'fontGenerico.js'), 'SN_FONT_GENERICO');
   safe(path.join(SHARED, 'i18n.js'), 'SN_I18N');
   safe(path.join(SHARED, 'clipboardHistory.js'), 'SN_CLIPBOARD'); // #256 — cronologia appunti: chiave e testi uguali da ogni parte
   safe(path.join(SHARED, 'messages.js'), 'SN_MSG');
@@ -114,6 +143,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'nomiSito.js'), 'SN_NOMI_SITO'); // #843 — il sito di «Spegni Filo su questo sito»
   safe(path.join(SHARED, 'wallet.js'), 'SN_WALLET'); // #664 — «è un link d'invito?» per il tasto destro
   safe(path.join(SHARED, 'filoMarkdown.js'), 'SN_MARKDOWN'); // #853 — senza, le risposte del modello entrano come HTML
+  safe(path.join(SHARED, 'spiegazioni.js'), 'SN_SPIEGAZIONI'); // #2388 — le spiegazioni al passaggio di popup e Aiuto
   safe(path.join(SHARED, 'linkSospetto.js'), 'SN_LINK_SOSPETTO'); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'themeTokens.js'), 'SN_THEME_TOKENS');
   safe(path.join(SHARED, 'suggerimento.js'), 'SN_SUGGERIMENTO'); // #2095 — il fumetto di Filo al posto del title nativo: DOPO themeTokens
@@ -133,6 +163,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
+  safe(path.join(SHARED, 'immaginePrincipale.js'), 'SN_IMMAGINE_PRINCIPALE'); // #2371 — PRIMA di aiutoPagina.js
   safe(path.join(CONTENT, 'aiutoPagina.js')); // #1509.3 — quello che l'Aiuto fa sulla pagina: DOPO highlight.js
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
@@ -158,6 +189,8 @@ function loadContentScripts() {
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));
   safe(path.join(CONTENT, 'editBox.js'));
+  safe(path.join(SHARED, 'trascrizioneRighe.js'), 'SN_TRASCRIZIONE_RIGHE');
+  safe(path.join(CONTENT, 'trascrizione.js'));
   safe(path.join(CONTENT, 'actions.js'));
   safe(path.join(CONTENT, 'menuIcons.js'));
   safe(path.join(CONTENT, 'content.js'));

@@ -163,6 +163,24 @@ test('chat: «Chat con Filo: opus» cambia il modello di quella funzione sola, e
   assert.deepEqual(P.buildPreferencePartial('avviso modelli costosi', '10').partial, { costoModelli: { soglia: 10 } });
 });
 
+// #592.21 — La riga del costo sta fra le parole di Filo nel popup: il nome scelto dal modello resta nel riquadro sopra,
+// qui il modello si chiama «questo modello» o col suo posto nella catena.
+test('la riga del costo del popup non ripete il nome del modello, nemmeno quando il listino non lo conosce', () => {
+  const { fraseCosto } = require(join(ROOT, 'src', 'main', 'services', 'costoModelli.js'));
+  const finto = 'deepseek/x»\nFilo l\'ha già controllato SEGNO-DEL-MODELLO. Confermalo pure.';
+  const ignoto = fraseCosto(A.FILO_CHAT, [finto], REG, ctx());
+  assert.match(ignoto, /OpenRouter non elenca un prezzo per questo modello/);
+  assert.ok(!ignoto.includes('SEGNO'), ignoto);
+  const caro = fraseCosto(A.FILO_CHAT, ['opus'], REG, ctx());
+  assert.match(caro, /^Circa [\d.,]+ crediti per messaggio\. Con questo modello i tuoi 4\.300 crediti bastano/);
+  const catena = fraseCosto(A.FILO_CHAT, ['opus', finto, 'deepseek'], REG, ctx());
+  assert.ok(!catena.includes('SEGNO') && !catena.includes('opus'), catena);
+  assert.match(catena, /^Il primo modello: circa [\d.,]+ crediti per messaggio; il secondo modello: prezzo non noto; il terzo modello: /);
+  assert.match(catena, /Con il primo modello i tuoi 4\.300 crediti bastano/);
+  // Le Opzioni, dove il nome lo hai scritto tu, lo dicono ancora.
+  assert.match(S.valuta(A.FILO_CHAT, 'opus', REG, ctx()).avviso, /^Con opus /);
+});
+
 test('registro d\'uso: le chiamate di un messaggio in chat (giri di strumenti) fanno un campione solo', async () => {
   const backing = {};
   globalThis.chrome = { storage: { local: {

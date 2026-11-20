@@ -307,7 +307,12 @@ test('#1592 — all’agente di chi non è owner, in pausa, non arrivano né la 
     // L'esito dice che la carta non c'è e descrive la home senza i Mazzi (l'utente li ha nominati, l'agente no).
     const dati = JSON.parse(esito.match(/\{"error"[^]*?\}/)[0]);
     expect(dati.error).toBe('carta sconosciuta');
-    expect([...dati.destra, ...dati.altro]).toEqual(['Editor', 'Filo ti suggerisce', 'Impostazioni rapide']);
+    expect(dati.destra).toEqual(['Editor', 'Filo ti suggerisce', 'Impostazioni rapide']);
+    // I tasti come li vede la home (#2593): la Bacheca in pausa è il tasto delle Segnalazioni, il Profilo sta nel «+».
+    expect(dati.tasti).toContain('Segnalazioni');
+    expect(dati.altro).toContain('Profilo');
+    expect([...dati.destra, ...dati.tasti, ...dati.altro]).not.toContain('Bacheca');
+    expect([...dati.destra, ...dati.tasti, ...dati.altro]).not.toContain('Mazzi');
     await page.reload();
     await expect(page.locator('#tieni .dash-carta[data-chiave="editor"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#tieni .dash-carta[data-chiave="mazzi"]')).toHaveCount(0);

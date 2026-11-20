@@ -6,6 +6,7 @@ import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { provaUnitSullaFusione, campoPerIlServer, testoProva, TETTO_ROSSI, ESITI_CHE_PROSEGUONO } from './lib/unit-sulla-fusione.mjs';
+import { prendiComandiDiActions } from './lib/comandi-di-actions.mjs';
 
 // Il server cerca la riga che COMINCIA così, l'ultima del registro: l'uscita dei test provati è rientrata, mai in colonna.
 export const MARCA = 'FILO-UNIT-FUSIONE';
@@ -134,13 +135,14 @@ export function partiDaAmbiente(nomi, env) {
   return nomi.map((nome) => ({ nome, campo: env[`CAMPO_${nome.toUpperCase()}`] || '', risultato: env[`RISULTATO_${nome.toUpperCase()}`] || '' }));
 }
 
-function riassunto(titolo, testo, riga) {
-  const file = process.env.GITHUB_STEP_SUMMARY;
+function riassunto(file, titolo, testo, riga) {
   if (!file) return;
   try { appendFileSync(file, `## ${titolo}\n\n\`\`\`\n${testo}\n\`\`\`\n\n\`${riga}\`\n`, 'utf8'); } catch (_) { /* il riassunto è per chi guarda, l'esito è nel registro */ }
 }
 
 function main() {
+  // Prima di qualunque figlio: anche fusioni e checkout della prova eseguono codice del ramo (hook e filtri di git) (#2558).
+  const { GITHUB_OUTPUT: uscita, GITHUB_STEP_SUMMARY: sommario } = prendiComandiDiActions();
   const a = leggiArgomenti(process.argv.slice(2));
   if (a.errori.length) {
     console.error(`unit-fusione-azione: ${a.errori.join('; ')}`);
@@ -149,7 +151,7 @@ function main() {
   if (a.unisci.length) {
     const campo = unisciParti({ ramo: a.ramo, main: a.main, parti: partiDaAmbiente(a.unisci, process.env) });
     const riga = rigaEsito(campo);
-    riassunto('Unit sulla fusione: esito per il server', a.unisci.join(' + '), riga);
+    riassunto(sommario, 'Unit sulla fusione: esito per il server', a.unisci.join(' + '), riga);
     console.log(riga);
     process.exit(codiceUscita(campo));
   }
@@ -161,16 +163,16 @@ function main() {
   const campo = campoEsito({ ramo: a.ramo, main: a.main, prova });
   if (!a.parte) {
     const riga = rigaEsito(campo);
-    riassunto('Unit sulla fusione', testo, riga);
+    riassunto(sommario, 'Unit sulla fusione', testo, riga);
     console.log(riga);
     process.exit(codiceUscita(campo));
   }
   // Una parte non decide la corsa: esce verde con l'esito scritto, e lo giudica il lavoro che unisce.
   const json = JSON.stringify(campo);
-  riassunto(`Unit sulla fusione (${a.parte}, ${a.unit})`, testo, json);
+  riassunto(sommario, `Unit sulla fusione (${a.parte}, ${a.unit})`, testo, json);
   console.log(`${MARCA_PARTE} ${a.parte} ${json}`);
-  if (process.env.GITHUB_OUTPUT) {
-    try { appendFileSync(process.env.GITHUB_OUTPUT, `campo=${json}\n`, 'utf8'); } catch (e) {
+  if (uscita) {
+    try { appendFileSync(uscita, `campo=${json}\n`, 'utf8'); } catch (e) {
       console.error(`unit-fusione-azione: non riesco a scrivere l'esito della parte (${e.message})`);
       process.exit(2);
     }

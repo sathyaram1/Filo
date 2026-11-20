@@ -50,7 +50,7 @@ const {
   ingressiContati,
 } = require('./autonomiaFonti');
 const {
-  voceChiusa, schedeNumerate, schedaPerNumero, bersaglioPausa, bersaglioAudio, apriPaginaSalvata, contoRestano,
+  voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, bersaglioPausa, bersaglioAudio, apriPaginaSalvata, contoRestano,
 } = require('./osservazioniPerModello');
 const { handleAIRequest, handleStream, maybeRunCompactor, stimaSogliaCompattazione } = require('./chiamateModello');
 const {
@@ -73,7 +73,7 @@ SN_CONST.registraCaricatoreCatalogo(() => require('./costoModelli').listino());
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, provenienza = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, chiesta = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
-  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null, intervista = false,
+  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null, intervista = false, senzaRilettura = false,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -183,7 +183,8 @@ async function eseguiAzioneFilo(action, {
   }
 
   // #884 — una scheda chiusa si riapre con l'indirizzo dell'archivio, mai con uno scritto dal modello: il popup la nomina.
-  if (type === 'RIAPRI_SCHEDA') {
+  // Senza id è l'ultima chiusa, la stessa di Ctrl+Shift+T (#2371).
+  if (type === 'RIAPRI_SCHEDA' && String(action.id ?? '').trim()) {
     const v = await voceChiusa(action.id);
     if (!v.voce) return { executed: false, kept: true, output: { riaperta: false, trovata: false } };
     action._titolo = v.perModello.titolo;
@@ -194,9 +195,11 @@ async function eseguiAzioneFilo(action, {
     const b = tm ? await bersaglioAudio(tm, action, schedeViste) : null;
     if (b && (b.tab || b.chiusa)) action._titolo = (await nomeDellaScheda())(b.tab || { url: b.chiusa.url, title: b.chiusa.titolo });
   }
-  if (type === 'PAUSA_AUDIO' || type === 'MOSTRA_SCHEDA') {
+  if (type === 'PAUSA_AUDIO' || type === 'MOSTRA_SCHEDA' || type === 'SALVA_PER_DOPO') {
     const tm = winOf(sender)?._filoTabs;
-    const b = tm ? (type === 'PAUSA_AUDIO' ? await bersaglioPausa(tm, action, schedeViste) : await schedaPerNumero(tm, action, schedeViste)) : null;
+    const b = !tm ? null : type === 'PAUSA_AUDIO' ? await bersaglioPausa(tm, action, schedeViste)
+      : type === 'MOSTRA_SCHEDA' ? await schedaDaMostrare(tm, action, schedeViste)
+        : action.scheda != null ? await schedaPerNumero(tm, action, schedeViste) : { tab: require('./handlersComuni').targetWebTab(sender).tab };
     const tabs = b ? (b.tabs || (b.tab ? [b.tab] : [])) : [];
     if (tabs.length) { const nome = await nomeDellaScheda(); action._titolo = tabs.map(nome).join(', '); }
   }
@@ -247,14 +250,15 @@ async function eseguiAzioneFilo(action, {
     } catch (_) {}
   }
 
+  // Le righe della memoria non arrivano a una pagina visitata: né nel popup che le mostra né lette dal modello.
+  if ((type === 'DIMENTICA' || type === 'CORREGGI_MEMORIA' || type === 'LEGGI_MEMORIA') && /^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+    return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+  }
+
   // DIMENTICA: le righe che la frase indica le trova il main, prima del gate,
   // così il popup mostra quelle che se ne andranno (#592).
-  // Il popup riporta righe della memoria: a una pagina visitata non si mostrano.
   let righeDaDimenticare = [];
   if (type === 'DIMENTICA') {
-    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
-      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
-    }
     try {
       if (confirmed) {
         const visti = bersagliMostrati(sender, action);
@@ -288,9 +292,6 @@ async function eseguiAzioneFilo(action, {
   // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
   let rigaDaCorreggere = null;
   if (type === 'CORREGGI_MEMORIA') {
-    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
-      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
-    }
     let trovate = [];
     try {
       if (confirmed) {
@@ -609,7 +610,7 @@ async function eseguiAzioneFilo(action, {
     return await esegui(action, {
       confirmed, sender, contesto, fontiLette, assistente, parole, avanzamento, chatId, segnale, nascostiDellaChat,
       domanda, capRilettura, schedeViste, intervista, type, righeDaDimenticare, rigaDaCorreggere, impostazioni,
-      decisione, daChiedere, sospesa,
+      decisione, daChiedere, sospesa, senzaRilettura: senzaRilettura === true,
 });
   } catch (e) {
     console.warn('[Filo] action exec failed', type, e);
@@ -626,6 +627,7 @@ const AZIONI = Object.freeze(Object.assign(Object.create(null),
   require('./azioni/proxy'),
   require('./azioni/impostazioni'),
   require('./azioni/sistema'),
+  require('./azioni/immagini'),
 ));
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {

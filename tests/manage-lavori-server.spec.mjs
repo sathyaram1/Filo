@@ -154,7 +154,8 @@ test('#2036: un lavoro server che nessuna routine prende sta fermo sulla scheda,
   await stubAutomazioni(page, { lavoriServer: true });
   await page.evaluate(() => window.__mgTest.loadAutoMode());
   const fermo = fb({ _id: 'srv-6', seq: 1903, status: 'revision_security', branch: 'worker/srv-6-20261101T090000Z',
-    restaLocale: { motivi: ['ramo non pulito', '<b>ramo del server non pulito</b>'], ruolo: 'secaudit', atMs: Date.parse('2026-11-01T12:00:00Z') } });
+    restaLocale: { motivi: ['ramo non pulito', '<b>ramo del server non pulito</b>'], ruolo: 'secaudit', atMs: Date.parse('2026-11-01T12:00:00Z'),
+      cause: ['ramo dell’app: il commit 1234abcd non l’ha dichiarato nessun biglietto pulito', 'la sanatoria della coda non lo toglie: <i>il commit 1234abcd è nato quando nessuna sessione pulita registrata sul ramo era viva</i>'] } });
   const sanato = fb({ _id: 'srv-7', seq: 1904, status: 'revision_security', branch: 'worker/srv-7-20261101T090000Z', restaLocale: null });
   const sporco = fb({ _id: 'srv-8', seq: 1905, status: 'revision_capability', branch: 'worker/srv-8-20261101T090000Z',
     restaLocale: { motivi: ['contenuto scritto da un biglietto sporco'], ruolo: 'new-work', atMs: Date.parse('2026-11-01T12:00:00Z') } });
@@ -166,8 +167,12 @@ test('#2036: un lavoro server che nessuna routine prende sta fermo sulla scheda,
   // Nessun motivo passa da solo (#2036.1): la scheda dice il gesto che sblocca, non promette una ripartenza.
   const spiega = (await riga.getAttribute('title')) || '';
   expect(spiega).not.toMatch(/riparte da solo/i);
-  expect(spiega).toContain('npm run fiducia:sana -- worker/srv-6-20261101T090000Z;');
-  expect(spiega).toContain('npm run fiducia:sana -- worker/srv-6-20261101T090000Z --server');
+  // #2565: il motivo del buco e quello per cui la sanatoria della coda non lo toglie, scritti dal server, si leggono qui.
+  expect(spiega).toContain('Perché: ramo dell’app: il commit 1234abcd non l’ha dichiarato nessun biglietto pulito; la sanatoria della coda non lo toglie: <i>il commit 1234abcd è nato quando nessuna sessione pulita registrata sul ramo era viva</i>.');
+  expect(spiega).toContain('Il ramo non risulta pulito e la sanatoria non lo copre: se l’hai letto, «Dichiara fidato com’è»');
+  expect(spiega).toContain('Il ramo del server non risulta pulito e la sanatoria non lo copre');
+  expect(spiega).not.toContain('fiducia:sana');
+  await expect(page.locator('.mg-item[data-id="srv-6"] i')).toHaveCount(0);
   const rigaSporca = page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server');
   await expect(rigaSporca).toHaveText('Fermo: resta locale');
   await expect(rigaSporca).toHaveAttribute('title', /non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è»/);

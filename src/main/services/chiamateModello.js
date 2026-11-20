@@ -7,6 +7,7 @@ const ContatoriServizio = require('./contatoriServizio');
 const ContestoFilo = require('./contestoFilo');
 const Compattazione = require('./compattazioneFilo');
 const Foto = require('./fotoDellaPagina');
+const Trascrizione = require('./trascrizioneYoutube');
 const { SN_CONST } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
 const Storage = globalThis.SN_STORAGE;
@@ -136,10 +137,12 @@ async function buildMessages(action, payload, { sender = null } = {}) {
       try { const u = new URL(payload.url || ''); return /^https?:$/.test(u.protocol) ? u.hostname.toLowerCase() : ''; }
       catch (_) { return ''; }
     })();
-    const [llmsRes, pathsRes] = await Promise.all([
+    const [llmsRes, pathsRes, video] = await Promise.all([
       domain ? LlmsTxt.get(domain, { sender }).catch(() => null) : Promise.resolve(null),
       // Dove il livello di privacy chiede prima (#1589) il sito non va al server.
       domain && payload.percorsiNoti !== false ? Paths.listByDomain(domain, { onlySuccess: true }).catch(() => []) : Promise.resolve([]),
+      // #1977 — su un video di YouTube la trascrizione: l'indirizzo è quello della scheda, non quello che dice la pagina.
+      Trascrizione.perLAiuto(sender && sender.wc).catch(() => ''),
     ]);
     const siteKnowledge = (llmsRes && llmsRes.present && llmsRes.text) ? llmsRes.text : '';
     const knownPaths = formatKnownPathsForPrompt(pathsRes || []);
@@ -156,6 +159,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
       ? PROMPTS.richiestaValuta({ testo: campo.testo, domanda: payload.userMessage || '' })
       : (payload.userMessage || testoDelTurnoAutomatico(payload));
     if (userText) parts.push({ type: 'text', text: userText });
+    if (video) parts.push({ type: 'text', text: video });
     // #2085 — le schede lasciate nel messaggio, lette come LEGGI_PAGINA.
     const G = globalThis.SN_SCHEDE_IN_CHAT;
     if (G && payload.userMessage && Array.isArray(payload.schede) && payload.schede.length) {
@@ -615,11 +619,16 @@ async function lessonsBufferText() {
   return buf.map((l) => `- ${l.text}`).join('\n');
 }
 
-// Il contesto dell'utente che «Valuta» porta all'Aiuto (#1449): la stessa memoria della chat. Senza, il parere parte lo stesso.
+// La memoria come la vede il modello della chat: la usano il CONTESTO, memoria(leggi) (#2536.1) e «Valuta» (#1449).
+async function memoriaPerModello() {
+  const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(await FiloMem.getMemory());
+  return { profilo, preferenze, espansioni, lezioni: await lessonsBufferText() };
+}
+
+// Senza memoria il parere di «Valuta» parte lo stesso.
 async function memoriaPerValuta() {
   try {
-    const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(await FiloMem.getMemory());
-    return { profilo, preferenze, espansioni, lezioni: await lessonsBufferText() };
+    return await memoriaPerModello();
   } catch (e) {
     console.warn('[Filo] memoria per «Valuta»:', e?.message || e);
     return {};
@@ -749,12 +758,14 @@ function compattaDaFermo(incognito, tetti) {
   }, cacheMs + 60 * 1000, incognito);
 }
 
-// La parte fissa della richiesta della chat, in token: strumenti, istruzioni e CONTESTO (la parte dell'utente). La chat
-// e la stima accanto alla soglia la contano allo stesso modo.
-function parteFissaChat(tools, parteUtente) {
-  let strumenti = 0;
-  try { strumenti = tools ? JSON.stringify(tools).length : 0; } catch (_) {}
-  return Math.ceil((PROMPTS.filoChatStatic().length + String(parteUtente || '').length + strumenti) / globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN);
+const parteFissaChat = (tools, parteUtente) => globalThis.SN_FILO_COMPATTAZIONE.parteFissa(tools, parteUtente || '');
+// La parte fissa prima che il turno la misuri: quella dell'ultimo turno; prima del primo, gli stessi pezzi con la parte
+// dell'utente fotografata (o quella tipica, se non c'è ancora). Soglia e tetto del tratto partono da qui.
+function baseDellaChat(incognito) {
+  const Tools = globalThis.SN_ACTION_TOOLS;
+  const foto = ContestoFilo.ultimaFotografia(incognito);
+  return Compattazione.base(incognito)
+    || globalThis.SN_FILO_COMPATTAZIONE.parteFissa(Tools ? Tools.definitions() : [], foto ? foto.testo : null);
 }
 
 // La frase accanto alla soglia: costo al mese e attesa, coi prezzi di OpenRouter di adesso per i modelli scelti.
@@ -770,13 +781,7 @@ async function stimaSogliaCompattazione(valore) {
   };
   const chat = primo(ACTIONS.FILO_CHAT);
   const comp = primo(modelloCheCompatta(settings));
-  // La parte fissa che la chat ha misurato all'ultimo turno; prima del primo, gli stessi pezzi con la parte dell'utente di
-  // adesso (o quella tipica, se non c'è ancora).
-  const Tools = globalThis.SN_ACTION_TOOLS;
-  const foto = ContestoFilo.ultimaFotografia(false);
-  const base = Compattazione.base(false) || (foto
-    ? parteFissaChat(Tools ? Tools.definitions() : [], foto.testo)
-    : parteFissaChat(Tools ? Tools.definitions() : [], '') + globalThis.SN_FILO_COMPATTAZIONE.USO.parteUtente);
+  const base = baseDellaChat(false);
   const r = globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({
     soglia, base, prezzoChat: S.prezzoDi(ctxCosto.listino, chat), prezzoCompattazione: S.prezzoDi(ctxCosto.listino, comp), prezzoPer: S.prezzoPer,
   });
@@ -814,10 +819,12 @@ module.exports = {
   handleStream,
   extractJson,
   lessonsBufferText,
+  memoriaPerModello,
   lezioniAutomaticheConsentite,
   maybeRunLessonAgent,
   maybeRunCompactor,
   compattaDaFermo,
   parteFissaChat,
+  baseDellaChat,
   stimaSogliaCompattazione,
 };

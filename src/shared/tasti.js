@@ -240,9 +240,14 @@
   function indiceSchedaVicina(ev, attiva, quante) {
     if (!ev || !(String(ev.code || '') === 'Tab' || String(ev.key || '') === 'Tab')) return null;
     if (!modificatore(ev, 'ctrl') || modificatore(ev, 'alt') || modificatore(ev, 'meta')) return null;
+    return schedaNelVerso(modificatore(ev, 'shift') ? 'prima' : 'dopo', attiva, quante);
+  }
+
+  // La stessa regola per «passa alla scheda dopo» chiesto in chat (#2371): `verso` è 'dopo' o 'prima'.
+  function schedaNelVerso(verso, attiva, quante) {
     const n = Number(quante);
     if (!Number.isInteger(n) || n < 1) return null;
-    const indietro = modificatore(ev, 'shift');
+    const indietro = verso === 'prima';
     const i = Number(attiva);
     if (!Number.isInteger(i) || i < 0 || i >= n) return indietro ? n - 1 : 0;
     return (i + (indietro ? n - 1 : 1)) % n;
@@ -580,6 +585,19 @@
       ctrlKey: mods.includes('c'), metaKey: mods.includes('m'),
       altKey: mods.includes('a'), shiftKey: mods.includes('s'),
       key: f.slice(f.indexOf('|') + 1), code: '',
+    };
+  }
+
+  // Come `pressioneScritta`, anche per un tasto da solo («Esc», «freccia giù»): chi PREME una combinazione scritta (il
+  // pilota delle prove, tests/agent/combinazioni.mjs) la legge con questi nomi. `cmdECtrl`: Ctrl e Cmd scritti insieme.
+  function letturaScritta(accel) {
+    const parti = pezzi(String(accel || '').trim().replace(/\+\s*\+$/, '+Plus'));
+    if (!parti.length) return null;
+    const mods = parti.slice(0, -1).map((m) => m.toLowerCase());
+    return {
+      ctrl: mods.some((m) => CTRL.test(m)), cmdECtrl: conControlECmd(mods),
+      alt: mods.some((m) => ALT.test(m)), shift: mods.some((m) => SHIFT.test(m)),
+      tasto: tastoCanonico(parti[parti.length - 1]), scritto: parti[parti.length - 1],
     };
   }
 
@@ -1055,11 +1073,11 @@
 
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
-    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, etichettaSchedaVicina,
+    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, schedaNelVerso, etichettaSchedaVicina,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
     comandoBarra, etichettaBarra, ACCEL_BARRA, comandoLucchettoBarra, etichettaLucchettoBarra, ACCEL_LUCCHETTO_BARRA, comandoPannello, etichettaPannello, ACCEL_PANNELLO, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,
-    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
+    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, letturaScritta, delSistema,
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,
     AZIONI_FILO, usaScorciatoieFilo, usaScorciatoiePannelli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
     scorciatoiaDaEvento, scorciatoiaDaScritta, rifiutoScorciatoiaFilo, testoRifiutoFilo, combaciaFilo, azioneFiloDaTasto,

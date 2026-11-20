@@ -14,6 +14,7 @@ const { resolveShell } = require('./services/terminal');
 const { virgoletteIncollando, propostaVirgolette } = require('./services/shellVirgolette');
 const SegretiLetti = require('./services/segretiLetti');
 const RilascioNellaChat = require('./rilascioNellaChat');
+const LinkSuScheda = require('./linkSuScheda');
 const SchedaTrascinata = require('./schedaTrascinata');
 // Quanto dell'output di un comando lanciato a mano passa dal registro dei segreti letti: quanto una pagina.
 const MAX_STAMPATO = 8000000;
@@ -307,6 +308,12 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win) RilascioNellaChat.consegna(win, voci).catch(() => {});
   });
+  // #2393 — un collegamento lasciato sulla fila delle schede: solo dalla barra della sua finestra.
+  ipcMain.on('shell:link-su-scheda', (event, dati) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return;
+    try { LinkSuScheda.ricevi(win._filoTabs, dati); } catch (e) { console.warn('[Filo] link sulla fila', e?.message || e); }
+  });
   // #2084 — una scheda trascinata fuori dalla fila: solo dalla barra della sua finestra.
   ipcMain.on('shell:scheda-fuori', (event, dati) => {
     const win = finestraDellaBarra(event.sender);
@@ -355,6 +362,15 @@ function registerIpcHandlers() {
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
     try { MenuDiRiserva.chiesto(event, richiesta); } catch (_) {}
+  });
+
+  // Una finestra con nome chiesta di nuovo dalla pagina che la tiene, o riportata davanti (page-preload.js, #737.8).
+  ipcMain.on('filo:finestra-davanti', (event, nome) => {
+    try {
+      const wc = event.sender;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      if (win) win._filoTabs.richiamataDallaPagina(wc, event.senderFrame, typeof nome === 'string' ? nome : null);
+    } catch (_) {}
   });
 
   // window.close() di una pagina web (page-preload.js): chiude la sua scheda, mai la finestra di Filo; una finestrella

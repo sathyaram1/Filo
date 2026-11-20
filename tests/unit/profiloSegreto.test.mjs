@@ -1066,13 +1066,17 @@ describe('le date del contenitore', () => {
     await s.cancellaFile('diario.txt');
     await s.scriviFile('diario.txt', 'cose mie, di nuovo');
     await s.chiudi();
-    assert.deepEqual(date(), attese, 'dopo aver creato e scritto');
+    // Una data scritta da altri torna al microsecondo, non al nanosecondo: da Node 24 libuv scrive i nanosecondi, e un
+    // double a questa data ha una grana di 238 ns (#2207). Rimessa una volta, non scivola più.
+    const micro = (d) => d.map((ns) => ns / 1000n);
+    assert.deepEqual(micro(date()), micro(attese), 'dopo aver creato e scritto');
+    const rimesse = date();
     for (let x = 0; x < 5; x++) await (await apri(base, 'Datato')).segreto.chiudi();
-    assert.deepEqual(date(), attese, 'dopo cinque riaperture: niente scivola');
+    assert.deepEqual(date(), rimesse, 'dopo cinque riaperture: niente scivola');
     assert.deepEqual(await apri(base, 'nome che non c’è'), NESSUNO);
-    assert.deepEqual(date(), attese, 'dopo un nome che non c’è');
+    assert.deepEqual(date(), rimesse, 'dopo un nome che non c’è');
     await (await apri(base, 'Datato')).segreto.cancella();
-    assert.deepEqual(date(), attese, 'dopo la cancellazione');
+    assert.deepEqual(date(), rimesse, 'dopo la cancellazione');
     rmSync(base.contenitore, { force: true });
   });
 

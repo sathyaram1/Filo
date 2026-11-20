@@ -39,7 +39,7 @@
     // ── impostazioni ──
     LEGGI_IMPOSTAZIONI: {
       via: ['impostazioni', 'leggi'], risultato: true,
-      description: 'com\'è impostato Filo adesso: ogni voce con chiave e valori ammessi, i permessi dei siti, i token dell\'aspetto. Prima di dire com\'è impostato qualcosa o di un cambio relativo.',
+      description: 'com\'è impostato Filo: chiavi e valori ammessi, permessi dei siti, token dell\'aspetto. Prima di dire com\'è impostato qualcosa o di un cambio relativo.',
       properties: { cerca: S() }, required: [],
     },
     IMPOSTA_PREFERENZA: {
@@ -60,7 +60,7 @@
     },
     IMPOSTA_ESTETICA: {
       via: ['impostazioni', 'aspetto'],
-      description: 'un token dell\'aspetto di Filo (accent, background, text, topbar, font, radius, motion…; tutti con leggi). Scegli tu un valore concreto: #rrggbb, "8px", opacità 0-1, "450ms", motion 0-3 ("0" toglie le animazioni), "Georgia, serif"; "predefinito" torna di serie.',
+      description: 'un token dell\'aspetto (accent, background, text, topbar, font, radius, motion…; tutti con leggi). Valore concreto: #rrggbb, "8px", opacità 0-1, "450ms", motion 0-3 ("0" toglie le animazioni), "Georgia, serif"; "predefinito" torna di serie.',
       properties: { token: S(), valore: S() }, required: ['token', 'valore'],
     },
     PULSANTE_PREFERENZE: {
@@ -102,12 +102,22 @@
     },
     MOSTRA_SCHEDA: {
       via: ['scheda', 'mostra'],
-      description: 'porta l\'utente su una scheda già aperta, senza ricaricarla.',
-      properties: { scheda: I() }, required: ['scheda'],
+      description: 'porta l\'utente su una scheda aperta (verso: la dopo o la prima), senza ricaricarla.',
+      properties: { scheda: I(), verso: S({ enum: ['dopo', 'prima'] }) }, required: [],
+    },
+    SALVA_PER_DOPO: {
+      via: ['scheda', 'salva'],
+      description: 'salva per dopo e chiude una pagina (senza scheda: la web davanti).',
+      properties: { scheda: I() }, required: [],
+    },
+    CERCA_IMMAGINE: {
+      via: ['scheda', 'lens'],
+      description: 'Google Lens: immagine N della chat, o scheda per la più grande della pagina; senza, l\'ultima della chat.',
+      properties: { immagine: I(), scheda: I() }, required: [],
     },
     CHIUDI_SCHEDE: {
       via: ['scheda', 'chiudi'],
-      description: 'chiude schede per numero, per sito o tutte, tranne quelle in tranne; tutte e sito lasciano aperta questa chat.',
+      description: 'chiude schede per numero, sito o tutte, meno tranne; tutte e sito lasciano aperta questa chat.',
       properties: { schede: LISTA(I()), sito: S(), tutte: B(), tranne: LISTA(I()) }, required: [],
     },
     PULISCI_TAB: {
@@ -122,8 +132,8 @@
     },
     RIAPRI_SCHEDA: {
       via: ['scheda', 'riapri'], risultato: true,
-      description: 'riapre com\'era una scheda trovata con chiuse.',
-      properties: { id: S() }, required: ['id'],
+      description: 'riapre com\'era una scheda trovata con chiuse; senza id l\'ultima chiusa.',
+      properties: { id: S() }, required: [],
     },
     CERCA_SALVATE: {
       via: ['scheda', 'salvate'], risultato: true,
@@ -209,7 +219,7 @@
     // ── home ──
     CARTA_HOME: {
       via: ['home', 'carta'],
-      description: 'togli|rimetti|sposta (verso su|giu|cima|fondo, o prima_di)|ripristina. Destra: editor, suggerimenti, rapide; sinistra: timer, avvisi, scaricamenti… detti a parole.',
+      description: 'togli|rimetti|sposta (verso su|giu|cima|fondo, o prima_di)|ripristina. Destra: editor, suggerimenti, rapide, cerca, impostazioni…; sinistra: timer, avvisi…',
       properties: { operazione: S(), carta: S(), verso: S(), prima_di: S() }, required: ['operazione'],
     },
     BARRA_SITI: {
@@ -339,12 +349,28 @@
       description: 'mette in ordine le icone del desktop (ordine nome|tipo|data|dimensione, verso righe|colonne).',
       properties: { ordine: S(), verso: S(), al_contrario: B(), cartelle_prima: B() }, required: [],
     },
+    BLOCCA_PC: {
+      via: ['computer', 'blocca'],
+      description: 'blocca subito il computer.',
+      properties: {}, required: [],
+    },
 
     // ── web ──
     CERCA_WEB: {
       via: ['web', 'cerca'], risultato: true,
       description: 'risultati con titolo, indirizzo e un pezzo di testo.',
       properties: { query: S() }, required: ['query'],
+    },
+    // #2272 — come metterle nella risposta lo dice l'esito: qui solo quando servono.
+    IMMAGINI_WEB: {
+      via: ['web', 'immagini'], risultato: true,
+      description: 'foto da mettere nella risposta, se l\'utente vuole vedere qualcosa o una foto spiega meglio.',
+      properties: { query: S() }, required: ['query'],
+    },
+    GENERA_IMMAGINE: {
+      via: ['web', 'disegna'], risultato: true,
+      description: 'un\'immagine nuova, solo se l\'utente chiede di crearla.',
+      properties: { descrizione: S() }, required: ['descrizione'],
     },
     LEGGI_PAGINA: {
       via: ['web', 'leggi'], risultato: true,
@@ -358,14 +384,19 @@
       description: 'una regola breve in terza persona su come comportarti con l\'utente, che vale da subito in ogni conversazione.',
       properties: { testo: S() }, required: ['testo'],
     },
+    LEGGI_MEMORIA: {
+      via: ['memoria', 'leggi'], risultato: true,
+      description: 'la memoria intera, quando non è nel CONTESTO.',
+      properties: {}, required: [],
+    },
     CORREGGI_MEMORIA: {
       via: ['memoria', 'correggi'],
-      description: 'corregge una riga della memoria (testo: un pezzo di quella di adesso; nuovo: quella giusta).',
+      description: 'corregge una riga della memoria (testo: un pezzo di quella di adesso; nuovo: quella giusta); una riga da togliere va a dimentica.',
       properties: { testo: S(), nuovo: S() }, required: ['testo', 'nuovo'],
     },
     DIMENTICA: {
       via: ['memoria', 'dimentica'],
-      description: 'nasconde una riga della memoria; per_sempre la cancella.',
+      description: 'nasconde una riga della memoria; per_sempre la cancella, solo se l\'utente dice «per sempre».',
       properties: { testo: S(), per_sempre: B() }, required: ['testo'],
     },
     CANCELLA_MEMORIA: {
@@ -387,7 +418,7 @@
     },
     TOGLI_CHAT: {
       via: ['filo', 'togli_chat'],
-      description: 'nasconde una conversazione (senza id quella di adesso); per_sempre la cancella.',
+      description: 'nasconde una conversazione (senza id quella di adesso); per_sempre la cancella, solo se l\'utente dice «per sempre».',
       properties: { id: S(), per_sempre: B() }, required: [],
     },
     RIMETTI_CHAT: {

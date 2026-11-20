@@ -2,7 +2,7 @@
 // tetti, cancellabili davvero, esportabili, e mai su disco dall'incognito. Ogni prova guarda il FILE, non solo l'app.
 // Senza il filo ogni prova è rossa: le chat stavano in storage.json e le pagine visitate non si registravano.
 
-import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
+import { test, expect, chiudiApp, argomentiScala, aspettaFinestra } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
@@ -12,6 +12,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { campoRicerca } from './helpers/tastiHome.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
@@ -33,9 +34,7 @@ async function avvia(userData) {
 async function paginaInterna(app, shell, url) {
   const host = new URL(url).hostname;
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-  await expect.poll(() => app.windows().some((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } }),
-    { timeout: 10_000 }).toBe(true);
-  const page = app.windows().find((w) => new URL(w.url()).hostname === host);
+  const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === host, `nessuna finestra su ${host}`);
   await page.waitForLoadState('domcontentloaded');
   return page;
 }
@@ -96,7 +95,7 @@ test('dopo l’aggiornamento le chat di prima sono nel filo della home e Filo le
     const elenco = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_chats_list' }));
     expect(elenco.chats.map((c) => [c.id, c.messageCount])).toEqual([['chat-coscienza', 3], ['chat-sveglia', 2]]);
     const casa = await paginaInterna(app, shell, 'filo://newtab/');
-    await casa.locator('#cercaInput').fill('coscienza emergente');
+    await (await campoRicerca(casa)).fill('coscienza emergente');
     await expect(casa.locator('.dash-cerca-msg', { hasText: 'Secondo te la coscienza è emergente?' })).toBeVisible({ timeout: 10_000 });
 
     const riaperta = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_chat_get', id: 'chat-coscienza' }));

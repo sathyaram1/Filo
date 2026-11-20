@@ -106,6 +106,16 @@ test('segnala finita in nota su un rosso di main già aperto: la riga dice il nu
   });
 });
 
+test('segnala finita in nota su una pratica fusa a metà: la riga dice che il rosso può venire da lì, e di non riprovare (#2584)', async () => {
+  await conServer(() => [200, { ok: true, nota: true, fusioneAMeta: true, id: 'p2291', num: '#2291' }], async ({ port }, casa) => {
+    const s = await esegui(['segnala'], ambiente(port, casa), 'Rosso su main del server: functions/test/l5-pubblicazioni-1497.test.js\n');
+    assert.equal(s.code, 0, s.se);
+    assert.match(s.so, /^OK: aggiunta come nota a #2291, fuso a metà \(l'app su main di Filo, il server non ancora\)/);
+    assert.match(s.so, /Non riprovare/);
+    assert.doesNotMatch(s.so, /segue già lo stesso rosso/);
+  });
+});
+
 test('il server che non ha ancora l’indirizzo è un guasto, non un rifiuto', async () => {
   await conServer(() => [404, {}], async ({ port }, casa) => {
     const r = await esegui(['segnala'], ambiente(port, casa), 'x\n');

@@ -395,6 +395,17 @@ html, body {
 .dash-altro-cella:hover .dash-altro-rimetti,
 .dash-altro-cella:focus-within .dash-altro-rimetti { opacity: 1; }
 .dash-altro-rimetti:hover { transform: scale(1.1); }
+.dash-altro-app.presa { opacity: 0.4; }
+/* La linea dove andrà il tasto lasciato: i tasti stanno in fila, quindi è verticale. */
+.dash-altro-app.sopra-prima { box-shadow: inset 2px 0 0 var(--dash-accent); }
+.dash-altro-app.sopra-dopo { box-shadow: inset -2px 0 0 var(--dash-accent); }
+.dash-altro-app .account-avatar { display: block; width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+/* Il «+» (#2372): fisso in fondo ai tasti, apre quelli fuori vista; il numero dice quanti sono. */
+.dash-altro-piu { color: var(--dash-ink-mute); }
+.dash-altro-piu[aria-expanded="true"] { background: var(--dash-line); color: var(--dash-ink); }
+.dash-altro-piu.bersaglio { background: var(--dash-line-strong); color: var(--dash-accent); }
+.dash-altro-fuori { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--dash-line); }
+.dash-altro-vuoto { padding: 6px 4px; font-size: 11.5px; color: var(--dash-ink-mute); }
 
 /* Menu del tasto destro sulle carte: stesse voci, stessa animazione al passaggio del puntatore. */
 .dash-menu {
@@ -517,17 +528,20 @@ html, body {
 body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; }
 
 /* ── La coda del filo (#869) ── */
-/* Cercare nel filo: un campo discreto in cima al centro, i risultati sopra il filo. */
-.dash-cerca { flex: none; display: flex; justify-content: center; padding: 10px 8px 0; position: relative; z-index: 6; }
+/* Cercare nel filo (#2372): la colonna destra intera, il campo in cima e i risultati riassunti sotto. */
+.dash-cerca { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
+.dash-cerca[hidden] { display: none; }
 .dash-cerca-campo {
-  display: flex; align-items: center; gap: 8px; width: min(320px, 100%);
-  padding: 5px 12px; border: 1px solid transparent; border-radius: var(--dash-radius-pill);
-  color: var(--dash-ink-mute); cursor: text;
-  transition: border-color calc(0.16s * var(--sn-motion, 1)) ease, background calc(0.16s * var(--sn-motion, 1)) ease, width calc(0.2s * var(--sn-motion, 1)) ease;
+  flex: none; display: flex; align-items: center; gap: 4px;
+  padding: 3px 12px 3px 4px; border: 1px solid var(--dash-line-strong); border-radius: var(--dash-radius-pill);
+  background: var(--dash-card); color: var(--dash-ink-soft); cursor: text;
 }
-.dash-cerca-campo:hover { background: var(--dash-line); }
-.dash-cerca-campo:focus-within { width: min(460px, 100%); background: var(--dash-card); border-color: var(--dash-line-strong); color: var(--dash-ink-soft); }
-.dash-cerca-lente { display: inline-flex; flex: none; }
+.dash-cerca-lente {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0;
+  border: none; border-radius: 50%; background: transparent; color: var(--dash-accent); cursor: pointer;
+  transition: background calc(0.14s * var(--sn-motion, 1)) ease;
+}
+.dash-cerca-lente:hover, .dash-cerca-lente:focus-visible { background: var(--dash-line); outline: none; }
 .dash-cerca-input {
   flex: 1; min-width: 0; border: none; outline: none; background: transparent;
   font: inherit; font-size: 13px; color: var(--dash-ink);
@@ -535,26 +549,24 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-cerca-input::placeholder { color: var(--dash-ink-mute); }
 .dash-cerca-input::-webkit-search-cancel-button { display: none; }
 .dash-cerca-risultati {
-  position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-  width: min(560px, calc(100% - 16px)); max-height: min(60vh, 520px); overflow-y: auto;
-  display: flex; flex-direction: column; gap: 1px; padding: 6px;
-  background: var(--dash-card); border: 1px solid var(--dash-line-strong); border-radius: 14px;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--dash-ink) min(100%, 16% * var(--sn-ombra, 1)), transparent);
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
   scrollbar-width: thin;
 }
+.dash-cerca-risultati[hidden] { display: none; }
 .dash-cerca-voce {
-  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-  padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left;
+  padding: 6px 8px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
   font: inherit; cursor: pointer;
   transition: background calc(0.14s * var(--sn-motion, 1)) ease;
 }
 .dash-cerca-voce:hover, .dash-cerca-voce.scelta, .dash-cerca-voce:focus-visible { background: var(--dash-line); outline: none; }
-.dash-cerca-ico { display: inline-flex; flex: none; color: var(--dash-accent); }
+.dash-cerca-ico { display: inline-flex; flex: none; margin-top: 2px; color: var(--dash-accent); }
 .dash-cerca-corpo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .dash-cerca-titolo { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-cerca-sotto { font-size: 11.5px; color: var(--dash-ink-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-cerca-quando { flex: none; font-size: 11px; color: var(--dash-ink-mute); font-variant-numeric: tabular-nums; }
-.dash-cerca-niente { padding: 8px 10px; font-size: 12.5px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-cerca-niente { padding: 8px 10px; font-size: 12.5px; color: var(--dash-ink-mute); }
 .dash-cerca-gruppo { border-top: 1px solid var(--dash-line); margin-top: 4px; }
 .dash-cerca-gruppo:first-child { border-top: none; margin-top: 0; }
 /* La ricerca per significato fra le schede chiuse parte a richiesta: la sua riga resta più quieta dei risultati. */
@@ -600,7 +612,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-cambio-ora, .dash-pagine-ora { flex: none; font-variant-numeric: tabular-nums; opacity: 0.75; }
 .dash-cambio-ico, .dash-pagine-ico { display: inline-flex; flex: none; }
 .dash-cambio-testo, .dash-pagine-testo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dash-cambio-stato { flex: none; font-style: italic; }
+.dash-cambio-stato { flex: none; }
 .dash-cambio.dash-cambi-annullato .dash-cambio-testo { text-decoration: line-through; text-decoration-color: var(--dash-line-strong); }
 .dash-cambio-annulla {
   margin-left: auto; flex: none; font: inherit; font-size: 11.5px; color: var(--dash-ink-soft);
@@ -944,7 +956,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   border: 1px solid var(--dash-line);
   border-bottom-left-radius: 6px;
 }
-.dash-bubble-filo.dash-bubble-pending { color: var(--dash-ink-mute); font-style: italic; }
+.dash-bubble-filo.dash-bubble-pending { color: var(--dash-ink-mute); }
 
 /* Bolla con formattazione leggera già renderizzata in HTML: ha i suoi <p>/<ul>, quindi niente
    pre-wrap, che renderebbe letterali gli a-capo fra i blocchi. */
@@ -956,7 +968,6 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   margin: 10px 0 4px 0; font-weight: 600; font-size: 1em;
 }
 .dash-bubble-md strong { font-weight: 600; }
-.dash-bubble-md em { font-style: italic; }
 .dash-bubble-md ul, .dash-bubble-md ol { margin: 4px 0 8px 0; padding-left: 22px; }
 .dash-bubble-md li { margin: 2px 0; }
 .dash-bubble-md code {
@@ -1054,68 +1065,71 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-msg-azione.dash-non-copiato::after { color: var(--dash-accent); }
 .dash-msg-azioni:has(.dash-copiato, .dash-non-copiato) .dash-msg-azione:not(.dash-copiato):not(.dash-non-copiato)::after { opacity: 0; }
 
-/* La risposta citata in testa alla bolla dell'utente, come nelle app di messaggi: una striscia, chi l'ha scritta, due
-   righe. Il testo sta negli attributi: la bolla resta fatta delle sole parole dell'utente. */
-.dash-bubble-user { --dash-citata-chi: var(--dash-accent-2); }
-[data-sn-theme="dark"] .dash-bubble-user { --dash-citata-chi: var(--dash-accent); }
+/* Le citazioni nella bolla, ognuna prima del suo commento (#2346): striscia sottile, due righe smorzate, nome solo per
+   «Tu». Il testo sta negli attributi: la bolla resta fatta delle sole parole dell'utente. */
+.dash-bubble-user { --dash-citata-riga: color-mix(in srgb, var(--dash-paper) 38%, transparent); }
 .dash-citata {
   display: block;
-  margin: -4px -8px 8px;
-  padding: 6px 12px 7px 14px;
-  border-radius: 10px;
-  background:
-    linear-gradient(var(--dash-citata-chi), var(--dash-citata-chi)) left / 4px 100% no-repeat,
-    color-mix(in srgb, var(--dash-paper) 13%, transparent);
+  margin: 2px -6px 4px;
+  padding: 2px 8px 2px 10px;
+  border-radius: 0 6px 6px 0;
+  background: linear-gradient(var(--dash-citata-riga), var(--dash-citata-riga)) left / 2px 100% no-repeat;
   white-space: normal;
   cursor: pointer;
   transition: background-color calc(0.15s * var(--sn-motion, 1)) ease;
 }
+.dash-citata:first-child { margin-top: -2px; }
 .dash-citata:hover, .dash-citata:focus-visible {
-  background:
-    linear-gradient(var(--dash-citata-chi), var(--dash-citata-chi)) left / 4px 100% no-repeat,
-    color-mix(in srgb, var(--dash-paper) 22%, transparent);
+  background-color: color-mix(in srgb, var(--dash-paper) 10%, transparent);
   outline: none;
 }
-.dash-citata::before {
+.dash-citata[data-chi]::before {
   content: attr(data-chi);
   display: block;
-  font-size: 12.5px; font-weight: 600; line-height: 1.35;
-  color: var(--dash-citata-chi);
+  font-size: 12px; font-weight: 600; line-height: 1.35;
+  opacity: 0.6;
 }
 .dash-citata::after {
   content: attr(data-testo);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
   font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere;
-  opacity: 0.78;
+  opacity: 0.62;
 }
 .dash-citata.dash-citata-manca { cursor: default; }
-.dash-citata.dash-citata-manca::after { font-style: italic; }
 
-/* La stessa citazione sopra il campo, finché il messaggio non parte. */
+/* Le stesse citazioni sopra il campo, finché il messaggio non parte: ognuna col suo commento sotto, l'ultima col campo. */
 .dash-citazione {
   flex-basis: 100%;
-  display: flex; align-items: center; gap: 4px;
+  display: flex; flex-direction: column; gap: 4px;
   min-width: 0;
+  max-height: 45vh; overflow: hidden auto;
 }
 .dash-citazione[hidden] { display: none; }
+.dash-citazione-pezzo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dash-citazione-riga { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .dash-citazione-vai {
   flex: 1; min-width: 0;
   display: flex; flex-direction: column; gap: 1px;
-  padding: 6px 12px 7px 15px;
-  border: none; border-radius: 20px 12px 12px 20px;
-  background:
-    linear-gradient(var(--dash-accent), var(--dash-accent)) left / 4px 100% no-repeat,
-    var(--dash-line);
-  font: inherit; text-align: left; color: var(--dash-ink-soft); cursor: pointer;
-  transition: background-color calc(0.15s * var(--sn-motion, 1)) ease;
+  margin-left: 6px;
+  padding: 3px 10px 4px 12px;
+  border: none; border-radius: 0 6px 6px 0;
+  background: linear-gradient(var(--dash-ink-mute), var(--dash-ink-mute)) left / 2px 100% no-repeat;
+  font: inherit; text-align: left; color: var(--dash-ink-mute); cursor: pointer;
+  transition: background-color calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-citazione-vai:hover, .dash-citazione-vai:focus-visible {
-  background:
-    linear-gradient(var(--dash-accent), var(--dash-accent)) left / 4px 100% no-repeat,
-    var(--dash-line-strong);
+  background-color: var(--dash-line);
+  color: var(--dash-ink-soft);
   outline: none;
 }
-.dash-citazione-chi { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--dash-accent); }
+.dash-citazione-chi { font-size: 12px; font-weight: 600; line-height: 1.35; }
+.dash-citazione-commento {
+  box-sizing: border-box; width: 100%; min-width: 0;
+  border: none; background: transparent; outline: none; resize: none;
+  field-sizing: content; max-height: 30vh;
+  padding: 2px 12px 4px;
+  font-family: inherit; font-size: 15px; line-height: 1.4; color: var(--dash-ink);
+}
 .dash-citazione-testo {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
   font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere;
@@ -1273,7 +1287,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-activity-reasoning { white-space: pre-wrap; word-wrap: break-word; }
 /* Commento a metà lavoro («Provo subito tutti e tre…»): è una nota, non una bolla. */
-.dash-activity-note { font-style: italic; color: var(--dash-ink-soft); }
+.dash-activity-note { color: var(--dash-ink-soft); }
 .dash-activity-esiti { display: flex; flex-direction: column; gap: 4px; color: var(--dash-ink-mute); }
 .dash-activity-esiti:empty { display: none; }
 .dash-activity-esiti:not(:first-child) { border-top: 1px solid var(--dash-line); padding-top: 7px; }
@@ -1390,7 +1404,6 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   line-height: 1.35;
   color: var(--dash-ink);
   opacity: 0.55;
-  font-style: italic;
 }
 .dash-action-favicon {
   width: 28px;
@@ -1526,7 +1539,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-cmd-output-err { color: var(--dash-accent); }
 /* Comando muto (cd / nessun output): testo attenuato ma comunque visibile. */
-.dash-cmd-output-empty { color: var(--dash-ink-mute); font-style: italic; }
+.dash-cmd-output-empty { color: var(--dash-ink-mute); }
 .dash-cmd-note {
   margin-top: 4px;
   font-size: 11px;
@@ -1723,7 +1736,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 
 .dash-right {
   grid-column: 3;
-  grid-row: 2 / span 2;
+  grid-row: 1 / -1;
   padding-top: 14px;
   display: flex;
   flex-direction: column;
@@ -1737,6 +1750,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-right:hover { scrollbar-color: var(--dash-line-strong) transparent; }
 /* A destra scorre la colonna intera: le carte non si schiacciano sotto «altro» quando la finestra è bassa. */
 .dash-right > .dash-carte { flex: none; padding: 2px; }
+/* La ricerca nel filo (#2372) prende la colonna intera: il resto torna quando la si chiude. */
+.dash-right.in-ricerca > :not(.dash-cerca) { display: none; }
 
 /* Le voci del computer (#873) dove sul desktop sta l'orologio, allineate al testo delle carte; restano appoggiate
    al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che chiede attenzione. */
@@ -2207,7 +2222,6 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-term-exit {
   font-size: 11.5px;
   color: var(--dash-ink-mute);
-  font-style: italic;
 }
 /* #968 — sotto un comando fallito, la sua versione con le virgolette: il tratto riscritto in sabbia. */
 .dash-term-proposta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
@@ -2239,45 +2253,6 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   50% { opacity: 1; }
 }
 
-/* Controlli del browser dentro la home: in tinta con la "carta calda", così sembrano parte della
-   pagina e non una barra a sé. Stanno in cima alla colonna destra e non le scorrono via. */
-.dash-controls {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
-  /* In riga con «Cerca nel filo»: il disegno parte all'altezza delle carte di sinistra. */
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.dash-ctrl {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--dash-ink-soft);
-  cursor: pointer;
-  transition: background calc(0.12s * var(--sn-motion, 1)), color calc(0.12s * var(--sn-motion, 1));
-  -webkit-app-region: no-drag;
-}
-.dash-ctrl:hover {
-  background: var(--dash-card);
-  color: var(--dash-ink);
-}
-.dash-ctrl:active { transform: translateY(0.5px); }
-.dash-ctrl svg { display: block; }
-.dash-ctrl .account-avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  object-fit: cover;
-}
 
 /* Recap dopo un aggiornamento. Vive nella pagina home perché lì non c'è la WebContentsView, che
    copre l'area pagina solo sui siti. */
@@ -2499,7 +2474,6 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-bubble-note {
   align-self: flex-start;
   font-size: 12px;
-  font-style: italic;
   color: var(--dash-ink-mute);
   padding: 0 12px;
 }
@@ -2525,12 +2499,12 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-crediti-avviso .sn-crediti-rimedio-corpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dash-crediti-avviso .sn-crediti-rimedio-cifra { font-size: 12.5px; color: var(--dash-ink-soft); }
 .dash-crediti-avviso .sn-crediti-rimedio-dettaglio { font-size: 12px; color: var(--dash-ink-mute); }
-.dash-crediti-avviso .sn-crediti-rimedio-esito { font-size: 12px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-crediti-avviso .sn-crediti-rimedio-esito { font-size: 12px; color: var(--dash-ink-mute); }
 .dash-crediti-avviso .sn-crediti-rimedio-btn { flex-shrink: 0; transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease; }
 .dash-crediti-avviso .sn-crediti-rimedio[data-applicato="1"] .sn-crediti-rimedio-testo { color: var(--dash-ink-soft); }
 
 /* La riga che dice una risposta interrotta: stessa voce delle note, dentro la bolla. */
-.dash-bubble-interrotta { font-size: 12px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-bubble-interrotta { font-size: 12px; color: var(--dash-ink-mute); }
 
 /* Le conversazioni delle altre app (#974): un nodo nel filo, al centro perché non le ha dette né l'utente né la
    chat di qui. Ripiegate sono una riga sola; aperte, lo scambio in piccolo sotto. */
@@ -2606,7 +2580,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-riga-app-msg-filo { align-self: flex-start; color: var(--dash-ink); }
 .dash-riga-app-msg.dash-bubble-md { white-space: normal; }
-.dash-riga-app-vuoto { font-size: 13px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-riga-app-vuoto { font-size: 13px; color: var(--dash-ink-mute); }
 .dash-riga-app-vai {
   align-self: flex-start;
   margin-top: 2px;

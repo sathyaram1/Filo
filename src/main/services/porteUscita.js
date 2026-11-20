@@ -367,7 +367,7 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
   const indirizzo = (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
   const delComando = tipo === 'ESEGUI_COMANDO' ? Exfil.indirizziDelComando(action) : [];
   let memoria = '';
-  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'LEGGI_PAGINA' || delComando.length) {
+  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'IMMAGINI_WEB' || tipo === 'LEGGI_PAGINA' || delComando.length) {
     const riservato = [indirizzo, ...delComando].filter(Boolean).map((u) => PageRead.materialeRiservato(u));
     memoria = [await navExfilCorpus(), ...riservato].filter(Boolean).join('\n');
   }

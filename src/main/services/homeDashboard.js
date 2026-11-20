@@ -122,16 +122,29 @@ async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {
     require('./carteHome').leggi(),
   ]);
   const lavori = require('./lavoriInCorso').elenco(ambito);
-  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
+  const avvisi = avvisiVolati(sender);
+  const cornice = avvisi ? avvisi.colonna() : [];
+  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId, cornice }, layout);
 }
 
-// Dove stanno le carte di destra per il modello, senza quella di una funzione in pausa (#1592).
+// Gli avvisi volati nella colonna (#2390) li tiene la finestra di chi chiede: la chat li vede e li chiude come la home.
+function avvisiVolati(sender) {
+  const win = sender && sender.win;
+  let a = null;
+  try { a = win && !win.isDestroyed() && win._filoTabs ? win._filoTabs.avvisi : null; } catch (_) { a = null; }
+  return a && typeof a.colonna === 'function' ? a : null;
+}
+
+// Dove stanno carte e tasti per il modello, come li vede la home: una funzione in pausa non si nomina (#1592), e la
+// Bacheca in pausa è il tasto delle Segnalazioni.
 function descriviCarte(layout) {
   const CH = globalThis.SN_CARTE_HOME;
   const dove = CH.descrivi(layout);
-  if (require('./inPausa').aperti().mazzi) return dove;
-  const mazzi = CH.carta('mazzi').titolo;
-  return { destra: dove.destra.filter((t) => t !== mazzi), altro: dove.altro.filter((t) => t !== mazzi) };
+  const aperti = require('./inPausa').aperti();
+  const mazzi = aperti.mazzi ? null : CH.carta('mazzi').titolo;
+  const bacheca = aperti.bacheca ? null : CH.tasto('bacheca').titolo;
+  const vista = (l) => l.filter((t) => t !== mazzi).map((t) => (t === bacheca ? CH.SEGNALAZIONI.titolo : t));
+  return { destra: vista(dove.destra), tasti: vista(dove.tasti), altro: vista(dove.altro) };
 }
 
 // null se il nome non è di una carta di sinistra tolta: allora decide il resto di CARTA_HOME.
@@ -172,6 +185,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
     let avvisi = 0;
     for (const v of voci) {
       if (v.tipo === 'avviso') { await FiloMem.dismissNotification(v.ref.id); avvisi++; }
+      else if (v.tipo === 'cornice') { const a = avvisiVolati(sender); if (a) a.azioneDallaHome(v.ref.id, 'chiudi'); }
       else {
         const esito = await Carte.modifica({ tipo: 'nascondi', chiave: v.chiave });
         if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
@@ -182,8 +196,8 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   }
   // sposta: la nuova posizione nell'ordine che l'utente vede, fra le carte che non stanno in cima per regola.
   const v = voci[0];
-  const FISSA = 'sta in cima finché suona: non si sposta e non si scavalca';
-  if (v.fissa) return no(`la carta «${v.titolo}» ${FISSA}`);
+  const fissa = (x) => `la carta «${x.titolo}» sta in cima finché ${x.tipo === 'cornice' ? 'non la chiudi' : 'suona'}: non si sposta e non si scavalca`;
+  if (v.fissa) return no(fissa(v));
   const mobili = sx.filter((x) => !x.fissa);
   const ordine = mobili.map((x) => x.chiave).filter((k) => k !== v.chiave);
   const at = mobili.findIndex((x) => x.chiave === v.chiave);
@@ -191,7 +205,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   if (action.prima_di != null) {
     const rif = sx.find((x) => x.chiave === String(action.prima_di)) || CH.trovaSinistra(action.prima_di, sx).voci[0];
     if (!rif || rif.chiave === v.chiave) return no('la carta di riferimento non è a sinistra');
-    if (rif.fissa) return no(`la carta «${rif.titolo}» ${FISSA}`);
+    if (rif.fissa) return no(fissa(rif));
     dove = ordine.indexOf(rif.chiave);
   } else if (verso === 'cima') dove = 0;
   else if (verso === 'fondo') dove = ordine.length;
@@ -210,6 +224,7 @@ function ordinaCome(sx, layout) {
   const per = (t) => sx.filter((x) => x.tipo === t).map((x) => x.ref);
   return CH.sinistra({
     timers: [...per('timer'), ...per('sveglia')], notifiche: per('avviso'), downloads: per('download'), lavori: per('lavoro'),
+    cornice: per('cornice'),
   }, layout);
 }
 

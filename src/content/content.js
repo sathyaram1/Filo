@@ -348,6 +348,8 @@
         if (e.defaultPrevented || isBlocked()) return; // la pagina interna ha il SUO menu
         onContextMenu(e);
       });
+      const datoPrima = self.__snTastoDestroInAttesa?.();
+      if (datoPrima && !isBlocked()) onContextMenu(datoPrima);
     }
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
@@ -1121,6 +1123,9 @@
   function applyThemeTokens(tokens) {
     const reg = self.SN_THEME_TOKENS;
     if (reg) reg.applyToDocument(document, tokens || {});
+    // I riquadri chiusi sui siti non leggono --sn-font dal documento (lo scrive anche il sito): il carattere glielo
+    // diciamo da qui, e la famiglia generica la sceglie SN_FILO_UI (#1342).
+    self.SN_FILO_UI?.carattereScelto?.(tokens && tokens.font);
   }
 
   // Il vero elemento cliccato. Il listener contextmenu vive su window (via il
@@ -2459,17 +2464,19 @@
       { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_save_image_as'), onClick: a.save },
       { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image_link'), onClick: a.copyLink },
       { type: 'item', azione: 'search-image', label: I18n.t('menu_search_image'), onClick: a.search },
-    ];
+      { type: 'item', azione: 'ocr', label: I18n.t('menu_transcribe'), onClick: a.transcribe },
+    ].filter((v) => typeof v.onClick === 'function');
   }
 
   // Le azioni di un'immagine e di un collegamento, una volta sola: le voci del menu e le icone della fila (#1434) fanno
-  // la stessa cosa.
+  // la stessa cosa. Un'immagine senza un indirizzo del web (creata da Filo, #2272) non ha indirizzo da copiare o cercare.
   function azioniDellImmagine(imgEl) {
+    const fuori = Actions.indirizzoDellImmagine(imgEl);
     return {
       copy: () => Actions.copyImage(imgEl),
       save: () => Actions.downloadImage(imgEl),
-      copyLink: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
-      search: () => Actions.searchImageOnWeb(imgEl),
+      ...(fuori ? { copyLink: () => Actions.copyUrlToClipboard(fuori), search: () => Actions.searchImageOnWeb(imgEl) } : {}),
+      transcribe: () => Actions.transcribeImage(imgEl),
       ask: () => chiediDellImmagine(imgEl),
     };
   }
@@ -3112,7 +3119,19 @@
       openHelpSidebar(context);
     } else if (command === 'aiuto-dalla-barra') {
       aiutoPasso();
+    } else if (command === 'leggi-ad-alta-voce') {
+      leggiAdAltaVoce(selInfo);
     }
+  }
+
+  // La L del doppio Ctrl (#2377): mentre legge la ferma; se no legge il testo selezionato, o la pagina.
+  function leggiAdAltaVoce(selInfo) {
+    if (TTS.ttsBusy()) { TTS.stopReading(); return; }
+    const voce = selInfo && selInfo.selection ? TTS.buildReadAloudItem(selInfo.selection) : null;
+    if (voce) { voce.onClick(); return; }
+    const testo = Extract.extractMainTextNodes().map((n) => n.text).join('\n\n') || String((document.body && document.body.innerText) || '');
+    if (testo.trim()) TTS.readAloud(testo);
+    else Popup.toastErrore('err_no_selection');
   }
 
   // Lettura ad alta voce e dettatura: src/content/tts.js.

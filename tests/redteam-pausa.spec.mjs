@@ -171,7 +171,7 @@ async function home(app) {
   expect(win, 'nessuna home').toBeTruthy();
   await win.reload();
   await win.waitForLoadState('domcontentloaded');
-  await expect(win.locator('#dashControls .dash-ctrl[data-command="settings"]')).toBeVisible({ timeout: 10_000 });
+  await expect(win.locator('#altro .dash-altro-app[data-id="impostazioni"]')).toBeAttached({ timeout: 10_000 });
   return win;
 }
 

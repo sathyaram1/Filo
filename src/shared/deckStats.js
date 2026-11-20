@@ -230,6 +230,19 @@
   }
   const countOf = (n) => Math.max(0, Math.floor(Number(n) || 0));
 
+  // Un mulligan detto a metà non si perde in silenzio (#791.1), per simulazione e parole insieme:
+  // una mano da tenere senza il numero conta un mulligan; un numero senza la mano parte da
+  // DEFAULT_KEEP se `categories` la contiene, se no resta `mulliganUncounted` e lo si dice.
+  const DEFAULT_MULLIGANS = 1;
+  function resolveConditions({ game, mulligans, keep, extraDraws } = {}, { categories = null } = {}) {
+    let m = countOf(mulligans);
+    let k = normReqs(keep);
+    if (k.length && !m) m = DEFAULT_MULLIGANS;
+    if (m && !k.length && Array.isArray(categories)
+      && DEFAULT_KEEP.every((w) => categories.map(normTag).includes(w.tag))) k = normReqs(DEFAULT_KEEP);
+    return { game: gameOf(game), mulligans: m, keep: k, extraDraws: countOf(extraDraws), mulliganUncounted: m > 0 && !k.length };
+  }
+
   // Mulligan London: delle 7 carte pescate ne vanno in fondo `bottom`. Prima
   // quelle che non servono né a `keep` né a `want`; se non bastano, fra le utili
   // si tiene la mano che regge `keep`, poi quella che copre più richiesta, poi
@@ -271,16 +284,14 @@
   }
 
   // Le condizioni della partita dette a parole, per la risposta in chat.
-  function describeConditions({ game, mulligans, keep, extraDraws } = {}) {
-    const parts = [GAMES[gameOf(game)].text];
-    const keepReqs = normReqs(keep);
-    const m = countOf(mulligans);
-    if (m > 0 && keepReqs.length) {
-      parts.push(`fino a ${m} mulligan se la mano non ha almeno ${keepReqs.map((w) => `${w.n} ${w.tag}`).join(' e ')}`);
-    } else if (m > 0) {
+  function describeConditions(cond = {}) {
+    const { game, mulligans: m, keep: keepReqs, extraDraws: x, mulliganUncounted } = resolveConditions(cond);
+    const parts = [GAMES[game].text];
+    if (mulliganUncounted) {
       parts.push('mulligan non contati: dimmi che mano terresti');
+    } else if (m > 0) {
+      parts.push(`fino a ${m} mulligan se la mano non ha almeno ${keepReqs.map((w) => `${w.n} ${w.tag}`).join(' e ')}`);
     }
-    const x = countOf(extraDraws);
     if (x > 0) parts.push(`${x} ${x === 1 ? 'pescata extra' : 'pescate extra'}`);
     return parts.join('; ');
   }
@@ -296,7 +307,7 @@
   //   extraDraws carte pescate in più entro il turno N (default 0)
   //   mulligans  quante volte al massimo si rifà la mano finché non regge `keep`
   //   keep       [{ tag, n }] — cosa deve avere la mano per tenerla; senza, la
-  //              prima mano si tiene sempre
+  //              prima mano si tiene sempre (le metà mancanti: resolveConditions)
   //   iterations default 10000; seed per run riproducibili.
   //
   // Ritorna { probability, hits, iterations, seen }; `seen` sono le carte viste
@@ -306,11 +317,12 @@
     const lib = Array.isArray(library) ? library : [];
     const n = lib.length;
     const reqs = normReqs(want);
-    const g = GAMES[gameOf(game)];
+    const cond = resolveConditions({ game, mulligans, keep, extraDraws });
+    const g = GAMES[cond.game];
     const t = Math.max(1, Math.floor(Number(turn) || 1));
     const iters = Math.max(1, Math.floor(Number(iterations) || 10000));
     const totalWanted = reqs.reduce((s, w) => s + w.n, 0);
-    const laterDraws = (t - 1) + (g.firstDraw ? 1 : 0) + countOf(extraDraws);
+    const laterDraws = (t - 1) + (g.firstDraw ? 1 : 0) + cond.extraDraws;
     const h7 = Math.min(7, n);
     const seen = Math.min(n, h7 + laterDraws);
 
@@ -318,11 +330,11 @@
     if (!n || totalWanted > n) return { probability: 0, hits: 0, iterations: iters, seen };
 
     const rng = mulberry32(Number.isFinite(Number(seed)) ? Number(seed) : (Date.now() & 0xffffffff));
-    const keepReqs = normReqs(keep);
+    const keepReqs = cond.keep;
     const keepUnits = keepReqs.reduce((s, w) => s + w.n, 0);
     const free = g.freeMulligan ? 1 : 0;
     // Oltre h7 + free mulligan la mano è già vuota: altri giri non cambiano niente.
-    const maxMull = keepReqs.length ? Math.min(countOf(mulligans), h7 + free) : 0;
+    const maxMull = keepReqs.length ? Math.min(cond.mulligans, h7 + free) : 0;
     const idx = lib.map((_, i) => i);
     // Fisher-Yates parziale: riempie [from, to) pescando a caso fra [from, end).
     const shuffleRange = (from, to, end) => {
@@ -398,6 +410,8 @@
     keptAfterBottom,
     gameOf,
     DEFAULT_KEEP,
+    DEFAULT_MULLIGANS,
+    resolveConditions,
     describeConditions,
     simulate,
     // Mani per lotto della stima progressiva (~15k = pochi ms): riquadro e chat

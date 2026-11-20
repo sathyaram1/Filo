@@ -149,19 +149,20 @@ async function openLauncherPopup(shell, app) {
 test('nella home i controlli sono solo quelli del browser: nessuna porta agli appunti', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
-  const controls = page.locator('#dashControls .dash-ctrl');
-  await expect(controls.first()).toBeVisible({ timeout: 8_000 });
+  // I tasti di «altro» (#2372), in vista e nel «+»: ci sono anche nella home del primo incontro, che li tiene nascosti.
+  const controls = page.locator('#altro .dash-altro-app[data-tasto="1"]');
+  await expect(controls.first()).toBeAttached({ timeout: 8_000 });
 
   // Assert POSITIVO sull'insieme completo: se tornasse una voce "Appunti"
   // (o qualsiasi altra porta separata) l'elenco non combacerebbe più.
   // Il Red Team in pausa (#896) non c'è per chi non è owner; le altre voci stanno nella barra laterale (#871).
-  await expect(controls).toHaveCount(2);
+  await expect(controls).toHaveCount(7);
   const items = await controls.evaluateAll((els) => els.map((e) => ({
-    command: e.dataset.command,
-    label: e.getAttribute('aria-label') || '',
+    command: e.dataset.id,
+    label: `${e.getAttribute('aria-label') || ''} ${e.textContent}`,
   })));
   expect(items.map((i) => i.command))
-    .toEqual(['settings', 'account']);
+    .toEqual(['cerca', 'perDopo', 'scaricamenti', 'cronologia', 'bacheca', 'impostazioni', 'profilo']);
   // (l'etichetta del profilo cambia con lo stato di accesso: qui basta che
   //  nessun controllo si presenti come porta agli appunti)
   expect(items.some((i) => /appunt/i.test(i.label))).toBe(false);

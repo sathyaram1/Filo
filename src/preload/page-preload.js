@@ -175,8 +175,9 @@ function escPrimaAFilo(e, ascolto, UI) {
 
 // Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
 function replayContextMenu(e, clic) {
-  const copy = require('./menu-del-sito.js').copiaDelClic(e);
-  const deadline = Date.now() + 3000;
+  const { copiaDelClic, RIGIOCO_MS } = require('./menu-del-sito.js');
+  const copy = copiaDelClic(e);
+  const deadline = Date.now() + RIGIOCO_MS;
   const tick = () => {
     if (globalThis.__snFiloSpento === true) { menuDiRiserva(clic); return; }
     if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
@@ -869,6 +870,7 @@ try {
   webFrame.executeJavaScript(`(()=>{const w=window,d=EventTarget.prototype.dispatchEvent,E=Event;
     Object.defineProperty(w,'close',{value:function close(){d.call(w,new E(${JSON.stringify(CHIUDI)}))},writable:true,configurable:true,enumerable:true})})()`, false).catch(() => {});
 } catch (_) {}
+try { require('./finestra-per-nome.js').installa({ ipcRenderer, webFrame, sottoriquadro: IS_SUBFRAME }); } catch (e) { console.error('[Filo CS] finestra per nome', e); }
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
@@ -989,11 +991,13 @@ function loadScripts() {
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
   try { require(path.join(SHARED_DIR, 'immaginiChat.js')); } catch (e) { console.error('[Filo CS] immaginiChat', e); } // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
+  try { require(path.join(SHARED_DIR, 'allegatiSegnalazione.js')); } catch (e) { console.error('[Filo CS] allegatiSegnalazione', e); } // #1664 — le immagini di una segnalazione dell'Aiuto: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo CS] contenutoEsterno', e); } // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js e spellcheck.js
   // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
   // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina
   // (traduzione, sentinella del testo nuovo) lo riconosce da quel marchio.
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
+  try { require(path.join(SHARED_DIR, 'fontGenerico.js')); } catch (e) { console.error('[Filo CS] fontGenerico', e); } // #1342 — il carattere dei riquadri chiusi
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'clipboardHistory.js')); } catch (e) { console.error('[Filo CS] clipboardHistory', e); } // #256 — PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
@@ -1010,6 +1014,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»
   suRichiesta(['SN_WALLET'], () => { try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } }); // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
+  try { require(path.join(SHARED_DIR, 'spiegazioni.js')); } catch (e) { console.error('[Filo CS] spiegazioni', e); } // #2388 — le spiegazioni al passaggio di popup e Aiuto
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo CS] themeTokens', e); }
   try { require(path.join(SHARED_DIR, 'suggerimento.js')); } catch (e) { console.error('[Filo CS] suggerimento', e); } // #2095 — il fumetto sui pezzi di Filo: DOPO filoUi e themeTokens
@@ -1032,6 +1037,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'menuDescritto.js')); } catch (e) { console.error('[Filo CS] menuDescritto', e); } // #1054 — il menu come dati per lo strato
   try { require(path.join(CONTENT_DIR, 'menuNelloStrato.js')); } catch (e) { console.error('[Filo CS] menuNelloStrato', e); } // #1054 — DOPO menu.js, PRIMA di chi lo usa
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
+  try { require(path.join(SHARED_DIR, 'immaginePrincipale.js')); } catch (e) { console.error('[Filo CS] immaginePrincipale', e); } // #2371 — l'immagine che cercano Aiuto e chat: PRIMA di aiutoPagina.js
   try { require(path.join(CONTENT_DIR, 'aiutoPagina.js')); } catch (e) { console.error('[Filo CS] aiutoPagina', e); } // #1509.3 — quello che l'Aiuto fa sulla pagina, anche dallo strato: DOPO highlight.js
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
   try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo CS] coerenza', e); } // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
@@ -1071,6 +1077,8 @@ function loadScripts() {
   });
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }
   try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo CS] editBox', e); }
+  try { require(path.join(SHARED_DIR, 'trascrizioneRighe.js')); } catch (e) { console.error('[Filo CS] trascrizioneRighe', e); }
+  try { require(path.join(CONTENT_DIR, 'trascrizione.js')); } catch (e) { console.error('[Filo CS] trascrizione', e); }
   try { require(path.join(CONTENT_DIR, 'actions.js')); } catch (e) { console.error('[Filo CS] actions', e); }
   try { require(path.join(CONTENT_DIR, 'menuIcons.js')); } catch (e) { console.error('[Filo CS] menuIcons', e); }
   try { require(path.join(CONTENT_DIR, 'content.js')); } catch (e) { console.error('[Filo CS] content', e); }

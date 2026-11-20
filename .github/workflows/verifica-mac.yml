@@ -47,6 +47,8 @@ on:
       # arrivano solo le modifiche vere alla ricetta o alle dipendenze, che
       # sono esattamente quelle che possono rompere la costruzione su Mac.
       - 'package.json'
+      # Il Node che costruisce il pacchetto.
+      - '.node-version'
       # Il preload delle pagine web che il pacchetto si porta dentro, e chi lo scrive.
       - 'src/main/preloadPacchetto.js'
 
@@ -62,7 +64,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .node-version
 
       - name: Install dipendenze
         run: node scripts/npm-ci-ritenta.mjs
@@ -166,9 +168,10 @@ jobs:
           APP="dist/mac-universal/Filo.app"
           test -d "$APP" || APP=$(find dist -maxdepth 2 -name 'Filo.app' -print -quit)
           echo "app: $APP"
-          lipo -info "$APP/Contents/MacOS/Filo"
-          lipo -info "$APP/Contents/MacOS/Filo" | grep -q 'x86_64' || {
+          ARCHITETTURE=$(lipo -info "$APP/Contents/MacOS/Filo")
+          echo "$ARCHITETTURE"
+          grep -q 'x86_64' <<< "$ARCHITETTURE" || {
             echo "::error::il pacchetto non contiene la parte Intel"; exit 1; }
-          lipo -info "$APP/Contents/MacOS/Filo" | grep -q 'arm64' || {
+          grep -q 'arm64' <<< "$ARCHITETTURE" || {
             echo "::error::il pacchetto non contiene la parte Apple Silicon"; exit 1; }
           codesign --verify --deep --strict --verbose=2 "$APP"

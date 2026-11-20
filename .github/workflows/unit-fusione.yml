@@ -53,15 +53,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Il Node lo sceglie main, come gli strumenti: un ramo nato prima del file non ce l'ha (#2207).
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: strumenti/.node-version
 
       # Le dipendenze del ramo, come la macchina che provava prima: un ramo che ne aggiunge una non esce rosso per quello.
+      # Il codice del ramo (qui gli script di installazione) gira senza i file dei comandi di Actions (#2558).
       - name: Dipendenze del ramo
         working-directory: prova
-        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+        run: node ../strumenti/scripts/senza-comandi-di-actions.mjs ../strumenti/scripts/npm-ci-ritenta.mjs
 
       - name: Unit sulla fusione
         id: prova
@@ -109,11 +111,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: strumenti/.node-version
 
       - name: Dipendenze del ramo
         working-directory: prova
-        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+        run: node ../strumenti/scripts/senza-comandi-di-actions.mjs ../strumenti/scripts/npm-ci-ritenta.mjs
 
       - name: Unit sulla fusione su Windows
         id: prova
@@ -158,15 +160,15 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: strumenti/.node-version
 
       - name: Dipendenze del ramo
         working-directory: prova
-        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+        run: node ../strumenti/scripts/senza-comandi-di-actions.mjs ../strumenti/scripts/npm-ci-ritenta.mjs
 
       - name: Binario di Electron
         working-directory: prova
-        run: node scripts/ensure-electron.mjs
+        run: node ../strumenti/scripts/senza-comandi-di-actions.mjs scripts/ensure-electron.mjs
 
       - name: Schermo virtuale (xvfb)
         run: |
@@ -205,7 +207,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: strumenti/.node-version
 
       - name: L'esito per il server
         run: node strumenti/scripts/unit-fusione-azione.mjs --unisci linux,windows,spec --ramo "$RAMO" --main "$MAIN"

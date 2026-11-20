@@ -43,29 +43,37 @@
       const AT = window.SN_FEEDBACK_ATTACH;
       const L = (AT && AT.LIMITI) || RIPIEGO;
       // Senza la lista condivisa il ripiego chiude: solo immagini raster.
-      const tipo = AT && typeof AT.classify === 'function' ? AT.classify(file)
-        : (/^image\/(png|jpe?g|gif|webp|bmp)$/i.test(file.type || '') ? 'image' : null);
+      const IC = window.SN_IMMAGINI_CHAT;
+      const tipo = (AT && typeof AT.classify === 'function' ? AT.classify(file)
+        : (/^image\/(png|jpe?g|gif|webp|bmp)$/i.test(file.type || '') ? 'image' : null))
+        || (IC && typeof IC.daRidisegnare === 'function' && IC.daRidisegnare(file) ? 'image' : null);
       if (!tipo) return (AT && AT.MESSAGGIO_TIPO) || 'Tipo di file non supportato.';
       const img = tipo === 'image';
       const gia = di(k).filter((a) => (a.kind === 'img') === img).length;
       if (img && gia >= L.immagini) return `Massimo ${L.immagini} immagini per risposta.`;
       if (!img && gia >= L.file) return `Massimo ${L.file} file per risposta.`;
-      if (file.size > L.byte) return `«${file.name || 'file'}» è troppo grande (massimo ${Math.round(L.byte / 1024 / 1024)} MB).`;
+      // Un'immagine troppo grande si rimpicciolisce in aggiungi, non si rifiuta.
+      if (!(img && IC && typeof IC.perLaSegnalazione === 'function') && file.size > L.byte) return `«${file.name || 'file'}» è troppo grande (massimo ${Math.round(L.byte / 1024 / 1024)} MB).`;
       const FB = window.SN_FEEDBACK;
       if (!FB || typeof FB.uploadAttachment !== 'function') return 'Il caricamento degli allegati non è disponibile qui.';
       return '';
     }
 
     async function aggiungi(k, files) {
-      for (const file of Array.from(files || [])) {
+      for (let file of Array.from(files || [])) {
         const no = motivoRifiuto(k, file);
         if (no) { avvisa(k, no); continue; }
         inCarico.set(k, caricando(k) + 1);
         cambia(k);
         try {
+          const IC = window.SN_IMMAGINI_CHAT;
+          const pronta = IC && typeof IC.perLaSegnalazione === 'function' ? await IC.perLaSegnalazione(file) : null;
+          if (pronta && pronta.motivo) { avvisa(k, `«${file.name || 'immagine'}»: ${pronta.motivo}.`); continue; }
+          const avviso = pronta && pronta.avviso ? `«${file.name || 'immagine'}» ${pronta.avviso}.` : '';
+          if (pronta) file = pronta.file;
           const att = await window.SN_FEEDBACK.uploadAttachment(file, file.name);
           if (att && att.url) liste.set(k, di(k).concat([att]));
-          avvisa(k, '');
+          avvisa(k, avviso);
         } catch (e) {
           const FB = window.SN_FEEDBACK;
           const cifratura = !!(FB && typeof FB.isEncryptionError === 'function' && FB.isEncryptionError(e));

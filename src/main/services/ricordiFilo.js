@@ -123,7 +123,8 @@ function indicizza(tratti, modello, e0 = epoca) {
   return corsa;
 }
 
-// Senza un modello d'indicizzazione vale per parole (regola in src/shared/filoContesto.js).
+// Senza un modello d'indicizzazione, o con troppo pochi scambi per misurare il rumore, vale per parole (regola in
+// src/shared/filoContesto.js).
 function perParole(domanda, tratti) {
   return FC().ricordiPerParole(domanda, tratti);
 }
@@ -133,7 +134,7 @@ function perParole(domanda, tratti) {
 async function cerca(domanda, { vecchi = [], davanti = [], esiti = [] } = {}) {
   const q = String(domanda || '').trim();
   const e0 = epoca;
-  if (!q || Disco.inIncognito() || !vecchi.length) return [];
+  if (!q || Disco.inIncognito() || !vecchi.length || !FC().domandaConArgomento(q)) return [];
   const gia = new Set(davanti.map((m) => `${m.chat}|${m.ts}`));
   const giaRipescati = FC().giaDavanti(esiti);
   const tratti = FC().tratti(vecchi).filter((t) => !gia.has(t.chiave) && !giaRipescati.chiavi.has(t.chiave) && !giaRipescati.chat.has(t.chat));
@@ -159,7 +160,7 @@ async function cerca(domanda, { vecchi = [], davanti = [], esiti = [] } = {}) {
     const v = indice.get(t.chiave);
     if (v && v.m === modello) punteggi.push({ tratto: t, score: app.coseno(vq, v.v) });
   }
-  return FC().scegliRicordi(punteggi);
+  return FC().ricordiPerVicinanza(punteggi) || perParole(q, tratti);
 }
 
 // Per le prove: il file e la memoria ripartono da zero.

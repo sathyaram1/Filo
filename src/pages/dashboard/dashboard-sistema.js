@@ -228,8 +228,11 @@
     if (e.target && e.target.closest && e.target.closest('.sn-menu, .sn-confirm-host')) return;
     chiudiBox();
   }
-  // Si chiude se scorre la pagina sotto, non se scorre il suo elenco (reti e dispositivi possono superare lo schermo).
-  function scorre(e) { if (box && !(e.target instanceof Node && box.el.contains(e.target))) chiudiBox(); }
+  // Si chiude se scorre la pagina sotto, non se scorre il suo elenco (reti e dispositivi possono superare lo schermo) né
+  // per uno scorrimento finito prima dell'apertura (#2452, #2586).
+  function scorre(e) {
+    if (box && !(e.target instanceof Node && box.el.contains(e.target)) && box.scorsoDopo(e)) chiudiBox();
+  }
   function tasto(e) {
     if (!box) return;
     if (e.key === 'Escape') { e.preventDefault(); const da = box.ancora; chiudiBox(); if (da && da.isConnected) da.focus(); return; }
@@ -701,7 +704,9 @@
     righeInfo(info, x);
     info.dataset.testo = x.dettaglio.join('\n');
     el.appendChild(info);
-    const questo = { el, info, voce: v, ancora, punto };
+    const a = punto || (() => { const r = ancora.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })();
+    const scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(a.x, a.y) || (() => true);
+    const questo = { el, info, voce: v, ancora, punto, scorsoDopo };
     const comandi = creaComandi(questo, x);
     if (comandi) { el.appendChild(comandi); questo.comandi = comandi; }
     // #2394 — niente «Copia» del riquadro: la frase la porta chi trascina la voce in chat, il nome lo copia il tasto destro.

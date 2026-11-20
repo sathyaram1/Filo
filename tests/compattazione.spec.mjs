@@ -473,6 +473,48 @@ test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti v
   }
 });
 
+// #2473.1 — quando la compattazione non parte il tetto in token è l'ultima rete, e vale per la richiesta intera:
+// istruzioni, strumenti e CONTESTO stanno dentro i 100.000, non sopra. Una conversazione di sei ore fa, da circa 90.000
+// token: sotto il tetto da sola, oltre il listino con la parte fissa.
+const conversazioneLunga = (app) => app.evaluate(async () => {
+  const t0 = Date.now() - 6 * 60 * 60 * 1000;
+  const testo = (i) => `Messaggio ${i} sul viaggio a Lisbona. ${'Gli orari dei treni, i quartieri da vedere, dove mangiare la sera. '.repeat(30)}`;
+  for (let i = 0; i < 90; i++) {
+    await globalThis.SN_FILO_CHATS.append('lunga1', { role: i % 2 ? 'filo' : 'user', text: testo(i), ts: new Date(t0 + i * 60000).toISOString() });
+  }
+});
+for (const caso of [
+  { nome: 'con la soglia alzata sopra il tetto', soglia: 500000, compatta: false },
+  { nome: 'con chi compatta in errore', soglia: null, compatta: true },
+]) {
+  test(`${caso.nome}, la richiesta della chat resta sotto i 100.000 token compresa la parte fissa`, async ({ app }) => {
+    const page = await home(app);
+    await conversazioneLunga(app);
+    if (caso.soglia) await conSoglia(app, caso.soglia);
+    await modelloFinto(app, [{ text: 'Va bene.' }]);
+    await app.evaluate(() => {
+      const C = globalThis.SN_COMPATTAZIONE;
+      globalThis.__compattazioni = [];
+      globalThis.__compattatoreVero = C._dip.chiama;
+      C._dip.chiama = async ({ motivo }) => { globalThis.__compattazioni.push({ motivo }); throw new Error('rete giù'); };
+    });
+    try {
+      await chiedi(page, 'quale treno prendo domattina?');
+      await expect(page.locator('.dash-bubble').filter({ hasText: 'Va bene.' })).toBeVisible({ timeout: 30000 });
+      const tentate = await app.evaluate(() => globalThis.__compattazioni.length);
+      if (caso.compatta) expect(tentate, 'la compattazione è partita e non è riuscita').toBeGreaterThan(0);
+      else expect(tentate, 'nessuna compattazione').toBe(0);
+      const [richiesta] = await chiamateAlModello(app);
+      expect(JSON.stringify(richiesta[0]).length, 'la parte fissa c\'è e pesa').toBeGreaterThan(20000);
+      expect(JSON.stringify(richiesta), 'la conversazione recente resta davanti').toContain('Messaggio 89 sul viaggio');
+      expect(await tokenDi(app, richiesta), 'la richiesta intera sta sotto il listino').toBeLessThanOrEqual(100000);
+    } finally {
+      await rimettiCompattatore(app);
+      await ripristina(app);
+    }
+  });
+}
+
 // La strada vera di chi compatta: niente funzione sostituita, il fornitore finto risponde dietro il cancello dei modelli.
 const fornitoreDiChiCompatta = (app, riga) => app.evaluate((_e, riga) => {
   const P = globalThis.SN_PROVIDERS;
@@ -607,10 +649,10 @@ test('riaperto Filo dopo ore di pausa, col tratto grande il primo messaggio comp
   }
 });
 
-// Turni pesanti (un capitolo incollato a ogni messaggio, circa 5.000 token, più i ricordi ripescati): sopra la parte
-// fissa resta spazio per il grezzo e altri turni, così la chat non compatta ogni due messaggi e la risposta non la
-// aspetta (giri 4 e 9 di #1563).
-test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in sottofondo, non prima di ogni risposta', async ({ app }) => {
+// Turni pesanti (un capitolo incollato a ogni messaggio, circa 9.000 token per Anthropic, più i ricordi ripescati):
+// sopra la parte fissa resta spazio per il grezzo e altri turni, così la chat non compatta ogni due messaggi e la
+// risposta non la aspetta (giri 4 e 9 di #1563; coi ricordi i turni cambiano peso, #2473).
+test('turni da circa 9.000 token: la chat compatta ogni qualche messaggio, in sottofondo, non prima di ogni risposta', async ({ app }) => {
   test.setTimeout(300000);
   const page = await home(app);
   await modelloFinto(app, [{ text: 'Letto, ecco il punto.' }]);

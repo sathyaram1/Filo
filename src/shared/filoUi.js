@@ -173,9 +173,31 @@
   // falla chiusa qui valga per tutti. Sui siti, dentro `ambito`, solo caratteri generici: dai pezzi di un font chiamato
   // per nome che il browser carica il sito saprebbe quali lettere abbiamo disegnato.
   const paginaDiFilo = (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
+  // La generica la sceglie il carattere dell'utente (SN_FONT_GENERICO, #1342), detto da content.js e mai letto dal
+  // documento: lì il sito scrive anche --sn-font. Un foglio per ambito, riscritto in posto: gli strati aperti seguono.
+  let famigliaGenerica = 'system-ui, sans-serif';
+  const fogliGenerici = new Map();
   function fontSoloGenerico(ambito = '') {
     const dove = ambito ? `${ambito}, ${ambito} *, ${ambito} ::before, ${ambito} ::after, ${ambito} ::placeholder` : '*, ::before, ::after, ::placeholder';
-    return `\n${dove} { font-family: system-ui, sans-serif !important; }\n`;
+    return `\n${dove} { font-family: ${famigliaGenerica} !important; }\n`;
+  }
+  function foglioGenerico(ambito) {
+    let f = fogliGenerici.get(ambito);
+    if (!f) {
+      f = new CSSStyleSheet();
+      try { f.replaceSync(fontSoloGenerico(ambito)); } catch (_) {}
+      fogliGenerici.set(ambito, f);
+    }
+    return f;
+  }
+  function carattereScelto(valore) {
+    const Tok = global.SN_THEME_TOKENS;
+    const valido = typeof valore === 'string' && (!Tok?.validate || Tok.validate('font', valore)) ? valore : '';
+    const g = global.SN_FONT_GENERICO ? global.SN_FONT_GENERICO.generica(valido) : 'system-ui, sans-serif';
+    if (g === famigliaGenerica) return g;
+    famigliaGenerica = g;
+    for (const [ambito, f] of fogliGenerici) { try { f.replaceSync(fontSoloGenerico(ambito)); } catch (_) {} }
+    return g;
   }
   // Scritti qui per nome: il preload impacchettato porta solo i fogli che il file che li legge nomina.
   const FOGLI_DEGLI_STRATI = ['theme.css', 'menu.css', 'popup.css', 'feedback.css', 'redteam-attack.css', 'spellcheck.css'];
@@ -189,10 +211,9 @@
       testo = nomi.filter((f) => FOGLI_DEGLI_STRATI.includes(f))
         .map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
     } catch (_) {}
-    if (!paginaDiFilo) testo += fontSoloGenerico(ambito);
     const foglio = new CSSStyleSheet();
     try { foglio.replaceSync(testo); } catch (_) {}
-    return [foglio];
+    return paginaDiFilo ? [foglio] : [foglio, foglioGenerico(ambito)];
   }
   function stratoChiuso(stileHost, fogli, { riquadro = true } = {}) {
     const host = document.createElement('div');
@@ -290,6 +311,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
-    ombra, ombraDi, paginaDiFilo, FOGLI_DEGLI_STRATI, fogliChiusi, stratoChiuso, bersaglio, tastoNelRiquadro, chiaveDiBozza, nelloStrato, _test,
+    ombra, ombraDi, paginaDiFilo, FOGLI_DEGLI_STRATI, fogliChiusi, carattereScelto, stratoChiuso, bersaglio, tastoNelRiquadro, chiaveDiBozza, nelloStrato, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

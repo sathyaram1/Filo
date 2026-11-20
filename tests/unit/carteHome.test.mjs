@@ -54,7 +54,11 @@ test('togliere manda la carta in «altro», rimetterla la riporta (in fondo, in 
   const tolta = C.applica(C.predefinita(), { tipo: 'togli', carta: 'mazzi' }).layout;
   assert.equal(ordine(tolta), 'editor,suggerimenti,rapide');
   assert.deepEqual(tolta.tolte, ['mazzi']);
-  assert.deepEqual(C.descrivi(tolta), { destra: ['Editor', 'Filo ti suggerisce', 'Impostazioni rapide'], altro: ['Mazzi'] });
+  assert.deepEqual(C.descrivi(tolta), {
+    destra: ['Editor', 'Filo ti suggerisce', 'Impostazioni rapide'],
+    tasti: ['Cerca nel filo', 'Aperti per dopo', 'Download', 'Memorie', 'Bacheca', 'Impostazioni'],
+    altro: ['Mazzi', 'Profilo'],
+  });
   assert.equal(ordine(C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi' }).layout), 'editor,suggerimenti,rapide,mazzi');
   assert.equal(ordine(C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi', verso: 'cima' }).layout), 'mazzi,editor,suggerimenti,rapide');
   const davanti = C.applica(tolta, { tipo: 'aggiungi', carta: 'mazzi', prima: 'rapide' }).layout;
@@ -85,6 +89,56 @@ test('il nome come lo dice l’utente porta alla carta giusta', () => {
   assert.equal(C.risolvi('la posta'), null);
   assert.equal(C.risolvi(''), null);
   assert.equal(ordine(C.applica(C.predefinita(), { tipo: 'togli', carta: 'i suggerimenti' }).layout), 'editor,mazzi,rapide');
+});
+
+// #2372 — i tasti di «altro»: la ricerca, le app, le impostazioni e il profilo si spostano e vanno nel «+».
+test('di serie in vista ci sono la ricerca e le impostazioni, il profilo sta nel «+»; chi aveva salvato prima ritrova le app', () => {
+  const l = C.predefinita();
+  assert.deepEqual(l.tasti, ['cerca', 'perDopo', 'scaricamenti', 'cronologia', 'bacheca', 'impostazioni']);
+  assert.deepEqual(l.riposti, ['profilo']);
+  const vecchia = C.normalizza({ destra: ['editor'], tolte: ['mazzi'] });
+  assert.deepEqual(vecchia.tasti, l.tasti);
+  assert.deepEqual(vecchia.riposti, ['profilo']);
+  // Un tasto che il catalogo non conosce sparisce; uno che c'è in tutte e due le liste resta dove l'utente l'ha messo via.
+  const strana = C.normalizza({ tasti: ['impostazioni', 'boh', 'cerca'], riposti: ['cerca'] });
+  assert.deepEqual(strana.tasti.slice(0, 1), ['impostazioni']);
+  assert.ok(strana.riposti.includes('cerca') && !strana.tasti.includes('cerca'));
+});
+
+test('un tasto si mette nel «+», si rimette dove lo si lascia, si sposta; il «+» non è un tasto', () => {
+  const via = C.applica(C.predefinita(), { tipo: 'togli', carta: 'impostazioni' });
+  assert.equal(via.cambiato, true);
+  assert.ok(!via.layout.tasti.includes('impostazioni'));
+  assert.deepEqual(via.layout.riposti, ['profilo', 'impostazioni']);
+  const torna = C.applica(via.layout, { tipo: 'aggiungi', carta: 'impostazioni', prima: 'cerca' }).layout;
+  assert.deepEqual(torna.tasti.slice(0, 2), ['impostazioni', 'cerca']);
+  assert.deepEqual(torna.riposti, ['profilo']);
+  const profilo = C.applica(torna, { tipo: 'aggiungi', carta: 'profilo' }).layout;
+  assert.equal(profilo.tasti[profilo.tasti.length - 1], 'profilo');
+  assert.deepEqual(profilo.riposti, []);
+  assert.deepEqual(C.applica(C.predefinita(), { tipo: 'sposta', carta: 'impostazioni', verso: 'cima' }).layout.tasti[0], 'impostazioni');
+  assert.match(C.applica(C.predefinita(), { tipo: 'sposta', carta: 'profilo', verso: 'su' }).errore, /rimesso/);
+  for (const nome of ['+', 'piu', 'altro']) assert.ok(C.applica(C.predefinita(), { tipo: 'togli', carta: nome }).errore, nome);
+  // Le carte restano dove sono: un tasto non le scavalca e una carta non finisce fra i tasti.
+  assert.equal(ordine(via.layout), 'editor,mazzi,suggerimenti,rapide');
+  assert.deepEqual(C.applica(C.predefinita(), { tipo: 'aggiungi', carta: 'mazzi', prima: 'cerca' }).layout.tasti, C.predefinita().tasti);
+  // «Come all'inizio» rimette anche i tasti.
+  assert.deepEqual(C.applica(via.layout, { tipo: 'ripristina' }).layout, C.predefinita());
+});
+
+test('i tasti si nominano a parole; «impostazioni» è il tasto, le rapide sono la carta, «download» resta a sinistra', () => {
+  assert.equal(C.risolvi('le impostazioni'), 'impostazioni');
+  assert.equal(C.risolvi('impostazioni', { esatto: true }), 'impostazioni', 'la «i» iniziale non è un articolo');
+  assert.equal(C.risolvi('Impostazioni rapide', { esatto: true }), 'rapide');
+  assert.equal(C.risolvi('il tasto delle impostazioni'), 'impostazioni');
+  assert.equal(C.risolvi('impostazioni rapide'), 'rapide');
+  assert.equal(C.risolvi('la ricerca', { esatto: true }), 'cerca');
+  assert.equal(C.risolvi('il profilo', { esatto: true }), 'profilo');
+  assert.equal(C.risolvi('le memorie', { esatto: true }), 'cronologia');
+  assert.equal(C.risolvi('download', { esatto: true }), null);
+  assert.equal(C.risolvi('scaricamenti', { esatto: true }), null);
+  assert.equal(C.risolvi('il tasto dei download', { esatto: true }), 'scaricamenti');
+  assert.ok(!C.applica(C.predefinita(), { tipo: 'togli', carta: 'le memorie' }).layout.tasti.includes('cronologia'));
 });
 
 test('a sinistra: le carte nuove vengono prima, quelle già disposte tengono il posto che ha dato l’utente', () => {
@@ -256,6 +310,43 @@ test('a sinistra i Crediti e ciò che suona sono fissi in cima; il resto no', ()
     notifiche: [{ id: 'n1', text: 'La lavatrice ha finito.' }],
   }, null, ora);
   assert.deepEqual(sx.map((v) => [v.chiave, !!v.fissa]), [['crediti', true], ['timer:t2', true], ['timer:t1', false], ['avviso:n1', false]]);
+});
+
+// #2390.1 — gli avvisi volati nella colonna sono carte dell'elenco unico: la home e la chat li vedono uguali.
+test('gli avvisi volati stanno in cima all\'elenco unico, fissi; quello di una cosa che ha già la carta non c\'è', () => {
+  const sx = C.sinistra({
+    timers: [{ id: 't2', label: 'Forno', ringing: true }],
+    cornice: [
+      { id: '7', testo: 'Errore: la pagina non si apre', azioni: ['Riprova'] },
+      { id: '6', testo: 'Timer «Forno» scaduto', carta: C.chiaveTimer('t2') },
+      { id: '5', testo: 'Scaricato: relazione.pdf', carta: C.chiaveDownload('nonCe') },
+    ],
+  }, null);
+  assert.deepEqual(sx.map((v) => [v.chiave, v.tipo, !!v.fissa]), [
+    ['cornice:7', 'cornice', true], ['cornice:5', 'cornice', true], ['timer:t2', 'timer', true],
+  ]);
+  assert.equal(sx[0].titolo, 'Errore: la pagina non si apre');
+  // «chiudi quell'avviso»: lo trova la chat col nome che usa l'utente.
+  assert.deepEqual(C.trovaSinistra('avvisi', sx).voci.map((v) => v.chiave), ['cornice:7', 'cornice:5']);
+  assert.deepEqual(C.trovaSinistra('l\'avviso della pagina che non si apre', sx).voci.map((v) => v.chiave), ['cornice:7']);
+  // Nascoste: un avviso volato non si nasconde, si chiude.
+  assert.deepEqual(C.nascosteSinistra({ cornice: [{ id: '7', testo: 'x' }] }, { nascoste: ['cornice:7'] }), []);
+});
+
+test('le chiavi delle carte che un avviso nomina vengono dal modulo che fa le carte', () => {
+  assert.equal(C.cartaDiAvviso(C.chiaveTimer('abc_1')), 'timer:abc_1');
+  assert.equal(C.cartaDiAvviso(C.chiaveDownload('d-9')), 'download:d-9');
+  for (const no of ['avviso:1', 'timer:', 'download:a b', `timer:${'x'.repeat(81)}`, 42, null, 'timer:<b>']) assert.equal(C.cartaDiAvviso(no), '', String(no));
+  // Nessuno le riscrive a mano: chi avvisa e chi controlla le chiede qui.
+  const SRC = (...p) => readFileSync(join(ROOT, 'src', ...p), 'utf8');
+  for (const f of [['main', 'services', 'alarmWatcher.js'], ['main', 'services', 'downloads.js']]) {
+    assert.doesNotMatch(SRC(...f), /carta: `(timer|download):/, f.join('/'));
+  }
+  for (const f of [['renderer', 'shell.js'], ['main', 'avvisiSopraPagina.js']]) {
+    assert.doesNotMatch(SRC(...f), /\(timer\|download\)/, f.join('/'));
+    assert.match(SRC(...f), /cartaDiAvviso\(/, f.join('/'));
+  }
+  assert.match(SRC('renderer', 'shell.html'), /filo:\/\/shared\/carteHome\.js/);
 });
 
 // #1661 — al primo incontro la home tiene solo la colonna di sinistra.

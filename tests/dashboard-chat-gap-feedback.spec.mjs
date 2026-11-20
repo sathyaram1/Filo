@@ -118,7 +118,8 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
       const text = JSON.stringify({
-        text: 'Non ho accesso al saldo dei crediti: puoi vederlo in Opzioni, alla voce Crediti e consumi.',
+        // Un dato che nessuna voce del manifesto dà: i crediti li legge uno strumento, e lì non c'è niente da segnalare (#2371).
+        text: 'Non ho accesso ai passi che fai durante il giorno: Filo non legge il contapassi del telefono.',
         actions: [],
       });
       try { onDelta && onDelta(text); } catch (_) {}
@@ -144,7 +145,7 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
     };
   });
 
-  await page.locator('#input').fill('quanti crediti ho?');
+  await page.locator('#input').fill('quanti passi ho fatto oggi?');
   await page.locator('#sendBtn').click();
 
   // ── L'assert centrale: la segnalazione è già lì, pronta da confermare ──────
@@ -160,12 +161,12 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
   // segnalazione utile (e ciò che gli permette di decidere se mandarla).
   await expect.poll(async () => page.evaluate(() => (window.__confirmSeen || []).join('\n')), {
     timeout: 10_000, intervals: [100],
-  }).toMatch(/quanti crediti ho/i);
+  }).toMatch(/quanti passi ho fatto/i);
 
   // Confermata, la segnalazione parte davvero, col testo che l'utente ha letto.
   await expect.poll(async () => app.evaluate(() => (globalThis.__submitted || []).map((p) => p.text).join('\n')), {
     timeout: 10_000, intervals: [200],
-  }).toMatch(/quanti crediti ho/i);
+  }).toMatch(/quanti passi ho fatto/i);
 
   // Feedback anonimo generico: NON deve partire in parallelo a quello che
   // l'utente ha autorizzato (una sola segnalazione per lo stesso buco).
@@ -203,8 +204,9 @@ test('Filo spiega a mano una cosa che sa fare: la segnalazione arriva lo stesso'
     // azione — solo indicazioni su dove cliccare.
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
       const text = JSON.stringify({
-        text: 'Per andare a schermo intero clicca l’icona con le due frecce in alto a '
-          + 'destra nella barra di Filo, oppure premi F11: la finestra occupa tutto lo schermo.',
+        // Una voce che nessuno strumento della chat comanda: lo schermo intero oggi ce l'ha (#2371).
+        text: 'Per aprire una finestra in incognito premi Ctrl+Shift+N oppure clicca l’icona Nuova finestra '
+          + 'incognito nella barra laterale: lì quello che visiti non resta.',
         actions: [],
       });
       try { onDelta && onDelta(text); } catch (_) {}
@@ -225,7 +227,7 @@ test('Filo spiega a mano una cosa che sa fare: la segnalazione arriva lo stesso'
     };
   });
 
-  await page.locator('#input').fill('metti Filo a schermo intero');
+  await page.locator('#input').fill('aprimi una finestra in incognito');
   await page.locator('#sendBtn').click();
 
   const proposal = page.locator('.dash-bubble-actions .dash-action-btn-primary', {
@@ -238,12 +240,12 @@ test('Filo spiega a mano una cosa che sa fare: la segnalazione arriva lo stesso'
   // l'ha fatta. È la differenza con il caso "non esiste".
   await expect.poll(async () => page.evaluate(() => (window.__confirmSeen || []).join('\n')), {
     timeout: 10_000, intervals: [100],
-  }).toMatch(/schermo intero/i);
+  }).toMatch(/«Finestra in incognito»/);
 
   // Confermata, parte davvero, citando cosa l'utente aveva chiesto.
   await expect.poll(async () => app.evaluate(() => (globalThis.__submitted || []).map((p) => p.text).join('\n')), {
     timeout: 10_000, intervals: [200],
-  }).toMatch(/schermo intero/i);
+  }).toMatch(/finestra in incognito/i);
 
   // Una sola segnalazione per lo stesso buco: quella anonima non parte in parallelo.
   const sources = await app.evaluate(() => (globalThis.__submitted || []).map((p) => String(p.clientId || '')));

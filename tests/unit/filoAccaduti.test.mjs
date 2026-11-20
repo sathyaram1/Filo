@@ -387,7 +387,7 @@ const SEGNO_DAI_TASTI = {
   gesto: ['INVIA_FEEDBACK', 'TOGLI_PERMESSO_SITO', 'EVENTO_CALENDARIO', 'DIMENTICA', 'CORREGGI_MEMORIA',
     'NON_TENERE_APERTA', 'CARTA_HOME', 'BARRA_SITI', 'INSTALLA_AGGIORNAMENTO', 'CANCELLA_ARCHIVIO'],
   // Chat e tasti passano dallo stesso punto, che scrive l'azione: aprire un file, dargli un nome, instradare una scheda.
-  punto: ['VOLUME', 'BLUETOOTH', 'WIFI', 'SPOSTA_ICONA', 'APRI_FILE', 'RINOMINA_FILE', 'PROXY_TAB', 'RIMUOVI_PROXY'],
+  punto: ['VOLUME', 'BLUETOOTH', 'WIFI', 'SPOSTA_ICONA', 'APRI_FILE', 'RINOMINA_FILE', 'PROXY_TAB', 'RIMUOVI_PROXY', 'BLOCCA_PC'],
   // Dai tasti passa dalla porta delle azioni, come la chat.
   porta: ['PULISCI_TAB'],
   // Dai tasti lascia lo stato che scrive: un cambio, una scheda, un documento, una cancellazione, una ricerca.
@@ -395,14 +395,14 @@ const SEGNO_DAI_TASTI = {
   stato: ['NAVIGA', 'TIMER', 'SVEGLIA', 'CANCELLA_SVEGLIA', 'MODIFICA_SVEGLIA', 'SALVA_APPUNTO', 'CERCA_WEB', 'APRI_SALVATA',
     'CANCELLA_PAGINE', 'TOGLI_CHAT', 'RIMETTI_CHAT', 'IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'REGOLA_PROXY_DOMINIO',
     'RIMUOVI_REGOLA_PROXY', 'ANNULLA_CAMBIO', 'ZOOM_PAGINA', 'RIMEDIO_CREDITI', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE',
-    'RIAPRI_SCHEDA'],
+    'RIAPRI_SCHEDA', 'SALVA_PER_DOPO', 'CERCA_IMMAGINE'],
   // I tasti della finestra e il pannello degli strumenti delle app sono gesti, non azioni di Filo.
   barra: ['COMANDO_FINESTRA', 'ACCOUNT', 'PANNELLO_APP'],
   // Nessun tasto la fa: letture, proposte e comandi che si chiedono solo a parole.
   soloFilo: ['SALVA_LEZIONE', 'ONBOARDING', 'CAPACITA_DETTAGLIO', 'LEGGI_IMPOSTAZIONI', 'CERCA_CHAT', 'ESPANDI_FILO',
     'CERCA_SALVATE', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_PAGINA', 'VEDI_SCHERMO', 'CERCA_DOCUMENTI', 'LEGGI_TRASPARENZA',
-    'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', 'RIMUOVI_PROXY_TUTTE', 'TIENI_APERTA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA',
-    'ORDINA_DESKTOP', 'ELIMINA_FILE', 'SCHEDE_CHIUSE', 'RIPRENDI_AUDIO', 'PAUSA_AUDIO', 'MOSTRA_SCHEDA'],
+    'CANCELLA_MEMORIA', 'LEGGI_MEMORIA', 'ESEGUI_COMANDO', 'RIMUOVI_PROXY_TUTTE', 'TIENI_APERTA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA',
+    'ORDINA_DESKTOP', 'ELIMINA_FILE', 'SCHEDE_CHIUSE', 'RIPRENDI_AUDIO', 'PAUSA_AUDIO', 'MOSTRA_SCHEDA', 'IMMAGINI_WEB', 'GENERA_IMMAGINE'],
 };
 
 test('ogni azione del catalogo dice dove nasce il suo segno quando la fa l\'utente coi tasti, e ogni tasto dichiarato esiste', () => {

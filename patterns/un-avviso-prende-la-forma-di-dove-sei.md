@@ -14,11 +14,14 @@ nati nella shell e quelli che il main manda come `shell:toast`.
   Filo torna davanti.
 - **Filo davanti su una pagina**: l'angolo in basso a destra, nella vista sopra la pagina
   (patterns/la-shell-non-disegna-sopra-la-pagina.md).
-- **Filo davanti nella home**: se la cosa ha già la sua carta (`carta: 'timer:<id>'`, `'download:<id>'`) la home fa
-  notare quella e l'avviso se ne va (`assorbi`); se no l'avviso sta nell'angolo il tempo di leggerlo e poi vola in
+- **Filo davanti nella home**: se la cosa ha già la sua carta (`carta`, la chiave chiesta a `SN_CARTE_HOME.chiaveTimer`
+  / `chiaveDownload`) la home fa notare quella e l'avviso se ne va (`assorbi`), anche quando era nato su una pagina e
+  l'utente torna nella home; se no l'avviso sta nell'angolo il tempo di leggerlo e poi vola in
   cima alla colonna di sinistra, dove resta finché lo si chiude. Il modello resta nella shell: la home disegna le
   carte che il main le gira (`AVVISI_COLONNA`) e ogni gesto torna alla shell. Il volo lo disegna la home (una copia
   della carta dall'angolo alla colonna); con la riduzione del movimento la carta compare subito nella colonna.
+  Le carte volate stanno nell'elenco unico della colonna (`SN_CARTE_HOME.sinistra`, campo `cornice`): la chat le
+  vede e le chiude come la home. Il tasto destro è uno, `SN_FORMA_AVVISO.menu()`, per l'angolo e per la carta.
   Fa eccezione un avviso a tempo la cui uscita fa partire qualcosa (`alChiudere`, come la segnalazione automatica
   che «Annulla» trattiene): nella colonna non scadrebbe mai e quel qualcosa resterebbe appeso, quindi sta
   nell'angolo e alla scadenza se ne va, come su una pagina (#2570).
@@ -27,5 +30,7 @@ Perché la home e non l'angolo: nell'angolo l'avviso copriva il tasto Invio, e s
 posto (#1551) lo riduceva a una fessura. Dove un avviso ha un posto fisso che è suo, lì va.
 
 Un avviso nuovo non sceglie la propria forma: passa da `avvisoNellaFinestra` (main) o `NOTIFS.show` (shell) e, se
-racconta una cosa che ha una carta nella home, dice quale con `carta`. Mai una `new Notification` altrove.
+racconta una cosa che ha una carta nella home, dice quale con `carta`. Mai una `new Notification` altrove. Dal main
+un avviso a una finestra che sta ancora caricando aspetta che abbia finito (`allaCornice`): perso lì, con Filo non
+davanti non arrivava nessuna notifica.
 Sentinella: `tests/unit/formaAvviso.test.mjs`; prova d'uso: `tests/avvisi-forma.spec.mjs`.

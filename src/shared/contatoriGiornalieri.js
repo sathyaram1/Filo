@@ -1380,7 +1380,7 @@
   function icone() { const D = global.SN_DISPOSIZIONE_ICONE; return D && oggetto(D.ICONE) ? Object.keys(D.ICONE) : []; }
   function carte() {
     const H = global.SN_CARTE_HOME;
-    const ids = H ? [...(H.CARTE || []), ...(H.APP || [])].map((c) => c && c.id).filter(Boolean) : [];
+    const ids = H ? [...(H.CARTE || []), ...(H.TASTI || H.APP || [])].map((c) => c && c.id).filter(Boolean) : [];
     return [...ids, ...TIPI_CARTA_SINISTRA, TUTTE_LE_CARTE];
   }
   function cartaDi(chiave) {
@@ -1399,7 +1399,7 @@
     const mossa = MOSSE_DI_TIPO[m.tipo];
     if (mossa === 'ripristina') return { carta: TUTTE_LE_CARTE, mossa };
     const sinistra = ['nascondi', 'mostra', 'ordina-sinistra'].includes(m.tipo);
-    const carta = sinistra ? cartaDi(m.chiave) : (H.IDS.includes(m.carta) ? m.carta : H.risolvi(m.carta));
+    const carta = sinistra ? cartaDi(m.chiave) : ([...H.IDS, ...(H.ID_TASTI || [])].includes(m.carta) ? m.carta : H.risolvi(m.carta));
     return carta ? { carta, mossa } : null;
   }
   function nomiToken() { const T = global.SN_THEME_TOKENS; return T && typeof T.names === 'function' ? T.names() : []; }

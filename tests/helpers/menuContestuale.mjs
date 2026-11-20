@@ -2,7 +2,9 @@
 // con un selettore sulla pagina, perché il menu uscirà dalla pagina del sito in uno strato di Filo sopra la scheda.
 // Sentinella: tests/unit/menuSoloDallAiuto.test.mjs (il marcatore per lo script del sito che cerca il menu sta lì).
 
-const MONDO_CONTENT_SCRIPT = 999;
+import { createRequire } from 'node:module';
+
+const { MONDO: MONDO_CONTENT_SCRIPT } = createRequire(import.meta.url)('../../src/preload/mondo-esente.js');
 
 function paginaDi(scheda) {
   if (typeof scheda.context === 'function') return scheda;
@@ -79,6 +81,15 @@ export async function nelMondoDelMenu(app, scheda, codice) {
 // fuocoRimuovi }], vuoto, cerca, svuota, riquadro, lista, sfondo } | null a pannello chiuso.
 export function statoCronologia(app, scheda) {
   return nelMondoDelMenu(app, scheda, 'globalThis.SN_MENU?._test?.cronologia() ?? null');
+}
+
+/** Il font-family calcolato delle voci della cronologia aperta (#1342), null a pannello chiuso. */
+export function carattereCronologia(app, scheda) {
+  return nelMondoDelMenu(app, scheda, `(() => {
+    const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+    const el = T ? T.trova('.sn-menu-history-paste') : document.querySelector('.sn-menu-history-paste');
+    return el ? getComputedStyle(el).fontFamily : null;
+  })()`);
 }
 
 // Lo strato del menu sopra la scheda (#1053, spento di serie: `test.use({ stratoDelMenu: true })`). La sua pagina

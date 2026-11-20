@@ -150,7 +150,6 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
 
 .sn-spell-popup-header-loading {
   color: var(--sn-muted);
-  font-style: italic;
   font-weight: 400;
 }
 
@@ -188,7 +187,6 @@ html[data-sn-correttore="senza-errori"] *::spelling-error {
 /* Stato di caricamento (richiesta LLM in corso per il rosso) */
 .sn-spell-popup-header-loading {
   font-weight: 400;
-  font-style: italic;
   opacity: 0.7;
 }
 

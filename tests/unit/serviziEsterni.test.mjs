@@ -56,7 +56,6 @@ const COMPOSTI = [
   { file: 'src/main/services/siteBlock.js', testo: 'new URL(`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/main/tabs.js', testo: '? src : `https://${src}`', perche: 'il nome del sito delle regole del proxy' },
   { file: 'src/pages/dashboard/dashboard-comandi.js', testo: 'raw : `https://${raw}`', perche: 'il sito scritto dall’utente, che si apre in una scheda' },
-  { file: 'src/shared/barraSiti.js', testo: 's = `https://${s}`', perche: 'il sito scritto per la barra dei siti senza schema: si salva, e si apre in una scheda al clic dell’utente' },
   { file: 'src/shared/stessoSito.js', testo: '`http://${s}`', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/urlExfil.js', testo: 'new URL(`http://${s}`)', perche: 'l’indirizzo che un comando contatta, per giudicarlo prima che parta (#2293)' },
   { file: 'src/shared/urlExfil.js', testo: '`http://${u.slice(s[0].length)}`', perche: 'la forma web di un indirizzo con un altro schema, per giudicarlo prima che parta (#2293)' },
@@ -114,6 +113,7 @@ const IMMAGINI_DAI_DATI = [
   { file: 'src/pages/feedback/feedback.js', funzione: 'render', testo: 'lightboxImg.src = img.dataset.full;', perche: 'l’ingrandimento di un’anteprima già a schermo' },
   { file: 'src/pages/feedback/feedback.js', funzione: 'render', testo: 'img.src = dataUrl;', perche: 'l’allegato decifrato dal main, data:' },
   { file: 'src/pages/manage/manage.js', funzione: 'resolveBubbleImages', testo: 'img.src = dataUrl;', perche: 'l’allegato decifrato dal main, data:' },
+  { file: 'src/shared/immaginiRisposta.js', funzione: 'html', testo: '<img class="filo-galleria-img" src="', perche: 'la copia locale di un’immagine della risposta (filo://icone/ o data:): srcSicuro non lascia passare altro' },
   { file: 'src/pages/manage/manage.js', funzione: 'openLightbox', testo: 'mgLightboxImg.src = src;', perche: 'l’ingrandimento di un’anteprima già a schermo' },
   { file: 'src/shared/immaginiChat.js', funzione: 'apri', testo: 'img.src = url;', perche: 'un’immagine della chat che il sistema non apre da solo (svg): un blob: fatto lì sopra dai suoi byte' },
   { file: 'src/shared/confirmUi.js', funzione: 'allegatiIn', testo: 'img.src = v.anteprima;', perche: 'la miniatura di un allegato di segnalazione, un data:image controllato sopra' },
@@ -124,6 +124,7 @@ const IMMAGINI_DAI_DATI = [
 const NOMI_NON_CONTATTATI = [
   { file: 'src/main/services/adblock.js', costante: 'BASE_WHITELIST', perche: 'i siti che il blocco della pubblicità non blocca mai' },
   { file: 'src/shared/feedback.js', costante: 'BUCKET', perche: 'il nome del deposito degli allegati, che sta nel percorso dell’indirizzo' },
+  { file: 'src/main/services/trascrizioneYoutube.js', costante: 'HOST_BREVE', perche: 'riconosce l’indirizzo breve di un video; la trascrizione si chiede a www.youtube.com' },
   { file: 'src/shared/feedback.js', costante: 'PREFISSI_ALLEGATO', perche: 'riconosce un allegato di Filo anche nella forma storage.googleapis.com; Filo li scrive tutti sotto firebasestorage' },
 ];
 // Un nome di file ha la stessa forma di un dominio: queste estensioni non sono domini di primo livello.

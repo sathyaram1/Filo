@@ -43,11 +43,22 @@
     return ospite;
   }
 
-  function bersaglio(doc, x, y) {
+  // `web`: la scheda è un sito. Le altre (una pagina di Filo, un file) le prende solo chi le ha chieste.
+  function bersaglio(doc, x, y, web) {
     const c = chatSotto(x, y);
-    if (c) return { chat: c, el: c.area };
+    if (c && (web || c.ogniScheda)) return { chat: c, el: c.area };
+    if (c || !web) return null;
     const f = campoSotto(doc, x, y);
     return f ? { campo: f, el: f } : null;
+  }
+
+  // Una scheda qualunque, per chi decide da sé cosa farne: l'indirizzo com'è, il titolo, l'icona se è un'immagine.
+  function qualunque(s) {
+    if (!s || typeof s !== 'object' || typeof s.url !== 'string' || !s.url.trim() || s.url.length > 4096) return null;
+    const titolo = String(s.titolo || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    const icona = typeof s.icona === 'string' && s.icona.length <= 200000 && /^data:image\//i.test(s.icona) ? s.icona : '';
+    const id = typeof s.id === 'string' && /^[\w-]{1,80}$/.test(s.id) ? s.id : '';
+    return { id, titolo, url: s.url.trim(), icona };
   }
 
   function illumina(doc, el) {
@@ -125,7 +136,8 @@
     const y = Number(msg.y);
     const S = global.SN_SCHEDE_IN_CHAT;
     const scheda = S ? S.normalizza(msg.scheda) : null;
-    const b = msg.fase === 'esci' || !scheda || !Number.isFinite(x) || !Number.isFinite(y) ? null : bersaglio(doc, x, y);
+    const grezza = scheda ? null : qualunque(msg.scheda);
+    const b = msg.fase === 'esci' || !(scheda || grezza) || !Number.isFinite(x) || !Number.isFinite(y) ? null : bersaglio(doc, x, y, !!scheda);
     const fr = b || msg.fase === 'esci' || !scheda || !Number.isFinite(x) || !Number.isFinite(y) ? null : riquadroSotto(doc, x, y);
     if (riquadroOra && riquadroOra !== fr) { inoltra(doc, riquadroOra, 'esci', 0, 0); riquadroOra = null; }
     if (fr && (msg.fase === 'sopra' || msg.fase === 'lascia')) {
@@ -144,7 +156,7 @@
     illumina(doc, null);
     ora = null;
     if (msg.fase !== 'lascia' || !b) return false;
-    if (b.chat) { try { return b.chat.prendi(scheda) !== false; } catch (_) { return false; } }
+    if (b.chat) { try { return b.chat.prendi(scheda || grezza) !== false; } catch (_) { return false; } }
     return scriviNelCampo(doc, b.campo, x, y, scheda);
   }
 
@@ -159,9 +171,10 @@
   }
 
   // `area`: l'elemento che prende il rilascio (il campo della chat o il suo modulo); `prendi(scheda)` lo riceve.
-  function registraChat(area, prendi) {
+  // `ogniScheda`: riceve anche le schede che non sono un sito (la barra dei siti accetta le pagine di Filo, #1803.1).
+  function registraChat(area, prendi, { ogniScheda = false } = {}) {
     if (!area || typeof prendi !== 'function') return () => {};
-    const voce = { area, prendi };
+    const voce = { area, prendi, ogniScheda: !!ogniScheda };
     chats.add(voce);
     ascolta();
     return () => chats.delete(voce);

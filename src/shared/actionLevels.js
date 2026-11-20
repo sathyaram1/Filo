@@ -268,10 +268,17 @@
     const id = C ? C.risolvi(a && a.carta, { esatto: true }) : null;
     const detto = String((a && a.carta) || '').trim();
     // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza. Un nome non riconosciuto è del modello.
-    const nome = id ? [` «${C.carta(id).titolo}»`] : (detto && !/^[a-z]+:/.test(detto) ? [' ', cit(detto.length > 60 ? `${detto.slice(0, 59)}…` : detto)] : []);
+    const def = id ? C.carta(id) || C.tasto(id) : null;
+    const nome = def ? [` «${def.titolo}»`] : (detto && !/^[a-z]+:/.test(detto) ? [' ', cit(detto.length > 60 ? `${detto.slice(0, 59)}…` : detto)] : []);
     const op = String((a && (a.operazione ?? a.op)) || '').toLowerCase();
     const frase = (prima, dopo) => (fatto ? piatto([prima, ...nome, dopo]) : [prima, ...nome, dopo]);
     if (op === 'ripristina') return fatto ? 'Carte della home rimesse com\'erano all\'inizio' : 'Rimettere le carte della home com\'erano all\'inizio';
+    // Un tasto di «altro» (#2372): togliere lo mette nel «+».
+    if (def && C.tasto(id)) {
+      if (op === 'togli') return fatto ? frase('Tasto', ' messo nel «+»') : frase('Mettere il tasto', ' nel «+»');
+      if (op === 'rimetti' || op === 'aggiungi') return fatto ? frase('Tasto', ' rimesso in vista') : frase('Rimettere in vista il tasto', '');
+      return fatto ? frase('Tasto', ' spostato') : frase('Spostare il tasto', '');
+    }
     if (op === 'togli' && !id) return fatto ? frase('Carta', ' tolta dalla home') : frase('Togliere la carta', ' dalla home');
     if (op === 'togli') return fatto ? frase('Carta', ' tolta dalla home: ora è un\'icona in «altro»') : frase('Togliere la carta', ' dalla home');
     if (op === 'rimetti' || op === 'aggiungi') return fatto ? frase('Carta', ' rimessa nella home') : frase('Rimettere la carta', ' nella home');
@@ -613,6 +620,29 @@
         return ['Cercare sul web ', cit(q)];
       },
     },
+    // #2272 — come CERCA_WEB: la ricerca porta fuori la sua query, e il main alza il costo se ci viaggia un segreto.
+    IMMAGINI_WEB: {
+      costo: (a) => (a && a._exfil ? 2 : 0),
+      campo: 'web',
+      uscita: (a) => ricercaImmaginiDi(a),
+      fonte: (a, out) => (Array.isArray(out.immagini) && out.immagini.length
+        ? { classe: 5, campo: 'web', chiave: 'web:immagini', motivo: 'ho cercato immagini sul web' } : null),
+      describe: (a) => {
+        const q = ricercaImmaginiDi(a);
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
+          return [`Cercare immagini sul web con un testo${why}:\n`, cit(q),
+            '\n\nPotrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.'];
+        }
+        return ['Cercare immagini di ', cit(q)];
+      },
+    },
+    // Disegnare costa qualche centesimo e non tocca niente dell'utente: si annulla ignorando l'immagine.
+    GENERA_IMMAGINE: {
+      costo: 1,
+      campo: null,
+      describe: (a) => ['Disegnare un\'immagine: ', cit(String(a.descrizione || a.prompt || ''))],
+    },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
       // le cose che ha scoperto o detto e dichiara quando l'intervista è
@@ -908,6 +938,13 @@
       campo: null,
       describe: (a) => (a && a.doc ? ['Rileggere la pagina di trasparenza ', cit(String(a.doc), true)] : 'Rileggere la pagina di trasparenza'),
     },
+    LEGGI_MEMORIA: {
+      // #2536.1 — la stessa memoria che la chat ha di solito nel CONTESTO: sola lettura, niente esce.
+      costo: 0,
+      campo: null,
+      describe: () => 'Rileggere la memoria',
+      describeDone: () => 'Riletta la memoria',
+    },
     EVENTO_CALENDARIO: {
       costo: 1,
       campo: null,
@@ -1139,16 +1176,14 @@
         const label = (t && t.label) || estTok(a) || 'un elemento';
         const val = estVal(a);
         if (a && a._illegible) {
-          // Nel popup solo parole di Filo: un token del registro e un valore valido.
+          // Nel popup solo parole di Filo: un token del registro e un colore valido, che non sa dire frasi.
           const nome = (t && t.label) || 'un elemento';
-          const valido = T && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
+          const valido = t && t.type === 'color' && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
           return `Cambiare “${nome}” a ${valido} renderebbe il testo `
             + `quasi illeggibile (colore troppo vicino allo sfondo). Applico comunque?`;
         }
-        // Fuori dal registro nome e valore sono del modello: stanno nel riquadro.
-        const valOk = !!(t && val && T.validate && T.validate(estTok(a), val));
-        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]),
-          ...(val ? (valOk ? [` a ${val}`] : [' a ', cit(val, true)]) : [])];
+        // Il valore è del modello anche quando è valido (un font può essere una frase, #592.21): sta nel riquadro.
+        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]), ...(val ? [' a ', cit(val, true)] : [])];
       },
     },
     ESEGUI_COMANDO: {
@@ -1572,6 +1607,12 @@
         return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
       },
     },
+    // Costo 1 (#2377): subito, senza domanda; un blocco non voluto costa solo la password.
+    BLOCCA_PC: {
+      costo: 1,
+      campo: null,
+      describe: () => 'Bloccare il computer',
+    },
     // ── icone del desktop del computer (#1621) ───────────────────────────────
     // Costo 1: ogni riordino è un cambio del filo, e l'annullo rimette ogni icona dov'era.
     ORDINA_DESKTOP: {
@@ -1648,7 +1689,39 @@
       campo: null,
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-        return t ? ['Portarti su ', cit(t)] : 'Portarti su una scheda aperta';
+        if (t) return ['Portarti su ', cit(t)];
+        if (a && a.verso === 'dopo') return 'Portarti sulla scheda dopo';
+        return a && a.verso === 'prima' ? 'Portarti sulla scheda prima' : 'Portarti su una scheda aperta';
+      },
+    },
+    // Come Alt+S: la pagina resta in «Aperti per dopo», da dove si riapre con un clic. Costo 1.
+    SALVA_PER_DOPO: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Salvare per dopo ', cit(t), ' e chiuderne la scheda'] : 'Salvare per dopo la pagina e chiuderne la scheda';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const t = String(o.titolo || (a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return o.salvata ? `Salvata per dopo «${t || 'la pagina'}»` : 'Pagina non salvata';
+      },
+    },
+    // Un'immagine dell'utente va a Google: costo 2, come la ricerca dell'Aiuto che porta fuori testo della pagina.
+    CERCA_IMMAGINE: {
+      costo: 2,
+      campo: 'web',
+      describe: (a) => {
+        const n = Number(a && a.immagine);
+        if (Number.isInteger(n) && n > 0) return `Cercare con Google Lens l'immagine ${n} di questa chat`;
+        return a && a.scheda != null ? 'Cercare con Google Lens l\'immagine più grande della pagina'
+          : 'Cercare con Google Lens l\'immagine (l\'ultima mandata in chat, o la più grande della pagina)';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        if (!o.cercata) return 'Immagine non cercata';
+        return o.numero ? `Cercata con Google Lens l'immagine ${o.numero} di questa chat` : 'Cercata con Google Lens l\'immagine della pagina';
       },
     },
   };
@@ -1696,7 +1769,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-    'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO',
+    'LEGGI_MEMORIA', 'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO', 'IMMAGINI_WEB',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
@@ -1718,6 +1791,8 @@
     PAUSA_AUDIO: senza('nessuna'),
     MOSTRA_SCHEDA: fatta,
     RIAPRI_SCHEDA: senza('nonRaggiungibile'),
+    SALVA_PER_DOPO: fatta,
+    CERCA_IMMAGINE: fatta,
     WIFI: accesaOSpenta,
     BLUETOOTH: accesaOSpenta,
     IMPOSTA_PREFERENZA: senza('costoModello', 'avviso'),
@@ -1830,5 +1905,16 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo, cosaAccount };
+  // Il testo di una ricerca di immagini (#2272): chi la esegue, il freno sulle uscite e quello sui segreti leggono questo.
+  const CAMPI_RICERCA_IMMAGINI = ['query', 'cerca', 'testo', 'q', 'text'];
+  function ricercaImmaginiDi(action) {
+    if (!action || typeof action !== 'object') return '';
+    for (const k of CAMPI_RICERCA_IMMAGINI) {
+      const v = action[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return '';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -201,6 +201,36 @@ test('una domanda legata a un tratto vecchio lo porta nella domanda, e il blocco
   await blocco.screenshot({ path: 'tests/.shots/868-ricordo-nel-blocco.png' });
 });
 
+// #2369 — con tante conversazioni vecchie, tutte vicine fra loro, una domanda su altro non ne ripesca nessuna.
+test('una domanda che non c\'entra con le conversazioni vecchie non ne ripesca nessuna, quella che c\'entra solo la sua', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await primaScheda(app);
+  const vecchie = ['la strada di Geber su wikipedia', 'una lista di dizionari in python', 'la bolletta della luce di ottobre',
+    'il compleanno di mia sorella', 'gli orari dei treni per Torino', 'la scheda di allenamento in palestra',
+    'chi ha vinto la partita di ieri', 'un romanzo da leggere in vacanza'];
+  await semina(app, {
+    chat: [
+      ...vecchie.map((s, i) => ({ id: `vecchia-${i}`, oreFa: (5 + i) * 24, titolo: s, scambi: [[`parliamo di ${s}`, 'Certo.']] })),
+      { id: 'viaggio-lisbona', oreFa: 14 * 24, titolo: 'Viaggio a Lisbona', scambi: [['segnati il ristorante di Lisbona: Taberna da Rua', 'Fatto.']] },
+    ],
+  });
+  await preparaModello(app, [{ text: 'Apro la segnalazione.' }, { text: 'Si chiamava Taberna da Rua.' }]);
+  await scrivi(page, 'ok apri il feedback e scrivi tutto su ctrl');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Apro la segnalazione.' })).toBeVisible({ timeout: 15_000 });
+  await scrivi(page, 'come si chiamava il ristorante di Lisbona?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Si chiamava Taberna da Rua.' })).toBeVisible({ timeout: 15_000 });
+
+  const [primo, secondo] = await chiamate(app);
+  expect(testo(primo[posDomanda(primo)])).not.toContain('RICORDI DAL FILO');
+  const k = posDomanda(secondo);
+  expect(testo(secondo[k])).toContain('RICORDI DAL FILO');
+  expect(testo(secondo[k])).toContain('Taberna da Rua');
+  for (const s of vecchie) expect(testo(secondo[k])).not.toContain(s);
+  const righe = page.locator('.dash-activity-row', { hasText: 'Ricordato dal filo' });
+  await expect(righe).toHaveCount(1);
+  await expect(righe).toContainText('Viaggio a Lisbona');
+});
+
 test('«quella pagina sulle orche che ho chiuso ieri»: la ricerca la trova nel filo e la riapre', async ({ app, testServer }) => {
   test.setTimeout(90_000);
   const page = await primaScheda(app);
@@ -641,13 +671,15 @@ test('l\'esito di un comando dato in chat resta davanti alle altre schede col tr
 test('un messaggio lunghissimo incollato torna intero nei turni dopo e si rilegge intero; oltre il tetto, a pezzi', async ({ app }) => {
   test.setTimeout(120_000);
   await primaScheda(app);
-  const lungo = 'a'.repeat(100_000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100_000);
+  // Circa 56.000 token in tutto: dentro il tetto di serie, ben oltre i 20.000 del tetto basso.
+  const lato = Math.round(28_000 * await app.evaluate(() => globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN));
+  const lungo = 'a'.repeat(lato) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(lato);
   await preparaModello(app, [
     { text: 'Letto.' },
     { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
     { text: 'Fatto.' },
     { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
-    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga', da: 90_000 } }] },
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga', da: Math.round(lato * 0.9) } }] },
     { text: 'Fatto.' },
   ]);
   await app.evaluate((_e, lungo) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: lungo, threadHistory: [], chatId: 'scheda-lunga' }), lungo);

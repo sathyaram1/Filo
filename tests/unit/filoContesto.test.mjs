@@ -379,7 +379,7 @@ test('una rilettura sta nella finestra nota del modello insieme al resto della r
   const cap = FC.capRilettura({ tetto: 100000, finestra, occupati, risposta });
   // Richiesta intera (quello che c'era, la rilettura, il tetto della risposta) sotto la finestra.
   assert.ok(occupati + cap / FC.CARATTERI_PER_TOKEN + risposta <= finestra, `${cap}`);
-  assert.ok(cap > 50000, 'con la finestra quasi vuota la rilettura la usa');
+  assert.ok(cap / FC.CARATTERI_PER_TOKEN > 15000, 'con la finestra quasi vuota la rilettura la usa');
   // Senza finestra nota vale il tetto in token; con una finestra grande vince il tetto.
   assert.equal(FC.capRilettura({ tetto: 100000 }), 100000 * FC.CARATTERI_PER_TOKEN);
   assert.equal(FC.capRilettura({ tetto: 100000, finestra: 1000000, occupati, risposta }), 100000 * FC.CARATTERI_PER_TOKEN);

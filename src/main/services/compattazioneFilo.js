@@ -407,9 +407,13 @@ function segnaBase(incognito, base) {
 function base(incognito) { return basi[lato(inIncognito(incognito))]; }
 
 // Soglia vera, anticipo e grezzo (SN_FILO_COMPATTAZIONE.limiti) dalla parte fissa misurata all'ultimo turno e dal peso
-// dei turni del tratto: la stessa misura per la richiesta, la risposta, il timer da fermo e il taglio.
+// dei turni del tratto: la stessa misura per la richiesta, la risposta, il timer da fermo e il taglio. Il peso viene dai
+// soli turni chiusi: la domanda in corso non ha ancora i suoi ricordi, e l'anticipo dopo la risposta deciderebbe su un
+// peso diverso da quello della richiesta dopo (#2473).
 function limitiDi(lista, incognito, soglia) {
-  return L().limiti({ soglia, base: basi[lato(incognito)], turno: L().pesoTurno(lista, pesoDi) });
+  const ultimo = lista[lista.length - 1];
+  const chiusi = ultimo && ultimo.role === 'user' && !ultimo.riga && !ultimo.seguito ? lista.slice(0, -1) : lista;
+  return L().limiti({ soglia, base: basi[lato(incognito)], turno: L().pesoTurno(chiusi, pesoDi) });
 }
 async function limiti(incognito, { ora = Date.now(), tetti = null } = {}) {
   const inc = inIncognito(incognito);

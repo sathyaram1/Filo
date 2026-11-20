@@ -324,8 +324,15 @@ riallineamento e risposte dell'owner li assegna il server come sempre, anche per
 fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori
 server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
 semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
-dall'ordine (regola 7) e le risposte dell'owner e gli smistamenti delle domande, i lavori
-già iniziati, i feedback dell'ordine, il resto nell'ordine della coda; e
+dall'ordine (regola 7) e le risposte dell'owner e gli smistamenti delle domande, i feedback
+dell'ordine nella sua sequenza (primo lavoro o già iniziati che siano), i lavori già
+iniziati fuori dall'ordine, il resto nell'ordine della coda. Con un ordine né la priorità
+né l'essere già iniziato scavalcano questa sequenza (#2411): la voce server accende i suoi
+lavori dell'ordine anche quando un lavoro server più urgente li supererebbe, i posti liberi
+fra le due voci vanno a chi viene prima nella sequenza comune (senza i lavori che il server
+fa da sé e senza i feedback con una sessione già in viaggio), e una sessione lascia il posto
+all'altra voce solo per un lavoro che le sta davanti nella stessa sequenza. Le accensioni di
+una voce nello stesso giro occupano un posto di N anche per le voci dopo di lei. Le voci
 accendono una sessione per ciascuno fino ai posti liberi, e per ogni routine non più di
 quanti biglietti al minuto il server dà alla sua chiave, meno uno per il manutentore: le
 altre vanno all'altro account o al giro dopo (#2343). Una priorità 3 già in viaggio non
@@ -400,7 +407,9 @@ chiusura di M o nomina il suo ramo: l'approvazione dell'owner fonde «finish: <r
 senza numero), che M sia un altro feedback e stia in `done`, e che la fusione sia più recente
 dell'ultima riapertura del doppione e di quella di M (riaperto dopo, vuol dire non risolto; #2046.1). Un
 rifiuto nomina la fusione registrata alla chiusura di M, già provata con le stesse regole, o il suo ramo. Il report
-porta in testa anche la riga «doppione di #M».
+porta in testa anche la riga «doppione di #M». Al contrario, il rifiuto di un «già risolto» semplice con una fusione
+che non cita il feedback o che precede la sua nascita, quando l'oggetto nomina un altro feedback chiuso
+(«merge-gate: #M» o il suo ramo), indica `--doppione-di M` con la stessa fusione (#2583).
 
 **Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
 segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
@@ -519,7 +528,10 @@ fileInConflitto, giro }`. Se tutti stanno fra i file di servizio (`FILE_DI_SERVI
 `PATTERNS.md`), o non ce n'è nessuno, niente giro nuovo di verifica: bastano le prove del
 server sulla fusione, e il controllo di sicurezza resta. Un file di codice in conflitto o
 riscritto chiede la verifica intera, perché è logica che nessuno ha guardato (anche un
-conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). La
+conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). Un
+motivo «prove rosse» chiede la verifica qualunque file tocchi: chi riallinea quei rossi
+non li corregge, e saltare la verifica li riporterebbe al cancello senza fine (#2590);
+lo stesso vale per il server quando la fusione si era fermata per prove rosse. La
 regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il confronto da
 sé con l'API di GitHub e non si fida di quello del client: per i conflitti approssima
 `merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
@@ -640,7 +652,11 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
   'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
   giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
   mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
-  - origine fidata (anche un derivato fidato già in coda) → `todo`;
+  - origine fidata (anche un derivato fidato già in coda) → `todo`. Il derivato di un rilievo **interno** (rimasti,
+    domande, in correzione) nasce comunque con l'attesa sul lavoro (`waitsFor`, #2554): verte sul codice del suo ramo,
+    e nessuna routine lo prende prima che sia su main. Fuso il lavoro l'attesa cade; chiuso senza fusione, il derivato
+    va all'owner (`attesa_chiusa`). Un esterno sta già su main e parte subito. Vale anche per i derivati che
+    l'orchestratore locale apre per un lavoro locale (`--aspetta`);
   - origine d'utente non ancora fusa → resta `unlabeled` (`statusReason: attesa_origine`); quando
     l'origine arriva a `done` → `todo`; se si blocca (`attack`, `spam`, `suspicious_file`, i
     confermati, `design` per `secaudit` o `l5`) → `design` (`statusReason: origine_bloccata`,
@@ -773,8 +789,13 @@ sopra; a manutentore spento il fermo non c'è), e una consegna `design` + `guast
 uguale di seguito il server apre una domanda col conteggio, che smista il compito
 «Gestisci la domanda» (SPEC-DOMANDE §3.5, §3.8). Non è lavoro per regola: quello è
 `locale`, e la sua nota dice quale regola lo tiene fuori dalla cloud. La risposta dell'owner appende
-alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
-«Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
+alla chat e (se decide) muove a `todo`. Sul caso `secaudit` (#2575) anche la
+bocciatura lascia il segnalibro di ripresa (motivo `secaudit`, i verdetti restano): il
+tasto si chiama «Rimanda in correzione», il commento è cosa correggere, e il correttore
+sul ramo riceve commento e perché della bocciatura (`ripresa.bocciatura`, il perché solo
+da un controllo pulito su un feedback fidato); un lavoro rimesso in coda senza segnalibro,
+col commento scritto dopo la bocciatura, lo riceve alla presa in carico. L'owner ha anche
+«Salta il controllo», che toglie il segnalibro: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
 ramo; l'esito è quello di un'approvazione (fuso → `done`; bloccato → richiesta
 di fusione in attesa, o la nota che quella versione era già decisa; conflitto →

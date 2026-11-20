@@ -248,7 +248,6 @@
 }
 .rt-hist-score[data-state="pending"] {
   font-weight: 400;
-  font-style: italic;
   color: var(--sn-muted);
 }
 .rt-hist-valid { text-align: center; width: 56px; }
@@ -306,7 +305,7 @@
 }
 .rt-detail-validity[data-valid="true"] { color: #2e9e5b; }
 .rt-detail-validity[data-valid="false"] { color: var(--sn-muted); }
-.rt-detail-muted { color: var(--sn-muted); font-style: italic; }
+.rt-detail-muted { color: var(--sn-muted); }
 .rt-detail-judges {
   list-style: none;
   margin: 0;
@@ -409,7 +408,7 @@
   background: color-mix(in srgb, var(--sn-accent) 6%, var(--sn-bg));
 }
 .rt-reveal h2 { margin-top: 0; border-bottom: none; padding-bottom: 0; }
-.rt-reveal-title { margin: 0 0 12px; font-style: italic; }
+.rt-reveal-title { margin: 0 0 12px; }
 .rt-reveal-slots {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -431,7 +430,6 @@
 .rt-slot-icon { font-size: 26px; line-height: 1; }
 .rt-slot-pts { font-size: 12px; color: var(--sn-muted); }
 .rt-slot--revealed { animation: rt-pop calc(400ms * var(--sn-motion, 1)) ease; border-color: var(--rt-judge-color, var(--sn-accent)); }
-.rt-slot--waiting .rt-slot-pts { font-style: italic; }
 .rt-slot-spinner {
   width: 18px;
   height: 18px;

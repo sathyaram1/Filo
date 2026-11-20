@@ -2,8 +2,12 @@
 // alla home perdendo la bozza, «Riprendiamola» ricominciava da capo, le interviste in Preferenze non si toglievano, la
 // prima risposta non aveva la riga corta, i titoli delle schede arrivavano al modello. Il testo incollato è la guardia.
 
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm, confirmState, confirmText } from './helpers/confirm.mjs';
+
+const SHOTS = join(process.cwd(), 'tests', '.shots');
 
 function newtabWindows(app) {
   return app.windows().filter((w) => w.url().startsWith('filo://newtab'));
@@ -175,6 +179,76 @@ test.describe('utente già accolto', () => {
     await expect(intervista.locator('.dash-bubble-filo', { hasText: 'Come vuoi che ti scriva' })).toBeVisible({ timeout: 30_000 });
     expect(await app.evaluate(() => globalThis.__chatPrompts[globalThis.__chatPrompts.length - 1])).toContain('DA SCOPRIRE');
     expect(JSON.stringify((await onbState(app)).thread)).toContain('sono Anna');
+  });
+
+  // #2536 — col profilo davanti il modello lo citava («Bene Luca, geometra») o lo ricopiava nel profilo, divieto o no.
+  test('nell’intervista rifatta il modello non vede la memoria; la chat della carbonara sì, prima e dopo', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    await app.evaluate(async () => {
+      await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Fa il geometra in uno studio tecnico. Ha un gatto, Pepe.', PREFERENZE: 'Preferisce risposte brevi.' });
+      await globalThis.SN_FILO_MEMORY.appendLesson('Ha prenotato un volo per Lisbona.');
+    });
+    const carb = await carbonara(app, shell);
+    const ultimo = () => app.evaluate(() => globalThis.__chatPrompts[globalThis.__chatPrompts.length - 1]);
+    expect(await ultimo(), 'fuori dall’intervista la memoria c’è').toContain('geometra');
+    const intervista = await intervistaRifattaAltrove(app, shell, openTab);
+
+    await queueChat(app, { text: 'Piacere Luca. Come vuoi che ti scriva?', actions: [] });
+    await scrivi(intervista, 'mi chiamo luca, uso il pc x lavoro sopratutto mail e excel');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'Piacere Luca' })).toBeVisible({ timeout: 30_000 });
+    const nellIntervista = await ultimo();
+    expect(nellIntervista).toContain('DA SCOPRIRE');
+    for (const fatto of ['geometra', 'Pepe', 'risposte brevi', 'Lisbona']) expect(nellIntervista, fatto).not.toContain(fatto);
+    expect(nellIntervista, 'la memoria tolta non è una memoria vuota').toContain('non ce l\'hai davanti apposta, ma c\'è');
+    await queueChat(app, { text: 'Va bene, ti do del tu.', actions: [] });
+    await scrivi(intervista, 'dammi del tu ovvio');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'ti do del tu' })).toBeVisible({ timeout: 30_000 });
+    expect(await ultimo(), 'anche al secondo turno').not.toContain('geometra');
+
+    // Nell'altra scheda, a intervista ancora aperta, la memoria torna.
+    await shell.locator('.tab').first().click();
+    await queueChat(app, { text: 'Per quattro: 400 g di spaghetti.', actions: [] });
+    await carb.locator('#sendBtn').click();
+    await expect(carb.locator('.dash-bubble-filo', { hasText: 'Per quattro' })).toBeVisible({ timeout: 30_000 });
+    const dopo = await ultimo();
+    expect(dopo).not.toContain('DA SCOPRIRE');
+    expect(dopo).not.toContain('non ce l\'hai davanti apposta');
+    for (const fatto of ['geometra', 'Pepe', 'risposte brevi', 'Lisbona']) expect(dopo, fatto).toContain(fatto);
+  });
+
+  // #2536.1 — con la memoria fuori dal CONTESTO il modello la prendeva per vuota: «di te non so niente», «niente da
+  // togliere», e la riga chiesta da togliere restava.
+  test('nell’intervista rifatta la memoria si legge quando la chiede l’utente, e una riga si toglie', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    await app.evaluate(async () => {
+      await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Fa il geometra in uno studio tecnico.\nHa un gatto, Pepe.', PREFERENZE: 'Preferisce risposte brevi.' });
+      await globalThis.SN_FILO_MEMORY.appendLesson('Ha prenotato un volo per Lisbona.');
+    });
+    await pronta(app, shell);
+    const intervista = await intervistaRifattaAltrove(app, shell, openTab);
+    const prompts = () => app.evaluate(() => globalThis.__chatPrompts.slice());
+
+    await queueChat(app, { toolCalls: [{ id: 'm1', name: 'LEGGI_MEMORIA', arguments: '{}' }] },
+      { text: 'Fai il geometra e hai un gatto, Pepe.', actions: [] });
+    const prima = (await prompts()).length;
+    await scrivi(intervista, 'sono luca. prima di andare avanti: cosa ti ricordi già di me?');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'hai un gatto, Pepe' })).toBeVisible({ timeout: 30_000 });
+    const [domanda, conLaMemoria] = (await prompts()).slice(prima);
+    expect(domanda).toContain('DA SCOPRIRE');
+    expect(domanda).toContain('memoria(leggi)');
+    for (const fatto of ['geometra', 'Pepe', 'Lisbona']) expect(domanda, `${fatto}: prima di chiederla non c’è`).not.toContain(fatto);
+    for (const fatto of ['geometra', 'Pepe', 'risposte brevi', 'Lisbona']) expect(conLaMemoria, `${fatto}: letta, arriva intera`).toContain(fatto);
+    await expect(intervista.locator('.dash-activity').last()).toContainText('Rileggo la memoria');
+
+    await queueChat(app, { toolCalls: [{ id: 'm2', name: 'DIMENTICA', arguments: JSON.stringify({ testo: 'Pepe' }) }] },
+      { text: 'L’ho tolto dalla memoria.', actions: [] });
+    await scrivi(intervista, 'ah il mio gatto pepe purtroppo non c\'è più, toglilo dalla memoria');
+    const memoria = () => app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getMemory()));
+    await expect.poll(memoria, { timeout: 30_000 }).not.toContain('Pepe');
+    expect(await memoria(), 'il resto resta').toContain('geometra');
+    await expect(intervista.locator('.dash-activity').last()).toContainText('Dimenticato');
+    mkdirSync(SHOTS, { recursive: true });
+    await intervista.screenshot({ path: join(SHOTS, 'accoglienza-rifatta-memoria-letta-e-tolta.png') });
   });
 
   test('con l’intervista rifatta aperta altrove, «stop» nella chat della carbonara va al modello e non chiude l’intervista', async ({ app, shell, openTab }) => {

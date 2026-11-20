@@ -1,4 +1,4 @@
-// Le attese fra feedback (#903): «aspetta #676, #663.2». Lettura dei numeri, rifiuti alla scrittura, stato di ciascuno, priorità ereditata (#1630).
+// Le attese fra feedback (#903): «aspetta #676, #663.2». Lettura dei numeri, rifiuti alla scrittura, stato di ciascuno, priorità ereditata (#1630), lavoro già su main (#2193.1).
 // Non tocca la rete: chi scrive passa `risolvi`, `leggiAttese` e `leggi`. Il server la incorpora al deploy (bake-shared): un cambio qui va su main solo con un lavoro server.
 // Test: tests/unit/feedbackAttese.test.mjs. Il campo: FEEDBACK-STATES.md.
 
@@ -82,6 +82,26 @@
     if (s === 'archived' && String(doc.resolvedInVersion || '').trim()) return STATO.FUSO;
     if (CHIUSI_SENZA_FUSIONE.has(s)) return STATO.CHIUSO;
     return STATO.APERTO;
+  }
+
+  const SHA_FUSIONE_RE = /^[0-9a-f]{40}$/i;
+  /**
+   * La pratica è chiusa col suo lavoro su main? Un conto solo per la Gestione e per il server (#2193.1). Prove: la
+   * fusione registrata alla chiusura (`fusioneSha`), la versione che la contiene, la chiusura «già risolto», una sua
+   * richiesta di fusione fusa (`richieste`: viste pubbliche o righe { id, data }). Stato cifrato: vale `statusPublic`. PURA.
+   */
+  function lavoroSuMain(doc, richieste) {
+    if (!doc || doc.missing) return false;
+    const s = String(doc.status || '').trim();
+    const leggibile = !!s && !s.startsWith('FENC');
+    const chiusa = leggibile ? s === 'done' || s === 'archived' : String(doc.statusPublic || '') === 'closed';
+    if (!chiusa) return false;
+    if (SHA_FUSIONE_RE.test(String(doc.fusioneSha || '').trim()) || String(doc.resolvedInVersion || '').trim()) return true;
+    if (s === 'done' && String(doc.statusReason || '') === 'gia_risolto') return true;
+    return (Array.isArray(richieste) ? richieste : []).some((r) => {
+      const v = r && r.data && typeof r.data === 'object' ? r.data : r;
+      return !!v && v.used === true && v.outcome === 'merged';
+    });
   }
 
   /** [{ id, num, stato }]. `trova(id)` → il documento noto, o undefined. */
@@ -323,7 +343,7 @@
 
   global.SN_FB_ATTESE = {
     CAMPO, MAX, STATO, ETICHETTA, eCompito,
-    normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, statiDelleAttese, aspettaAncora, atteseDellaScheda, etichetta, testoAttese, valida,
+    normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, lavoroSuMain, statiDelleAttese, aspettaAncora, atteseDellaScheda, etichetta, testoAttese, valida,
     daScrivereSu, conflittoDiScrittura, scriviSullaLettura, RILETTURE,
     prioritaDi, scattaEredita, ereditaPriorita, notaEredita,
   };

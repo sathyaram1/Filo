@@ -581,6 +581,8 @@
     // Un'azione fermata perché avrebbe portato fuori un segreto (#810): si vede anche a blocco chiuso.
     FERMATA: (n) => (n > 1 ? `fermato ${n} azioni` : 'fermato un\'azione'),
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
+    IMMAGINI_WEB: (n) => (n > 1 ? `cercato immagini ${n} volte` : 'cercato immagini'),
+    GENERA_IMMAGINE: (n) => (n > 1 ? `disegnato ${n} immagini` : 'disegnato un\'immagine'),
     CERCA_CHAT: (n) => (n > 1 ? `cercato nel filo ${n} volte` : 'cercato nel filo'),
     ESPANDI_FILO: (n) => (n > 1 ? `riletto il filo ${n} volte` : 'riletto il filo'),
     RICORDO_FILO: () => 'ripescato un ricordo dal filo',
@@ -595,6 +597,8 @@
     RIPRENDI_AUDIO: () => 'fatto ripartire la musica',
     PAUSA_AUDIO: () => 'messo in pausa la musica',
     MOSTRA_SCHEDA: () => 'portato su una scheda',
+    SALVA_PER_DOPO: (n) => (n > 1 ? `salvato ${n} pagine per dopo` : 'salvato una pagina per dopo'),
+    CERCA_IMMAGINE: (n) => (n > 1 ? `cercato ${n} immagini` : 'cercato un\'immagine'),
     RINOMINA_FILE: () => 'dato un nome ai file',
     ELIMINA_FILE: () => 'tolto dei file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
@@ -617,6 +621,7 @@
     TOGLI_CHAT: (n) => (n > 1 ? `tolto ${n} conversazioni` : 'tolto una conversazione'),
     RIMETTI_CHAT: (n) => (n > 1 ? `rimesso ${n} conversazioni nel filo` : 'rimesso una conversazione nel filo'),
     CORREGGI_MEMORIA: (n) => (n > 1 ? `corretto ${n} cose` : 'corretto una cosa'),
+    LEGGI_MEMORIA: () => 'riletto la memoria',
     CANCELLA_MEMORIA: () => 'cancellato la memoria',
     NAVIGA: (n) => (n > 1 ? `aperto ${n} pagine` : 'aperto una pagina'),
     ONBOARDING: () => 'proseguito con l\'accoglienza',
@@ -644,6 +649,7 @@
     BLUETOOTH: () => 'comandato il Bluetooth',
     WIFI: () => 'comandato il Wi-Fi',
     ORDINA_DESKTOP: (n) => (n > 1 ? `sistemato le icone del desktop ${n} volte` : 'sistemato le icone del desktop'),
+    BLOCCA_PC: () => 'bloccato il computer',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
     CHIUDI_SCHEDE: (n) => (n > 1 ? `chiuso schede ${n} volte` : 'chiuso delle schede'),
@@ -1561,11 +1567,36 @@
         const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', parti: a._confirm.parti, avviso: a._confirm.avviso || '' };
         // #1668 — gli allegati di una segnalazione si vedono in miniatura prima del sì; li prende il main dalla chat.
         let allegati = null;
+        const preparati = {};
         if (type === 'INVIA_FEEDBACK') {
           try {
             const p = await send({ type: MSG.FILO_FEEDBACK_ALLEGATI, action: a, chatId: chat || chatAttuale() || '' });
             if (p && p.ok && ((p.allegati || []).length || (p.scartati || []).length)) allegati = p;
           } catch (_) {}
+          // #1664 — una foto oltre il tetto o un AVIF dal disco si ridisegna qui, con la regola della casella «Invia feedback».
+          const IC = window.SN_IMMAGINI_CHAT;
+          for (const v of (allegati && allegati.allegati) || []) {
+            if (!v.daPreparare || !v.anteprima || !IC || typeof IC.perLaSegnalazione !== 'function') continue;
+            delete v.daPreparare;
+            try {
+              const b = IC.blobDa(v.anteprima);
+              const pronta = b ? await IC.perLaSegnalazione(new File([b], v.nome || 'immagine', { type: b.type })) : null;
+              const url = pronta && pronta.file ? await new Promise((ok) => {
+                const r = new FileReader();
+                r.onload = () => ok(typeof r.result === 'string' ? r.result : '');
+                r.onerror = () => ok('');
+                r.readAsDataURL(pronta.file);
+              }) : '';
+              if (url) {
+                preparati[v.id] = url;
+                v.anteprima = url;
+                delete v.problema;
+              } else {
+                delete v.anteprima;
+                if (pronta && pronta.motivo) v.problema = pronta.motivo;
+              }
+            } catch (_) { delete v.anteprima; }
+          }
           if (allegati) Object.assign(opts, { allegati: allegati.allegati || [], scartati: allegati.scartati || [], limiti: allegati.limiti });
         }
         const ok = Ui
@@ -1590,10 +1621,15 @@
         const qui = !chat || chat === chatAttuale();
         const chiesta = primaRigaConferma(a);
         const scelti = opts.allegati ? opts.allegati.filter((v) => v.tieni).map((v) => v.id) : [];
-        const r = await send({
+        const conferma = {
           type: MSG.FILO_CONFIRM_ACTION, action: a, parole: qui ? paroleUtente() : [], chatId: chat || chatAttuale() || '',
-          ...(type === 'INVIA_FEEDBACK' ? { allegatiScelti: scelti } : {}),
-        });
+          ...(type === 'INVIA_FEEDBACK' ? { allegatiScelti: scelti, allegatiPreparati: Object.fromEntries(scelti.filter((id) => preparati[id]).map((id) => [id, preparati[id]])) } : {}),
+        };
+        let r = await send(conferma);
+        // La rilettura L0 (#1403.1) ha fermato la segnalazione: lo stesso riquadro lo dice, e un secondo sì la manda.
+        if (type === 'INVIA_FEEDBACK' && Ui && typeof Ui.dopoRilettura === 'function' && r && !r.executed && r.output && r.output.rilettura) {
+          if (await Ui.dopoRilettura(r.output.rilettura)) r = await send({ ...conferma, senzaRilettura: true });
+        }
         // #1373 — la conferma è una pausa del lavoro, non la sua fine: com'è andata (fatta o no) torna al modello, che
         // continua o chiude. Un segreto fermato non torna: il modello cercherebbe un'altra strada per farlo uscire.
         const riprende = !!(r && !r.rejected && !(r.output && r.output.blocked === 'segreto'));
@@ -1817,6 +1853,9 @@
       return stepTrace(c ? `⚙ Leggo come è impostato: ${c}` : '⚙ Leggo le impostazioni');
     }
     if (type === 'CERCA_DOCUMENTI') return stepTrace(`🔎 ${testoRicercaDocumenti(a)}`);
+    // #2272 — le immagini stanno nella risposta: qui resta solo la traccia del passo.
+    if (type === 'IMMAGINI_WEB') return stepTrace(`🖼 Cerco immagini: ${a.query || ''}`.trim());
+    if (type === 'GENERA_IMMAGINE') return stepTrace('🖌 Disegno un\'immagine');
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
       // per iscritto prima di rispondere sul perché di un modello o di un dato.

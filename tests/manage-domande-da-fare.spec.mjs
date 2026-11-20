@@ -132,6 +132,75 @@ test('un «da fare» senza lavoro collegato ha il solo «Fatto»; «Applica il c
   await expect.poll(() => page.evaluate(() => window.__domande.map((m) => [m.type, m.id, m.scelta]))).toContainEqual(['domanda_rispondi', 'D-22', 0]);
 });
 
+test('il tasto destro su un «da fare» offre «Fatto» e «Non lo faccio», e mandano la stessa scelta dei pulsanti (#2229.1)', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriDomande(page, [DA_FARE, DA_FARE_SOLO, DA_DECIDERE]);
+  await mainFinto(page);
+  const menu = page.locator('.mg-ctxmenu').last();
+
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-22"]').click({ button: 'right' });
+  await expect(menu).toContainText('Fatto');
+  await expect(menu).not.toContainText('Applica il consiglio');
+  await page.keyboard.press('Escape');
+
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-21"]').click({ button: 'right' });
+  await expect(menu).toContainText('Fatto: riprendi #1736');
+  await expect(menu).toContainText('Non lo faccio: archivia #1736');
+  await page.screenshot({ path: 'tests/.shots/domande-da-fare-tasto-destro.png' });
+  await menu.getByText('Fatto: riprendi #1736').click();
+  await expect.poll(() => page.evaluate(() => window.__domande.filter((m) => m.type === 'domanda_rispondi'))).toEqual([
+    expect.objectContaining({ id: 'D-21', scelta: 0 }),
+  ]);
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-21"]');
+  await expect(dq.locator('.mg-dq-opzione[data-indice="0"] .mg-dq-badge--scelta')).toHaveText('Scelta');
+
+  // Una volta segnato, il menu non lo offre più; una domanda vera tiene il suo consiglio.
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-20"]').click({ button: 'right' });
+  await expect(menu).toContainText('Applica il consiglio: Riprendi #1736');
+  await expect(menu).not.toContainText('Fatto');
+});
+
+test('col filtro delle sole non fidate, «Da rispondere» conta a parte i «da fare» che restano; la sezione conta tutto', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const nonFidata = (d, numero, titolo) => ({ ...d, id: `D-${numero}`, numero, titolo, fiducia: 'non_fidato' });
+  await apriDomande(page, [DA_DECIDERE, DA_FARE, DA_FARE_SOLO, nonFidata(DA_DECIDERE, 30, 'Forma dei bordi'), nonFidata(DA_FARE_SOLO, 31, 'Rinnova la chiave')]);
+  const tab = page.locator('.mg-tab[data-tab="domande"]');
+  await expect(tab).toHaveText('Da rispondere (2 · 3 da fare)');
+  await page.locator('#mgDomandeFiduciaFiltro').click();
+  await expect(page.locator('#mgDomandeFiduciaFiltro')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgDomandeLista .mg-domanda')).toHaveCount(2);
+  await expect(tab).toHaveText('Da rispondere (1 · 1 da fare)');
+  await expect(tab).toHaveAttribute('title', '1 da decidere, 1 da fare');
+  await expect(page.locator('.mg-sezione[data-sezione="domande"] .mg-sezione-count')).toHaveText('(2 · 3 da fare)');
+  // Restano solo cose da decidere: il numero torna quello di sempre.
+  await page.evaluate(([l, r]) => window.__mgTest.setDomande(l, { riferimenti: r }), [[DA_FARE, nonFidata(DA_DECIDERE, 30, 'Forma dei bordi')], RIF]);
+  await expect(tab).toHaveText('Da rispondere (1)');
+  await expect(tab).toHaveAttribute('title', '1 da rispondere');
+});
+
+test('trascinata in una chat, la riga di un «da fare» porta il segno e le sue sezioni: perché, cosa fare, quando hai finito', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriDomande(page, [DA_FARE, DA_DECIDERE]);
+  const testoTrascinato = (id) => page.evaluate((i) => {
+    const dt = new DataTransfer();
+    const riga = document.querySelector(`#mgDomandeLista .mg-domanda[data-id="${i}"]`);
+    riga.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    return dt.getData('text/plain');
+  }, id);
+  const fare = await testoTrascinato('D-21');
+  expect(fare.split('\n')[0]).toBe('D-21 Permessi di Claude Code dal tuo PC');
+  expect(fare).toContain('Domanda D-21 (da fare, ');
+  expect(fare).toContain('Perché serve:\nIn cloud il classificatore ferma le modifiche ai permessi.');
+  expect(fare).toContain('Cosa fare:\nApri una sessione sul PC e approva la modifica ai permessi del repo.');
+  expect(fare).toContain('Quando hai finito:\n1. L’ho fatto\n2. Non serve più');
+  expect(fare).not.toContain('Contesto:');
+  // La domanda vera tiene i nomi di sempre.
+  const vera = await testoTrascinato('D-20');
+  expect(vera).toContain('Domanda D-20 (da decidere, ');
+  expect(vera).toContain('Opzioni:\n1. Caldo (consigliata)');
+  expect(vera).not.toContain('Quando hai finito');
+});
+
 test('in tema scuro il segno «da fare» si legge', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await page.emulateMedia({ colorScheme: 'dark' });

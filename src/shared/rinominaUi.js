@@ -79,6 +79,10 @@
     el.style.left = `${Math.max(4, Math.min(x, vw - el.offsetWidth - 4))}px`;
     el.style.top = `${Math.max(4, Math.min(y, vh - el.offsetHeight - 4))}px`;
     const fuori = (e) => { if (!el.contains(e.target)) chiudiMenu(); };
+    // Uno scorrimento finito prima dell'apertura non chiude il menu: la regola è quella del tasto destro (#2452, #2453).
+    const foto = global.SN_MENU && global.SN_MENU.fotoDelloScorrimento;
+    const scorsoDopo = typeof foto === 'function' ? foto(x, y) : () => true;
+    const scorre = (e) => { if (scorsoDopo(e)) chiudiMenu(); };
     const tasto = (e) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
@@ -94,7 +98,7 @@
         doc.removeEventListener('keydown', tasto, true);
         global.removeEventListener('blur', chiudiMenu);
         global.removeEventListener('resize', chiudiMenu);
-        doc.removeEventListener('scroll', chiudiMenu, true);
+        doc.removeEventListener('scroll', scorre, true);
       },
     };
     doc.addEventListener('keydown', tasto, true);
@@ -103,11 +107,30 @@
       doc.addEventListener('mousedown', fuori, true);
       global.addEventListener('blur', chiudiMenu);
       global.addEventListener('resize', chiudiMenu);
-      doc.addEventListener('scroll', chiudiMenu, true);
+      doc.addEventListener('scroll', scorre, true);
     }, 0);
     const primo = el.querySelector('.sn-select-option');
     if (primo) try { primo.focus({ preventScroll: true }); } catch (_) {}
     return el;
+  }
+
+  // Una frase che nomina Crediti o Opzioni porta il tasto per andarci (#1344.2): dove, lo dice SN_CHAT_ERRORS.
+  function mostraRimedio(statoEl, rimedio, chiudiRiquadro) {
+    const vecchio = statoEl.querySelector('.sn-rinomina-rimedio');
+    if (vecchio) vecchio.remove();
+    const CE = global.SN_CHAT_ERRORS;
+    const pagina = rimedio && CE && CE.rimedioPagina ? CE.rimedioPagina(rimedio) : null;
+    if (!pagina) return;
+    const b = doc.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-rinomina-rimedio';
+    b.textContent = pagina.label;
+    b.title = pagina.title || '';
+    b.addEventListener('click', () => {
+      send({ type: MSG().OPEN_URL, url: pagina.url }).catch(() => {});
+      chiudiRiquadro();
+    });
+    statoEl.appendChild(b);
   }
 
   // ── il riquadro ──
@@ -185,11 +208,12 @@
     let caricando = true;
     let confermaInAttesa = false;
 
-    const mostraStato = (testo, { carica = false, errore = false } = {}) => {
+    const mostraStato = (testo, { carica = false, errore = false, rimedio = null } = {}) => {
       statoEl.hidden = !testo;
       rotella.hidden = !carica;
       statoEl.classList.toggle('sn-rinomina-errore', !!errore);
       statoTesto.textContent = testo || '';
+      mostraRimedio(statoEl, rimedio, chiudi);
     };
 
     const fuori = (e) => { if (!el.contains(e.target) && !(ancora && ancora.contains(e.target))) chiudi(); };
@@ -232,15 +256,15 @@
     const bersaglio = downloadId ? { downloadId } : { percorso };
 
     mostraStato('Leggo il file…', { carica: true });
-    const senzaProposta = (frase) => {
+    const senzaProposta = (frase, rimedio) => {
       caricando = false;
       if (!attivo || fatto) return;
       if (confermaInAttesa) { confermaInAttesa = false; ok.disabled = false; }
-      mostraStato(frase || 'Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true });
+      mostraStato(frase || 'Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true, rimedio });
       try { campo.focus({ preventScroll: true }); } catch (_) {}
     };
     send({ type: MSG().FILE_NOME_PROPONI, ...bersaglio }).then((r) => {
-      if (!(r && r.ok && r.proposta)) { senzaProposta(r && r.frase); return; }
+      if (!(r && r.ok && r.proposta)) { senzaProposta(r && r.frase, r && r.rimedio); return; }
       caricando = false;
       if (!attivo || fatto) return;
       mostraStato('');
