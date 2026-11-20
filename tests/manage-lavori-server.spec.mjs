@@ -167,8 +167,12 @@ test('#2036: un lavoro server che nessuna routine prende sta fermo sulla scheda,
   // Nessun motivo passa da solo (#2036.1): la scheda dice il gesto che sblocca, non promette una ripartenza.
   const spiega = (await riga.getAttribute('title')) || '';
   expect(spiega).not.toMatch(/riparte da solo/i);
-  expect(spiega).toContain('npm run fiducia:sana -- worker/srv-6-20261101T090000Z;');
-  expect(spiega).toContain('npm run fiducia:sana -- worker/srv-6-20261101T090000Z --server');
+  // #2565: il motivo del buco e quello per cui la sanatoria della coda non lo toglie, scritti dal server, si leggono qui.
+  expect(spiega).toContain('Perché: ramo dell’app: il commit 1234abcd non l’ha dichiarato nessun biglietto pulito; la sanatoria della coda non lo toglie: <i>il commit 1234abcd è nato quando nessuna sessione pulita registrata sul ramo era viva</i>.');
+  expect(spiega).toContain('Il ramo non risulta pulito e la sanatoria non lo copre: se l’hai letto, «Dichiara fidato com’è»');
+  expect(spiega).toContain('Il ramo del server non risulta pulito e la sanatoria non lo copre');
+  expect(spiega).not.toContain('fiducia:sana');
+  await expect(page.locator('.mg-item[data-id="srv-6"] i')).toHaveCount(0);
   const rigaSporca = page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server');
   await expect(rigaSporca).toHaveText('Fermo: resta locale');
   await expect(rigaSporca).toHaveAttribute('title', /non torna pulito da solo: se l’hai letto, «Dichiara fidato com’è»/);
