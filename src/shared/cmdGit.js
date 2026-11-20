@@ -458,5 +458,5 @@
     return 3; // run/exec/start/test/publish/sconosciuti → 3
   }
 
-  Object.assign(P, { GIT_READ, GIT_GLOBALE_CARTELLA, gitChiaveInerte, gitScriveFile, gitUscita, gitProgrammaScritto, classifyGit, classifyNpm });
+  Object.assign(P, { GIT_READ, GIT_GLOBALI_INNOCUE, GIT_GLOBALE_CARTELLA, gitChiaveInerte, gitScriveFile, gitUscita, gitProgrammaScritto, classifyGit, classifyNpm });
 })(typeof globalThis !== 'undefined' ? globalThis : self);
