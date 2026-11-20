@@ -4276,7 +4276,7 @@
       mgAcceptComment.hidden = !conCommento;
       mgAcceptComment.value = '';
       mgAcceptComment.placeholder = azioni.some((a) => a.correzione)
-        ? `Cosa correggere: il testo arriva a chi corregge (${TASTO_MANDA} per mandarlo)…`
+        ? 'Cosa correggere: il testo arriva a chi corregge…'
         : MR.classifyBlock(fb)
           ? 'Commento (opzionale): perché lo sblocchi…'
           : 'Commento (opzionale): perché lo approvi…';
