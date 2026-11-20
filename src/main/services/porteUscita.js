@@ -631,17 +631,23 @@ async function primaVoltaDelTerminale() {
 }
 
 // #874 — l'azione della chat nella forma che capiscono i tasti della home: il tipo dice cosa, il resto passa.
+// L'indirizzo Bluetooth no: vale solo per i tasti di Filo, e a scriverlo qui sarebbe il modello, che sceglie un
+// dispositivo mentre la conferma ne nomina un altro (#2394.1).
 function richiestaDiSistema(type, action) {
-  const { _richiestaSistema, _nomeSistema, ...resto } = action || {};
+  const { _richiestaSistema, _nomeSistema, _indirizzoSistema, indirizzo, ...resto } = action || {};
   return { ...resto, cosa: type === 'VOLUME' ? 'volume' : type === 'WIFI' ? 'wifi' : 'bluetooth' };
 }
 
-// Parte la rete o il dispositivo che la conferma ha nominato: il nome vero, non le parole del modello.
+// Parte la rete o il dispositivo che la conferma ha nominato: il nome vero, non le parole del modello, e per il
+// Bluetooth l'indirizzo che il main ha trovato con quel nome.
 function richiestaDaEseguire(type, action) {
   const r = richiestaDiSistema(type, action);
   const nome = action && action._nomeSistema;
   if (nome && type === 'WIFI') return { ...r, rete: nome };
-  if (nome && type === 'BLUETOOTH') return { ...r, dispositivo: nome };
+  if (nome && type === 'BLUETOOTH') {
+    const ind = action._indirizzoSistema;
+    return { ...r, dispositivo: nome, ...(typeof ind === 'string' && ind ? { indirizzo: ind } : {}) };
+  }
   return r;
 }
 
