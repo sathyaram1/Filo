@@ -63,12 +63,16 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
     return true;
   }
 
-  // Quello che si riconosce senza modello: chiavi, password annunciate, carte e conti con la loro verifica, e i segreti
-  // che Filo custodisce anche travestiti, con lo stesso riconoscimento che li toglie da ciò che va ai modelli.
+  // Quello che il passaggio verso i modelli nasconde il modello della rilettura non lo vede: qui si riconosce con le
+  // stesse regole (pavimento della privacy e segreti custoditi anche travestiti), più carte e conti del guardiano.
   function trovatiSenzaModello(g, testo, custoditi) {
     let valori = [];
     let tratti = [];
     try { valori = (g.segretiNelTesto(testo) || []).filter((x) => x && x.valore); } catch (_) {}
+    try {
+      const P = globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
+      valori.push(...(P.trova(testo) || []).filter((x) => x && x.valore));
+    } catch (_) {}
     try { tratti = g.trattiSegreti(testo, custoditi) || []; } catch (_) {}
     return { valori, tratti };
   }
