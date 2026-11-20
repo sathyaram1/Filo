@@ -48,6 +48,7 @@
       titolo: unaRiga(v.titolo, 200),
       sito: unaRiga(v.sito, 80),
       ...(pagina ? { pagina } : {}),
+      ...(originale ? { originale } : {}),
       ...(v.generata === true ? { generata: true } : {}),
       ...(l > 0 && l < 100000 ? { larghezza: l } : {}),
       ...(a > 0 && a < 100000 ? { altezza: a } : {}),
