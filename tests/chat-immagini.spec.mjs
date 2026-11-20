@@ -28,7 +28,7 @@ async function preparaImmagini(app, quante, { w = 320, h = 220 } = {}) {
       const k = Number((/antilope-(\d+)/.exec(url) || [])[1]);
       return new Response(png(k), { status: 200 });
     };
-  }, quante);
+  }, { quante, w, h });
 }
 
 // Il modello finto: al primo giro chiama lo strumento dato, poi risponde col testo, dove $ID0, $ID1… sono gli id
