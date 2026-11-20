@@ -222,3 +222,109 @@ test('nessuna pagina web aperta: Filo lo dice, invece di dire fatto', async ({ a
   expect(r.executed).toBe(false);
   expect(r.output.traduzione).toBe('no-page');
 });
+
+test('pagina coperta dall\'avviso di sito pericoloso: non si traduce finché l\'utente non sceglie, e Filo lo dice', async ({ app, openTab, testServer }) => {
+  await fornitoreFinto(app);
+  // Su http un modulo con la password fa comparire l'avviso sopra la scheda.
+  const page = await openTab(testServer.html(`<!doctype html><html lang="en"><body>
+    <h1 id="head">Sign in to your account</h1><form><input type="password" name="p"></form></body></html>`));
+  await expect.poll(async () => (await copertura(app).catch(() => null))?.coperta === true, { timeout: 10_000 }).toBe(true);
+  const r = await traduci(app);
+  expect(r.executed).toBe(false);
+  expect(r.output.traduzione).toBe('coperta');
+  expect(await perIlModello(app, { type: 'TRADUCI_PAGINA' }, r)).toMatch(/^Non fatto: la pagina è coperta dall'avviso/);
+  await page.waitForTimeout(500);
+  await expect(page.locator('#head')).toHaveText('Sign in to your account');
+  expect(await app.evaluate(() => globalThis.__filoChiamate)).toBe(0);
+});
+
+test('pagina che non risponde (senza Filo montato): Filo dice che non l\'ha fatto, non «fatto»', async ({ app, openTab, testServer }) => {
+  await fornitoreFinto(app);
+  const page = await testServer.openReady(openTab, ARTICOLO);
+  // Come un visualizzatore interno o una pagina di sistema: la domanda alla pagina non arriva a nessuno.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    const vera = wc.send.bind(wc);
+    wc.send = (canale, ...resto) => (canale === 'filo:traduci-pagina' ? undefined : vera(canale, ...resto));
+  });
+  const r = await traduci(app);
+  expect(r.executed).toBe(false);
+  expect(r.output.traduzione).toBe('muto');
+  expect(await perIlModello(app, { type: 'TRADUCI_PAGINA' }, r)).toMatch(/^Non fatto: la pagina davanti non risponde/);
+  await expect(page.locator('#head')).toHaveText('A feed that keeps growing while you scroll it');
+});
+
+// L'Aiuto della pagina con un modello finto che usa l'azione «translate_page» descritta nelle sue istruzioni.
+async function aiutoFinto(app, pagina) {
+  await app.evaluate(async (_electron, pagina) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({ models: { [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash' } });
+    const P = globalThis.SN_PROVIDERS;
+    const traduzione = P.completeWithFallback;
+    globalThis.__aiutoIstruzioni = '';
+    globalThis.__aiutoPagina = pagina;
+    const risposta = async (args) => {
+      const sistema = String((args.messages.find((m) => m.role === 'system') || {}).content || '');
+      const base = { model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+      if (!sistema.includes('# Protocollo di risposta')) return traduzione(args);
+      globalThis.__aiutoIstruzioni = sistema;
+      return { ...base, text: JSON.stringify({ action: 'page', page: globalThis.__aiutoPagina, text: 'Ci penso io.', status: 'done' }) };
+    };
+    P.completeWithFallback = risposta;
+    P.streamCompleteWithFallback = risposta;
+  }, pagina);
+}
+
+test('nell\'Aiuto della pagina «traducimi questa pagina» la traduce, e «torna all\'originale» la rimette', async ({ app, shell, openTab, testServer }) => {
+  await fornitoreFinto(app);
+  await aiutoFinto(app, { op: 'translate_page' });
+  const page = await testServer.openReady(openTab, ARTICOLO);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const aiuto = await paginaDellAiuto(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  const scrivi = async (testo) => {
+    await aiuto.fill('.sn-sidebar-input textarea', testo);
+    await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  };
+
+  await scrivi('traducimi questa pagina');
+  await expect(page.locator('#head')).toHaveText(/^IT A feed/, { timeout: 30_000 });
+  await expect(page.locator('#r1')).toHaveText(/^IT Second row/);
+  // Le istruzioni dell'Aiuto dicono come si chiede, e il diario dice com'è andata.
+  expect(await app.evaluate(() => globalThis.__aiutoIstruzioni)).toContain('"translate_page"');
+  await expect(aiuto.locator('.sn-sidebar')).toContainText('traduzione della pagina partita');
+  await aiuto.screenshot({ path: 'tests/.shots/traduci-pagina-aiuto.png' }).catch(() => {});
+
+  await app.evaluate(() => { globalThis.__aiutoPagina = { op: 'translate_page', originale: true }; });
+  await scrivi('torna all\'originale');
+  await expect(page.locator('#head')).toHaveText('A feed that keeps growing while you scroll it', { timeout: 15_000 });
+  expect(await tradotti(page)).toBe(0);
+  await expect(aiuto.locator('.sn-sidebar')).toContainText('pagina rimessa nella lingua originale');
+});
+
+// Il tasto vero, come lo manda il sistema: i tasti sintetici del test non passano dalle scorciatoie di Filo.
+const premiAltT = (app) => app.evaluate(({ BrowserWindow }) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+  const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+  wc.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['alt'] });
+  wc.sendInputEvent({ type: 'keyUp', keyCode: 'T', modifiers: ['alt'] });
+});
+
+test('Alt+T senza selezione fa l\'icona Traduci: traduce la pagina, e di nuovo la rimette com\'era', async ({ app, openTab, testServer }) => {
+  await fornitoreFinto(app);
+  const page = await testServer.openReady(openTab, ARTICOLO);
+  await guardaAvvisi(page);
+  await page.locator('#r0').click();
+  await page.evaluate(() => window.getSelection().removeAllRanges());
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText(/^IT A feed/, { timeout: 30_000 });
+  await expect(page.locator('#r1')).toHaveText(/^IT Second row/);
+  await expect.poll(async () => (await avvisi(page)).includes('Pagina tradotta'), { timeout: 30_000 }).toBe(true);
+  expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
+
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText('A feed that keeps growing while you scroll it', { timeout: 15_000 });
+  expect(await tradotti(page)).toBe(0);
+});
