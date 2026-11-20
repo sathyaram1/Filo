@@ -4002,6 +4002,16 @@ class TabManager {
     if (tab._openedByLink || storia <= 1) this.closeTab(tab.id, { daSola: true });
   }
 
+  // La finestra tenuta dalla pagina, riempita da un'altra scheda col clic (un target o window.open con lo stesso nome),
+  // torna davanti come nei browser; senza clic resta dietro (#737.8).
+  _chiestaPerNome(tab, wc, e) {
+    if (!e || !e.isMainFrame || e.isSameDocument || !e.initiator || this.activeId === tab.id || !this.tabs.includes(tab)) return;
+    let da = null;
+    try { da = webContents.fromFrame(e.initiator); } catch (_) {}
+    if (!da || da === wc || !this.tabs.some((t) => t.view.webContents === da) || !Permessi.gestoRecente(da)) return;
+    this.activate(tab.id);
+  }
+
   // Una scheda proxata ha la partizione sua, e in privacy ogni sito la sua: lì la finestra non può restare alla pagina.
   _finestraDellaPagina(tab, url, apriComunque) {
     if (!tab || tab.isInternal !== false || tab.proxy) return false;
