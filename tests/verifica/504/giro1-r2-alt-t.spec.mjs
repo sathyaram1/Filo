@@ -39,7 +39,13 @@ test('r2 Alt+T senza selezione traduce la pagina', async ({ app, openTab, testSe
   const page = await testServer.openReady(openTab, ARTICLE);
   await page.locator('#p1').click();
   await page.evaluate(() => window.getSelection().removeAllRanges());
-  await page.keyboard.press('Alt+t');
+  // Il tasto come lo manda il sistema: quelli sintetici di Playwright non passano dalle scorciatoie di Filo (giro 2).
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['alt'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'T', modifiers: ['alt'] });
+  });
   await expect(page.locator('#title')).toHaveText(/^IT /, { timeout: 20_000 });
   await expect(page.locator('#p1')).toHaveText(/^IT /);
 });
