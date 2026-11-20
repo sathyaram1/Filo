@@ -1051,6 +1051,67 @@
     return { detti: piano.detti, cambiato };
   }
 
+  // ── Chi ha servito le ultime richieste dei crediti (#542) ──────────────────
+  // Il main legge le ultime righe del registro d'uso coi soli campi qui sotto e le conta per fornitore e modello; la
+  // pagina dei predefiniti le raggruppa per fornitore e le giudica con la lista d'esclusione che ha davanti in quel momento.
+  const SERVITO_ULTIME = 1000;
+  const SERVITO_CAMPI = Object.freeze(['at', 'model', 'servedBy']);
+
+  function contaServito(righe) {
+    const conti = new Map();
+    let letti = 0;
+    let dal = '';
+    let al = '';
+    for (const r of Array.isArray(righe) ? righe : []) {
+      if (!r || typeof r !== 'object') continue;
+      letti++;
+      const at = typeof r.at === 'string' ? r.at : '';
+      if (at && (!dal || at < dal)) dal = at;
+      if (at > al) al = at;
+      const host = testoCorto(r.servedBy, USAGE_LIMITS.servedBy);
+      const modello = testoCorto(r.model, USAGE_LIMITS.model);
+      const k = JSON.stringify([host, modello]);
+      const c = conti.get(k);
+      if (c) c.n++; else conti.set(k, { host, modello, n: 1 });
+    }
+    return { letti, dal, al, conti: [...conti.values()].sort((a, b) => b.n - a.n) };
+  }
+
+  // Per fornitore, dal più usato. La violazione è la peggiore fra quelle delle sue righe: «escluso» vale per tutte,
+  // «non servito dal produttore» dipende dal modello. `host` vuoto: il router non l'ha detto, e non si giudica.
+  function chiHaServito(conti, escluse) {
+    const P = global.SN_POLITICA_MODELLI || {};
+    const chiave = typeof P.normalizeProviderName === 'function' ? P.normalizeProviderName : (s) => String(s || '').trim().toLowerCase();
+    const giudica = typeof P.servedPolicyViolation === 'function' ? P.servedPolicyViolation : () => '';
+    const lista = Array.isArray(escluse) ? escluse : [];
+    const gruppi = new Map();
+    let totale = 0;
+    for (const c of Array.isArray(conti) ? conti : []) {
+      const n = Number(c && c.n);
+      if (!(n > 0)) continue;
+      const host = testoCorto(c.host, USAGE_LIMITS.servedBy);
+      const modello = testoCorto(c.modello, USAGE_LIMITS.model);
+      const k = chiave(host);
+      let g = gruppi.get(k);
+      if (!g) gruppi.set(k, (g = { host, n: 0, nomi: new Map(), modelli: new Map(), violazione: '' }));
+      g.n += n;
+      totale += n;
+      g.nomi.set(host, (g.nomi.get(host) || 0) + n);
+      g.modelli.set(modello, (g.modelli.get(modello) || 0) + n);
+      const v = host ? giudica(host, modello, lista) : '';
+      if (v === 'excluded' || (v && !g.violazione)) g.violazione = v;
+    }
+    const piuDi = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+    return [...gruppi.values()].map((g) => ({
+      host: piuDi(g.nomi)[0][0],
+      n: g.n,
+      quota: totale ? g.n / totale : 0,
+      modelli: piuDi(g.modelli).map(([modello, n]) => ({ modello, n })),
+      violazione: g.violazione,
+      fuori: g.violazione ? (VIOLAZIONI_USO[g.violazione] || '') : '',
+    })).sort((a, b) => b.n - a.n || a.host.localeCompare(b.host));
+  }
+
   global.SN_WALLET = {
     USAGE_FIELDS, USAGE_LIMITS, rifiutoDellaRigaUso, scriviIsolando, registroScartateTesto, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
