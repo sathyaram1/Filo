@@ -1065,6 +1065,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   };
   // Turno finito prima del suo ultimo giro (fermato, o un guasto): nell'archivio restano le azioni successe davvero e la
   // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
+  let giaScrittaControllata = null;
   const archiviaGiaFatto = async () => {
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
     // Anche la parte già scritta porta le sue fonti e immagini controllate, mai i marcatori grezzi (#2383, #2272).
