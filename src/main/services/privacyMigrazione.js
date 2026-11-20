@@ -43,7 +43,7 @@ function convertite(dati) {
 // All'avvio, prima di ogni finestra: poi il segno dice che il livello è quello di adesso.
 async function migra({ storage = require('../shim/storage'), registro = require('./registroCambi') } = {}) {
   const K = chiavi();
-  const dati = await storage.get([K.SETTINGS, K.FILO_CAMBI, SEGNO]);
+  const dati = await storage.get([K.SETTINGS, K.FILO_CAMBI, K.FILO_ONBOARDING, SEGNO]);
   if (dati[SEGNO]) return false;
   if (!Array.isArray(dati[K.FILO_CAMBI]) && typeof registro.lista === 'function') {
     try { dati[K.FILO_CAMBI] = await registro.lista(); } catch (_) {}
