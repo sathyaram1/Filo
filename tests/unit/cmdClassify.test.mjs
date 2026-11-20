@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { sorgenteDelClassificatore } from '../helpers/sorgenteClassificatore.mjs';
