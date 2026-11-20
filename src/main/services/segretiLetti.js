@@ -182,13 +182,6 @@ function immessoDallUtente(chiave, testo, desde) {
   const r = compatto(testo);
   if (r) tieni(`immesso:${chiave}`, r, Number(desde));
 }
-// `maxRiga` per il testo di una proposta: lo scrive un modello, e una riga lunga di cifre coprirebbe i codici di domani.
-function valoriDellUtente(testo, { maxRiga = Infinity } = {}) {
-  for (const riga of String(testo || '').split('\n')) {
-    const r = compatto(riga);
-    if (r && r.length <= maxRiga) tieni(`riga:${r}`, r);
-  }
-}
 
 // Il testo scritto da altri entra in un modello dentro una busta (src/shared/contenutoEsterno.js), da qualunque
 // strada arrivi (titoli delle schede, risultati, pagine, comandi): i segreti dentro le buste contano come letti.
