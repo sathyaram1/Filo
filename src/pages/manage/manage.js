@@ -4376,7 +4376,7 @@
     // Il commento della revisione si legge PRIMA dell'attesa qui sotto: nel
     // frattempo la casella può svuotarsi, e il "perché" andrebbe perso senza
     // che niente lo dica.
-    const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
+    const comment = testoCorrezione;
     setActionsBusy(true);
     const fraseOk = await fraseAlSicuro();
     if (!fraseOk) {
