@@ -788,8 +788,8 @@ export async function esegui(argv, io = {}) {
     // Col token del proprietario il server non distingue una sessione dall'owner: la sessione lo dice, col suo biglietto,
     // e le sue parole prendono la fiducia del biglietto invece di valere come dell'owner.
     const daSessione = async () => {
-      if (conChiave()) return {};
       const s = await bigliettoLocale();
+      if (conChiave()) return s ? { biglietto: s } : {};
       return s ? { sessione: true, biglietto: s } : { sessione: true };
     };
     if (a.cmd === 'archivia' || a.cmd === 'riapri') {
