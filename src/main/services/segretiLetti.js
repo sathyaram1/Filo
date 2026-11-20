@@ -230,6 +230,6 @@ function svuota() { if (inAttesa) salvaOra(); letti.svuota(); caricato = false; 
 function usaDeposito(d) { deposito = d; caricato = false; letti.svuota(); immessi.clear(); caratteriImmessi = 0; }
 
 module.exports = {
-  ricorda, ricordaBuste, registro, aggiungi, aggiungiTutti, tutti, svuota, usaDeposito, immessoDallUtente, valoriDellUtente,
+  ricorda, ricordaBuste, registro, aggiungi, aggiungiTutti, tutti, svuota, usaDeposito, immessoDallUtente,
   FONTI_BUSTA, GIORNI_RICORDO,
 };
