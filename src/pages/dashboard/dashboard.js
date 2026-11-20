@@ -1960,6 +1960,10 @@
       setBubbleText(host, r.text, true, r.fonti, r.immagini);
       nota.remove();
       if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
+    } else if (parziale && conGiaScritta(host, r)) {
+      entry.text = r.giaScritta.testo;
+      if (r.giaScritta.fonti.length) entry.fonti = r.giaScritta.fonti;
+      if (r.giaScritta.immagini.length) entry.immagini = r.giaScritta.immagini;
     }
     // Nessun popup di conferma che si apre da solo: l'utente ha appena detto di smettere.
     Att.renderActions(host, azioni, { onAck: chiudiConversazione, autoConfirm: false, activity: pending, shown, chat });
