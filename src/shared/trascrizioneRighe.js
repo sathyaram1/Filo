@@ -1,5 +1,5 @@
-// Il testo di un'immagine letto dal modello, riga per riga col suo riquadro (#2374): lettura della risposta e scatole in
-// pixel. Puro, senza DOM. Il prompt sta in SN_CONST.PROMPTS.transcribeImage; il disegno in src/content/trascrizione.js.
+// Il testo di un'immagine letto dal modello, riga per riga col suo riquadro (#2374): lettura della risposta, scatole in
+// pixel e dove cadono le parole nei pixel della riga. Puro, senza DOM. Il prompt sta in SN_CONST.PROMPTS.transcribeImage; il disegno in src/content/trascrizione.js.
 
 (function (global) {
   'use strict';
