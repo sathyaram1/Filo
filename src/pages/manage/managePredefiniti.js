@@ -722,6 +722,69 @@
     renderExcludedDrift();
   }
 
+  // ── Chi ha servito le ultime richieste dei crediti (#542) ─────────────────
+  // Accanto alla lista, perché un host che comincia a servire male si veda in giorni e non alla prossima corsa del banco
+  // di prova. Il giudizio segue la lista com'è sullo schermo, anche prima del salvataggio.
+  let servito = null;
+  let servitoErrore = '';
+  let servitoVolo = 0;
+
+  async function caricaServito() {
+    const volo = ++servitoVolo;
+    servito = null;
+    servitoErrore = '';
+    renderServito();
+    let res;
+    try {
+      res = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_SERVED_BY });
+    } catch (e) {
+      res = { ok: false, error: e?.message || String(e) };
+    }
+    if (volo !== servitoVolo) return;
+    if (res && res.ok && res.servito && typeof res.servito === 'object') servito = res.servito;
+    else servitoErrore = (res && res.error) || I18n.t('admin_defaults_servito_nessuna_risposta');
+    renderServito();
+  }
+
+  function dataServito(at) {
+    const d = new Date(at);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function quotaServito(q) {
+    const p = q * 100;
+    return p > 0 && p < 1 ? '<1%' : `${Math.round(p)}%`;
+  }
+
+  function renderServito() {
+    const stato = $('servitoStato');
+    const elenco = $('servitoList');
+    if (!stato || !elenco) return;
+    elenco.replaceChildren();
+    if (servitoErrore) { stato.textContent = I18n.t('admin_defaults_servito_errore', servitoErrore); return; }
+    if (!servito) { stato.textContent = I18n.t('admin_defaults_servito_attesa'); return; }
+    const letti = Number(servito.letti) || 0;
+    if (!letti) { stato.textContent = I18n.t('admin_defaults_servito_vuoto'); return; }
+    const tutte = letti < (Number(servito.limite) || Infinity);
+    stato.textContent = I18n.t(tutte ? 'admin_defaults_servito_tutte' : 'admin_defaults_servito_ultime',
+      letti.toLocaleString('it-IT'), dataServito(servito.dal) || '—');
+    const ul = document.createElement('ul');
+    ul.className = 'sn-wallet-scheda-elenco sn-wallet-router';
+    for (const r of window.SN_WALLET.chiHaServito(servito.conti, collectExcluded())) {
+      const li = document.createElement('li');
+      li.className = 'sn-servito-riga';
+      li.classList.toggle('is-flagged', Boolean(r.violazione));
+      li.title = r.modelli.map((m) => `${m.modello || '—'}: ${m.n.toLocaleString('it-IT')}`).join('\n');
+      const a = document.createElement('span');
+      a.textContent = [r.host || I18n.t('admin_defaults_servito_non_detto'), r.fuori].filter(Boolean).join(' · ');
+      const b = document.createElement('span');
+      b.textContent = `${quotaServito(r.quota)} (${r.n.toLocaleString('it-IT')})`;
+      li.append(a, b);
+      ul.appendChild(li);
+    }
+    elenco.appendChild(ul);
+  }
+
   // Modelli per azione: stesso editor a segmenti della pagina Opzioni.
   function renderModelsGrid(models) {
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
