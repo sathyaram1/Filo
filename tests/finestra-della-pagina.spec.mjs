@@ -85,6 +85,7 @@ const davanti = (app, u) => app.evaluate(({ BrowserWindow }, url) => {
 for (const [forma, apri] of [
   ['un collegamento con target="_new"', (id, dest) => `<a id="${id}" href="${dest}" target="_new" style="display:block;width:200px;height:60px">vai</a>`],
   ['window.open con lo stesso nome', (id, dest) => pulsante(id, 'aiuto', `window.open(${JSON.stringify(dest)},'aiuto')`)],
+  ['un modulo con target="_new"', (id, dest) => `<form action="${dest}" target="_new"><button id="${id}" style="width:200px;height:60px">cerca</button></form>`],
 ]) {
   test(`la finestra chiesta di nuovo per nome da ${forma} torna davanti con la seconda pagina`, async ({ app, openTab, testServer }) => {
     const prima = testServer.html('<title>PRIMA DEST</title>');
