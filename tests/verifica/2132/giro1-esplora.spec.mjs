@@ -91,12 +91,17 @@ test('seguito di «Spiega» su un sito: la risposta di Filo sopra la casella del
   test.setTimeout(90_000);
   const page = await apri(app, openTab, testServer, `<!doctype html><meta charset="utf-8"><body style="margin:0;padding:20px;font:20px sans-serif">
 <main><p>Nelle preferenze c'è un <b id="parola">token</b> salvato.</p></main></body>`);
-  await app.evaluate(() => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const s = await globalThis.SN_STORAGE.getSettings();
+    await globalThis.SN_STORAGE.updateSettings({ models: { ...s.models, [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash', [C.ACTIONS.EXPLAIN]: 'deepseek-flash', [C.ACTIONS.FOLLOWUP || 'followup']: 'deepseek-flash' } });
     const prima = globalThis.SN_PROVIDERS.completeWithFallback;
     const finto = async (req) => {
       const t = JSON.stringify(req.messages);
       if (t.includes('proponi SUGGERIMENTI') || t.includes('Sei il controllo rapido') || t.includes('[nessuno]')) return prima(req);
-      return { text: 'Il token GitHub in chiaro dà accesso ai tuoi repository a chi lo legge.', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+      const text = 'Il token GitHub in chiaro dà accesso ai tuoi repository a chi lo legge.';
+      if (typeof req.onDelta === 'function') req.onDelta(text);
+      return { text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
     };
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
