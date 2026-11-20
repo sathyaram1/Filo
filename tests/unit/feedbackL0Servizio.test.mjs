@@ -210,5 +210,6 @@ test('una carta valida nel testo: la frase di carte e conti, e la carta evidenzi
   const r = await L0.controlla({ testo: 'Il pagamento con la carta 4539 1488 0343 6467 viene rifiutato' });
   assert.equal(r.stato, 'trovato');
   assert.deepEqual(r.esito.frasi, [globalThis.SN_FEEDBACK_L0.FRASI_TESTO.documento]);
+  assert.deepEqual(r.esito.pezzi.map((p) => p.testo), ['4539 1488 0343 6467'], 'la carta scritta a gruppi si evidenzia com\'è scritta');
   assert.ok(r.esito.pezzi.every((p) => p.tipo === 'documento'));
 });
