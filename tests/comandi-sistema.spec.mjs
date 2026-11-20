@@ -375,6 +375,66 @@ test('in chat, col Bluetooth spento letto prima di una pausa, «spegni il Blueto
   await liberaLetture(app);
 });
 
+// #2394.1 — l'indirizzo Bluetooth vale per i tasti della home, non per il modello: dalla chat il dispositivo lo sceglie
+// il nome che la conferma mostra, e la conferma lo fissa.
+const CUFFIE_E_CASSE = () => [
+  { indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony', collegato: true },
+  { indirizzo: '00:11:22:33:44:66', nome: 'Casse JBL', collegato: true },
+];
+
+test('in chat, un indirizzo Bluetooth senza nome non scollega niente: torna al modello, senza conferma', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo');
+  await computerFinto(app, { dispositivi: CUFFIE_E_CASSE() });
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'a1', name: 'BLUETOOTH', arguments: JSON.stringify({ indirizzo: '00:11:22:33:44:55', collega: false }) }] },
+    { text: 'Non ci sono riuscito.' },
+  ]);
+  await chiedi(page, 'scollega quel dispositivo');
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 8_000 }).toBe(2);
+  expect(JSON.stringify((await chiamateAlModello(app))[1])).toContain('Non fatto');
+  expect(await confirmText(page).catch(() => '')).toBe('');
+  expect((await chiamate(app)).filter((c) => c[0] === 'btCollega')).toEqual([]);
+  expect((await app.evaluate(() => globalThis.__pcDisp)).every((d) => d.collegato)).toBe(true);
+});
+
+test('in chat, col nome di un dispositivo e l\'indirizzo di un altro, si scollega quello nominato nella conferma', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo');
+  await computerFinto(app, { dispositivi: CUFFIE_E_CASSE() });
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'a2', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'Casse JBL', indirizzo: '00:11:22:33:44:55', collega: false }) }] },
+    { text: 'Scollegate.' },
+  ]);
+  await chiedi(page, 'scollega le casse');
+  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('Casse JBL');
+  expect(await confirmText(page)).not.toContain('Cuffie Sony');
+  await clickConfirm(page, 'ok');
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega'))
+    .toEqual([['btCollega', { indirizzo: '00:11:22:33:44:66', collega: false }]]);
+  const dopo = await app.evaluate(() => globalThis.__pcDisp);
+  expect(dopo.find((d) => d.nome === 'Cuffie Sony').collegato).toBe(true);
+  expect(dopo.find((d) => d.nome === 'Casse JBL').collegato).toBe(false);
+});
+
+test('in chat, «dimentica le casse» nomina il dispositivo vero e, confermato, dimentica quello anche se ne arriva un omonimo', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo');
+  await computerFinto(app, { dispositivi: CUFFIE_E_CASSE() });
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'a3', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'le casse', dimentica: true }) }] },
+    { text: 'Dimenticate.' },
+  ]);
+  await chiedi(page, 'dimentica le casse');
+  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('Dimenticare il dispositivo Bluetooth\nCasse JBL');
+  // Fra la domanda e l'OK si abbina un altro dispositivo con lo stesso nome: parte quello che la conferma ha mostrato.
+  await app.evaluate(() => globalThis.__pcDisp.unshift({ indirizzo: '00:11:22:33:44:77', nome: 'Casse JBL', collegato: false }));
+  await clickConfirm(page, 'ok');
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btDimentica'))
+    .toEqual([['btDimentica', { indirizzo: '00:11:22:33:44:66' }]]);
+  expect((await app.evaluate(() => globalThis.__pcDisp)).map((d) => d.indirizzo)).toEqual(['00:11:22:33:44:77', '00:11:22:33:44:55']);
+});
+
 test('acceso o spento dal riquadro o da fuori, l\'elenco del riquadro aperto si rilegge e non dice il contrario della radio', async ({ app }) => {
   const cuffie = { indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: true };
   await computerFinto(app, { dispositivi: [cuffie], reti: ['Casa', 'Ufficio'], stato: { ...PARTENZA, bluetooth: { acceso: true, dispositivi: ['Cuffie'] } } });
