@@ -33,11 +33,3 @@ test('r1 git clean con -C o -c davanti e pwsh -EncodedCommand abbreviato voglion
   expect(senzaParola).toEqual([]);
   expect(existsSync(file)).toBe(true);
 });
-
-test('esplorazione rsync', async ({ app }) => {
-  await livelloAutonomia(app, 'default');
-  for (const comando of ['rsync -a --delete vuota/ ~/Documenti/', 'robocopy vuota C:\\x /MIR']) {
-    const c = await execAction(app, { type: 'ESEGUI_COMANDO', comando, spiegazione: 'Allineo' }, {});
-    console.log('ESPLORA', comando, c.executed, c.needsConfirm);
-  }
-});
