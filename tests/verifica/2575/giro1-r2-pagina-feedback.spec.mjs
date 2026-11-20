@@ -42,7 +42,7 @@ test('r2 il primo clic su «Rimanda in correzione» senza testo non manda alla c
   expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
 
-test('r1 rimandata in correzione, il commento scritto prima della bocciatura non torna valido con un\'ora nuova', async ({ openTab }) => {
+test('r2 rimandata in correzione, il commento scritto prima della bocciatura non torna valido con un\'ora nuova', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(page, [BOCCIATA]);
   const tasto = page.locator('.fb-act[data-id="fb-2338"][data-to="todo"]');
