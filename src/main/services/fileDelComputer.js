@@ -109,6 +109,7 @@ function nominati(percorso, cartella) {
     } finally { fs.closeSync(fd); }
   } catch (_) { return []; }
   const base = indirizzoDi(percorso);
+  const k = chiave(cartella);
   const fuori = [];
   for (const m of testo.matchAll(NOMINA)) {
     const valore = m.slice(1).find((v) => v != null) || '';
