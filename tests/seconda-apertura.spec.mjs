@@ -341,8 +341,12 @@ const finestrellaDavanti = (app, base) => expect.poll(() => app.evaluate(({ Brow
   return BrowserWindow.getFocusedWindow() === f;
 }, base), { message: 'la finestrella non è andata davanti', timeout: 5000 }).toBe(true);
 
-for (const [principale, chiusura] of [['aperta', 'Chiudi finestra'], ['chiusa', 'Chiudi scheda']]) {
-  test(`su Mac, con la finestrella di accesso davanti e la principale ${principale}, le voci della scheda agiscono su di lei`, async ({ app, shell, openTab, testServer }) => {
+// Le due voci che chiudono, ognuna con la principale aperta e chiusa (#2031.3): le altre voci si provano una volta sola.
+for (const [principale, chiusura, conVoci] of [
+  ['aperta', 'Chiudi finestra', true], ['aperta', 'Chiudi scheda', false],
+  ['chiusa', 'Chiudi scheda', true], ['chiusa', 'Chiudi finestra', false],
+]) {
+  test(`su Mac, con la finestrella di accesso davanti e la principale ${principale}, ${conVoci ? 'le voci della scheda agiscono su di lei' : `«${chiusura}» chiude lei`}`, async ({ app, shell, openTab, testServer }) => {
     const { accesso, negozio: html } = negozioConAccesso(testServer);
     await sentinella(app);
     const page = await testServer.openReady(openTab, html);
