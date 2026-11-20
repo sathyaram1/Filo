@@ -308,9 +308,8 @@
   // Il file su cui scrive una lettura di git con `--output` ('' se non si sa quale), o null se stampa e basta (#2292).
   function gitUscita(args) {
     for (let i = 0; i < args.length; i++) {
-      if (args[i] === '--output') return args[i + 1] || '';
-      const m = /^--output=(.*)$/.exec(args[i]);
-      if (m) return m[1];
+      const v = opzioneLunga(args[i], 'output', 2);
+      if (v != null) return args[i].includes('=') ? v : args[i + 1] || '';
     }
     return null;
   }
