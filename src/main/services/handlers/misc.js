@@ -228,6 +228,7 @@ module.exports = function register(on, ctx) {
     segreti: async () => (typeof ctx.segretiCustoditi === 'function' ? ctx.segretiCustoditi() : []),
     redTeam: () => require('../redteamGate').visibile(),
   });
+  require('../feedbackL0').usa(L0);
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo
   // — l'invio non deve MAI fallire per colpa del titolo.
