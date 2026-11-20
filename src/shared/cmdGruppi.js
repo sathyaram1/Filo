@@ -382,6 +382,8 @@
   // Il SEGNAPOSTO di un gruppo comincia anch'esso con `$_`, ma non è la variabile: `(ls | wc -l)` resta una lettura (#2345).
   const ULTIMO_ARG_RE = new RegExp(String.raw`\$_(?![\w${SEGNO_GRUPPO}])`, 'g');
   const ULTIMI_MAX = 16;
+  // Oltre queste misure la riga chiede: ogni `$_` si misura con fino a ULTIMI_MAX comandi, e il conto gira nel main.
+  const MISURE_MAX = 4096;
   function usaUltimoArg(s, c) {
     return shellPosix(c) && String(s).search(ULTIMO_ARG_RE) >= 0;
   }
