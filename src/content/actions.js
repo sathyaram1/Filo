@@ -2325,6 +2325,7 @@
     searchUrlFor,
     searchImageOnWeb,
     imageSearchUrlFor,
+    indirizzoDellImmagine,
     // video / audio
     buildMediaItems,
     azioniDelMedia,
