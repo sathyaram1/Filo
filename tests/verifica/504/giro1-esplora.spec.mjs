@@ -207,6 +207,41 @@ test('chat senza pagina web: lo dice', async ({ app, shell }) => {
   await ripristina(app);
 });
 
+test('Aiuto sulla pagina: «traducimi questa pagina»', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await fornitore(app);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({ models: { [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash' } });
+    const P = globalThis.SN_PROVIDERS;
+    const tr = P.completeWithFallback;
+    globalThis.__aiuto = [];
+    const aiuto = (attempts, messages) => {
+      globalThis.__aiuto.push(JSON.parse(JSON.stringify(messages)));
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        text: JSON.stringify({ action: 'filo', filo: { type: 'TRADUCI_PAGINA' }, text: 'Traduco la pagina.', status: 'done' }) };
+    };
+    P.completeWithFallback = async (args) => {
+      const last = [...args.messages].reverse().find((m) => typeof m.content === 'string');
+      if (((last && last.content) || '').includes('@@@SN_SEP@@@')) return tr(args);
+      return aiuto(args.attempts, args.messages);
+    };
+    P.streamCompleteWithFallback = async (args) => aiuto(args.attempts, args.messages);
+  });
+  const page = await testServer.openReady(openTab, ARTICLE);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await page.fill('.sn-sidebar-input textarea', 'traducimi questa pagina');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await expect.poll(() => app.evaluate(() => globalThis.__aiuto.length), { timeout: 20_000 }).toBeGreaterThan(0);
+  const prompt = JSON.stringify(await app.evaluate(() => globalThis.__aiuto[0]));
+  console.log('AIUTO-PROMPT-HA-TRADUCI', prompt.includes('TRADUCI_PAGINA'), /tradu[a-z]* (la|questa|l'intera) pagina/i.test(prompt));
+  await page.waitForTimeout(5000);
+  console.log('AIUTO-TITOLO', await page.locator('#title').innerText());
+  await page.screenshot({ path: 'tests/.shots/v504-aiuto.png' });
+});
+
 test('Alt+T senza selezione sulla pagina', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await fornitore(app);
