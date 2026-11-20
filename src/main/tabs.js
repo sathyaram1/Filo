@@ -3428,7 +3428,7 @@ class TabManager {
     wc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc }));
     wc.on('will-navigate', (event, url) => {
       // Da un file aperto un collegamento a un altro della sua cartella si segue (#1905).
-      const fraFile = /^file:/i.test(String(wc.getURL() || '')) && FileDelComputer.concessoDaLink(url);
+      const fraFile = /^file:/i.test(String(wc.getURL() || '')) && FileDelComputer.concessoDaLink(tab._fileConcesso, url);
       // SICUREZZA: niente schemi non-web in cima. mailto/tel/sms non sono
       // pagine e vanno consegnati al sistema invece di fallire.
       if (!fraFile && (isWebUnsafeNav(url) || this._versoFiloDaFuori(tab, url))) {
