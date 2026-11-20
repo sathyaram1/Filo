@@ -1058,20 +1058,21 @@ class TabManager {
     }
     // SICUREZZA (#247) — un loadURL programmatico non emette will-navigate: qui convergono
     // TUTTI gli handler IPC che aprono una scheda, e il cammino IPC → file:// va tenuto chiuso.
-    const fileConcesso = fileDelComputer && FileDelComputer.concedi(url);
+    const fileConcesso = fileDelComputer && !adotta ? FileDelComputer.concedi(url) : null;
     if (!fileConcesso && isWebUnsafeNav(url)) {
       fermaNavigazione(url, { win: this.win }); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
       return null;
     }
     const bloccata = apriComunque ? null : this._decisioneBlocco(null, url);
     if (bloccata && !bloccoInPagina) {
+      FileDelComputer.revoca(fileConcesso);
       this._notifyBlocked(bloccata);
       this._contaBloccato(bloccata);
       return null;
     }
     const isInternal = url.startsWith('filo://');
     const rinviata = !!rinvia && !activate && !adotta;
-    const partition = adotta ? adotta.partition : this._partitionFor(url);
+    const partition = adotta ? adotta.partition : (fileConcesso || this._partitionFor(url));
     // La home già pronta (#1128) vale per la scheda che si apre davanti e non ha niente da rifare al caricamento.
     const pronta = activate && !adotta && !bloccata && restoreScrollPct == null && restoreZoomLevel == null
       ? this._prendiPronta(url, this._sessionePer(partition))
