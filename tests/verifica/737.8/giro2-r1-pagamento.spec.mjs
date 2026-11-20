@@ -20,7 +20,7 @@ const torna = async (app, shell, page) => {
 for (const [forma, nome, misure] of [['il pagamento in una finestrella', 'pagamento', 'width=500,height=600'], ["l'aiuto in una scheda", 'aiuto', '']]) {
   test(`r1 ${forma} su un altro sito, già aperto e riportato davanti dalla pagina col secondo clic, torna davanti`, async ({ app, shell, openTab, testServer }) => {
     const altrove = testServer.html('<title>ALTROVE</title>', { pubblico: true });
-    const page = await openTab(testServer.html(`<script>var w=null;function apri(){if(w&&!w.closed){w.focus();}else{w=window.open(${JSON.stringify(altrove)},${JSON.stringify(nome)},'width=500,height=600');}}</script>
+    const page = await openTab(testServer.html(`<script>var w=null;function apri(){if(w&&!w.closed){w.focus();}else{w=window.open(${JSON.stringify(altrove)},${JSON.stringify(nome)},${JSON.stringify(misure)});}}</script>
       <button id="a" style="height:40px" onclick="apri()">apri</button>`));
     await page.click('#a');
     await expect.poll(async () => (await stato(app)).attiva, { timeout: 8000 }).toBe(altrove);
