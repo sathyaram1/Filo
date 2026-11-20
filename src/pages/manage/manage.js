@@ -4355,7 +4355,7 @@
     window.SN_CONFERMA_SUL_POSTO.arma(btn, ETICHETTA_SENZA_TESTO);
     correzioneArmata = btn;
     correzioneTimer = setTimeout(disarmaCorrezione, 8000);
-    avvisoAccanto(btn, AVVISO_SENZA_TESTO, 'err');
+    avvisoSenzaTesto(true);
     return true;
   }
   if (mgAcceptComment) {
