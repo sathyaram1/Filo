@@ -159,6 +159,35 @@ test('foto verticale da sola e foto larga in finestra stretta: stanno nella risp
   expect(m2.ir).toBeLessThanOrEqual(m2.br + 1);
 });
 
+test('immagine creata: resta dopo la riapertura, si ingrandisce e si salva', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  await modello(app, [{ chiamata: { azione: 'disegna', descrizione: 'un drago' } }, { testo: 'Ecco il drago.\n\n[[immagine: $ID0]]' }]);
+  await app.evaluate(({ nativeImage }) => {
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => {
+      const buf = Buffer.alloc(256 * 256 * 4, 180);
+      return { text: '', images: [`data:image/png;base64,${nativeImage.createFromBitmap(buf, { width: 256, height: 256 }).toPNG().toString('base64')}`], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+  });
+  const page = await openTab(NEWTAB);
+  await chiedi(page, 'disegnami un drago');
+  const img = page.locator('.dash-bubble-filo .filo-galleria-img[data-generata="1"]');
+  await expect(img).toHaveCount(1, { timeout: 30_000 });
+  console.log('SRC CREATA', (await img.getAttribute('src')).slice(0, 60));
+  await page.reload();
+  const img2 = page.locator('.dash-bubble-filo .filo-galleria-img[data-generata="1"]');
+  await expect(img2).toHaveCount(1, { timeout: 20_000 });
+  await expect.poll(() => img2.evaluate((e) => e.complete && e.naturalWidth > 0), { timeout: 10_000 }).toBe(true);
+  await img2.click();
+  await expect(page.locator('#lightbox.open img')).toBeVisible();
+  await page.keyboard.press('Escape');
+  const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR || '');
+  const { menuDi } = await import('../../helpers/menuContestuale.mjs');
+  await img2.click({ button: 'right' });
+  await menuDi(page).voce('Salva immagine come').click();
+  const salvate = () => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.(png|jpe?g|webp)$/i.test(f)) : []);
+  await expect.poll(() => salvate().length, { timeout: 15_000 }).toBeGreaterThan(0);
+});
+
 test('il modello sa, dal suo prompt, che le immagini si cercano con lo strumento e non aprendo Google', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await modello(app, [{ testo: 'ok' }]);
