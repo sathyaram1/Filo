@@ -27,25 +27,31 @@
     }
   }
 
+  // L'unica domanda a Tavily: la usano anche le immagini della chat (#2272), che chiedono `extra` in più.
+  async function richiestaTavily({ query, apiKey, maxResults, extra = {}, signal }) {
+    const r = await fetch(TAVILY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify({
+        ...extra,
+        api_key: apiKey,
+        query,
+        max_results: maxResults,
+        search_depth: 'basic',
+        include_answer: false,
+      }),
+    });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      throw new Error(`tavily ${r.status}: ${errText.slice(0, 200)}`);
+    }
+    return r.json();
+  }
+
   async function searchTavily({ query, apiKey, maxResults }) {
     return withTimeout(async (signal) => {
-      const r = await fetch(TAVILY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal,
-        body: JSON.stringify({
-          api_key: apiKey,
-          query,
-          max_results: maxResults,
-          search_depth: 'basic',
-          include_answer: false,
-        }),
-      });
-      if (!r.ok) {
-        const errText = await r.text().catch(() => '');
-        throw new Error(`tavily ${r.status}: ${errText.slice(0, 200)}`);
-      }
-      const data = await r.json();
+      const data = await richiestaTavily({ query, apiKey, maxResults, signal });
       const results = (data.results || []).slice(0, maxResults).map((row) => ({
         title: clip(row.title, 200),
         url: row.url || '',
