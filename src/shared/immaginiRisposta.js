@@ -241,6 +241,8 @@
       + '<img class="filo-galleria-img" src="' + esc(v.src) + '" alt="' + esc(v.titolo || didascalia(v)) + '"'
       + ' loading="lazy" draggable="true" data-galleria-voce="' + i + '"'
       + (v.pagina ? ' data-pagina="' + esc(v.pagina) + '"' : '')
+      // Sempre presente: il tasto destro copia o cerca da qui, mai dal rimando interno alla copia (vuoto se creata).
+      + ' data-originale="' + esc(v.originale || '') + '"'
       + (v.generata ? ' data-generata="1"' : '')
       + (v.larghezza && v.altezza ? ' width="' + v.larghezza + '" height="' + v.altezza + '"' : '')
       + ' data-tip="' + esc(fumetto(v)) + '">'
