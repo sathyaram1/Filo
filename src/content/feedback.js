@@ -592,6 +592,8 @@
       pezziSegnati = Array.isArray(r?.pezzi) ? r.pezzi.filter((p) => p && typeof p.testo === 'string') : [];
       immaginiSegnate.clear();
       for (const k of Array.isArray(r?.immagini) ? r.immagini : []) if (images[k]) immaginiSegnate.add(images[k]);
+      fileSegnati.clear();
+      for (const k of Array.isArray(r?.allegati) ? r.allegati : []) if (files[k]) fileSegnati.add(files[k]);
       avvisoEl.textContent = '';
       const titolo = document.createElement('div');
       titolo.className = 'sn-fb-l0-titolo';
