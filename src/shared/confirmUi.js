@@ -807,5 +807,19 @@
     if (active) active.done(false);
   }
 
-  global.SN_CONFIRM_UI = { confirm, confirmTyped, notify, chiudi, _test };
+  // La rilettura L0 (#1403.1) ha fermato una segnalazione già confermata: le sue frasi, e il sì che la manda com'è.
+  // → Promise<bool>. Lo usano la chat della home e l'Aiuto, con le stesse parole del riquadro del feedback.
+  function dopoRilettura(rilettura, ospite = null) {
+    const r = rilettura && typeof rilettura === 'object' ? rilettura : {};
+    const frasi = (Array.isArray(r.frasi) ? r.frasi : []).map((f) => String(f ?? '')).filter(Boolean);
+    return confirm({
+      title: String(r.titolo || 'Prima che parta, ricontrolla.'),
+      text: frasi.join('\n'),
+      parti: frasi.length ? frasi : null,
+      okLabel: 'Manda così',
+      cancelLabel: 'Non mandarla',
+    }, ospite).then((x) => x === true);
+  }
+
+  global.SN_CONFIRM_UI = { confirm, confirmTyped, dopoRilettura, notify, chiudi, _test };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

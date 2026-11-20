@@ -73,7 +73,7 @@ SN_CONST.registraCaricatoreCatalogo(() => require('./costoModelli').listino());
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, provenienza = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, chiesta = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
-  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null, intervista = false,
+  domanda = '', soloConferma = false, capRilettura = null, schedeViste = null, intervista = false, senzaRilettura = false,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -608,7 +608,7 @@ async function eseguiAzioneFilo(action, {
     return await esegui(action, {
       confirmed, sender, contesto, fontiLette, assistente, parole, avanzamento, chatId, segnale, nascostiDellaChat,
       domanda, capRilettura, schedeViste, intervista, type, righeDaDimenticare, rigaDaCorreggere, impostazioni,
-      decisione, daChiedere, sospesa,
+      decisione, daChiedere, sospesa, senzaRilettura: senzaRilettura === true,
 });
   } catch (e) {
     console.warn('[Filo] action exec failed', type, e);

@@ -1831,9 +1831,15 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       try {
         // Una miniatura tolta nel riquadro ha `tieni` falso; le altre partono.
         const tenute = inviaFeedback ? Object.fromEntries(opts.allegati.filter((v) => v.tieni !== false).map((v) => [v.id, v.anteprima])) : null;
-        c = await chrome.runtime.sendMessage({
+        const conferma = {
           type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente(), ...(tenute ? { immaginiAiuto: tenute } : {}),
-        });
+        };
+        c = await chrome.runtime.sendMessage(conferma);
+        // La rilettura L0 (#1403.1) ha fermato la segnalazione: il riquadro lo dice, e un secondo sì la manda.
+        if (c && !c.executed && c.output && c.output.rilettura && Ui && typeof Ui.dopoRilettura === 'function'
+          && await Ui.dopoRilettura(c.output.rilettura)) {
+          c = await chrome.runtime.sendMessage({ ...conferma, senzaRilettura: true });
+        }
       } catch (_) {}
       if (c && c.output && c.output.blocked === 'segreto') {
         fermata(c.output.frase || `${label}: fermata`);

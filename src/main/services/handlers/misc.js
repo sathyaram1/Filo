@@ -228,6 +228,7 @@ module.exports = function register(on, ctx) {
     segreti: async () => (typeof ctx.segretiCustoditi === 'function' ? ctx.segretiCustoditi() : []),
     redTeam: () => require('../redteamGate').visibile(),
   });
+  require('../feedbackL0').usa(L0);
 
   // Titolo generato da un LLM economico: best-effort, si ripiega sulle prime parole del testo
   // — l'invio non deve MAI fallire per colpa del titolo.
@@ -736,7 +737,7 @@ module.exports = function register(on, ctx) {
       const r = await Outbox.enqueue(payload, { dallOwner, attendiMs: ATTESA_CONSEGNA_MS, trattieni: msg.rileggi === true });
       let tentativo = r?.tentativo;
       if (r?.trattenuta) {
-        const letto = await L0.controlla({ testo: payload.text, immagini: (payload.images || []).map((i) => i && i.dataUrl) });
+        const letto = await L0.controlla({ testo: payload.text, immagini: (payload.images || []).map((i) => i && i.dataUrl), allegati: payload.files });
         if (letto.stato === 'trovato' && await Outbox.ritira(r.id)) {
           const id = String(payload.submissionId);
           // Il riquadro si riapre col testo intatto; senza riquadro la segnalazione resta fra le non partite, da rimandare.

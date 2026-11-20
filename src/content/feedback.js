@@ -304,9 +304,10 @@
     const files = [];
     const MAX_FILES = LIMITI.file;
     const MAX_ATTACH_BYTES = LIMITI.byte;
-    // Quello che L0 ha segnato: i pezzi di testo da evidenziare e le immagini da ricontrollare.
+    // Quello che L0 ha segnato: i pezzi di testo da evidenziare, le immagini e i file da ricontrollare.
     let pezziSegnati = [];
     const immaginiSegnate = new Set();
+    const fileSegnati = new Set();
 
     // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
     // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
@@ -527,6 +528,10 @@
         const chip = document.createElement('div');
         chip.className = 'sn-fb-file-chip';
         chip.title = f.name;
+        if (fileSegnati.has(f)) {
+          chip.classList.add('sn-fb-file-chip--l0');
+          chip.title = `${f.name}: da ricontrollare`;
+        }
         const ic = document.createElement('span');
         ic.className = 'sn-fb-file-ic';
         // Icona documento in linea: nel set condiviso non c'è un'icona 'file'.
@@ -542,7 +547,7 @@
         xBtn.className = 'sn-fb-file-x';
         xBtn.setAttribute('aria-label', 'Rimuovi');
         xBtn.textContent = '×';
-        xBtn.addEventListener('click', () => { files.splice(i, 1); bumpSubmissionId(); renderThumbs(); });
+        xBtn.addEventListener('click', () => { files.splice(i, 1); fileSegnati.delete(f); bumpSubmissionId(); renderThumbs(); });
         chip.appendChild(ic);
         chip.appendChild(nameEl);
         chip.appendChild(sizeEl);
@@ -578,15 +583,32 @@
       // Lo spazio in coda tiene l'ultima riga vuota alta quanto quella della casella.
       evidenzeEl.appendChild(document.createTextNode(v.slice(at) + ' '));
       evidenzeEl.parentElement.classList.add('sn-fb-campo--evidenze');
+      allineaEvidenze();
+    }
+    // La barra di scorrimento della casella (Windows, Linux) stringe le sue righe: lo sfondo prende lo stesso margine,
+    // se no va a capo altrove e l'evidenza scivola su un'altra riga.
+    function allineaEvidenze() {
+      if (!evidenzeEl.parentElement.classList.contains('sn-fb-campo--evidenze')) return;
+      const cs = getComputedStyle(textEl);
+      const bordi = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+      const barra = Math.max(0, textEl.offsetWidth - textEl.clientWidth - bordi);
+      evidenzeEl.style.paddingRight = `${(parseFloat(cs.paddingRight) || 0) + barra}px`;
       evidenzeEl.scrollTop = textEl.scrollTop;
     }
     textEl.addEventListener('scroll', () => { evidenzeEl.scrollTop = textEl.scrollTop; });
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(() => allineaEvidenze());
+      ro.observe(textEl);
+      stacchi.push(() => ro.disconnect());
+    }
 
     // L'avviso di L0 sopra la casella: frasi e due strade, correggere o mandarlo com'è.
     function mostraRilettura(r) {
       pezziSegnati = Array.isArray(r?.pezzi) ? r.pezzi.filter((p) => p && typeof p.testo === 'string') : [];
       immaginiSegnate.clear();
       for (const k of Array.isArray(r?.immagini) ? r.immagini : []) if (images[k]) immaginiSegnate.add(images[k]);
+      fileSegnati.clear();
+      for (const k of Array.isArray(r?.allegati) ? r.allegati : []) if (files[k]) fileSegnati.add(files[k]);
       avvisoEl.textContent = '';
       const titolo = document.createElement('div');
       titolo.className = 'sn-fb-l0-titolo';
@@ -615,7 +637,7 @@
           const p = pezziSegnati.find((x) => v.indexOf(x.testo) === primo);
           try { textEl.setSelectionRange(primo, primo + p.testo.length); } catch (_) {}
         } else {
-          thumbsEl.querySelector('.sn-fb-thumb--l0')?.scrollIntoView?.({ block: 'nearest' });
+          thumbsEl.querySelector('.sn-fb-thumb--l0, .sn-fb-file-chip--l0')?.scrollIntoView?.({ block: 'nearest' });
         }
       });
       const manda = document.createElement('button');

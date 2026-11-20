@@ -42,6 +42,20 @@ test('un pezzo si segnala solo se il testo lo contiene, anche copiato con gli sp
   assert.equal(TESTO.slice(r[0].inizio, r[0].fine), 'Gatto!2024');
 });
 
+// #1403.1 — gli invisibili che la busta toglie sono quelli di SN_ESTERNO, anche fuori dal piano base («tag»,
+// selettori di variante supplementari): il pezzo letto imbustato si ritrova nel testo vero che li porta.
+test('un pezzo con invisibili fuori dal piano base si ritrova, con la fine dopo il carattere intero', () => {
+  const vero = 'Accesso: Ga\u{E0041}tto!20\u{E0100}24\u{E007F} e poi niente.';
+  const imbustato = E.imbusta({ tipo: 'FEEDBACK_DA_RILEGGERE', testo: vero });
+  assert.ok(imbustato.includes('Gatto!2024'), 'il modello legge la parola senza invisibili');
+  for (const pezzo of ['Gatto!2024', 'Ga\u{E0041}tto!20\u{E0100}24', 'Gatto!2024\u{E007F}']) {
+    const r = L.leggiTesto(JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo }] }), vero);
+    assert.equal(r.length, 1, JSON.stringify(pezzo));
+    assert.equal(vero.slice(r[0].inizio, r[0].fine).replace(/[\u{E0000}-\u{E01EF}]/gu, ''), 'Gatto!2024');
+    assert.ok(!/[\uD800-\uDBFF]$/.test(vero.slice(r[0].inizio, r[0].fine)), 'mai a metà di un carattere');
+  }
+});
+
 test('una risposta che non si legge vale come rilettura fallita, non come «niente trovato»', () => {
   assert.equal(L.leggiTesto('non lo so', TESTO), null);
   assert.equal(L.leggiTesto('{"altro":1}', TESTO), null);

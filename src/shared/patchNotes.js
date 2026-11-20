@@ -18,6 +18,7 @@
         'Un avviso che Filo manda mentre la finestra finisce di aprirsi compare sempre, invece di perdersi.',
         { testo: 'Nel calcolatore di probabilità dei mazzi, «faccio mulligan delle mani con meno di 3 terre» detto in chat conta un mulligan e lo scrive nella risposta; nel riquadro, un mulligan senza la mano da tenere ti avvisa che non è contato.', segnalazione: 791 },
         { testo: 'Sui siti che aprono collegamenti, aiuto o anteprime sempre nella stessa finestra, come tanti siti vecchi e intranet, ogni clic ti porta davanti quella scheda, invece di aggiornarla dietro.', segnalazione: 737 },
+        { testo: 'Prima di mandare un feedback Filo ricontrolla anche i file di testo allegati, come un log, e la segnalazione che scrive per te in chat: se ci vede una password o una chiave te lo dice, e scegli tu se mandarla così.', segnalazione: 1403 },
       ],
     },
     {
