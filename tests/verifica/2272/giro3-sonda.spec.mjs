@@ -188,6 +188,28 @@ test('immagine creata: resta dopo la riapertura, si ingrandisce e si salva', asy
   await expect.poll(() => salvate().length, { timeout: 15_000 }).toBeGreaterThan(0);
 });
 
+test('chi usa i crediti e chiede di disegnare: dove lo manda Filo, e cosa trova', async ({ app, openTab }) => {
+  test.setTimeout(150_000);
+  const s = await app.evaluate(async () => {
+    const st = await globalThis.SN_STORAGE.getSettings();
+    const C = globalThis.SN_CONST;
+    return { useDefault: st.useDefaultModels, img: (st.models || {})[C.ACTIONS.IMAGE_GEN], puo: C.canServeAction(st, C.ACTIONS.IMAGE_GEN), chiavi: Object.keys(st.apiKeys || {}) };
+  });
+  console.log('IMPOSTAZIONI PARTENZA', JSON.stringify(s));
+  const page = await openTab('filo://options/');
+  await page.waitForTimeout(2500);
+  const voce = page.getByText('Immagini create in chat').first();
+  console.log('VOCE VISIBILE', await voce.isVisible().catch(() => false), await page.getByText('Immagini create in chat').count());
+  if (await voce.count()) { await voce.scrollIntoViewIfNeeded().catch(() => {}); }
+  await page.screenshot({ path: 'tests/.shots/2272-g3-modelli-crediti.png' }).catch(() => {});
+  const testoRiga = await page.evaluate(() => {
+    const el = [...document.querySelectorAll('*')].find((e) => e.children.length < 6 && /Immagini create in chat/.test(e.textContent || ''));
+    const r = el && (el.closest('.sn-usage-row, .sn-default-row, li, tr, .row') || el.parentElement);
+    return r ? r.innerText : '(niente)';
+  });
+  console.log('RIGA', testoRiga);
+});
+
 test('il modello sa, dal suo prompt, che le immagini si cercano con lo strumento e non aprendo Google', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await modello(app, [{ testo: 'ok' }]);
