@@ -214,7 +214,13 @@ test('risposta della home arrivata mentre la home sta dietro: la spiegazione pag
   const page = await testServer.openReady(openTab, FRASE);
   const avvisi = await osservaAvvisi(page);
   await expect(home.locator('.dash-bubble-note')).toContainText('crediti di Filo', { timeout: 30000 });
-  expect(await home.evaluate(() => document.visibilityState)).toBe('hidden');
+  // La scheda davanti è la pagina, non la home: la riga è arrivata in una scheda dietro.
+  const davanti = await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const t = tm.tabs && (tm.tabs.get ? tm.tabs.get(tm.activeId) : null);
+    return String((t && (t.url || (t.view && t.view.webContents.getURL()))) || '');
+  });
+  expect(davanti).not.toContain('newtab');
   await page.waitForTimeout(6000);
   const prima = seen.completions.length;
   await selezionaColMouse(page, '#t');
