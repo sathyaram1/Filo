@@ -147,6 +147,39 @@ function sorgenteSonda(nome) {
 // comparirebbe quando l'utente non lo aspetta più (riquadri in page-preload.js, pagine filo:// in internal-preload.js).
 const RIGIOCO_MS = 3000;
 
+// L'ultimo tasto destro dato prima che il menu di Filo ascolti. Un clic, un tocco o un tasto dopo lo scarta: l'utente è
+// passato ad altro, e il menu non deve comparire più tardi sulla voce di prima (#2444.1). Un tasto tenuto giù da prima
+// (ripetizione) non è un gesto nuovo.
+function tastoDestroInAttesa(finestra = globalThis.window) {
+  let tenuto = null;
+  const scarta = (e) => { if (e.isTrusted && !e.repeat) tenuto = null; };
+  for (const tipo of ['pointerdown', 'keydown']) finestra.addEventListener(tipo, scarta, true);
+  return {
+    tieni(e) { tenuto = { evento: e, copia: copiaDelClic(e), alle: Date.now() }; return tenuto; },
+    // Vero finché nessun gesto e nessun altro tasto destro ha preso il posto di questo.
+    ancora: (t) => !!t && tenuto === t,
+    // La copia da dare al menu, una volta sola; null se non c'è o è troppo vecchia. Porta la scelta della pagina
+    // (`defaultPrevented`): se il menu di Filo deve cedere lo decide chi lo apre, come per un tasto destro dato dopo.
+    prendi() {
+      const t = tenuto;
+      tenuto = null;
+      if (!t || Date.now() - t.alle > RIGIOCO_MS) return null;
+      t.copia.defaultPrevented = !!t.evento.defaultPrevented;
+      // La pagina può aver ridisegnato la voce cliccata mentre caricava: vale quella sotto il cursore.
+      if (!t.copia.target || !t.copia.target.isConnected) {
+        const nodo = finestra.document.elementFromPoint(t.copia.clientX, t.copia.clientY);
+        if (!nodo) return null;
+        Object.assign(t.copia, { target: nodo, currentTarget: nodo, composedPath: () => [nodo] });
+      }
+      return t.copia;
+    },
+    smetti() {
+      tenuto = null;
+      for (const tipo of ['pointerdown', 'keydown']) finestra.removeEventListener(tipo, scarta, true);
+    },
+  };
+}
+
 // La copia inerte di un tasto destro, da consegnare al menu di Filo dopo che l'evento è finito: consegnato,
 // composedPath() torna vuoto, quindi l'elemento vero (anche dentro uno shadow root) si fotografa subito.
 function copiaDelClic(e) {
