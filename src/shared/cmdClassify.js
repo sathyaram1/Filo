@@ -207,7 +207,7 @@
   function cancellaDa(tok, i) {
     const prog = nomeProgramma(tok[i]);
     if (CANCELLANO.has(prog) || /^mkfs(\.|$)/.test(prog)) return true;
-    if (!/^(find|git|robocopy|foreach-object|foreach|%|powershell|pwsh)$/.test(prog)) return false;
+    if (!/^(find|git|robocopy|rsync|rclone|foreach-object|foreach|%|powershell|pwsh)$/.test(prog)) return false;
     const resto = tok.slice(i + 1);
     if (prog === 'find' && resto.includes('-delete')) return true;
     if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
