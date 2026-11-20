@@ -141,22 +141,26 @@ async function selezionaColMouse(page, sel) {
   await page.mouse.up();
 }
 
-// Il primo piano tolto dove l'avviso lo controlla: la finestra per il main, la pagina per sé.
+// Il primo piano tolto dove l'avviso lo controlla: la finestra per il main, la pagina nel mondo dei content script (999).
+const fuocoNelMondo = (app, url, si) => app.evaluate(async ({ webContents }, { u, s }) => {
+  const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+  const torna = s ? 'window.dispatchEvent(new Event(\'focus\'));' : '';
+  return wc.executeJavaScriptInIsolatedWorld(999, [{ code: `Document.prototype.hasFocus = () => ${s}; ${torna} 1` }]);
+}, { u: url, s: si });
 async function fuoriDaFilo(app, page) {
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
     win.isFocused = () => false;
   });
-  await page.evaluate(() => { document.hasFocus = () => false; });
+  await fuocoNelMondo(app, page.url(), false);
 }
 async function tornaSuFilo(app, page) {
-  await page.evaluate(() => { document.hasFocus = () => true; });
   await app.evaluate(({ app: a, BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
-    win.isFocused = () => true;
+    delete win.isFocused;
     a.emit('browser-window-focus', {}, win);
   });
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await fuocoNelMondo(app, page.url(), true);
 }
 
 const FRASE = '<!doctype html><meta charset="utf-8"><title>Prova</title>'
