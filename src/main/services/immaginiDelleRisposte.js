@@ -41,12 +41,9 @@ async function conTempo(ms, fn) {
 
 async function cercaTavily(query, chiave) {
   return conTempo(ATTESA_RICERCA_MS, async (signal) => {
-    const r = await fetch(TAVILY_URL, {
-      method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: chiave, query, max_results: 5, search_depth: 'basic', include_answer: false, include_images: true, include_image_descriptions: true }),
+    const data = await globalThis.SN_WEB_SEARCH.richiestaTavily({
+      query, apiKey: chiave, maxResults: 5, signal, extra: { include_images: true, include_image_descriptions: true },
     });
-    if (!r.ok) throw new Error(`tavily ${r.status}`);
-    const data = await r.json();
     return (Array.isArray(data && data.images) ? data.images : []).map((i) => {
       const url = typeof i === 'string' ? i : (i && i.url) || '';
       return { immagine: url, titolo: unaRiga(i && i.description, 200), sito: host(url) };
