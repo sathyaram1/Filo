@@ -86,7 +86,7 @@
     if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !statoCheAspetta(normalizeStatus(fb).status)) return null;
     const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
     if (!motivi.length) return null;
-    const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m)))];
+    const sblocchi = [...new Set(motivi.map((m) => sbloccoFermo(m, motivi)))];
     // Il perché scritto dal server (#2235, #2565: anche il motivo del buco del registro), testo e basta.
     const cause = (Array.isArray(r.cause) ? r.cause : []).map((c) => String(c || '').trim()).filter(Boolean);
     return { motivi, sblocchi, cause, atMs: Number(r.atMs) || 0 };
