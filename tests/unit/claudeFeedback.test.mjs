@@ -513,8 +513,55 @@ test('#1211 un biglietto con una lettura esterna annotata solo in locale non fir
   await conSubmit(async () => ({ id: 'doc2', seq: 7, senderProof: 'admin' }), async (visti) => {
     const sporcoInAttesa = await SCRIPT.apri({ titolo: 'T', testo: 'X', idToken: 'tok', biglietto: { fp, fiducia: 'non_fidato', inAttesa: 1 } });
     assert.equal(visti.opts[0].bigliettoLocale, undefined);
+    assert.equal(visti.opts[0].bigliettoDelSegno, fp, '#2027.4: il segno riservato del biglietto lo porta lo stesso');
     assert.equal(sporcoInAttesa.biglietto, 'sporco');
     await SCRIPT.apri({ titolo: 'T', testo: 'X', idToken: 'tok', biglietto: { fp, fiducia: 'non_fidato' } });
     assert.equal(visti.opts[1].bigliettoLocale, fp, 'sporco sul server: l’impronta va, ed è il server a dirlo');
   });
+});
+
+test('#2027.4 il segno riservato rimasto sul PC si dichiara: il biglietto pulito non basta a farlo nascere riservato', async () => {
+  const fp = 'f'.repeat(64);
+  await conSubmit(async () => ({ id: 'doc3', seq: 8, senderProof: 'admin' }), async (visti) => {
+    await SCRIPT.apri({ titolo: 'T', testo: 'X', idToken: 'tok', biglietto: { fp, fiducia: 'fidato', riservatoInAttesa: 1 } });
+    assert.equal(visti.opts[0].bigliettoLocale, fp, 'la fiducia resta quella del biglietto');
+    assert.equal(visti.opts[0].riservatoDichiarato, true);
+    await SCRIPT.apri({ titolo: 'T', testo: 'X', idToken: 'tok', biglietto: { fp, fiducia: 'fidato' } });
+    assert.equal('riservatoDichiarato' in visti.opts[1], false, 'col segno già sul server lo legge lui dal biglietto');
+    await SCRIPT.apri({ titolo: 'T', testo: 'X', idToken: 'tok', biglietto: { fp, fiducia: 'non_fidato', inAttesa: 1, riservatoInAttesa: 1 } });
+    assert.deepEqual([visti.opts[2].bigliettoLocale, visti.opts[2].bigliettoDelSegno, visti.opts[2].riservatoDichiarato], [undefined, fp, true]);
+  });
+  assert.deepEqual(SCRIPT.campiDelBiglietto(null), {});
+  assert.deepEqual(SCRIPT.campiDelBiglietto({ fiducia: 'fidato' }), {}, 'senza impronta non c’è niente da indicare');
+});
+
+test('#2027.4 la create admin scrive il biglietto del solo segno e la dichiarazione; la anonima di ripiego no', async () => {
+  const corpi = [];
+  const origFetch = globalThis.fetch;
+  let rifiuta = false;
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === 'POST' && /:commit\?/.test(String(url))) {
+      const auth = !!(init.headers && init.headers.Authorization);
+      corpi.push({ auth, body: JSON.parse(init.body).writes[0].update });
+      if (auth && rifiuta) return { ok: false, status: 403, json: async () => ({}), text: async () => '' };
+      return { ok: true, status: 200, json: async () => ({ writeResults: [{}] }), text: async () => '' };
+    }
+    return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+  };
+  const fp = 'a'.repeat(64);
+  try {
+    await FB.submit({ text: 't', clientId: 'local:claude', name: 'n' }, { idToken: 'tok', soloAdmin: true, bigliettoDelSegno: fp, riservatoDichiarato: true });
+    // Con entrambi vale quello della fiducia: il server ne legge uno solo.
+    await FB.submit({ text: 't', clientId: 'local:claude', name: 'n' }, { idToken: 'tok', soloAdmin: true, bigliettoLocale: fp, bigliettoDelSegno: fp });
+    rifiuta = true;
+    await FB.submit({ text: 't', clientId: 'utente', name: 'n' }, { idToken: 'tok', bigliettoDelSegno: fp, riservatoDichiarato: true });
+  } finally { globalThis.fetch = origFetch; }
+  assert.equal(corpi[0].body.fields.bigliettoDelSegno.stringValue, fp);
+  assert.equal(corpi[0].body.fields.riservatoDichiarato.booleanValue, true);
+  assert.equal('bigliettoDelSegno' in corpi[1].body.fields, false);
+  assert.equal(corpi[1].body.fields.bigliettoLocale.stringValue, fp);
+  const anonima = corpi.at(-1);
+  assert.equal(anonima.auth, false, 'col token rifiutato riparte da anonimo');
+  assert.equal('bigliettoDelSegno' in anonima.body.fields, false);
+  assert.equal('riservatoDichiarato' in anonima.body.fields, false);
 });

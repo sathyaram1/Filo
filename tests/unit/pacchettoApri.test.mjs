@@ -92,6 +92,7 @@ test('un pacchetto che porta allegati di unite non fidate nasce non fidato anche
     const pulito = { fp: 'a'.repeat(64), fiducia: 'fidato' };
     const r = await SCRIPT.apri({ titolo: 't', testo: 'x', idToken: 'tok', biglietto: pulito, unisce: [{ id: 'id2', num: '2' }], nonFidato: 'porta allegati di #2' });
     assert.equal(visti[0].bigliettoLocale, undefined, 'senza biglietto il server lo fa nascere non fidato');
+    assert.equal(visti[0].bigliettoDelSegno, pulito.fp, 'il segno riservato della sessione va lo stesso (#2027.4)');
     assert.equal(r.biglietto, 'tolto');
     await SCRIPT.apri({ titolo: 't', testo: 'x', idToken: 'tok', biglietto: pulito, unisce: [{ id: 'id1', num: '1' }] });
     assert.equal(visti[1].bigliettoLocale, pulito.fp);
