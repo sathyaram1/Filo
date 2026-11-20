@@ -57,7 +57,7 @@ async function apriAiuto(app, shell, page) {
 async function chiedi(aiuto, testo, attesa = 'Ecco.', n = 0) {
   await aiuto.fill('.sn-sidebar-input textarea', testo);
   await aiuto.press('.sn-sidebar-input textarea', 'Enter');
-  await expect(aiuto.locator('.sn-sidebar').getByText(attesa).nth(n)).toBeVisible({ timeout: 20_000 });
+  if (attesa) await expect(aiuto.locator('.sn-sidebar').getByText(attesa).nth(n)).toBeVisible({ timeout: 20_000 });
 }
 const letti = (app) => app.evaluate(() => globalThis.SN_SEGRETI_LETTI.tutti().map((x) => x.valore));
 async function dopoUnRiavvio(app) {
