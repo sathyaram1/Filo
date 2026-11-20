@@ -100,10 +100,11 @@ test('con la chiave owner-non-fidato elenco, mostra, rispondi, archivia e riapri
   }
   assert.equal(f.owner.length, 0, 'il token admin non è stato usato');
   assert.deepEqual(f.chiave.map((c) => c.passphrase), Array(6).fill('parola-owner'));
+  const b = 'segreto-locale';
   assert.deepEqual(f.chiave.map((c) => c.data), [
-    { op: 'elenco' }, { op: 'mostra', id: 'D-3' }, { op: 'mostra', id: 'D-3' }, { op: 'rispondi', id: 'D-3', scelta: 0 },
-    { op: 'archivia', id: 'D-3' }, { op: 'riapri', id: 'D-3' },
-  ], 'niente biglietto locale né «sessione»: con la chiave il server non li legge');
+    { op: 'elenco', biglietto: b }, { op: 'mostra', id: 'D-3', biglietto: b }, { op: 'mostra', id: 'D-3', biglietto: b },
+    { op: 'rispondi', id: 'D-3', scelta: 0, biglietto: b }, { op: 'archivia', id: 'D-3', biglietto: b }, { op: 'riapri', id: 'D-3', biglietto: b },
+  ], 'niente «sessione»: chi scrive è la chiave; il biglietto locale va col server perché segni le letture (#2027.3)');
   const righe = f.out.filter((s) => s.startsWith('Parlo con la chiave owner-non-fidato (FILO_OWNER_NON_FIDATO_KEY)'));
   assert.equal(righe.length, 5, 'ogni comando dice con cosa parla');
   assert.match(righe[0], /nascono non fidate/);
