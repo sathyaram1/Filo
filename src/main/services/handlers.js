@@ -608,7 +608,7 @@ async function eseguiAzioneFilo(action, {
     return await esegui(action, {
       confirmed, sender, contesto, fontiLette, assistente, parole, avanzamento, chatId, segnale, nascostiDellaChat,
       domanda, capRilettura, schedeViste, intervista, type, righeDaDimenticare, rigaDaCorreggere, impostazioni,
-      decisione, daChiedere, sospesa,
+      decisione, daChiedere, sospesa, senzaRilettura: senzaRilettura === true,
 });
   } catch (e) {
     console.warn('[Filo] action exec failed', type, e);
