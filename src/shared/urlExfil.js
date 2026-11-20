@@ -802,7 +802,7 @@
     if (!G || !uscente.trim()) return valutaAvvisi(tipo, action, avvisi, niente);
     const fonti = contestoDaAzioni(azioni).esterni.slice();
     if (pagina && typeof pagina.testo === 'string' && pagina.testo.trim()) {
-      fonti.push({ testo: pagina.testo, fonte: pagina.host ? `dalla pagina ${pagina.host}` : 'dalla pagina' });
+      fonti.push({ testo: pagina.testo, fonte: fonteDallaPagina(pagina.host) });
     }
     const candidati = [];
     const saturi = [];
