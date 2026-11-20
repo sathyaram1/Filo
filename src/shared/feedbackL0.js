@@ -92,18 +92,33 @@
     return String(testo == null ? '' : testo).length > MAX_TESTO;
   }
 
-  // Spazi e invisibili non contano: la busta toglie gli invisibili, e un modello copia gli a capo come spazi.
-  const SALTA = /[\s­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ]/;
+  // Spazi e invisibili non contano: un modello copia gli a capo come spazi, e gli invisibili o non li vede o non li
+  // copia. Quelli che la busta toglie li dice la busta stessa, l'unica a saperli tutti.
+  const SALTA = /[\s\u0000-\u001F\u007F­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ]/;
+  function salta(c) {
+    if (SALTA.test(c)) return true;
+    const E = global.SN_ESTERNO;
+    return !!(E && typeof E.invisibiliTolti === 'function' && E.invisibiliTolti(c) === '');
+  }
+  // Per punti di codice: un invisibile fuori dal piano base (i «tag», i selettori di variante supplementari) sono due
+  // unità, e preso a metà non si riconosce.
   function normale(s) {
     const chars = [];
     const pos = [];
-    for (let i = 0; i < s.length; i++) {
-      const c = s[i];
-      if (SALTA.test(c)) continue;
-      chars.push(c.toLowerCase());
-      pos.push(i);
+    let i = 0;
+    for (const c of s) {
+      if (!salta(c)) {
+        const m = c.toLowerCase();
+        for (let k = 0; k < m.length; k++) { chars.push(m[k]); pos.push(i); }
+      }
+      i += c.length;
     }
-    return { testo: chars.join(''), pos };
+    return { testo: chars.join(''), pos, lunghezze: null, s };
+  }
+  // La fine del pezzo cade dopo il punto di codice intero che lo chiude.
+  function dopo(s, i) {
+    const c = s.codePointAt(i);
+    return i + (c > 0xFFFF ? 2 : 1);
   }
 
   // { inizio, fine } del pezzo nel testo, o null: un pezzo che il testo non contiene non si segnala.
