@@ -1026,6 +1026,7 @@
     $('sec-denied').hidden = true;
     $('editor').hidden = false;
     applyConfig(res.config || {});
+    caricaServito();
   }
 
   // La conferma parla dell'ULTIMO salvataggio: appena qualcosa sullo schermo non
