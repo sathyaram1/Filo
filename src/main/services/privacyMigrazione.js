@@ -33,7 +33,7 @@ function convertite(dati) {
   if (d[SEGNO] || !s || typeof s !== 'object' || !s.security || typeof s.security !== 'object') return null;
   const L = livelli();
   const daQui = L.livelloDiPrima(s.security.pagineDelicate);
-  if (!daQui || sceltoDopo(d[K.FILO_CAMBI])) return null;
+  if (!daQui || sceltoDopo(d[K.FILO_CAMBI], d[K.FILO_ONBOARDING])) return null;
   const privacy = s.security.privacy && typeof s.security.privacy === 'object' ? s.security.privacy : {};
   const attuale = L.regola(s).livello;
   if (L.ORDINE.indexOf(attuale) >= L.ORDINE.indexOf(daQui)) return null;
