@@ -1627,8 +1627,8 @@
         };
         let r = await send(conferma);
         // La rilettura L0 (#1403.1) ha fermato la segnalazione: lo stesso riquadro lo dice, e un secondo sì la manda.
-        if (type === 'INVIA_FEEDBACK' && Ui && r && !r.executed && r.output && r.output.rilettura) {
-          if (await chiediDopoRilettura(Ui, r.output.rilettura)) r = await send({ ...conferma, senzaRilettura: true });
+        if (type === 'INVIA_FEEDBACK' && Ui && typeof Ui.dopoRilettura === 'function' && r && !r.executed && r.output && r.output.rilettura) {
+          if (await Ui.dopoRilettura(r.output.rilettura)) r = await send({ ...conferma, senzaRilettura: true });
         }
         // #1373 — la conferma è una pausa del lavoro, non la sua fine: com'è andata (fatta o no) torna al modello, che
         // continua o chiude. Un segreto fermato non torna: il modello cercherebbe un'altra strada per farlo uscire.
