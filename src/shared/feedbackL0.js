@@ -113,7 +113,7 @@
       }
       i += c.length;
     }
-    return { testo: chars.join(''), pos, lunghezze: null, s };
+    return { testo: chars.join(''), pos };
   }
   // La fine del pezzo cade dopo il punto di codice intero che lo chiude.
   function dopo(s, i) {
