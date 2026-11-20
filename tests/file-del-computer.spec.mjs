@@ -240,11 +240,9 @@ test.describe('aperto un file nella cartella di casa', () => {
     copyFileSync(FOTO, join(CASA, 'Documenti', 'passaporto.png'));
     writeFileSync(join(CASA, '.ssh', 'id_rsa'), 'CHIAVE');
     const appunti = join(CASA, 'appunti.html');
-    writeFileSync(appunti, '<!doctype html><title>Appunti</title><h1>Appunti</h1><img id="i" src="foto.png" width="80"><img id="p" src="Documenti/passaporto.png?x" width="10">');
-    // Il nome «passaporto.png?x» non è il file: nominato col trucco della query, il file resta fuori.
     writeFileSync(appunti, '<!doctype html><title>Appunti</title><h1>Appunti</h1><img id="i" src="foto.png" width="80">');
     await home(app);
-    expect(await app.evaluate(() => require('node:os').homedir())).toBe(CASA);
+    expect(await app.evaluate(() => process.env.HOME)).toBe(CASA);
     expect((await execAction(app, { type: 'NAVIGA', url: appunti }, { parole: `aprimi ${appunti}` })).executed).toBe(true);
     let id = null;
     await expect.poll(async () => (id = await schedaFile(app, 'appunti.html')), { timeout: 10_000 }).toBeTruthy();
