@@ -261,7 +261,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron (sul PC dell'owner solo i file che il ramo cambia: il resto lo prova GitHub al finish)
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~730 spec, ~4.650 casi): NON si lancia a mano (vedi § Verifica)
+npm test                   # SUITE COMPLETA (~770 spec, ~4.650 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo (sul PC dell'owner quelli arrivati da main li prova GitHub)
 npm run test:shoot         # cattura visiva della finestra reale
 ```
