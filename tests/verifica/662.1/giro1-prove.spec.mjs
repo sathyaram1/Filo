@@ -217,10 +217,10 @@ test('risposta della home arrivata mentre la home sta dietro: la spiegazione pag
   // La scheda davanti è la pagina, non la home: la riga è arrivata in una scheda dietro.
   const davanti = await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
-    const t = tm.tabs && (tm.tabs.get ? tm.tabs.get(tm.activeId) : null);
+    const t = tm.tabs.find((x) => x.id === tm.activeId);
     return String((t && (t.url || (t.view && t.view.webContents.getURL()))) || '');
   });
-  expect(davanti).not.toContain('newtab');
+  expect(davanti).toContain('127.0.0.1');
   await page.waitForTimeout(6000);
   const prima = seen.completions.length;
   await selezionaColMouse(page, '#t');
