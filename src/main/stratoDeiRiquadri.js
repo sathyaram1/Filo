@@ -204,8 +204,9 @@ class StratoDeiRiquadri {
       const dataUrl = IMMAGINE.test(testo(dati.dataUrl)) ? testo(dati.dataUrl) : '';
       const r = principale && dati.rect && typeof dati.rect === 'object' ? dati.rect : null;
       const v = r ? ['x', 'y', 'w', 'h'].map((k) => numero(r[k])) : [];
-      const rect = v.length && v.every((n) => n !== undefined) && v[2] > 0 && v[3] > 0
-        ? { x: v[0] * zoom, y: v[1] * zoom, w: v[2] * zoom, h: v[3] * zoom } : null;
+      const a = v.length && v.every((n) => n !== undefined) && v[2] > 0 && v[3] > 0
+        ? ancoraNellaVista({ left: v[0], top: v[1], right: v[0] + v[2], bottom: v[1] + v[3] }, zoom) : null;
+      const rect = a && a.right > a.left && a.bottom > a.top ? { x: a.left, y: a.top, w: a.right - a.left, h: a.bottom - a.top } : null;
       return { dataUrl, rect };
     }
     // Un riquadro incorporato conosce solo la sua finestra: l'ancora è l'ultimo punto del puntatore sulla scheda.
