@@ -40,6 +40,7 @@
     const src = srcSicuro(v.src);
     if (!src) return null;
     const pagina = web(v.pagina);
+    const originale = v.generata === true ? '' : web(v.originale);
     const l = Math.round(Number(v.larghezza));
     const a = Math.round(Number(v.altezza));
     return {
