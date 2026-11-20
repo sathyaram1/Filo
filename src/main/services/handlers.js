@@ -508,6 +508,8 @@ async function eseguiAzioneFilo(action, {
     // Il nome sta anche fuori, dove il recinto dei testi salvati lo trova (CAMPI_SALVATI in azioniPerModello.js).
     if (nome) action._nomeSistema = nome;
     else delete action._nomeSistema;
+    if (type === 'BLUETOOTH' && nome && indirizzo) action._indirizzoSistema = indirizzo;
+    else delete action._indirizzoSistema;
   }
 
   // #1039 — «aggiornati» riavvia Filo solo se una versione è già pronta: lo dice l'updater, mai il modello.
