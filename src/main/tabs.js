@@ -4017,7 +4017,33 @@ class TabManager {
     try { da = webContents.fromFrame(e.initiator); } catch (_) {}
     let chiede = '';
     try { chiede = e.initiator.url; } catch (_) {}
-    if (!da || da === wc || !this.tabs.some((t) => t.view.webContents === da) || !Permessi.gestoPer(da, chiede)) return;
+    if (da && da !== wc) this._richiamata(tab, da, chiede);
+  }
+
+  // Le richieste che non caricano una pagina nuova (un collegamento a un'ancora, window.open senza indirizzo, focus) le
+  // segnala il preload (#737.8): `nome` dalla pagina che chiede, null dalla finestra stessa a cui hanno chiesto focus.
+  richiamataDallaPagina(wc, frame, nome) {
+    if (nome == null) {
+      const tab = this.tabs.find((t) => t.view.webContents === wc);
+      // Il focus non dice chi l'ha chiesto: vale solo a ridosso del clic sulla pagina che la tiene, non quello che la
+      // finestra si dà da sé più tardi (in Chromium serve il gesto di chi chiama).
+      if (tab && tab._chiestaDa && !(frame && frame.parent)) this._richiamata(tab, tab._chiestaDa, '', RICHIAMO_DA_FOCUS_MS);
+      return;
+    }
+    const tab = this.tabs.find((t) => t._chiestaDa === wc && t._nomeFinestra === nome);
+    let chiede = '';
+    try { chiede = (frame && frame.url) || ''; } catch (_) {}
+    if (tab) this._richiamata(tab, wc, chiede);
+  }
+
+  // Torna davanti se la chiede, col clic che la pagina ha ricevuto, la scheda che l'utente sta guardando; la finestra
+  // nata da quello stesso clic resta dove l'ha messa l'apertura (Ctrl+clic: dietro).
+  _richiamata(tab, da, chiede, entro) {
+    if (this.activeId === tab.id || !this.tabs.includes(tab)) return;
+    const attiva = this.tabs.find((t) => t.id === this.activeId);
+    if (!attiva || attiva.view.webContents !== da) return;
+    const t = Permessi.gestoPerRichiamare(da, chiede, entro);
+    if (!t || (tab._adottataAlle || 0) >= t) return;
     this.activate(tab.id);
   }
 
