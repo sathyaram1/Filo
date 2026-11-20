@@ -12,11 +12,6 @@ import { pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
-// La sessione che lancia le prove non entra nelle letture finte: la si legge solo dove la si chiede.
-const ENV_VERO = { ...process.env };
-delete process.env.CLAUDE_PID;
-delete process.env.CLAUDE_CODE_WORKER_EPOCH;
-
 const REPO = resolve(import.meta.dirname, '..', '..');
 const { letturaMemoria, testoMemoria, cgroupDi, uccisiPerMemoria, sessioneClaude } = await import('../../scripts/lib/memoria-contenitore.mjs');
 const {
