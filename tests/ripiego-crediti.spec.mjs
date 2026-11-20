@@ -1082,17 +1082,16 @@ test('(X) selezionare un testo e passare a un’altra applicazione con la chiave
 
   // Detto adesso, davanti agli occhi: «Trascrivi» pagata allo stesso modo resta nei dieci minuti.
   const primaT = seen.completions.length;
-  await page.locator('#t').click({ button: 'right', position: { x: 5, y: 5 } });
-  await page.locator('.sn-menu-row-overflow').hover();
-  await page.locator('.sn-menu-row-overflow').click().catch(() => {});
-  await page.locator('[data-sn-icon-id="transcribe"]').click();
+  await premiNellaBarra(app, 'transcribe');
   await expect(page.locator('.sn-region-overlay')).toBeVisible({ timeout: 10000 });
   await page.mouse.move(30, 100);
   await page.mouse.down();
   await page.mouse.move(300, 140, { steps: 5 });
   await page.mouse.move(500, 180, { steps: 5 });
   await page.mouse.up();
-  await expect.poll(avvisi, { timeout: 30_000 }).toContain('Testo trascritto e copiato');
+  const strato = await paginaDelloStrato(app, page);
+  await expect(strato.locator('.sn-tr-overlay')).toBeVisible({ timeout: 30_000 });
+  await expect(strato.locator('.sn-tr-overlay .sn-rinomina-rotella')).toHaveCount(0, { timeout: 30_000 });
   expect(seen.completions.slice(primaT).map((c) => c.key).slice(0, 2)).toEqual([OWN_KEY, PERSONAL_KEY]);
   await page.waitForTimeout(6000);
   expect(await quante()).toBe(1);
