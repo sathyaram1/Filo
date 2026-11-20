@@ -780,7 +780,7 @@
       const a = document.createElement('span');
       a.textContent = [r.host || I18n.t('admin_defaults_servito_non_detto'), r.fuori].filter(Boolean).join(' · ');
       const b = document.createElement('span');
-      b.textContent = `${quotaServito(r.quota)} (${r.n.toLocaleString('it-IT')})`;
+      b.textContent = `${quotaServito(r.quota)} (${numeroIt(r.n)})`;
       li.append(a, b);
       ul.appendChild(li);
     }
