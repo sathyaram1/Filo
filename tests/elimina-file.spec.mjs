@@ -5,6 +5,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
 import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { cartellaInCasa, cartellaTemporanea } from './helpers/percorsi.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, basename } from 'node:path';
