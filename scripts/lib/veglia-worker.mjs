@@ -9,7 +9,7 @@ import { gitIn, lavoroVivo, timbroFile, comandoLeggibile, cartelleDelLavoro } fr
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
 import { attesaDichiarata, codiceUscita, leggiMeta, rigaSintetica } from '../session-report.mjs';
-import { corsaInterrotta, guastoDellaCorsa, oraUtc as ora, pulito, testoUcciso } from './corsa-controlli.mjs';
+import { corsaInterrotta, guastoDellaCorsa, oraUtc as ora, PREFISSO_CORSA, pulito, sessioneDellaCorsa, testoUcciso } from './corsa-controlli.mjs';
 import { letturaMemoria } from './memoria-contenitore.mjs';
 
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
@@ -236,20 +236,27 @@ export function testoGuasto({
   if (Number.isFinite(chiusoMs)) {
     return pulito(`guasto: strumento worker: il worker ha chiuso la sessione alle ${ora(chiusoMs)} senza rilasciare il biglietto, e da ${minuti} minuti nella cartella non lavora nessuno. ${coda}`);
   }
-  // #2571: un worker vivo risponde a un'uscita 137; tacere dopo vuol dire che è morta anche la sua sessione.
+  // #2571.1: una sessione di Claude Code ripartita dopo l'ultimo strumento non torna, e la risposta che manca non è un
+  // permesso. Un worker vivo risponde a un'uscita di segnale (oltre 128): tacere dopo vuol dire che col comando si è
+  // fermato anche lui. «Sessione» resta il processo di Claude Code, che può essere vivo con il worker morto (#2571.1).
+  const ultimoMs = attesa && Number.isFinite(attesa.ms) ? attesa.ms : ultimo && Number.isFinite(ultimo.ms) ? ultimo.ms : NaN;
+  const ripartita = sessioneDellaCorsa(memoria, corsa && corsa.memoria, ultimoMs) === 'ripartita';
   const ucciso = !attesa && ultimo && ultimo.risposta && ultimo.uscita >= UCCISO_DA;
-  if (!attesa && (corsa || ucciso)) {
-    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}), segno che col comando è morta anche la sua sessione. ${coda}`;
-    return corsa
-      ? guastoDellaCorsa(corsa, memoria, dopo)
-      : testoUcciso({ programma: ultimo.programma, cosa: `${ultimo.nome} delle ${ora(ultimo.ms)}`, codice: ultimo.uscita, memoria, daMs: ultimo.ms, coda: dopo });
+  if (ripartita || ucciso) {
+    const dopo = `${ucciso ? `Il suo ultimo strumento è uscito ${ultimo.uscita} e da lì` : 'Da lì'} il worker non dà segni di vita da ${minuti} minuti (${segni}): ${ripartita ? 'la sua sessione non è tornata' : 'col comando si è fermato anche il worker, il sotto-agente che girava nella sessione'}. ${coda}`;
+    if (corsa) return guastoDellaCorsa(corsa, memoria, dopo);
+    const quale = attesa || ultimo;
+    const programma = attesa ? (attesa.nome === 'Bash' ? programmaDi(attesa.comando) : attesa.nome) : ultimo.programma || ultimo.nome;
+    return testoUcciso({ programma, cosa: `${quale.nome} delle ${ora(ultimoMs)}`, codice: ucciso ? ultimo.uscita : NaN, memoria, daMs: ultimoMs, coda: dopo });
   }
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
     const cosa = attesa.comando ? `${attesa.nome} «${comandoLeggibile(attesa.comando)}»` : attesa.nome;
     return pulito(`guasto: permessi ${nome}: permesso in attesa: il worker non dà segni di vita da ${minuti} minuti (${segni}) e il suo ultimo strumento non ha mai avuto risposta: ${cosa}. In cloud nessuno approva un permesso. ${coda}`);
   }
-  return pulito(`guasto: strumento worker: worker fermo da ${minuti} minuti (${segni}), senza uno strumento in attesa: forse un permesso, forse il modello. ${coda}`);
+  // Una corsa interrotta senza un'uscita di segnale può averla fermata il worker stesso: è un fatto del quadro, non il fermo.
+  const primaCorsa = corsa ? `Prima: ${guastoDellaCorsa(corsa, memoria).slice(PREFISSO_CORSA.length)} ` : '';
+  return pulito(`guasto: strumento worker: worker fermo da ${minuti} minuti (${segni}), senza uno strumento in attesa: forse un permesso, forse il modello. ${primaCorsa}${coda}`);
 }
 
 /** Le righe degli ultimi 512 KB di un transcript: la prima può essere tagliata, e si salta. Illeggibile: nessuna. */

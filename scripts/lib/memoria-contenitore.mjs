@@ -1,5 +1,5 @@
-// La memoria che resta ai comandi (#2571): in cloud il tetto vero è il cgroup dei comandi (13,4 GB su 16), non la RAM, e
-// MemFree non conta la cache che si libera. La leggono il battito, i controlli prima di partire e la veglia per dire cosa è
+// La memoria che resta ai comandi (#2571), e le ripartenze di contenitore e sessione: in cloud il tetto vero è il cgroup
+// dei comandi (13,4 GB su 16), non la RAM. La leggono il battito, i controlli prima di partire e la veglia per dire cosa è
 // morto. Solo letture. Regole: tests/unit/processoUcciso.test.mjs.
 
 import { readFileSync } from 'node:fs';
@@ -44,24 +44,46 @@ function livelli(base, rel) {
  * secondo). Due letture diverse vogliono dire un contenitore ripartito, e contatori ripartiti da zero. PURA.
  */
 export function avvioContenitoreS(leggi = leggiFile) {
+  return avvioProcessoS(1, leggi);
+}
+
+function avvioProcessoS(pid, leggi) {
   const boot = chiave(leggi('/proc/stat'), 'btime');
-  const stat = String(leggi('/proc/1/stat') || '');
+  const stat = String(leggi(`/proc/${pid}/stat`) || '');
   const tick = Number(stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/)[19]);
   return Number.isFinite(boot) && stat && Number.isFinite(tick) ? boot + tick / 100 : NaN;
+}
+
+/**
+ * Il processo di Claude Code che ospita la sessione e i suoi comandi (#2571.1): `claudePid` e `epoca` dall'ambiente che
+ * Claude Code dà ai comandi (in cloud l'epoca cresce a ogni ripartenza del lavoratore), `claudeAvvioS` da /proc. Un pid o
+ * un'epoca diversi da quelli di una corsa vogliono dire una sessione ripartita, e con lei i comandi morti. PURA.
+ */
+export function sessioneClaude(env = process.env, leggi = leggiFile) {
+  const pid = numero(env && env.CLAUDE_PID);
+  return {
+    claudePid: Number.isInteger(pid) && pid > 0 ? pid : NaN,
+    claudeAvvioS: Number.isInteger(pid) && pid > 0 ? avvioProcessoS(pid, leggi) : NaN,
+    epoca: numero(env && env.CLAUDE_CODE_WORKER_EPOCH),
+  };
 }
 
 /**
  * La memoria vista dai comandi, in MB: `disponibileMb` è il minimo fra quella del sistema (MemAvailable) e il margine
  * di ogni cgroup con un tetto, al netto della cache che si libera; `usataMb` è dello stesso cgroup di `tettoMb` (senza
  * tetto, di quello dei comandi). `piccoMb` e `uccisioniComandi` sono del cgroup dei comandi, `uccisioniSistema`
- * dell'intera macchina dall'avvio. Senza /proc/self/cgroup vale la radice. Un numero che non si legge resta NaN. PURA.
+ * dell'intera macchina dall'avvio. Porta anche la sessione di Claude Code (`sessioneClaude`). Senza /proc/self/cgroup vale
+ * la radice. Un numero che non si legge resta NaN. PURA.
  */
-export function letturaMemoria(leggi = leggiFile) {
+export function letturaMemoria(leggi = leggiFile, env = process.env) {
   const info = leggi('/proc/meminfo');
   const sistemaMb = chiave(info, 'MemAvailable:') / 1024;
   const totaleMb = chiave(info, 'MemTotal:') / 1024;
   const uccisioniSistema = chiave(leggi('/proc/vmstat'), 'oom_kill');
-  const out = { disponibileMb: sistemaMb, totaleMb, tettoMb: NaN, usataMb: NaN, piccoMb: NaN, uccisioniComandi: NaN, uccisioniSistema, avvioS: avvioContenitoreS(leggi) };
+  const out = {
+    disponibileMb: sistemaMb, totaleMb, tettoMb: NaN, usataMb: NaN, piccoMb: NaN, uccisioniComandi: NaN, uccisioniSistema, avvioS: avvioContenitoreS(leggi),
+    ...sessioneClaude(env, leggi),
+  };
   const cg = cgroupDi(leggi('/proc/self/cgroup'))
     || (leggi('/sys/fs/cgroup/memory.current') !== null ? { v: 2, rel: '' } : { v: 1, rel: '' });
   const base = cg.v === 1 ? '/sys/fs/cgroup/memory' : '/sys/fs/cgroup';

@@ -1,6 +1,6 @@
-// Il segno di finish:check in corso, nella cartella git (#2571): ucciso (exit 137) non lo toglie, e chi viene dopo sul
-// suo ramo (aspetta, la veglia, il lancio seguente) sa cosa è morto, in che fase e con quanta memoria. Non decide niente.
-// Regole: tests/unit/processoUcciso.test.mjs.
+// Il segno di finish:check in corso, nella cartella git (#2571): una corsa interrotta non lo toglie, e chi viene dopo sul
+// suo ramo (aspetta, la veglia, il lancio seguente) sa cosa si è fermato, in che fase, con quanta memoria e se la sessione
+// è ripartita. Il segno non sa con quale segnale: niente numeri d'uscita. Regole: tests/unit/processoUcciso.test.mjs.
 
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -8,7 +8,6 @@ import { gitIn } from './branch-integrity.mjs';
 import { leggiFile, letturaMemoria, ripartito, testoMemoria, uccisiPerMemoria } from './memoria-contenitore.mjs';
 
 export const FILE_CORSA = 'filo-controlli-in-corso.json';
-export const CODICE_SIGKILL = 137;
 
 // Un guasto finisce fra virgolette doppie in una riga di comando e nelle note: una riga, senza virgolette, apici
 // inversi, dollari. Lo usano anche i testi della veglia: una copia sola.
@@ -32,7 +31,7 @@ function ramoDi(root) {
 /**
  * Apre il segno della corsa: `fase(nome)` lo aggiorna, l'uscita normale lo toglie, `bilancio()` dice la memoria da
  * quando è partita. I segnali non si intercettano: durante una prova lanciata in modo sincrono il gestore non girerebbe
- * fino alla sua fine, e la corsa fermata andrebbe avanti; un segno col processo morto dice già «ucciso».
+ * fino alla sua fine, e la corsa fermata andrebbe avanti; un segno col processo morto dice già «interrotta».
  */
 export function apriCorsa(root, { sha = '', ramo = ramoDi(root), proc = process, ora = () => new Date().toISOString(), memoria = letturaMemoria } = {}) {
   const file = fileCorsa(root);
@@ -67,59 +66,92 @@ export function corsaInterrotta(root, { file = fileCorsa(root), viva = corsaViva
   return viva(s.pid) ? null : s;
 }
 
-/** L'uscita di una corsa interrotta: 137, il colpo che in cloud lascia il segno senza processo. PURA. */
-export function codiceDellaCorsa() {
-  return CODICE_SIGKILL;
-}
+// Due avvii più vicini di così sono lo stesso: i tick di /proc e l'arrotondamento al secondo.
+const SCARTO_MS = 5000;
 
 /** Il contenitore è ripartito dopo `daMs`, o fra `prima` e `memoria`? PURA. */
 function contenitoreRipartito(memoria, prima, daMs) {
   const avvio = memoria && memoria.avvioS;
   if (!Number.isFinite(avvio)) return false;
-  if (prima && Number.isFinite(prima.avvioS)) return Math.abs(avvio - prima.avvioS) > 5;
-  return Number.isFinite(daMs) && avvio * 1000 > daMs + 5000;
+  if (prima && Number.isFinite(prima.avvioS)) return Math.abs(avvio - prima.avvioS) * 1000 > SCARTO_MS;
+  return Number.isFinite(daMs) && avvio * 1000 > daMs + SCARTO_MS;
 }
 
-/** Perché è morto, per quanto si legge: memoria, ripartenza del contenitore o dei comandi, o un colpo da fuori. PURA. */
+/**
+ * La sessione di Claude Code che ospitava il processo (#2571.1): 'ripartita' (epoca del lavoratore cresciuta, o il
+ * Claude Code di adesso nato dopo la partenza), 'stessa' (lo stesso processo, nato prima), '' se non si sa (fuori da
+ * Claude Code, o chi legge è un'altra sessione). PURA.
+ */
+export function sessioneDellaCorsa(memoria, prima, daMs) {
+  if (!memoria) return '';
+  const { epoca, claudePid: pid, claudeAvvioS: avvio } = memoria;
+  if (prima && Number.isFinite(prima.epoca) && Number.isFinite(epoca) && epoca > prima.epoca) return 'ripartita';
+  if (Number.isFinite(avvio) && Number.isFinite(daMs) && avvio * 1000 > daMs + SCARTO_MS) return 'ripartita';
+  if (!Number.isFinite(pid)) return '';
+  if (prima && Number.isFinite(prima.claudePid)) return prima.claudePid === pid ? 'stessa' : '';
+  return Number.isFinite(avvio) && Number.isFinite(daMs) ? 'stessa' : '';
+}
+
+const STESSA = 'la sessione di Claude Code che l\'ha lanciato è la stessa, ancora viva: l\'ha fermato lei (lo strumento che ferma i comandi, il tempo massimo del comando, un sotto-agente fermato o interrotto) o un colpo mirato al processo';
+
+/** Perché si è fermato, per quanto si legge: ripartenze del contenitore, della sessione o dei comandi, memoria. PURA. */
 function causaDellUccisione(memoria, prima, daMs) {
   if (contenitoreRipartito(memoria, prima, daMs)) {
     return `il contenitore è ripartito alle ${oraUtc(memoria.avvioS * 1000)}, dopo la partenza: i contatori della memoria ripartono da zero e non dicono se prima è stata la memoria`;
   }
-  if (ripartito(memoria, prima)) return 'i contatori delle uccisioni per memoria sono tornati indietro (i comandi sono ripartiti): non dicono se è stata la memoria';
-  const perMemoria = uccisiPerMemoria(memoria, prima);
+  const sessione = sessioneDellaCorsa(memoria, prima, daMs);
+  const contatori = ripartito(memoria, prima);
+  const perMemoria = contatori ? null : uccisiPerMemoria(memoria, prima);
+  if (sessione === 'ripartita') {
+    const ora = Number.isFinite(memoria.claudeAvvioS) ? ` alle ${oraUtc(memoria.claudeAvvioS * 1000)}` : '';
+    const epoca = prima && Number.isFinite(prima.epoca) && Number.isFinite(memoria.epoca) && memoria.epoca !== prima.epoca ? ` (epoca del lavoratore da ${prima.epoca} a ${memoria.epoca})` : '';
+    return `la sessione di Claude Code è ripartita${ora}${epoca}, dopo la partenza: con lei muoiono tutti i suoi comandi e i suoi sotto-agenti${perMemoria === true ? '; prima il kernel aveva ucciso processi per memoria' : ''}`;
+  }
+  if (contatori) return 'i contatori delle uccisioni per memoria sono tornati indietro (i comandi sono ripartiti): non dicono se è stata la memoria';
   if (perMemoria === true) return 'il kernel ha ucciso processi per memoria';
-  if (perMemoria === null) return 'causa non leggibile';
+  if (perMemoria === null) return sessione === 'stessa' ? `memoria non leggibile; ${STESSA}` : 'causa non leggibile (fermato a mano, al tempo massimo del comando o da un colpo da fuori)';
+  if (sessione === 'stessa') return `nessun processo ucciso per memoria e ${STESSA}`;
   const avvioNoto = memoria && Number.isFinite(memoria.avvioS) && ((prima && Number.isFinite(prima.avvioS)) || Number.isFinite(daMs));
   return avvioNoto
-    ? 'nessun processo ucciso per memoria e il contenitore non è ripartito, quindi un colpo da fuori dei comandi (la sessione o l\'harness)'
-    : 'nessun processo ucciso per memoria, quindi un colpo da fuori dei comandi (la sessione, l\'harness o un riavvio del contenitore)';
+    ? 'nessun processo ucciso per memoria e il contenitore non è ripartito: fermato da chi l\'ha lanciato (a mano, o al tempo massimo del comando) o da un colpo da fuori dei comandi (la sessione o l\'harness)'
+    : 'nessun processo ucciso per memoria: fermato da chi l\'ha lanciato (a mano, o al tempo massimo del comando) o da un colpo da fuori dei comandi (la sessione, l\'harness o un riavvio del contenitore)';
+}
+
+function guasto(programma, titolo, { memoria = null, prima = null, daMs = NaN, coda = '' } = {}) {
+  const nome = String(programma || 'worker').toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker';
+  return pulito(`guasto: strumento ${nome}: ${titolo}: ${causaDellUccisione(memoria, prima, daMs)}; ${testoMemoria(memoria, prima)}.${coda ? ` ${coda}` : ''}`);
 }
 
 /**
- * Il guasto di un processo ucciso, col gruppo davanti (`guasto: strumento <programma>`): `cosa` è quello che girava,
- * `codice` l'uscita (NaN se non si sa), `memoria` la lettura di adesso, `prima` quella di quando è partito e `daMs`
- * quando è partito, se la lettura di allora manca. PURA.
+ * Il guasto di un processo fermato, col gruppo davanti (`guasto: strumento <programma>`): `cosa` è quello che girava,
+ * `codice` l'uscita letta dal risultato dello strumento (NaN se non si sa: allora niente numero), `memoria` la lettura
+ * di adesso, `prima` quella di quando è partito e `daMs` quando è partito, se la lettura di allora manca. PURA.
  */
 export function testoUcciso({ programma = 'worker', cosa = '', codice = NaN, memoria = null, prima = null, daMs = NaN, coda = '' } = {}) {
-  const nome = String(programma || 'worker').toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker';
-  const parti = [
-    `guasto: strumento ${nome}: processo ucciso${Number.isFinite(codice) ? ` (${codice})` : ''}${cosa ? ` durante ${pulito(cosa)}` : ''}`,
-    `${causaDellUccisione(memoria, prima, daMs)}; ${testoMemoria(memoria, prima)}.`,
-  ];
-  return pulito(`${parti.join(': ')}${coda ? ` ${coda}` : ''}`);
+  const titolo = `${Number.isFinite(codice) ? `processo ucciso (${codice})` : 'processo interrotto'}${cosa ? ` durante ${pulito(cosa)}` : ''}`;
+  return guasto(programma, titolo, { memoria, prima, daMs, coda });
 }
 
-/** Il guasto di una corsa di finish:check morta senza finire. PURA. */
+const doveDellaCorsa = (segno) => `fase ${pulito(segno.fase) || 'ignota'} dalle ${oraUtc(segno.faseDa)}, partito alle ${oraUtc(segno.inizio)} su ${String(segno.sha || '').slice(0, 8) || 'commit ignoto'}`;
+export const PREFISSO_CORSA = 'guasto: strumento finish-check: ';
+const TITOLO_CORSA = 'finish:check interrotto senza finire ';
+
+/** Il guasto di una corsa di finish:check rimasta a metà: interrotta, mai un numero che il segno non sa. PURA. */
 export function guastoDellaCorsa(segno, memoria, coda = '') {
-  const cosa = `finish:check (fase ${pulito(segno.fase) || 'ignota'} dalle ${oraUtc(segno.faseDa)}, partito alle ${oraUtc(segno.inizio)} su ${String(segno.sha || '').slice(0, 8) || 'commit ignoto'})`;
-  return testoUcciso({
-    programma: 'finish-check', cosa, codice: codiceDellaCorsa(segno), memoria, prima: segno.memoria || null, daMs: Date.parse(String(segno.inizio || '')), coda,
+  return guasto('finish-check', `${TITOLO_CORSA}(${doveDellaCorsa(segno)})`, {
+    memoria, prima: segno.memoria || null, daMs: Date.parse(String(segno.inizio || '')), coda,
   });
 }
 
-/** Cosa fa il worker che trova la sua corsa morta: rilanciarla una volta, poi il guasto già scritto. PURA. */
+/**
+ * Cosa fa il worker che trova la sua corsa interrotta: niente, se l'ha fermata lui; col tetto più largo, se l'ha fermata
+ * il tempo massimo; altrimenti rilanciarla una volta, poi il guasto già scritto. PURA.
+ */
 export function testoPerIlWorker(segno, memoria) {
-  return `La corsa di finish:check è morta senza finire: ${guastoDellaCorsa(segno, memoria).replace(/^guasto: strumento finish-check: /, '')}\n`
-    + 'Rilanciala una volta, in sottofondo: gli spec già verdi su questo contenuto non si rifanno. Se muore di nuovo, non insistere: '
-    + `rilascia col guasto, così:\n  --guasto "${guastoDellaCorsa(segno, memoria)}"`;
+  const g = guastoDellaCorsa(segno, memoria);
+  return `La corsa di finish:check si è interrotta senza finire ${g.slice(PREFISSO_CORSA.length + TITOLO_CORSA.length)}\n`
+    + 'Se l\'hai fermata tu (lo strumento che ferma i comandi in sottofondo, Ctrl+C) non è un guasto: rilanciala solo se ti serve ancora. '
+    + 'Se l\'ha fermata il tempo massimo del comando, rilanciala in sottofondo col tetto più largo.\n'
+    + 'Altrimenti rilanciala una volta, in sottofondo: gli spec già verdi su questo contenuto non si rifanno. Se si interrompe di nuovo, non insistere: '
+    + `rilascia col guasto, così:\n  --guasto "${g}"`;
 }

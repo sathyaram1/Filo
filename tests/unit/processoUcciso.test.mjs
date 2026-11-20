@@ -1,6 +1,6 @@
 // #2571: tre primi lavori morti mentre aspettavano finish:check, con l'ultimo comando uscito 137 e la veglia che diceva
-// «forse un permesso, forse il modello». Qui: la memoria vista dai comandi, il segno della corsa ucciso con SIGKILL, il
-// guasto col 137 e la riga che il worker riceve per riprendere o rilasciare.
+// «forse un permesso, forse il modello». Qui: la memoria vista dai comandi, il segno della corsa interrotta (senza un
+// numero che non sa), la sessione di Claude Code ripartita o la stessa (#2571.1), e la riga che il worker riceve.
 
 import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
@@ -13,9 +13,9 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const REPO = resolve(import.meta.dirname, '..', '..');
-const { letturaMemoria, testoMemoria, cgroupDi, uccisiPerMemoria } = await import('../../scripts/lib/memoria-contenitore.mjs');
+const { letturaMemoria, testoMemoria, cgroupDi, uccisiPerMemoria, sessioneClaude } = await import('../../scripts/lib/memoria-contenitore.mjs');
 const {
-  apriCorsa, corsaInterrotta, codiceDellaCorsa, fileCorsa, guastoDellaCorsa, testoPerIlWorker, testoUcciso, CODICE_SIGKILL,
+  apriCorsa, corsaInterrotta, fileCorsa, guastoDellaCorsa, testoPerIlWorker, testoUcciso, sessioneDellaCorsa,
 } = await import('../../scripts/lib/corsa-controlli.mjs');
 const { testoGuasto, ultimoPasso, quadroDelFermo, veglia, autopsiaDelWorker, USCITA_FERMO } = await import('../../scripts/lib/veglia-worker.mjs');
 const { codiceUscita, rigaErrore } = await import('../../scripts/session-report.mjs');
@@ -114,7 +114,7 @@ describe('il segno della corsa di finish:check', () => {
   });
   const fine = (c) => new Promise((ok) => c.once('exit', (codice, segnale) => ok({ codice, segnale })));
 
-  test('ucciso con SIGKILL il segno resta, col processo morto: la corsa è interrotta e la sua uscita è 137', { skip: process.platform === 'win32' }, async () => {
+  test('ucciso con SIGKILL il segno resta, col processo morto: la corsa è interrotta, senza un numero che il segno non sa', { skip: process.platform === 'win32' }, async () => {
     const root = repo();
     const c = await lancia(root);
     assert.equal(corsaInterrotta(root), null, 'finché il processo vive la corsa non è interrotta');
@@ -124,9 +124,26 @@ describe('il segno della corsa di finish:check', () => {
     const s = corsaInterrotta(root);
     assert.ok(s, 'il segno è rimasto');
     assert.equal(s.fase, 'spec delle aree toccate — lotto 2/3');
-    assert.equal(s.segnale, undefined);
-    assert.equal(codiceDellaCorsa(s), CODICE_SIGKILL);
+    assert.match(guastoDellaCorsa(s, null), /^guasto: strumento finish-check: finish:check interrotto senza finire \(fase spec delle aree toccate — lotto 2\/3/);
+    assert.doesNotMatch(testoPerIlWorker(s, null), /137|ucciso \(/);
   });
+
+  // Verifica #2571 giro 2, r1: il worker ferma la corsa che non gli serve più (lo strumento dei comandi in sottofondo,
+  // Ctrl+C). Il segno non sa il segnale: non deve dire «ucciso (137)», e il testo deve lasciargli il caso della fermata.
+  for (const segnale of ['SIGTERM', 'SIGINT']) {
+    test(`fermata apposta con ${segnale}: niente «processo ucciso (137)», e il worker legge che se l'ha fermata lui non è un guasto`, { skip: process.platform === 'win32' }, async () => {
+      const root = repo();
+      const c = await lancia(root);
+      const finito = fine(c);
+      c.kill(segnale);
+      assert.equal((await finito).segnale, segnale);
+      const testo = testoPerIlWorker(corsaInterrotta(root), null);
+      assert.doesNotMatch(testo, /processo ucciso|\(137\)/);
+      assert.match(testo, /^La corsa di finish:check si è interrotta senza finire \(fase spec delle aree toccate/);
+      assert.match(testo, /Se l'hai fermata tu \(lo strumento che ferma i comandi in sottofondo, Ctrl\+C\) non è un guasto/);
+      assert.match(testo, /Se l'ha fermata il tempo massimo del comando, rilanciala in sottofondo col tetto più largo/);
+    });
+  }
 
   test('fermata durante una prova lanciata in modo sincrono la corsa si ferma subito, e un\'uscita normale toglie il segno', { skip: process.platform === 'win32' }, async () => {
     // Un gestore dei segnali girerebbe solo a prova finita: la corsa fermata lancerebbe ancora il lotto dopo.
@@ -142,7 +159,7 @@ describe('il segno della corsa di finish:check', () => {
     c.kill('SIGTERM');
     assert.equal((await finito).segnale, 'SIGTERM');
     assert.ok(Date.now() - da < 10_000, `fermata dopo ${Date.now() - da} ms`);
-    assert.equal(codiceDellaCorsa(corsaInterrotta(root)), CODICE_SIGKILL, 'il segno resta, col processo morto');
+    assert.ok(corsaInterrotta(root), 'il segno resta, col processo morto');
 
     const pulito = repo();
     assert.throws(() => execFileSync(process.execPath, ['--input-type=module', '-e', `const { apriCorsa } = await import(${JSON.stringify(modulo)}); apriCorsa(${JSON.stringify(pulito)}); process.exit(1);`], { stdio: 'ignore' }), /status 1|failed/);
@@ -164,8 +181,9 @@ describe('il segno della corsa di finish:check', () => {
     });
     assert.equal(r.code, 0, r.so + r.se);
     assert.match(r.so, /Finito: nessun tuo processo/);
-    assert.match(r.so, /La corsa di finish:check è morta senza finire: processo ucciso \(137\) durante finish:check \(fase avvio/);
-    assert.match(r.so, /--guasto "guasto: strumento finish-check: processo ucciso \(137\)/);
+    assert.match(r.so, /La corsa di finish:check si è interrotta senza finire \(fase avvio/);
+    assert.match(r.so, /--guasto "guasto: strumento finish-check: finish:check interrotto senza finire \(fase avvio/);
+    assert.doesNotMatch(r.so, /137/);
   });
 
   test('finish:check apre il segno prima dei controlli e lo aggiorna a ogni lotto di spec', () => {
@@ -217,7 +235,7 @@ describe('il segno della corsa di finish:check', () => {
       p.on('close', (code) => ok({ code, so }));
     });
     assert.equal(r.code, 0, r.so);
-    assert.doesNotMatch(r.so, /morta senza finire|--guasto/);
+    assert.doesNotMatch(r.so, /interrotta senza finire|--guasto/);
   });
 
   test('ogni corsa dice in fondo la sua memoria: picco e uccisioni da quando è partita', () => {
@@ -239,15 +257,15 @@ describe('il guasto di un processo ucciso', () => {
   test('per il worker: cosa è morto, dove, la memoria, e il --guasto già scritto da copiare', () => {
     const adesso = letturaMemoria(leggiDa(contenitore({ oomCmd: 2, oomSis: 2 })));
     const g = guastoDellaCorsa(segno, adesso);
-    assert.match(g, /^guasto: strumento finish-check: processo ucciso \(137\) durante finish:check \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01:00 UTC, partito alle 18:40:00 UTC su abcdef12\): il kernel ha ucciso processi per memoria; memoria: /);
+    assert.match(g, /^guasto: strumento finish-check: finish:check interrotto senza finire \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01:00 UTC, partito alle 18:40:00 UTC su abcdef12\): il kernel ha ucciso processi per memoria; memoria: /);
     assert.match(g, /da allora: 2 nella macchina, 2 fra i comandi\.$/);
     const t = testoPerIlWorker(segno, adesso);
-    assert.match(t, /^La corsa di finish:check è morta senza finire: processo ucciso \(137\)/);
-    assert.match(t, /Rilanciala una volta, in sottofondo/);
+    assert.match(t, /^La corsa di finish:check si è interrotta senza finire \(fase spec delle aree toccate \(190\) — lotto 2\/3 dalle 19:01:00 UTC, partito alle 18:40:00 UTC su abcdef12\): il kernel ha ucciso/);
+    assert.match(t, /Altrimenti rilanciala una volta, in sottofondo/);
     assert.ok(t.includes(`--guasto "${g}"`), t);
     assert.doesNotMatch(g, /["`$]/, 'il guasto sta fra virgolette doppie in una riga di comando');
     const senza = guastoDellaCorsa(segno, segno.memoria);
-    assert.match(senza, /nessun processo ucciso per memoria, quindi un colpo da fuori dei comandi \(la sessione, l'harness o un riavvio del contenitore\)/);
+    assert.match(senza, /nessun processo ucciso per memoria: fermato da chi l'ha lanciato \(a mano, o al tempo massimo del comando\) o da un colpo da fuori dei comandi \(la sessione, l'harness o un riavvio del contenitore\)/);
   });
 
   // L'avvio del contenitore: kernel partito a 1.763.000.000 s, processo 1 dopo `tick` centesimi.
@@ -270,7 +288,7 @@ describe('il guasto di un processo ucciso', () => {
 
     // Niente ripartenze, nessuna uccisione: il colpo è da fuori, e il riavvio è escluso.
     const fermo = letturaMemoria(leggiDa(conAvvio(contenitore({ oomCmd: 3, oomSis: 2 }), 5000)));
-    assert.match(guastoDellaCorsa({ ...segno, memoria: prima }, fermo), /nessun processo ucciso per memoria e il contenitore non è ripartito, quindi un colpo da fuori dei comandi \(la sessione o l'harness\)/);
+    assert.match(guastoDellaCorsa({ ...segno, memoria: prima }, fermo), /nessun processo ucciso per memoria e il contenitore non è ripartito: fermato da chi l'ha lanciato \(a mano, o al tempo massimo del comando\) o da un colpo da fuori dei comandi \(la sessione o l'harness\)/);
 
     // Senza la lettura di allora vale l'ora dello strumento: il contenitore partito dopo vuol dire ripartito.
     const dopoLoStrumento = testoUcciso({ programma: 'node', codice: 137, cosa: 'x', memoria: ripartito, daMs: Date.parse('2025-11-13T02:00:00Z') });
@@ -324,7 +342,8 @@ describe('il guasto di un processo ucciso', () => {
     assert.match(g, /Processi nella cartella: nessuno\. Rilasciato dalla veglia di chi guida il giro\.$/);
     assert.doesNotMatch(g, /forse un permesso|SEGRETO/);
     const conCorsa = testoGuasto({ fermoMs: 21 * 60000, ultimo, corsa: segno, memoria: segno.memoria });
-    assert.match(conCorsa, /^guasto: strumento finish-check: processo ucciso \(137\) durante finish:check \(fase spec delle aree toccate/);
+    assert.match(conCorsa, /^guasto: strumento finish-check: finish:check interrotto senza finire \(fase spec delle aree toccate/);
+    assert.match(conCorsa, /Il suo ultimo strumento è uscito 137 e da lì .*: col comando si è fermato anche il worker, il sotto-agente che girava nella sessione\./, 'il 137 c\'è dove lo dice il risultato dello strumento');
     // Un'uscita 1 è un rosso qualunque: il fermo resta quello di prima.
     const rosso = testoGuasto({ fermoMs: 21 * 60000, ultimo: { ...ultimo, uscita: 1 } });
     assert.match(rosso, /^guasto: strumento worker: worker fermo da 21 minuti .*forse un permesso, forse il modello/);
@@ -343,7 +362,7 @@ describe('il guasto di un processo ucciso', () => {
       dorme: async () => {},
     });
     assert.equal(r.uscita, USCITA_FERMO);
-    assert.match(dichiarato, /^guasto: strumento finish-check: processo ucciso \(137\) durante finish:check/);
+    assert.match(dichiarato, /^guasto: strumento finish-check: finish:check interrotto senza finire/);
     assert.match(dichiarato, /Ultimo strumento: Bash alle 19:06:00 UTC, con risposta, uscita 137\./);
   });
 
@@ -357,6 +376,81 @@ describe('il guasto di un processo ucciso', () => {
 
   test('un processo ucciso fuori da finish:check: il programma come gruppo, la causa se si legge', () => {
     assert.equal(testoUcciso({ programma: 'Node', codice: 137, cosa: 'x', memoria: null }),
-      'guasto: strumento node: processo ucciso (137) durante x: causa non leggibile; memoria: non letta.');
+      'guasto: strumento node: processo ucciso (137) durante x: causa non leggibile (fermato a mano, al tempo massimo del comando o da un colpo da fuori); memoria: non letta.');
+    assert.match(testoUcciso({ programma: 'node', cosa: 'x' }), /^guasto: strumento node: processo interrotto durante x:/, 'senza un\'uscita letta, niente numero');
+  });
+
+  test('la veglia: una corsa fermata dal worker e poi un fermo suo non diventano «ucciso» né «morta la sessione»', () => {
+    // L'ultimo strumento è quello che ha fermato la corsa: risposta avuta, nessuna uscita di segnale.
+    const fermata = { nome: 'TaskStop', ms: ORA, risposta: true };
+    const g = testoGuasto({ fermoMs: 21 * 60000, ultimo: fermata, corsa: segno, memoria: segno.memoria, quadro: 'Processi nella cartella: nessuno.' });
+    assert.match(g, /^guasto: strumento worker: worker fermo da 21 minuti .*forse un permesso, forse il modello\. Prima: finish:check interrotto senza finire \(fase spec delle aree toccate/);
+    assert.doesNotMatch(g, /137|ucciso \(|si è fermato anche il worker|sessione non è tornata/);
+    const rosso = testoGuasto({ fermoMs: 21 * 60000, ultimo: { ...fermata, nome: 'Bash', uscita: 1 }, corsa: segno, memoria: segno.memoria });
+    assert.match(rosso, /^guasto: strumento worker:/);
+  });
+
+  // Il Claude Code della corsa: pid 226, nato un minuto dopo il contenitore; quello di adesso può essere un altro.
+  const conClaude = (f, pid, tick) => ({
+    ...conAvvio(f, 5000),
+    [`/proc/${pid}/stat`]: `${pid} (claude) S 171 ${pid} ${pid} 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 1 0 ${tick} 1000 100 1\n`,
+  });
+  const allaPartenza = letturaMemoria(leggiDa(conClaude(contenitore(), 226, 11000)), { CLAUDE_PID: '226', CLAUDE_CODE_WORKER_EPOCH: '1' });
+  // 18:50:00 UTC del 17/11/2026: dieci minuti dopo la partenza della corsa (18:40).
+  const TICK_DOPO = (Date.parse('2026-11-17T18:50:00Z') / 1000 - 1763000000) * 100;
+
+  test('#2571.1 la sessione di Claude Code ripartita dopo la partenza: il guasto dice il colpo sulla sessione, con ora ed epoca', () => {
+    assert.deepEqual([allaPartenza.claudePid, allaPartenza.claudeAvvioS, allaPartenza.epoca], [226, 1763000110, 1]);
+    const ripartita = letturaMemoria(leggiDa(conClaude(contenitore(), 312, TICK_DOPO)), { CLAUDE_PID: '312', CLAUDE_CODE_WORKER_EPOCH: '2' });
+    const g = guastoDellaCorsa({ ...segno, memoria: allaPartenza }, ripartita);
+    assert.match(g, /: la sessione di Claude Code è ripartita alle 18:50:00 UTC \(epoca del lavoratore da 1 a 2\), dopo la partenza: con lei muoiono tutti i suoi comandi e i suoi sotto-agenti; memoria: /);
+    assert.doesNotMatch(g, /il contenitore è ripartito|colpo da fuori/);
+    // L'epoca da sola basta (in locale non c'è /proc): e il kernel che uccide per memoria resta scritto.
+    const soloEpoca = { ...letturaMemoria(leggiDa(contenitore({ oomCmd: 2, oomSis: 2 })), { CLAUDE_PID: '226', CLAUDE_CODE_WORKER_EPOCH: '3' }) };
+    assert.match(guastoDellaCorsa({ ...segno, memoria: { ...segno.memoria, epoca: 1, claudePid: 226 } }, soloEpoca), /ripartita \(epoca del lavoratore da 1 a 3\).*; prima il kernel aveva ucciso processi per memoria; memoria:/);
+    assert.equal(sessioneDellaCorsa(ripartita, allaPartenza, Date.parse(segno.inizio)), 'ripartita');
+  });
+
+  test('#2571.1 la stessa sessione, viva: l\'ha fermata lei o un colpo mirato, non la sessione morta', () => {
+    const adesso = letturaMemoria(leggiDa(conClaude(contenitore(), 226, 11000)), { CLAUDE_PID: '226', CLAUDE_CODE_WORKER_EPOCH: '1' });
+    const g = guastoDellaCorsa({ ...segno, memoria: allaPartenza }, adesso);
+    assert.match(g, /nessun processo ucciso per memoria e la sessione di Claude Code che l'ha lanciato è la stessa, ancora viva: l'ha fermato lei \(lo strumento che ferma i comandi, il tempo massimo del comando, un sotto-agente fermato o interrotto\) o un colpo mirato al processo/);
+    // Chi legge da un'altra sessione, più vecchia della corsa (in locale, due finestre): non si sa, e non si dice.
+    const altra = letturaMemoria(leggiDa(conClaude(contenitore(), 400, 9000)), { CLAUDE_PID: '400' });
+    assert.equal(sessioneDellaCorsa(altra, allaPartenza, Date.parse(segno.inizio)), '');
+    assert.match(guastoDellaCorsa({ ...segno, memoria: allaPartenza }, altra), /fermato da chi l'ha lanciato/);
+    assert.equal(sessioneDellaCorsa(letturaMemoria(() => null, {}), allaPartenza, 0), '', 'fuori da Claude Code non si sa');
+  });
+
+  test('#2571.1 la veglia: lo strumento senza risposta di una sessione ripartita non è un permesso', () => {
+    const ripartita = letturaMemoria(leggiDa(conClaude(contenitore(), 312, TICK_DOPO)), { CLAUDE_PID: '312', CLAUDE_CODE_WORKER_EPOCH: '2' });
+    const attesa = { nome: 'Bash', comando: 'cd /x && npm run finish:check', ms: Date.parse('2026-11-17T18:45:00Z') };
+    const g = testoGuasto({ fermoMs: 21 * 60000, attesa, memoria: ripartita, quadro: 'Processi nella cartella: nessuno.' });
+    assert.match(g, /^guasto: strumento npm: processo interrotto durante Bash delle 18:45:00 UTC: la sessione di Claude Code è ripartita alle 18:50:00 UTC/);
+    assert.match(g, /Da lì il worker non dà segni di vita da 21 minuti .*: la sua sessione non è tornata\. Processi nella cartella: nessuno\./);
+    assert.doesNotMatch(g, /permess|137/);
+    // Con la stessa sessione lo strumento senza risposta resta un permesso in attesa.
+    const stessa = letturaMemoria(leggiDa(conClaude(contenitore(), 226, 11000)), { CLAUDE_PID: '226' });
+    assert.match(testoGuasto({ fermoMs: 21 * 60000, attesa, memoria: stessa }), /^guasto: permessi npm:/);
+  });
+
+  test('#2571.1 la veglia: dopo un 137 con la stessa sessione viva si è fermato il worker, non la sessione', () => {
+    const stessa = letturaMemoria(leggiDa(conClaude(contenitore(), 226, 11000)), { CLAUDE_PID: '226', CLAUDE_CODE_WORKER_EPOCH: '1' });
+    const ultimo = { nome: 'Bash', programma: 'npx', ms: Date.parse('2026-11-17T18:45:00Z'), risposta: true, uscita: 137 };
+    for (const corsa of [null, { ...segno, memoria: allaPartenza }]) {
+      const g = testoGuasto({ fermoMs: 21 * 60000, ultimo, corsa, memoria: stessa, quadro: 'Processi nella cartella: nessuno.' });
+      assert.match(g, /la sessione di Claude Code che l'ha lanciato è la stessa, ancora viva/, g);
+      assert.match(g, /Il suo ultimo strumento è uscito 137 e da lì il worker non dà segni di vita da 21 minuti \([^)]*\): col comando si è fermato anche il worker, il sotto-agente che girava nella sessione\. Processi nella cartella: nessuno\./, g);
+      assert.doesNotMatch(g, /si è fermata anche la sua sessione|sessione non è tornata/, 'la sessione viva non si dice anche morta');
+    }
+  });
+
+  test('#2571.1 in questo sistema l\'avvio di un processo vero si legge da /proc: questo, nato da poco', { skip: process.platform !== 'linux' && 'senza /proc' }, () => {
+    const s = sessioneClaude({ CLAUDE_PID: String(process.pid), CLAUDE_CODE_WORKER_EPOCH: '4' });
+    const nato = Date.now() - process.uptime() * 1000;
+    assert.equal(s.claudePid, process.pid);
+    assert.equal(s.epoca, 4);
+    assert.ok(Math.abs(s.claudeAvvioS * 1000 - nato) < 5000, `${s.claudeAvvioS * 1000} contro ${nato}`);
+    assert.ok(Number.isNaN(letturaMemoria().claudePid), 'la sessione che lancia le prove non arriva alle prove');
   });
 });

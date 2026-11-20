@@ -82,7 +82,7 @@ import { unitLontane, VAR_LONTANE, specSulPc, cambiatiDelRamo } from './lib/unit
 import { avviaProvaRemota, attendiProvaRemota, provaRemota } from './lib/prova-remota.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
-import { apriCorsa, corsaInterrotta, guastoDellaCorsa } from './lib/corsa-controlli.mjs';
+import { apriCorsa, corsaInterrotta, guastoDellaCorsa, PREFISSO_CORSA } from './lib/corsa-controlli.mjs';
 import { letturaMemoria, testoMemoria } from './lib/memoria-contenitore.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
@@ -949,9 +949,9 @@ async function main() {
   // Lo sha si fissa adesso e i controlli girano in una cartella staccata su di lui: se intanto questa cartella cambia
   // ramo (un altro worker, un checkout), l'esito resta di questo commit (#1480, D-91).
   const shaProvato = git(['rev-parse', 'HEAD']).out;
-  // #2571: un lancio ucciso (137) non lascia processi né righe; il suo segno dice a chi viene dopo cosa è morto e dove.
+  // #2571: un lancio interrotto non lascia processi né righe; il suo segno dice a chi viene dopo cosa si è fermato e dove.
   const morta = corsaInterrotta(ROOT);
-  if (morta) console.log(`\n▸ ${guastoDellaCorsa(morta, letturaMemoria()).replace(/^guasto: strumento finish-check: /, 'Il lancio precedente: ')}`);
+  if (morta) console.log(`\n▸ Il lancio precedente: ${guastoDellaCorsa(morta, letturaMemoria()).slice(PREFISSO_CORSA.length)}`);
   const corsa = apriCorsa(ROOT, { sha: shaProvato });
   // Ogni corsa arrivata in fondo è la misura che un ramo largo non va oltre il tetto dei comandi (#2571).
   process.on('exit', () => console.log(`\n▸ Memoria della corsa: ${corsa.bilancio().replace(/^memoria: /, '')}`));
