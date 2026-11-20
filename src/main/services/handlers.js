@@ -474,21 +474,27 @@ async function eseguiAzioneFilo(action, {
     const C = require('./comandiSistema');
     if (!confirmed) delete action._nomeTrovato;
     const q = C.normalizzaRichiesta(richiestaDiSistema(type, action));
+    // Una richiesta che non partirebbe torna al modello subito, senza un popup che chiede di confermarla.
+    if (q.errore) return { executed: false, kept: false, output: { ok: false, cosa: richiestaDiSistema(type, {}).cosa, errore: 'richiesta', frase: q.errore } };
     let nome = q.nome || '';
+    // Il dispositivo che la conferma ha nominato, fissato col suo indirizzo: lo scrive solo il main (#2394.1).
+    let indirizzo = '';
     // Già com'è chiesto (la rete è quella, le cuffie sono staccate, la radio è spenta): niente da confermare.
     let gia = false;
     // Rete e dispositivo da confermare: il popup nomina quello che partirà, trovato prima di chiedere; all'OK parte
     // quello mostrato. Un nome che non ne trova uno solo torna al modello con l'elenco, senza una conferma a vuoto.
-    if (nome && (type === 'WIFI' || q.collega === false)) {
+    if (nome && (type === 'WIFI' || q.collega === false || q.dimentica)) {
       if (confirmed) {
         const visti = bersagliMostrati(sender, action);
         if (visti && typeof visti.nome === 'string' && visti.nome) nome = visti.nome;
+        if (visti && typeof visti.indirizzo === 'string') indirizzo = visti.indirizzo;
       } else {
         const trovato = await C.risolviNome(q);
         if (trovato.esito) return { executed: false, kept: false, output: trovato.esito };
         // Il nome vero l'ha scelto chi gestisce la rete o il dispositivo: entra nel compito come una lettura.
         if (trovato.nome && trovato.nome !== q.nome) action._nomeTrovato = true;
         if (trovato.nome) nome = trovato.nome;
+        if (trovato.indirizzo) indirizzo = trovato.indirizzo;
         gia = trovato.gia === true;
       }
     } else if (!nome && q.acceso === false && !confirmed) {
