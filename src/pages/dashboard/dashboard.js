@@ -1159,9 +1159,10 @@
       const f = globalThis.SN_FONTI_CITATE ? globalThis.SN_FONTI_CITATE.nascondi(t) : String(t || '');
       return globalThis.SN_IMMAGINI_RISPOSTA ? globalThis.SN_IMMAGINI_RISPOSTA.nascondi(f) : f;
     };
-    const testoDelGiro = () => senzaMarcatori(globalThis.SN_CALC
+    const testoGrezzoDelGiro = () => (globalThis.SN_CALC
       ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
       : streamedText);
+    const testoDelGiro = () => senzaMarcatori(testoGrezzoDelGiro());
     const bollaDellaRisposta = () => {
       if (!streamBubble) {
         streamBubble = document.createElement('div');
