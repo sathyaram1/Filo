@@ -2233,13 +2233,17 @@
     document.body.appendChild(lightboxEl);
     return lightboxEl;
   }
-  function openLightbox(src) {
+  // `fila`: le foto dello stesso carosello (#2272), che le frecce della tastiera scorrono restando ingrandite.
+  let filaLightbox = [];
+  function openLightbox(src, fila = null) {
     const el = ensureLightbox();
     el.querySelector('img').src = src;
+    filaLightbox = Array.isArray(fila) && fila.length > 1 && fila.includes(src) ? fila.slice() : [];
     el.classList.add('open');
   }
   function closeLightbox() {
     if (!lightboxEl) return;
+    filaLightbox = [];
     lightboxEl.classList.remove('open');
     const img = lightboxEl.querySelector('img');
     if (img) img.removeAttribute('src');
