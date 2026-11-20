@@ -5,7 +5,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import path, { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/urlNav.js');
