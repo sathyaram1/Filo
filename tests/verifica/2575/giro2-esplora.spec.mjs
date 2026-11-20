@@ -106,7 +106,7 @@ test('pagina feedback: aspetto e testo che arriva', async ({ openTab }) => {
     await page.waitForTimeout(150);
     await page.screenshot({ path: `tests/.shots/verifica-2575-g2-feedback-${tema}.png` });
   }
-  const box = page.locator('textarea:visible').first();
+  const box = page.locator('.fb-correzione-text');
   await box.fill('Usa la coda che c’è già.');
   await page.keyboard.press('Control+Enter');
   await page.waitForTimeout(300);
