@@ -1,5 +1,5 @@
 // Verifica #2394.1, giro 2: mentre il PowerShell del lettore risponde a un elenco non rilegge lo stato, e la sua
-// ultima riga non deve passare per una lettura di adesso; arrivata la risposta, torna a valere.
+// ultima riga non deve passare per una lettura di adesso.
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
