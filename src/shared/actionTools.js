@@ -349,6 +349,11 @@
       description: 'mette in ordine le icone del desktop (ordine nome|tipo|data|dimensione, verso righe|colonne).',
       properties: { ordine: S(), verso: S(), al_contrario: B(), cartelle_prima: B() }, required: [],
     },
+    BLOCCA_PC: {
+      via: ['computer', 'blocca'],
+      description: 'blocca subito il computer.',
+      properties: {}, required: [],
+    },
 
     // ── web ──
     CERCA_WEB: {

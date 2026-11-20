@@ -1057,6 +1057,7 @@
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
     ORDINA_DESKTOP: 'Sistemo le icone del desktop…',
+    BLOCCA_PC: 'Blocco il computer…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
     RIMEDIO_CREDITI: 'Guardo i crediti…',
     PULSANTE_PREFERENZE: 'Uso le Preferenze…',

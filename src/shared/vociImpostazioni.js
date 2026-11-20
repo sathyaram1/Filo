@@ -99,6 +99,8 @@
         correttoreRiscritte: 'correttore.riscrittePerImparare',
         categorieAutomatiche: 'featureFlags.categorize',
         doppioToccoSoglia: 'doppioTocco.sogliaMs',
+        doppioCtrlAcceso: 'doppioCtrl.acceso',
+        doppioCtrlSoglia: 'doppioCtrl.sogliaMs',
         ricercaFiloPausa: 'ricercaFilo.pausaMs',
       },
       gruppi: {

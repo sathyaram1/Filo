@@ -758,6 +758,12 @@
     }
     return global.SN_DOPPIO_TOCCO || null;
   }
+  function doppioCtrl() {
+    if (!global.SN_DOPPIO_CTRL && typeof require === 'function') {
+      try { if (!global.SN_CARTE_HOME) require('./carteHome.js'); require('./doppioCtrl.js'); } catch (_) {}
+    }
+    return global.SN_DOPPIO_CTRL || null;
+  }
 
   // Millisecondi da una frase: «0,5 s», «400 ms», «400». Senza unità sono millisecondi, sotto `secondiSotto` secondi.
   function msDaTesto(v, secondiSotto = 0) {
@@ -1216,6 +1222,45 @@
         const [min, max] = D.SOGLIA_LIMITI;
         if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
         return { partial: { doppioTocco: { sogliaMs: n } }, label: `Doppio tocco entro → ${cifre(n)} ms` };
+      },
+    },
+    // #2377 — il doppio Ctrl: acceso, la soglia fra i due tocchi (accessibilità) e le lettere.
+    {
+      scrive: ['doppioCtrl.acceso'],
+      aiuto: 'true | false (due tocchi di Ctrl, Cmd su Mac, aprono il box delle lettere di Filo; Ctrl, Ctrl e una lettera fanno l\'azione)',
+      costo: 1,
+      keys: ['doppio_ctrl', 'doppio ctrl', 'doppio control', 'doppio cmd', 'ctrl ctrl', 'box delle lettere', 'lettere di filo', 'doppioctrl.acceso'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { doppioCtrl: { acceso: b } }, label: `Doppio Ctrl → ${b ? 'acceso' : 'spento'}` };
+      },
+    },
+    {
+      scrive: ['doppioCtrl.sogliaMs'],
+      costo: 1,
+      aiuto: 'millisecondi 150-1500 (entro quanto il secondo tocco di Ctrl vale come doppio, e quanto si aspetta prima del box; più alto per chi ha la mano che trema)',
+      keys: ['soglia_doppio_ctrl', 'soglia doppio ctrl', 'tempo doppio ctrl', 'velocita doppio ctrl', 'velocità doppio ctrl', 'doppioctrl.sogliams'],
+      build(v) {
+        const n = msDaTesto(v, 10);
+        const D = doppioCtrl();
+        if (n == null || !D) return null;
+        const [min, max] = D.SOGLIA_LIMITI;
+        if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+        return { partial: { doppioCtrl: { sogliaMs: n } }, label: `Doppio Ctrl entro → ${cifre(n)} ms` };
+      },
+    },
+    {
+      scrive: ['doppioCtrl.lettere'],
+      costo: 1,
+      aiuto: 'una lettera e la sua azione: «e editor», «z riapri», «togli b», «di serie». Azioni: cerca nel filo, impostazioni, cattura schermo, tema, schermo intero, aiuto, muto, pausa, leggi ad alta voce, salva per dopo, riapri scheda chiusa, blocca il computer, cuffie preferite, trascrivi, e le app (editor, download, memorie, aperti per dopo)',
+      keys: ['lettere_doppio_ctrl', 'lettere del doppio ctrl', 'lettera doppio ctrl', 'lettera del ctrl', 'doppioctrl.lettere'],
+      build(v, attuali) {
+        const D = doppioCtrl();
+        const r = D && D.daTesto(v, attuali);
+        if (!r) return null;
+        if (r.rifiuto) return { rifiuto: r.rifiuto };
+        return { partial: { doppioCtrl: { lettere: r.lettere } }, label: r.label };
       },
     },
     {

@@ -28,6 +28,7 @@
   <script src="filo://shared/urlNav.js"></script>
   <script src="filo://shared/carteHome.js"></script>
   <script src="filo://shared/doppioTocco.js"></script>
+  <script src="filo://shared/doppioCtrl.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
   <script src="filo://shared/cambi.js"></script>
   <script src="filo://shared/menuImpostazioni.js"></script>
@@ -461,6 +462,19 @@
         <button class="sn-btn sn-btn-secondary" id="doppioToccoAggiungi" type="button">Aggiungi</button>
         <span id="doppioToccoHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
       </div>
+    </section>
+
+    <!-- #2377 — il doppio Ctrl: acceso e soglia; le lettere si cambiano dal box, il nome del tasto lo scrive preferences.js. -->
+    <section id="sec-doppio-ctrl">
+      <h2>Lettere di Filo</h2>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="doppioCtrlAcceso" />
+          <span>Due tocchi di <span class="tasto-ctrl"></span> aprono le lettere; <span class="tasto-ctrl"></span>, <span class="tasto-ctrl"></span> e una lettera fanno l'azione</span>
+        </label>
+      </div>
+      <label for="doppioCtrlSoglia" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Entro quanto il secondo tocco vale (millisecondi, da 150 a 1.500)</label>
+      <input type="number" id="doppioCtrlSoglia" min="150" max="1500" step="50" style="width:120px;" />
     </section>
 
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">

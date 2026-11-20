@@ -442,6 +442,20 @@
     });
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
+    // La C del doppio Ctrl (#2377): nella home la apre il comando, da un'altra scheda si arriva con ?cerca.
+    try {
+      global.chrome.runtime.onMessage.addListener((m) => {
+        if (m && m.type === MSG.SHORTCUT_TRIGGERED && m.command === 'cerca-nel-filo') apri();
+      });
+    } catch (_) {}
+    try {
+      const u = new URL(global.location.href);
+      if (u.searchParams.has('cerca')) {
+        u.searchParams.delete('cerca');
+        global.history.replaceState(global.history.state, '', u.pathname + u.search + u.hash);
+        apri();
+      }
+    } catch (_) {}
   }
 
   global.SN_DASH_CERCA = { init, apri, chiudi, aperta: () => aperta };

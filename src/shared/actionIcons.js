@@ -75,6 +75,7 @@
     BLUETOOTH: 'bluetooth',
     WIFI: 'wifi',
     ORDINA_DESKTOP: 'desktopIcons',
+    BLOCCA_PC: 'lock',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
     ANNULLA_CAMBIO: 'undo',

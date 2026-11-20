@@ -3116,7 +3116,19 @@
       openHelpSidebar(context);
     } else if (command === 'aiuto-dalla-barra') {
       aiutoPasso();
+    } else if (command === 'leggi-ad-alta-voce') {
+      leggiAdAltaVoce(selInfo);
     }
+  }
+
+  // La L del doppio Ctrl (#2377): mentre legge la ferma; se no legge il testo selezionato, o la pagina.
+  function leggiAdAltaVoce(selInfo) {
+    if (TTS.ttsBusy()) { TTS.stopReading(); return; }
+    const voce = selInfo && selInfo.selection ? TTS.buildReadAloudItem(selInfo.selection) : null;
+    if (voce) { voce.onClick(); return; }
+    const testo = Extract.extractMainTextNodes().map((n) => n.text).join('\n\n') || String((document.body && document.body.innerText) || '');
+    if (testo.trim()) TTS.readAloud(testo);
+    else Popup.toastErrore('err_no_selection');
   }
 
   // Lettura ad alta voce e dettatura: src/content/tts.js.

@@ -875,6 +875,8 @@
       case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro({ uscitaMs: $('pannelloUscita').value }).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs;
       case 'doppioTocco.sogliaMs': return window.SN_DOPPIO_TOCCO.sogliaMs($('doppioToccoSoglia').value);
+      case 'doppioCtrl.acceso': return $('doppioCtrlAcceso').checked;
+      case 'doppioCtrl.sogliaMs': return window.SN_DOPPIO_CTRL.sogliaMs($('doppioCtrlSoglia').value);
       case 'ricercaFilo.pausaMs': return window.SN_CONST.opzioniRicercaFilo({ pausaMs: $('ricercaFiloPausa').value }).pausaMs;
       case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
@@ -983,6 +985,8 @@
       case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro(s.pannelloDestro).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno(s.avvisoSchermoPieno).durataMs;
       case 'doppioTocco.sogliaMs': return window.SN_DOPPIO_TOCCO.normalizza(s.doppioTocco).sogliaMs;
+      case 'doppioCtrl.acceso': return window.SN_DOPPIO_CTRL.normalizza(s.doppioCtrl).acceso;
+      case 'doppioCtrl.sogliaMs': return window.SN_DOPPIO_CTRL.normalizza(s.doppioCtrl).sogliaMs;
       case 'ricercaFilo.pausaMs': return window.SN_CONST.opzioniRicercaFilo(s.ricercaFilo).pausaMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
@@ -1174,6 +1178,8 @@
     if (vuole('pannelloDestro.uscitaMs')) $('pannelloUscita').value = String(pannello.uscitaMs);
     if (vuole('avvisoSchermoPieno.durataMs')) $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno(settings.avvisoSchermoPieno).durataMs);
     if (vuole('doppioTocco.sogliaMs')) $('doppioToccoSoglia').value = String(window.SN_DOPPIO_TOCCO.normalizza(settings.doppioTocco).sogliaMs);
+    if (vuole('doppioCtrl.acceso')) $('doppioCtrlAcceso').checked = window.SN_DOPPIO_CTRL.normalizza(settings.doppioCtrl).acceso;
+    if (vuole('doppioCtrl.sogliaMs')) $('doppioCtrlSoglia').value = String(window.SN_DOPPIO_CTRL.normalizza(settings.doppioCtrl).sogliaMs);
     if (vuole('ricercaFilo.pausaMs')) $('ricercaFiloPausa').value = String(window.SN_CONST.opzioniRicercaFilo(settings.ricercaFilo).pausaMs);
 
     const terminal = settings.terminal || {};
@@ -2042,6 +2048,8 @@
     });
     $('showHomeMessage').addEventListener('change', persist);
     $('barraSitiVisibile').addEventListener('change', persist);
+    $('doppioCtrlAcceso').addEventListener('change', persist);
+    for (const n of document.querySelectorAll('.tasto-ctrl')) n.textContent = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl') : 'Ctrl';
     for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth', 'homeSisVolume']) $(id).addEventListener('change', persist);
     $('tabPreviewEnabled').addEventListener('change', () => {
       $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
@@ -2134,9 +2142,9 @@
     $('avvisoSchermoPienoDurata').addEventListener('blur', () => {
       $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs);
     });
-    for (const id of ['doppioToccoSoglia', 'ricercaFiloPausa']) {
+    for (const id of ['doppioToccoSoglia', 'doppioCtrlSoglia', 'ricercaFiloPausa']) {
       $(id).addEventListener('change', persist);
-      $(id).addEventListener('blur', () => { $(id).value = String(valoreDelCampo(id === 'doppioToccoSoglia' ? 'doppioTocco.sogliaMs' : 'ricercaFilo.pausaMs')); });
+      $(id).addEventListener('blur', () => { $(id).value = String(valoreDelCampo(CAMPO_DI[id])); });
     }
     $('doppioToccoAggiungi').addEventListener('click', () => { aggiungiLettera().catch(() => {}); });
     for (const id of ['doppioToccoNuova', 'doppioToccoDove']) {

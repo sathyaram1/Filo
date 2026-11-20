@@ -321,6 +321,7 @@
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
+    BLOCCA_PC: () => ({ icon: '🔒', text: 'Computer bloccato' }),
     // #1621 — l'ordine chiesto e quante icone Windows ha davvero spostato.
     ORDINA_DESKTOP: (a) => {
       const o = a._output || {};
@@ -451,7 +452,7 @@
     CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
-    ORDINA_DESKTOP: 'Icone del desktop non spostate',
+    ORDINA_DESKTOP: 'Icone del desktop non spostate', BLOCCA_PC: 'Computer non bloccato',
     ESEGUI_COMANDO: 'Comando non eseguito', CANCELLA_MEMORIA: 'Memoria non cancellata',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
     PULISCI_TAB: 'Riordino non riuscito', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
