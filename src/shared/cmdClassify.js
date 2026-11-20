@@ -250,9 +250,7 @@
     }
     return voci.some(([ambito, k, valore]) => {
       if (ambito !== 'local' && ambito !== 'worktree') return false;
-      const chiave = k.toLowerCase();
-      if (chiave === 'core.fsmonitor') return !/^(true|false|yes|no|on|off|1|0)?$/i.test(valore.trim());
-      return !GIT_CHIAVI_INERTI.some((re) => re.test(chiave));
+      return !gitChiaveInerte(k, valore, false);
     });
   }
 
