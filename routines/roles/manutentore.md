@@ -89,7 +89,8 @@ prima che decidi, il fermo va all'owner. Tre strade, in quest'ordine di preferen
 1. **Riaprirlo con decisioni nuove**: `nota <N> -` con le decisioni (cosa correggere, cosa lasciare). Riprende un
    correttore sul ramo, coi rilievi davanti e i bilanci azzerati.
 2. **Farlo passare con un figlio per ciò che resta**: `passa <N> [perché]`. I rilievi aperti diventano un feedback
-   figlio, il lavoro passa la verifica sul commit provato e va al controllo di sicurezza.
+   figlio, il lavoro passa la verifica sul commit provato e va al controllo di sicurezza. Se dopo l'ultima verifica il
+   ramo è cambiato (una correzione o un riallineamento che nessuno ha provato), `passa` rifiuta: riaprilo con una nota.
 3. **Una domanda all'owner**, come ultima risorsa (`domanda <file.json>`, con l'azione `riprendi` sul lavoro).
 
 `bilanci` li legge; `bilanci --cap3 N --cap2 N --cap1 N --tetto N` li scrive (i bilanci da 0 a 10, il tetto da 1 a 50),
