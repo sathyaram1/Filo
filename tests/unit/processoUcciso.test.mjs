@@ -186,7 +186,7 @@ describe('il segno della corsa di finish:check', () => {
     });
     assert.equal(r.code, 0, r.so + r.se);
     assert.match(r.so, /Finito: nessun tuo processo/);
-    assert.match(r.so, /La corsa di finish:check si è interrotta senza finire: fase avvio/);
+    assert.match(r.so, /La corsa di finish:check si è interrotta senza finire \(fase avvio/);
     assert.match(r.so, /--guasto "guasto: strumento finish-check: finish:check interrotto senza finire \(fase avvio/);
     assert.doesNotMatch(r.so, /137/);
   });
