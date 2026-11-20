@@ -2225,7 +2225,10 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
 test('restaLocale: il fermo di un lavoro server che nascerebbe non fidato, coi motivi, solo in coda (#2036)', () => {
   const srv = (extra) => Object.assign({ status: 'revision_security', localOnly: { by: 'owner', at: '2026-10-01' } }, extra);
   const segno = { motivi: ['ramo non pulito', ' '], ruolo: 'secaudit', atMs: 5 };
-  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], sblocchi: [MR.sbloccoFermo('ramo non pulito')], atMs: 5 });
+  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], sblocchi: [MR.sbloccoFermo('ramo non pulito')], cause: [], atMs: 5 });
+  // #2565: il motivo del buco che il server scrive fra le cause arriva alla scheda.
+  const conCausa = Object.assign({}, segno, { cause: ['ramo dell’app: il commit 1234abcd non l’ha dichiarato nessun biglietto pulito', ' ', 7] });
+  assert.deepEqual(MR.restaLocale(srv({ restaLocale: conCausa })).cause, ['ramo dell’app: il commit 1234abcd non l’ha dichiarato nessun biglietto pulito', '7']);
   assert.deepEqual(MR.restaLocale(srv({ status: 'todo', restaLocale: segno })).motivi, ['ramo non pulito']);
   assert.equal(MR.restaLocale(srv({ restaLocale: segno }), { lavoriServer: false }), null, 'lavori server spenti: in mano locale (#2036.1)');
   assert.ok(MR.restaLocale(srv({ restaLocale: segno }), { lavoriServer: true }));
