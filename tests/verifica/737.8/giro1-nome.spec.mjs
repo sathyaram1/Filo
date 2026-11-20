@@ -99,7 +99,7 @@ test('senza clic la pagina che riempie la finestra per nome non la porta davanti
   const uno = testServer.html('<title>UNO</title>');
   const due = testServer.html('<title>DUE</title>');
   const page = await openTab(testServer.html(`<a id="a" href="${uno}" target="_new" style="display:block;height:40px">uno</a>
-    <script>document.getElementById('a').addEventListener('click',function(){setTimeout(function(){window.open(${JSON.stringify(due)},'_new')},4000)})</script>`));
+    <script>document.getElementById('a').addEventListener('click',function(){setTimeout(function(){window.open(${JSON.stringify(due)},'_new')},7000)})</script>`));
   await page.click('#a');
   await expect.poll(async () => (await stato(app)).attiva, { timeout: 8000 }).toBe(uno);
   await torna(app, shell, page);
