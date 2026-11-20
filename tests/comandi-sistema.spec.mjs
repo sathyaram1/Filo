@@ -24,6 +24,7 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
     globalThis.__pcLetture = [];
     const pc = globalThis.__pc;
     const disp = a.dispositivi;
+    globalThis.__pcDisp = disp;
     const reti = a.reti;
     const traccia = (nome, p) => globalThis.__pcChiamate.push([nome, p || {}]);
     const lettura = () => (a.lettureFerme ? new Promise((r) => globalThis.__pcLetture.push(r)) : Promise.resolve());
