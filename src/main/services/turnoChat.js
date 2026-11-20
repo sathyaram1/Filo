@@ -1299,7 +1299,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     try { e.filoActions = renderedActions; } catch (_) {}
     // La risposta scritta coi bottoni era già arrivata: un giro dopo che fallisce non la toglie dalla chat (#1167).
     if (unisciTesti(risposta)) {
-      try { await archiviaGiaFatto(); } catch (err) { console.warn('[Filo] archivio della risposta prima del guasto:', err?.message || err); }    }
+      try { await archiviaGiaFatto(); } catch (err) { console.warn('[Filo] archivio della risposta prima del guasto:', err?.message || err); }
+    }
     throw e;
   } finally {
     turno.chiuso = !fermato;
