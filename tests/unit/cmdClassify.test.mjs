@@ -1396,6 +1396,60 @@ test('cancellaPerSempre: il programma che git lancia da sé si guarda come gli a
   }
 });
 
+// #2623: il remoto di un ramo e quello predefinito accettano un indirizzo al posto di un nome, e il `git push` nudo
+// che segue (2) lo raggiunge: scriverli vale come scrivere l'indirizzo di un remoto.
+const CHIAVI_DEL_PUSH = ['branch.main.pushRemote', 'remote.pushDefault', 'branch.main.remote'];
+test('git config — il remoto di un ramo o quello predefinito, scritti, decidono dove va il push (3) (#2623)', () => {
+  for (const chiave of [...CHIAVI_DEL_PUSH, 'branch.feature/x.y.pushremote', 'REMOTE.PUSHDEFAULT']) {
+    for (const cmd of [`git config ${chiave} https://altrove.example/r.git`, `git config ${chiave} altrove.example:r.git`,
+      `git config ${chiave} origin`, `git config --global ${chiave} ../altrove`, `git config --add ${chiave} x`,
+      `git config --replace-all ${chiave} x`, `git config set ${chiave} https://x/r.git`, `git config set --append ${chiave} x`]) {
+      assert.equal(lvl(cmd), 3, `"${cmd}" (sceglie dove va il prossimo push) dovrebbe essere livello 3`);
+    }
+  }
+  // Leggerle resta lettura; le chiavi vicine che non scelgono il server restano 2.
+  for (const cmd of ['git config --get branch.main.remote', 'git config remote.pushDefault', 'git config get branch.main.pushRemote']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  }
+  for (const cmd of ['git config branch.main.merge refs/heads/main', 'git config push.default current', 'git config branch.main.rebase true',
+    'git config remote.origin.push refs/heads/main', 'git config branch.remote.x y']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (non sceglie il server) dovrebbe essere livello 2`);
+  }
+});
+
+const conGit = (() => { try { execFileSync('git', ['--version'], { stdio: 'ignore' }); return true; } catch (_) { return false; } })();
+test('git vero: dopo una di quelle chiavi, il `git push` nudo manda il codice all\'indirizzo scritto (#2623)', { skip: conGit ? false : 'git non installato' }, () => {
+  const base = cartellaTemporanea('filo-2623-push-');
+  // Niente impostazioni della macchina: un insteadOf globale cambierebbe gli indirizzi.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/.test(k)));
+  Object.assign(env, { GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(base, 'nessuna.gitconfig'), GIT_TERMINAL_PROMPT: '0' });
+  const git = (cwd, ...a) => execFileSync('git', a, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  try {
+    const origine = join(base, 'origine.git');
+    git(base, 'init', '-q', '--bare', origine);
+    const lavoro = join(base, 'lavoro');
+    git(base, 'init', '-q', '-b', 'main', lavoro);
+    git(lavoro, 'config', 'user.email', 'prova@example.test');
+    git(lavoro, 'config', 'user.name', 'prova');
+    git(lavoro, 'remote', 'add', 'origin', origine);
+    git(lavoro, 'commit', '-q', '--allow-empty', '-m', 'primo');
+    git(lavoro, 'push', '-q', '-u', 'origin', 'main');
+    for (const chiave of CHIAVI_DEL_PUSH) {
+      const altrove = join(base, `altrove-${chiave}.git`);
+      git(base, 'init', '-q', '--bare', altrove);
+      git(lavoro, 'commit', '-q', '--allow-empty', '-m', chiave);
+      git(lavoro, 'config', chiave, altrove);
+      assert.equal(lvl(`git config ${chiave} ${altrove}`), 3, `"git config ${chiave} <indirizzo>" dovrebbe chiedere "conferma"`);
+      assert.equal(lvl('git push'), 2);
+      git(lavoro, 'push', '-q');
+      assert.equal(git(altrove, 'rev-parse', 'main'), git(lavoro, 'rev-parse', 'HEAD'), `con ${chiave} il push è arrivato all'indirizzo scritto`);
+      git(lavoro, 'config', '--unset', chiave);
+    }
+  } finally {
+    togliCartella(base);
+  }
+});
+
 // #1909 — cancellare senza cestino si riconosce dal programma di ogni pezzo, anche nascosto dietro un altro comando.
 test('cancellaPerSempre: i comandi che cancellano senza cestino, in ogni shell', () => {
   for (const cmd of [
