@@ -946,8 +946,16 @@
       const v = url ? valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda }) : null;
       if (v && v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
-    if (tipo === 'CERCA_WEB' || tipo === 'IMMAGINI_WEB') {
-      const v = valutaRicerca(String(action.query ?? action.q ?? action.cerca ?? action.testo ?? action.text ?? ''), { memoria, azioni });
+    if (tipo === 'IMMAGINI_WEB') {
+      // Senza il modulo delle azioni si guardano tutti i campi insieme: più di quello che esce, mai meno.
+      const L = global.SN_ACTION_LEVELS;
+      const q = L && L.ricercaImmaginiDi ? L.ricercaImmaginiDi(action)
+        : [action.query, action.cerca, action.testo, action.q, action.text].filter((x) => x != null).join('\n');
+      const v = valutaRicerca(String(q), { memoria, azioni });
+      if (v.exfil) return { ...niente, exfil: true, reason: v.reason };
+    }
+    if (tipo === 'CERCA_WEB') {
+      const v = valutaRicerca(String(action.query ?? action.q ?? action.testo ?? action.text ?? ''), { memoria, azioni });
       if (v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
     // Un comando che va in rete porta fuori il suo indirizzo come un NAVIGA (#2293): stesso controllo, uno per indirizzo.
