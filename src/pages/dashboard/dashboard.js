@@ -2260,6 +2260,14 @@
     if (e.key === 'Escape' && lightboxEl?.classList.contains('open')) {
       e.preventDefault();
       closeLightbox();
+      return;
+    }
+    if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && filaLightbox.length && lightboxEl?.classList.contains('open')) {
+      e.preventDefault();
+      const big = lightboxEl.querySelector('img');
+      const n = filaLightbox.length;
+      const i = filaLightbox.indexOf(big.getAttribute('src'));
+      big.src = filaLightbox[(Math.max(0, i) + (e.key === 'ArrowRight' ? 1 : n - 1)) % n];
     }
   });
 
