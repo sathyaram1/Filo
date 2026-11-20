@@ -752,6 +752,8 @@
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
+  const numeroIt = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
+
   function quotaServito(q) {
     const p = q * 100;
     return p > 0 && p < 1 ? '<1%' : `${Math.round(p)}%`;
