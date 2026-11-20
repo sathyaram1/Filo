@@ -136,4 +136,24 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
   return { anticipa, controlla, _cache: cache };
 }
 
-module.exports = { crea, ATTESA_MS };
+// Il testo di un allegato che non è un'immagine né un PDF, o null: l'elenco dei tipi è quello del riquadro.
+function testoDiAllegato(f) {
+  try {
+    if (!f || typeof f.dataUrl !== 'string') return null;
+    const AT = globalThis.SN_FEEDBACK_ATTACH;
+    const tipo = String(f.type || '').toLowerCase();
+    if (AT && AT.classify({ name: f.name, type: tipo }) !== 'file') return null;
+    if (tipo === 'application/pdf' || /\.pdf$/i.test(String(f.name || ''))) return null;
+    const m = /^data:[^,]*?(;base64)?,/i.exec(f.dataUrl);
+    if (!m) return null;
+    const corpo = f.dataUrl.slice(m[0].length);
+    return m[1] ? Buffer.from(corpo, 'base64').toString('utf8') : decodeURIComponent(corpo);
+  } catch (_) { return null; }
+}
+
+// Lo stesso L0 per il riquadro e per la segnalazione confermata in chat: lo crea chi ha il cancello dei modelli.
+let attivo = null;
+function usa(l0) { attivo = l0 || null; }
+function corrente() { return attivo; }
+
+module.exports = { crea, ATTESA_MS, testoDiAllegato, usa, corrente };
