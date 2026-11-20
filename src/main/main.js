@@ -226,6 +226,7 @@ app.whenReady().then(async () => {
   // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
   try { await require('./services/interruttoreAiuto').migra(); } catch (e) { console.warn('[Filo] interruttore dell\'Aiuto:', e?.message || e); }
   try { await require('./services/correttoreMigrazione').migra(); } catch (e) { console.warn('[Filo] correttore a due segni:', e?.message || e); }
+  try { await require('./services/privacyMigrazione').migra(); } catch (e) { console.warn('[Filo] livelli di privacy:', e?.message || e); }
   let impostazioniAvvio = {};
   try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
   passo('impostazioni_lette', t);
