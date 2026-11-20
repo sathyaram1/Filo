@@ -25,6 +25,8 @@ require(join(ROOT, 'src', 'shared', 'pavimento.js'));
 require(join(ROOT, 'src', 'main', 'services', 'webSearch.js'));
 const Chat = require(join(ROOT, 'src', 'main', 'services', 'immaginiDelleRisposte.js'));
 const Copie = require(join(ROOT, 'src', 'main', 'services', 'copieIcone.js'));
+// I motori veri, prima che le prove qui sotto li sostituiscano: le ultime leggono le loro risposte.
+const MOTORI = { tavily: Chat._dip.tavily, commons: Chat._dip.commons };
 
 const PNG = (n) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from(`pixel-${n}`)]);
 const HTML = Buffer.from('<!doctype html><title>non è un\'immagine</title>');
