@@ -337,6 +337,8 @@ Le regole del calcolo, tutte sul server:
   (`radici.ereditate` in filo-security); il sì dell'owner su quel testo
   (`fidataDallOwner`, le radici superate) non ne lascia. Così togliere un
   timbro rende non fidato anche chi l'aveva letto, e ciò che ha scritto dopo.
+  Chi eredita `ignota`, da sola o accanto a radici timbrate, si sporca: anche
+  la sessione locale che dichiara di aver letto solo testo fidato.
 
 Il timbro lo dà solo `ownerFiducia`, dal clic dell'owner in Gestione (§ 1.4):
 `segna` e `togli` prendono una radice, e il tasto sta su feedback e domande.
