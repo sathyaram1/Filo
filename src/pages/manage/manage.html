@@ -1404,6 +1404,9 @@
       border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
       color: var(--sn-fg);
     }
+    /* La correzione senza testo (#2575): l'avviso è il segnaposto della casella vuota, e il bordo lo indica. */
+    .mg-accept-comment--avviso { border-color: #c0392b; }
+    .mg-accept-comment--avviso::placeholder { color: #c0392b; opacity: 1; }
     .mg-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .mg-action-msg { font-size: 12px; color: var(--sn-muted); white-space: pre-line; }
 
