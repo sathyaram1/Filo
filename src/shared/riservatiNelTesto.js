@@ -271,60 +271,6 @@ global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, trova, formeLibere, valoriRisposta, 
 if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 
-// Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
-// Una parola di sole lettere vale intera: il «camera» di una risposta non tocca «cameraman».
-function formaDi(valore) {
-  if (/^\d+$/.test(valore)) return new RegExp(valore.split('').join('[\\s-]?'), 'gi');
-  if (/^\p{L}+$/u.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore}(?![\\p{L}\\p{N}])`, 'giu');
-  return new RegExp(esc(valore), 'gi');
-}
-const valoriDi = (testo) => [...new Set(riservati(testo))].sort((a, b) => b.length - a.length);
-
-function oscura(testo, valori = null) {
-  let v = String(testo == null ? '' : testo);
-  if (!v.trim()) return v;
-  for (const valore of valori || valoriDi(v)) v = v.replace(formaDi(valore), SEGNAPOSTO);
-  return v;
-}
-
-// I pezzi contigui del campo (prima, nuovo, dopo), oscurati sul campo intero: la parola che presenta una password, o
-// metà di un numero di carta, può stare in un pezzo diverso dal valore, o fuori dai pezzi. `campo` e `campoDa` (dove
-// comincia il primo pezzo) li manda la pagina; se non tornano coi pezzi vale il loro testo unito.
-function pezziOscurati(pezzi, campo, campoDa, sopra = '') {
-  const unito = pezzi.join('');
-  const daCampo = typeof campo === 'string' && Number.isInteger(campoDa) && campoDa >= 0
-    && campo.slice(campoDa, campoDa + unito.length) === unito;
-  const base = daCampo ? campo : unito;
-  const scarto = daCampo ? campoDa : 0;
-  // Sopra il campo stanno la domanda a cui risponde e il messaggio che ha già detto il dato.
-  const s = typeof sopra === 'string' ? sopra.slice(-SOPRA_MAX) : '';
-  const aperta = s ? richiestaAperta(s) : null;
-  // Anche pezzo per pezzo: due pezzi incollati possono fondere due numeri in uno che non è più una carta.
-  const valori = [...new Set([
-    ...[base, ...pezzi].flatMap(valoriDi),
-    ...(s ? valoriDi(s) : []),
-    ...(aperta ? lunghi(valoriRisposta(base.slice(0, RISPOSTA_MAX).toLowerCase(), aperta.tipo, aperta.chiesta)) : []),
-  ])].sort((x, y) => y.length - x.length);
-  const coperti = [];
-  for (const valore of valori) for (const m of base.matchAll(formaDi(valore))) coperti.push([m.index - scarto, m.index - scarto + m[0].length]);
-  let a = 0;
-  const out = pezzi.map((pezzo) => {
-    const da = a;
-    a += pezzo.length;
-    const qui = coperti.map(([x, y]) => [Math.max(x, da) - da, Math.min(y, a) - da]).filter(([x, y]) => y > x).sort((p, q) => p[0] - q[0]);
-    const uniti = [];
-    for (const [x, y] of qui) {
-      const ultimo = uniti[uniti.length - 1];
-      if (ultimo && x <= ultimo[1]) ultimo[1] = Math.max(ultimo[1], y); else uniti.push([x, y]);
-    }
-    let v = '';
-    let i = 0;
-    for (const [x, y] of uniti) { v += pezzo.slice(i, x) + SEGNAPOSTO; i = y; }
-    return v + pezzo.slice(i);
-  });
-  return { pezzi: out, valori };
-}
-
 // Le parti di una richiesta del correttore che portano testo: quello del campo, i candidati, la pagina intorno. Il campo
 // intero e il testo sopra servono solo qui: non partono.
 function richiestaSenzaRiservati(payload) {
