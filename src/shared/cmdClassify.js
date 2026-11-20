@@ -195,6 +195,9 @@
     'do', 'then', 'else']);
   // Gli script di una riga (python, node, ruby, .NET) che cancellano chiamando una funzione.
   const CANCELLA_IN_UNO_SCRIPT = /(?:\.|::)delete\s*\(|\b(?:os\.(?:remove|unlink|rmdir|removedirs)|shutil\.rmtree|fileutils\.rm(?:_rf|_r|dir)?)\s*\(|(?:\.|\b)(?:unlink|rmsync|unlinksync|rmdirsync|rmtree)\s*\(|\b(?:fs|fsp|promises|fse)\.(?:rm|rmdir|remove)\s*\(/;
+  // --delete e le sue varianti (--del, --delete-after, --delete-excluded, --delete-missing-args…).
+  const RSYNC_CANCELLA = /^--del(?:ete(?:-[a-z]+)*)?$/;
+  const RCLONE_CANCELLA = new Set(['sync', 'bisync', 'delete', 'deletefile', 'purge', 'rmdir', 'rmdirs', 'cleanup']);
   const nomeProgramma = (tok) => String(tok || '').split(/[\\/]/).pop().replace(/\.(exe|cmd|bat|ps1|com)$/, '');
   function cancellaPerSempre(cmd) {
     if (typeof cmd !== 'string' || !cmd.trim()) return false;
