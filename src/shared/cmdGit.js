@@ -347,6 +347,49 @@
     'symbolic-ref': (args) => (args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 0),
   };
 
+  // I sotto-comandi di scrittura che eseguono un programma scelto nel comando: valgono quanto lanciarlo da soli (#2619.1).
+  // Le lunghe si riconoscono anche accorciate, come le accetta git; le corte anche raggruppate (`-ix`), fino alla
+  // prima che si prende il resto come valore. `config` e `template` di clone/init il programma lo scelgono senza scriverlo.
+  const GIT_ESEGUE = {
+    rebase: { lunghe: ['exec'], corte: 'x', conValore: 'sXCS' },
+    clone: { lunghe: ['upload-pack', 'config', 'template'], corte: 'uc', conValore: 'objuc' },
+    fetch: { lunghe: ['upload-pack'] },
+    pull: { lunghe: ['upload-pack'] },
+    push: { lunghe: ['receive-pack', 'exec'] },
+    init: { lunghe: ['template'] },
+  };
+  // `t` sono i token dopo `git`, senza virgolette. Il comando che git esegue, dal programma in poi (vuoto se non si
+  // legge, come per `config` e `template`), o null se la forma non esegue niente di scritto nel comando.
+  function gitProgrammaScritto(t) {
+    let k = 0;
+    while (k < t.length && String(t[k]).startsWith('-')) k += /^-[Cc]$/.test(t[k]) ? 2 : 1;
+    if (k >= t.length) return null;
+    const sub = String(t[k]).toLowerCase();
+    const args = t.slice(k + 1).map(String);
+    if (sub === 'submodule') {
+      const j = args.findIndex((a) => !a.startsWith('-'));
+      if (j < 0 || !argVariants(args[j]).some((v) => v.toLowerCase() === 'foreach')) return null;
+      const dopo = args.slice(j + 1);
+      return dopo.slice(Math.max(0, dopo.findIndex((a) => !a.startsWith('-'))));
+    }
+    const regola = GIT_ESEGUE[sub];
+    if (!regola) return null;
+    const conAttaccato = (valore, i) => (valore ? [valore, ...args.slice(i + 1)] : args.slice(i + 1));
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      for (const nome of regola.lunghe) {
+        const valore = opzioneLunga(a, nome, 1);
+        if (valore != null) return conAttaccato(valore, i);
+      }
+      if (!regola.corte || !/^-[^-]/.test(a)) continue;
+      for (let c = 1; c < a.length; c++) {
+        if (regola.corte.includes(a[c])) return conAttaccato(a.slice(c + 1), i);
+        if (regola.conValore.includes(a[c])) break;
+      }
+    }
+    return null;
+  }
+
   function classifyGit(cmd, grezzo = cmd) {
     const sub = subcommandOf(cmd);
     const globali = tokens(cmd).slice(1).map(unquote);
@@ -362,6 +405,7 @@
     if (t.slice(0, t.findIndex((x) => !x.startsWith('-'))).some((x) => !GIT_GLOBALI_INNOCUE.has(x) && !GIT_GLOBALE_CARTELLA.test(x))) return 3;
     if (gitScriveFile(cmd)) return 3;
     if (gitLanciaProgramma(sub, gitArgsAfterSub(cmd))) return 3;
+    if (gitProgrammaScritto(globali)) return 3;
     const dual = GIT_DUAL[sub];
     // Una scrittura di config con le virgolette aperte nel testo grezzo è un pezzo: la sequenza è stata spezzata dentro
     // il valore, e quello che git consegnerà alla shell (`"code;evil"`) non è il valore controllato qui.
@@ -399,5 +443,5 @@
     return 3; // run/exec/start/test/publish/sconosciuti → 3
   }
 
-  Object.assign(P, { GIT_READ, GIT_GLOBALE_CARTELLA, gitChiaveInerte, gitScriveFile, gitUscita, classifyGit, classifyNpm });
+  Object.assign(P, { GIT_READ, GIT_GLOBALE_CARTELLA, gitChiaveInerte, gitScriveFile, gitUscita, gitProgrammaScritto, classifyGit, classifyNpm });
 })(typeof globalThis !== 'undefined' ? globalThis : self);

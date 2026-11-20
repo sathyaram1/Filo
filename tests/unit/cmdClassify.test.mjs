@@ -1353,6 +1353,47 @@ test('git push — al remoto configurato si rimedia (2); a un indirizzo scritto 
   }
 });
 
+// #2619.1: un sotto-comando di git che lancia un programma scritto nel comando vale quanto lanciarlo da solo.
+test('git che esegue un programma scritto nel comando → livello 3, come il programma da solo', () => {
+  assert.equal(lvl('python3 evil.py'), 3);
+  for (const cmd of [
+    'git rebase -x "python3 evil.py" HEAD~1', 'git rebase --exec "python3 evil.py" HEAD~1', 'git rebase --exec="python3 evil.py" main',
+    'git rebase --exe "python3 evil.py" main', 'git rebase -i -x "python3 evil.py" main', 'git rebase -ix "python3 evil.py" main',
+    'git rebase -x"python3 evil.py" main', 'git rebase "-x" "python3 evil.py" main',
+    'git submodule foreach "python3 evil.py"', 'git submodule --quiet foreach --recursive "python3 evil.py"',
+    'git submodule "foreach" python3 evil.py', 'git submodule f\\oreach python3 evil.py',
+    'git clone --upload-pack="python3 evil.py" ./a b', 'git clone -u "python3 evil.py" ./a b', 'git clone -qu "python3 evil.py" ./a b',
+    'git clone --upl="python3 evil.py" ./a b', 'git fetch --upload-pack "python3 evil.py" ./a', 'git pull --upload-pack="python3 evil.py" ./a',
+    'git push --receive-pack="python3 evil.py" ./a main', 'git push --exec="python3 evil.py" ./a main',
+    'git clone -c core.sshCommand="python3 evil.py" git@host:r.git', 'git clone --config core.fsmonitor=evil ./a b',
+    'git clone --template=./modelli ./a b', 'git init --template ./modelli',
+    'git status && git rebase -x "python3 evil.py" HEAD~1',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  }
+  // Le forme vicine che non lanciano niente restano dove stavano.
+  for (const cmd of [
+    'git rebase main', 'git rebase -i HEAD~3', 'git rebase -X ours main', 'git rebase -Xsubtree=lib/x main', 'git rebase -s ort main',
+    'git rebase --empty=drop main', 'git rebase --no-exec main', 'git submodule update --init', 'git submodule add ./x',
+    'git clone ./a b', 'git clone -b main ./a b', 'git clone -o upstream ./a b', 'git fetch -u origin', 'git fetch --update-head-ok origin',
+    'git pull', 'git push origin main', 'git push --recurse-submodules=check origin main', 'git init',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
+  }
+});
+
+test('cancellaPerSempre: il programma che git lancia da sé si guarda come gli altri', () => {
+  for (const cmd of [
+    'git rebase -x "rm -rf build" HEAD~1', 'git rebase --exec="rm -rf build" main', 'git rebase -ix "rm x" main',
+    'git submodule foreach "rm -rf node_modules"', 'git submodule foreach --recursive rm -rf x', 'git rebase -x "sudo rm x" main',
+    'git push --receive-pack="rm -rf ~" ./a main',
+  ]) assert.equal(C.cancellaPerSempre(cmd), true, cmd);
+  for (const cmd of ['git rebase -x "npm test" main', 'git submodule foreach git status', 'git rebase main', 'git submodule update',
+    'git rebase -s rm main', 'git clone -c core.autocrlf=false ./a b']) {
+    assert.equal(C.cancellaPerSempre(cmd), false, cmd);
+  }
+});
+
 // #1909 — cancellare senza cestino si riconosce dal programma di ogni pezzo, anche nascosto dietro un altro comando.
 test('cancellaPerSempre: i comandi che cancellano senza cestino, in ogni shell', () => {
   for (const cmd of [
