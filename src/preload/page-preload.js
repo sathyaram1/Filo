@@ -174,11 +174,15 @@ function escPrimaAFilo(e, ascolto, UI) {
 }
 
 // Il clic destro si rigioca, in copia, quando l'handler vero è pronto; un gesto dato intanto lo scarta senza menu.
+// L'ascolto dei gesti nasce qui, prima degli script del sito, che in cattura potrebbero fermarli.
 let tastoDestroInAttesa = null;
+if (IS_SUBFRAME) {
+  try { tastoDestroInAttesa = require('./menu-del-sito.js').tastoDestroInAttesa(window); } catch (e) { console.error('[Filo CS] tasto destro in attesa', e); }
+}
 function replayContextMenu(e, clic) {
-  const { tastoDestroInAttesa: crea, RIGIOCO_MS } = require('./menu-del-sito.js');
-  if (!tastoDestroInAttesa) tastoDestroInAttesa = crea(window);
+  const { RIGIOCO_MS } = require('./menu-del-sito.js');
   const attesa = tastoDestroInAttesa;
+  if (!attesa) { menuDiRiserva(clic); return; }
   const mio = attesa.tieni(e);
   const tick = () => {
     if (!attesa.ancora(mio)) return;
