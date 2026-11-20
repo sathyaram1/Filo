@@ -138,6 +138,66 @@ test.describe('nel sito', () => {
     await controlla.click();
     await expect.poll(delCampo, { timeout: 10_000 }).toBeGreaterThan(0);
   });
+
+  // #1589.8 — dove il livello chiede prima il nome del sito non va al server dei percorsi noti; l'Aiuto risponde lo stesso.
+  test('l\'Aiuto su una pagina di sanità col livello di serie non chiede al server i percorsi noti; sulla posta sì', async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(120_000);
+    await siteDiProva(app);
+    await modelliFinti(app);
+    await app.evaluate(() => {
+      globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback;
+      const P = globalThis.SN_PATHS;
+      globalThis.__percorsiVeri = P.listByDomain;
+      globalThis.__percorsi = [];
+      P.listByDomain = async (dominio) => { globalThis.__percorsi.push(dominio); return []; };
+    });
+    try {
+      for (const host of [SANITA, POSTA]) {
+        const pagina = await apriSu(openTab, testServer, host, '<!doctype html><title>Area personale</title><body><p>I tuoi documenti</p></body>');
+        const prima = await app.evaluate(() => globalThis.__mandato.length);
+        const aiuto = await apriAiuto(app, shell, pagina);
+        await aiuto.fill('.sn-sidebar-input textarea', 'dove trovo i miei documenti?');
+        await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+        await expect.poll(() => app.evaluate(() => globalThis.__mandato.length), { timeout: 20_000 }).toBeGreaterThan(prima);
+        await expect(aiuto.locator('.sn-sidebar')).toContainText('Descrizione finta.', { timeout: 10_000 });
+      }
+      expect(await app.evaluate(() => globalThis.__percorsi)).toEqual([POSTA]);
+    } finally {
+      await app.evaluate(() => { globalThis.SN_PATHS.listByDomain = globalThis.__percorsiVeri; });
+    }
+  });
+
+  test('una pagina d\'errore su un sito dove Filo chiede prima non va al riconoscimento dei blocchi geografici; altrove sì', async ({ app, openTab }) => {
+    test.setTimeout(90_000);
+    await siteDiProva(app);
+    const server = createServer((_req, res) => {
+      // Un 403 generico: le regole locali non lo riconoscono, e senza il livello andrebbe al classificatore.
+      res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<title>403</title><h1 id="msg">Access denied to this resource.</h1>');
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const porta = server.address().port;
+    try {
+      await app.evaluate(async () => {
+        await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: 'socks5://127.0.0.1:9' } });
+        globalThis.__geoVeri = globalThis.SN_GEO_CLASSIFY;
+        globalThis.__classificati = [];
+        globalThis.SN_GEO_CLASSIFY = async (input) => { globalThis.__classificati.push(input.host); return { skipped: true }; };
+      });
+      const classificati = () => app.evaluate(() => globalThis.__classificati);
+      const sanita = await openTab(`http://${SANITA}:${porta}/esami`);
+      await sanita.waitForSelector('#msg');
+      const posta = await openTab(`http://${POSTA}:${porta}/casella`);
+      await posta.waitForSelector('#msg');
+      await expect.poll(classificati, { timeout: 15_000 }).toContain(POSTA);
+      await pausa(2500);
+      expect(await classificati(), 'la pagina della sanità resta sul computer').not.toContain(SANITA);
+    } finally {
+      await app.evaluate(() => { globalThis.SN_GEO_CLASSIFY = globalThis.__geoVeri; });
+      server.closeAllConnections?.();
+      await new Promise((r) => server.close(r));
+    }
+  });
 });
 
 // La sezione del tasto destro si monta nel mondo dei content script della scheda in incognito, come la monta il menu.
