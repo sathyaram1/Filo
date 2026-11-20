@@ -2245,6 +2245,10 @@ test('sbloccoFermo: ogni motivo del fermo dice il gesto che lo toglie, nessuno p
   assert.match(ramo, /la sanatoria non lo copre.*«Dichiara fidato com’è»/);
   assert.doesNotMatch(ramo, /fiducia:sana/);
   assert.match(MR.sbloccoFermo('ramo del server non pulito'), /^Il ramo del server non risulta pulito/);
+  // Su un feedback non fidato la coda la sanatoria non la prova: la scheda non dice che non lo copre.
+  const conFeedback = MR.sbloccoFermo('ramo non pulito', ['feedback non fidato', 'ramo non pulito']);
+  assert.doesNotMatch(conFeedback, /la sanatoria non lo copre/);
+  assert.match(conFeedback, /la coda da sé quando segni fidato il feedback/);
   assert.doesNotMatch(MR.sbloccoFermo('ramo del server non pulito'), /fiducia:sana/);
   // Lo sporco lo toglie il gesto di #2258 in Gestione, non una sessione sul PC.
   assert.match(MR.sbloccoFermo('contenuto scritto da un biglietto sporco'), /non torna pulito da solo.*«Dichiara fidato com’è»/);
