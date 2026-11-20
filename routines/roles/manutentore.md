@@ -83,7 +83,8 @@ una domanda: poche a settimana.
 
 Quando i bilanci di un lavoro finiscono, o il lavoro supera il **tetto totale delle verifiche** (tutte: passate, dopo
 un riallineamento, verificatori morti; si riparte da zero a ogni decisione), il lavoro si ferma e arriva a te col
-fermo dei giri finiti, coi rilievi aperti. Tre strade, in quest'ordine di preferenza:
+fermo dei giri finiti, coi rilievi che l'ultima verifica ha lasciato aperti (nessuno se è passata). Se ti spengono
+prima che decidi, il fermo va all'owner. Tre strade, in quest'ordine di preferenza:
 
 1. **Riaprirlo con decisioni nuove**: `nota <N> -` con le decisioni (cosa correggere, cosa lasciare). Riprende un
    correttore sul ramo, coi rilievi davanti e i bilanci azzerati.
