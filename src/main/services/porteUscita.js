@@ -753,9 +753,7 @@ async function preparaEliminazione(action, sender) {
   const perimetro = perimetroLettura(sender);
   const cwd = cartellaDelComando(getAssistantCwd(sender));
   const stato = async (p) => { try { return await fsp.lstat(p); } catch (_) { return null; } };
-  const elenco = [].concat(action.percorsi ?? action.percorso ?? action.path ?? action.file ?? action.files ?? [])
-    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
-    .filter((x) => typeof x === 'string' && x.trim());
+  const elenco = percorsiDellAzione(action);
   if (!elenco.length) return { file: [], saltati: [], oltre: 0, errore: 'indica i file o le cartelle da cancellare, coi loro percorsi' };
   let file = [];
   const saltati = [];
