@@ -161,7 +161,7 @@ function dellUtente(x, fonte) {
 }
 // `desde`: quando è partito il pezzo che l'utente ha appena immesso. Un codice letto prima resta letto: riscriverlo non
 // lo fa diventare suo (giri 5 e 6).
-function tieni(chiave, r, desde) {
+function tieni(chiave, r, desde = 0) {
   const prima = immessi.get(chiave);
   if (prima === r) return;
   if (prima !== undefined) { immessi.delete(chiave); caratteriImmessi -= prima.length; }
