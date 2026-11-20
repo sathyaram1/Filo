@@ -64,28 +64,17 @@ if (IS_FILO_ORIGIN) {
 }
 
 // #2444 — il menu di Filo qui lo monta content.js a fine init, dopo le impostazioni: l'ultimo tasto destro dato prima
-// si tiene, e content.js lo rigioca appena ascolta, salvo che la pagina l'abbia preso per il suo menu.
+// si tiene, e content.js lo passa appena ascolta dalla stessa porta dei tasti destri dati dopo.
 if (IS_FILO_ORIGIN) {
   try {
-    const { copiaDelClic, RIGIOCO_MS } = require('./menu-del-sito.js');
-    let inAttesa = null;
+    const attesa = require('./menu-del-sito.js').tastoDestroInAttesa(window);
     let menuInAscolto = false;
-    window.addEventListener('contextmenu', (e) => {
-      if (menuInAscolto || !e.isTrusted) return;
-      inAttesa = { evento: e, copia: copiaDelClic(e), alle: Date.now() };
-    });
+    window.addEventListener('contextmenu', (e) => { if (!menuInAscolto && e.isTrusted) attesa.tieni(e); });
     globalThis.__snTastoDestroInAttesa = () => {
       menuInAscolto = true;
-      const t = inAttesa;
-      inAttesa = null;
-      if (!t || t.evento.defaultPrevented || Date.now() - t.alle > RIGIOCO_MS) return null;
-      // La pagina può aver ridisegnato la voce cliccata mentre caricava le impostazioni: vale quella sotto il cursore.
-      if (!t.copia.target || !t.copia.target.isConnected) {
-        const nodo = document.elementFromPoint(t.copia.clientX, t.copia.clientY);
-        if (!nodo) return null;
-        Object.assign(t.copia, { target: nodo, currentTarget: nodo, composedPath: () => [nodo] });
-      }
-      return t.copia;
+      const copia = attesa.prendi();
+      attesa.smetti();
+      return copia;
     };
   } catch (e) { console.error('[Filo internal] tasto destro in attesa', e); }
 }
