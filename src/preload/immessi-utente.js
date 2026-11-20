@@ -148,14 +148,15 @@ function ascoltaIn(w, invia) {
         if (fattoDiCaratteri(nuova, t.conti)) testo = `${estesa}\u0001${t.testo}`;
         else if (fattoAiBordi(nuova, t.conti)) testo = `${nuova}\u0001${t.testo}`;
       }
-      if (testo) { try { invia(`${documento}.${t.n}`, testo, t.desde); } catch (_) { /* il main è andato via */ } }
+      if (testo) { try { invia(`${documento}.${t.n}`, testo, t.inViaggio || Date.now()); } catch (_) { /* il main è andato via */ } }
+      t.inViaggio = 0;
     }
     daDire.clear();
-    // Senza un inizio: toglie dal registro solo una lettura arrivata mentre questo testo era in viaggio.
     if (fila.testo && fila.testo !== fila.detto) {
       fila.detto = fila.testo;
-      try { invia(`${documento}.0`, fila.testo, Date.now()); } catch (_) {}
+      try { invia(`${documento}.0`, fila.testo, fila.inViaggio || Date.now()); } catch (_) {}
     }
+    fila.inViaggio = 0;
   }
   const presto = () => { if (!timer) timer = setTimeout(di, ATTESA_MS); };
   const bersaglio = (e) => {
