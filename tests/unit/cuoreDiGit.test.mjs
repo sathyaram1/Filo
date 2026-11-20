@@ -66,7 +66,7 @@ test('ogni strada verso gli stessi file: programmi, opzioni, cartella di lavoro,
 
 test('git config: una chiave che sceglie un programma vale 3, come `git -c`', () => {
   const tre = ['git config core.sshCommand ./evil.sh', 'git config set core.pager ./evil.sh',
-    'git config --global core.editor vim', 'git config --file .git/config core.sshCommand x',
+    'git config --global core.editor ./evil.sh','git config --file .git/config core.sshCommand x',
     'git config -f .git/config remote.origin.url https://altrove.test/r.git', 'git config core.hooksPath strani',
     'git config --global init.templateDir modelli', 'git config merge.x.driver ./evil.sh', 'git config include.path altro.cfg',
     'git config --global --add credential.helper ./evil.sh', 'git config core.fsmonitor ./evil.sh',
