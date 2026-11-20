@@ -117,6 +117,27 @@ test('#2027.3: col server giù il segno resta annotato, parte alla chiamata dopo
   });
 });
 
+test('#2027.3: sporco e segno riservato hanno la stessa coda: una voce illeggibile conta, parte e se ne va', async () => {
+  const code = [
+    { annota: B.annotaSporco, inAttesa: B.sporchiInAttesa, consegna: B.consegnaSporchi, cartella: B.cartellaSporchi, op: 'sporca' },
+    { annota: B.annotaRiservato, inAttesa: B.riservatiInAttesa, consegna: B.consegnaRiservati, cartella: B.cartellaRiservati, op: 'riservato' },
+  ];
+  for (const c of code) {
+    await conBiglietto(async ({ env, cwd }) => {
+      const [b] = B.trovaBiglietti({ env, cwd });
+      c.annota(b, 'letto #813', 1);
+      writeFileSync(join(c.cartella(b), '00000000000002-rotta.json'), '{non è json');
+      assert.deepEqual(c.inAttesa(b).map((v) => /illeggibile/.test(v.motivo)), [false, true], c.op);
+      const giu = await c.consegna(b, { deps: localTicket({ rompi: true }).deps });
+      assert.deepEqual([giu.consegnati, giu.restano, giu.errore], [0, 2, 'fetch failed'], c.op);
+      const su = localTicket();
+      assert.deepEqual(await c.consegna(b, { deps: su.deps }), { consegnati: 2, restano: 0 }, c.op);
+      assert.deepEqual(su.chiamate.map((x) => x.op), [c.op]);
+      assert.deepEqual(c.inAttesa(b), [], c.op);
+    });
+  }
+});
+
 test('#2027.3: senza biglietto leggere dati privati lo dice, come per lo sporco', async () => {
   const fuori = cartellaTemporanea('senza-');
   try {
