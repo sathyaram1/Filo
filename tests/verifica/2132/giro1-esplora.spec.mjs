@@ -86,6 +86,32 @@ test('popup di chat in un dialog piccolo sopra una pagina lunga', async ({ app, 
   expect(prompt).toContain('token GitHub in chiaro');
 });
 
+test('seguito di «Spiega» su un sito: la risposta di Filo sopra la casella del riquadro', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await apri(app, openTab, testServer, `<!doctype html><meta charset="utf-8"><body style="margin:0;padding:20px;font:20px sans-serif">
+<main><p>Nelle preferenze c'è un <b id="parola">token</b> salvato.</p></main></body>`);
+  await app.evaluate(() => {
+    const prima = globalThis.SN_PROVIDERS.completeWithFallback;
+    const finto = async (req) => {
+      const t = JSON.stringify(req.messages);
+      if (t.includes('proponi SUGGERIMENTI') || t.includes('Sei il controllo rapido') || t.includes('[nessuno]')) return prima(req);
+      return { text: 'Il token GitHub in chiaro dà accesso ai tuoi repository a chi lo legge.', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
+  });
+  await page.locator('#parola').dblclick();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('token GitHub in chiaro');
+  const dove = await clicca(app, page, '.sn-popup-input');
+  await dove.waitForTimeout(800);
+  const prompt = await promptDopo(app, dove);
+  expect(prompt).toContain('token GitHub in chiaro');
+});
+
 test('chat di casa: la risposta di Filo sopra la casella', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await prepara(app);
