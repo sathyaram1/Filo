@@ -191,8 +191,8 @@
   // Dopo un programma che non si sa se lancia altro (sudo, `pwsh -ExecutionPolicy Bypass -Command`, timeout, busybox,
   // `for …; do`) ogni parola può essere il comando lanciato: le opzioni coi loro valori non si sanno contare (#1909.3).
   // Gli argomenti sono solo dati dopo un programma che non lancia niente (`echo rm`, `git commit -m "rm"`).
-  const DAVANTI = new Set(['time', 'env', 'command', 'builtin', 'exec', 'start', 'arch', 'do', 'then', 'else']);
-  const INERTI = new Set([...LEVEL1, ...LEVEL2, ...PS_READ, 'git'].filter((p) => !DAVANTI.has(p)));
+  // `arch` sta fra le letture ma con un argomento lancia un programma.
+  const INERTI = new Set([...LEVEL1, ...LEVEL2, ...PS_READ, 'git'].filter((p) => p !== 'arch'));
   // Gli script di una riga (python, node, ruby, .NET) che cancellano chiamando una funzione.
   const CANCELLA_IN_UNO_SCRIPT = /(?:\.|::)delete\s*\(|\b(?:os\.(?:remove|unlink|rmdir|removedirs)|shutil\.rmtree|fileutils\.rm(?:_rf|_r|dir)?)\s*\(|(?:\.|\b)(?:unlink|rmsync|unlinksync|rmdirsync|rmtree)\s*\(|\b(?:fs|fsp|promises|fse)\.(?:rm|rmdir|remove)\s*\(/;
   // --delete e le sue varianti (--del, --delete-after, --delete-excluded, --delete-missing-args…).
