@@ -710,7 +710,8 @@ async function bigliettoDellaSessione() {
   }
 }
 
-async function chiama(cred, op, dati = {}, opts = {}) {
+/** Una richiesta a routineManutentore: con una chiave porta anche il biglietto della sessione del PC (#2027.3). */
+export async function chiama(cred, op, dati = {}, opts = {}) {
   const { call } = await import('./routine-channel.mjs');
   const bigliettoLocale = cred && cred.passphrase ? await bigliettoDellaSessione() : '';
   const { status, body } = await call('routineManutentore', corpoManutentore(cred, op, dati, { bigliettoLocale }), opts);
