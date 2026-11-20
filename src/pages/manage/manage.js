@@ -4235,7 +4235,7 @@
   const TASTO_MANDA_CORREZIONE = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+Invio') : 'Ctrl+Invio';
   const TITOLO_CORREZIONE = `Torna a chi corregge, col testo scritto sopra (${TASTO_MANDA_CORREZIONE})`;
   const ETICHETTA_SENZA_TESTO = 'Manda lo stesso';
-  const AVVISO_SENZA_TESTO = 'Senza testo chi riprende non saprà cosa correggere. Scrivilo sopra, o premi di nuovo per mandarlo così.';
+  const AVVISO_SENZA_TESTO = 'Senza testo chi riprende non saprà cosa correggere: scrivilo qui, o premi di nuovo per mandarlo così.';
   const ACTION_PROGRESS = {
     accept: 'Metto in coda…',
     accept_local: 'Lo passo ai lavori server…',
