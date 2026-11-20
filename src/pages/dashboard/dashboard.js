@@ -995,7 +995,7 @@
   // L'etichetta di una fonte apre la pagina sulla frase dalla stessa porta dei collegamenti della chat (#2383).
   self.SN_FONTI_CITATE?.aggancia(document, (url, el) => apriProposta(url, el));
   // Le immagini delle risposte (#2272): clic per ingrandire, il carosello scorre, la pagina d'origine dalla stessa porta.
-  self.SN_IMMAGINI_RISPOSTA?.aggancia(document, { apriPagina: (url, el) => apriProposta(url, el), ingrandisci: (src) => openLightbox(src) });
+  self.SN_IMMAGINI_RISPOSTA?.aggancia(document, { apriPagina: (url, el) => apriProposta(url, el), ingrandisci: (src, _img, fila) => openLightbox(src, fila) });
 
   bubblesEl.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
