@@ -105,17 +105,20 @@ function richieste(l, tutte = false) {
 
 // Le parole della risposta (già minuscola) contano come quelle dopo la parola che presenta il dato (segretiDetti):
 // quelle con cifre o simboli fino alla frase che porta il dato; quelle di sole lettere, per una password chiesta, nelle
-// prime PAROLE_RISPOSTA o dopo PRESENTA_DATO.
-function valoriRisposta(risposta, tipo, chiesta = true) {
+// prime PAROLE_RISPOSTA o dopo PRESENTA_DATO. `data`: la risposta sta già sopra, e qui contano solo le parole con la
+// forma di una password.
+function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
   const X = exfil();
   if (!X || !X.segretiDetti) return [];
   const presentata = presenta().map(([re]) => new RegExp(`^(?:${re.source})$`, 'u'));
   const out = [];
-  let lettere = tipo === 'password' && chiesta;
+  let lettere = tipo === 'password' && chiesta && !data;
   let saluto = false;
   let trovato = false;
-  // Un dato con cifre o simboli è la risposta: dopo la sua frase il messaggio parla d'altro.
+  // Un dato con cifre o simboli è la risposta: dopo la sua frase il messaggio parla d'altro, e può portarne solo un altro
+  // con la stessa forma («Gatto2024. Anzi no, l'ho cambiata: Gatto2025»).
   let forte = false;
+  let soloForma = data;
   let dopoPresenta = false;
   let n = 0;
   for (const [, w, spazio] of risposta.matchAll(/(\S+)(\s*)/g)) {
