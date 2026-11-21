@@ -376,7 +376,7 @@ module.exports = function register(on, ctx) {
     }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
-    const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
+    const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && daPaginaNonDiFilo(sender)
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
     // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).
