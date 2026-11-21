@@ -25,8 +25,15 @@ const RICHIESTA = new RegExp([
   '(?:(?:mi|ci) serv(?:e|irebbe)|ho bisogno|per\\s*favore|perfavore|x\\s*favore|pls|plz|please)',
   '(?:send|give|tell|share|what|need|can\\s+you|could\\s+you|do\\s+you)',
   // «ti ricordi la password», «come è la password», «che password ha il wifi», «e la password del wifi».
-  '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?:^|:\\s*)e\\s+(?:la|il))',
+  '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?<=^|:\\s*)e\\s+(?:la|il))',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
+// La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
+// dopo l'ultima virgola o i due punti al più un articolo o un saluto, dopo il nome solo di cosa è e poi la fine della
+// riga; «Il pw del documento. Il documento è pronto» continua, e non chiede (#2638).
+const ELLITTICA_PRIMA = /^\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|ciao+|ehi|hey|hi|wi-?fi|router|home)\s+))*$/u;
+const DI_COSA = String.raw`(?:(?:del(?:la|lo)?|dell['’]|di|de|per|for|of)\s*(?:(?:la|il|lo|l['’]|the|my|mio|mia|tuo|tua)\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
+const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:grazie|thanks|thx))?[^\\p{L}\\p{N}]*$`, 'u');
+const ellittica = (prima, dopo) => ELLITTICA_PRIMA.test(prima.split(/[,;:]|\s[-–—]\s/).pop()) && ELLITTICA_DOPO.test(dopo);
 // In chat la password si chiama anche così: «pass» solo con l'articolo o col wifi, da solo è anche l'inglese «to pass».
 const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|pass\\s+(?:del(?:la)?\\s+)?wi-?fi'
   + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
@@ -93,8 +100,9 @@ function richieste(l, tutte = false) {
     // La frase si cerca in un tratto corto: un testo lungo senza punti, con la parola ripetuta, non diventa quadratico.
     const f = new RegExp(FINE_FRASE.source, 'g').exec(l.slice(m.j, m.j + FRASE_MAX));
     const a = f ? m.j + f.index + f[0].length : Math.min(l.length, m.j + FRASE_MAX);
-    const frase = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop() + l.slice(m.i, a);
-    const chiesta = !!((f && f[0].includes('?')) || RICHIESTA.test(frase()));
+    const prima = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop();
+    const riga = l.slice(m.j, m.j + FRASE_MAX).split('\n')[0];
+    const chiesta = !!((f && f[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(prima(), riga));
     if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, fine: a, tipo: m.tipo, chiesta });
   }
   return out;

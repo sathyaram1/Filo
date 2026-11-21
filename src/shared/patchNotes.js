@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.297', date: '2026-11-21',
+      fixes: [
+        { testo: 'Il correttore non manda ai modelli la password che scrivi sotto chi te la chiede in due parole, come «sono arrivato, password del wifi», anche quando è fatta di sole lettere.', segnalazione: 2638 },
+      ],
+    },
+    {
       version: '0.2.296', date: '2026-11-20',
       features: [
         { testo: 'La traduzione della pagina si chiede anche a Filo, nella chat o nell\'Aiuto della pagina: «traducimi questa pagina», «riprendi la traduzione», «torna all\'originale». Se la pagina è già tradotta o già com\'era, te lo dice. Il tasto che traduce la selezione, premuto senza niente di selezionato, traduce la pagina.', segnalazione: 504 },

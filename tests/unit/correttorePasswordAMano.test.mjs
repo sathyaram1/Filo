@@ -34,7 +34,31 @@ test('#1446.4: la password data in risposta arriva come segnaposto, qualunque fo
   ]) {
     nascosto('certo, Gatto2024', `Anna: ciao!\n${richiesta}`, 'Gatto2024', richiesta);
     nascosto('Gatto2024', richiesta, 'Gatto2024', richiesta);
+    nascosto('gattonero', richiesta, 'gattonero', richiesta);
   }
+});
+
+test('#2638: il solo nome della password in fondo alla frase è una richiesta, anche per una risposta di sole lettere', () => {
+  for (const richiesta of [
+    'Marco: password del wifi',
+    'Marco: sono arrivato. password del wifi',
+    'Marco: sono arrivato, la password del wifi 🙏',
+    'Marco: sono qui, pw di casa',
+    'Marco: sono qui - la pass del wifi',
+    'Marco: arrived, wifi password',
+    'sono arrivato, password del wifi',
+  ]) {
+    nascosto('gattonero', richiesta, 'gattonero', richiesta);
+    nascosto('certo, gattonero', `Anna: ciao!\n${richiesta}`, 'gattonero', richiesta);
+  }
+  nascosto('4821', 'Marco: sono al portone, codice del cancello', '4821', 'codice');
+  // Il nome dentro una frase che dice altro non chiede niente: la risposta di sole lettere parte.
+  for (const sopra of [
+    'Marco: la password del wifi è cambiata',
+    'Marco: grazie per la password del wifi',
+    'Marco: nuova password del wifi',
+    'Marco: cose da fare: chiamare Luca, password del wifi, spesa',
+  ]) assert.equal(alModello('figurati, a stasera', sopra).nuovo, 'figurati, a stasera', sopra);
 });
 
 test('#1446.4: un sollecito o una seconda domanda dopo la richiesta non sciolgono il legame', () => {
