@@ -972,6 +972,7 @@ class TabManager {
     installaPermessi(view.webContents.session);
     Permessi.seguiGesti(view.webContents);
     ReteDiCasa.attach(view.webContents.session);
+    FileDelComputer.chiudiRete(view.webContents);
     return view;
   }
 
