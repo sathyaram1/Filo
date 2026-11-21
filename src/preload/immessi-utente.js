@@ -317,7 +317,8 @@ function ascoltaIn(w, invia) {
     if (e.isComposing || typeof e.key !== 'string' || [...e.key].length !== 1) return;
     if ((e.ctrlKey || e.metaKey) && !(e.getModifierState && e.getModifierState('AltGraph'))) return;
     const el = bersaglio(e);
-    if (scrivibile(el)) aggiorna(el, null, e.key);
+    const tasto = e.key;
+    seNonArriva(el, () => aggiorna(el, (s) => s + tasto, tasto));
   }, true);
   // Un invio (Invio o un clic) porta con sé quello che l'utente ha appena scritto: il main lo sa prima di leggere la pagina.
   function diSubito() { if (daDire.size || fila.testo !== fila.detto) { if (timer) clearTimeout(timer); di(); } }
