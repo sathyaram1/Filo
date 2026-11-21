@@ -314,17 +314,25 @@
     if (seq && seq.length) {
       let cands = [c];
       let det = UNO;
-      const ultimi = [];
+      // I valori si raccolgono man mano: rifare l'elenco a ogni `$_` costava il quadrato dei comandi (#1994.1).
+      const valori = new Set();
+      let primo = true;
+      let ignoto = false;
+      let misure = 0;
       for (const part of seq) {
         let forme = [part];
         if (usaUltimoArg(part, c)) {
-          const valori = [...new Set(ultimi.flat())];
-          if (!ultimi.length || ultimi.includes(null) || valori.length > ULTIMI_MAX) return TRE;
-          forme = valori.map((v) => part.replace(ULTIMO_ARG_RE, () => comeParola(v)));
+          misure += valori.size;
+          if (primo || ignoto || valori.size > ULTIMI_MAX || misure > MISURE_MAX) return TRE;
+          forme = [...valori].map((v) => part.replace(ULTIMO_ARG_RE, () => comeParola(v)));
         }
         for (const f of forme) {
           for (const cc of cands) det = peggiore(det, classifyOneDet(f, cc));
-          ultimi.push(ultimiArgomenti(f, c));
+          primo = false;
+          if (ignoto || valori.size > ULTIMI_MAX) continue;
+          const u = ultimiArgomenti(f, c);
+          if (u) u.forEach((v) => valori.add(v));
+          else ignoto = true;
         }
         if (!SPOSTAMENTI.has(programOf(dequote(part)))) continue;
         const visti = new Map();
@@ -374,6 +382,8 @@
   // Il SEGNAPOSTO di un gruppo comincia anch'esso con `$_`, ma non è la variabile: `(ls | wc -l)` resta una lettura (#2345).
   const ULTIMO_ARG_RE = new RegExp(String.raw`\$_(?![\w${SEGNO_GRUPPO}])`, 'g');
   const ULTIMI_MAX = 16;
+  // Oltre queste misure la riga chiede: ogni `$_` si misura con fino a ULTIMI_MAX comandi, e il conto gira nel main.
+  const MISURE_MAX = 4096;
   function usaUltimoArg(s, c) {
     return shellPosix(c) && String(s).search(ULTIMO_ARG_RE) >= 0;
   }

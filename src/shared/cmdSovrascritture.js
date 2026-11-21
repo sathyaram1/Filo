@@ -6,7 +6,8 @@
   const P = global.SN_CMD_PARTI;
   const {
     dove, assolutoDi, pezzi, JOLLY, shellPosix, opzioneLunga, valoreDuePunti, parametro, programOf, dequote, argomenti,
-    uniqUscita, treeUscita, gitUscita, forsePowerShell, graffe, gitScriveFile, perimetroDi, cartellaDa, nomeNorm,
+    uniqUscita, treeUscita, gitUscita, forsePowerShell, graffe, gitScriveFile, perimetroDi, cartellaDa, nomeNorm, peggiore,
+    GIT_GLOBALI_INNOCUE,
   } = P;
   // Da una parte caricata dopo: si cerca alla chiamata, perché classifyOne e segmentIsRead si chiamano a vicenda.
   const classifyOne = (raw, shell) => P.classifyOne(raw, shell);
@@ -303,7 +304,44 @@
     return det;
   }
 
+  // `git -C <cartella> …` lavora come dopo un `cd <cartella>` che dura il solo comando: si misurano il `cd` e il comando
+  // senza `-C` nella cartella nuova, dove guarda anche la sonda delle impostazioni (#1994.1). Solo su parole che la
+  // shell passa com'è scritte: `~` lo espandono sh e bash per tutti e due, PowerShell solo per `cd`.
+  function gitAltrove(raw, c) {
+    if (programOf(dequote(raw)) !== 'git') return null;
+    const t = String(raw).trim().split(/\s+/);
+    const posix = shellPosix(c);
+    const semplice = posix ? /^[\w./:+=~-]+$/ : c.win && !c.sistemaIgnoto ? /^[\w./:+=\\-]*[\w./:+=-]$/ : /^[\w./:+=-]+$/;
+    const tenute = [t[0]];
+    const cartelle = [];
+    let i = 1;
+    for (; i < t.length && t[i].startsWith('-'); i++) {
+      if (t[i] !== '-C') {
+        if (!GIT_GLOBALI_INNOCUE.has(t[i])) return null;
+        tenute.push(t[i]);
+        continue;
+      }
+      const d = t[i + 1];
+      if (!d || d.startsWith('-') || !semplice.test(d)) return null;
+      cartelle.push(d);
+      i += 1;
+    }
+    if (!cartelle.length || i >= t.length) return null;
+    const resto = String(raw).trim().slice(new RegExp(String.raw`^(?:\S+\s+){${i}}`).exec(String(raw).trim())[0].length);
+    return { cartelle, raw: `${tenute.join(' ')} ${resto}` };
+  }
+
   function classifyOneDet(raw, c) {
+    const altrove = gitAltrove(raw, c);
+    if (altrove) {
+      let det = { level: 1, motivo: '' };
+      let cc = c;
+      for (const d of altrove.cartelle) {
+        det = peggiore(det, classifyOneDet(`cd ${d}`, cc));
+        cc = spostati(`cd ${d}`, cc);
+      }
+      return peggiore(det, classifyOneDet(altrove.raw, cc));
+    }
     const base = classifyOneLetto(raw, c);
     // git cambia le sue impostazioni con `git config`, che misura la chiave.
     if (base === 2 && programOf(dequote(raw)) !== 'git' && toccaIlCuoreDiGit(raw, c)) return { level: 3, motivo: CUORE_GIT };

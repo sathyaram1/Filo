@@ -176,19 +176,31 @@
     return pos;
   }
 
+  // git legge un'opzione lunga anche accorciata (`--unset-a` è `--unset-all`, `--verb` è `--verbose`), ma un nome
+  // scritto intero vince sugli altri che comincia: `--get` non è `--get-regexp`, `--unset` non è `--unset-all`.
+  const GIT_NOMI_INTERI = new Set(['get', 'unset']);
+  function gitOpzione(a, nomi) {
+    return nomi.some((n) => {
+      if (opzioneLunga(a, n, 1) == null) return false;
+      const scritto = a.slice(2).split('=')[0].toLowerCase();
+      return scritto === n || !GIT_NOMI_INTERI.has(scritto);
+    });
+  }
+  const conOpzione = (args, ...nomi) => args.some((a) => gitOpzione(a, nomi));
+
   // `git config` nella forma con le opzioni (`--unset`, `chiave valore`…): gli argomenti dopo il sotto-comando.
   function gitConfigForma(args) {
     const low = args.map((a) => a.toLowerCase());
-    if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
+    if (conOpzione(args, 'unset', 'unset-all', 'remove-section')) return 3;
     // Rinominare una sezione sposta le sue chiavi in un'altra: `color.sshcommand` diventa `core.sshcommand` (#2621).
-    if (low.includes('--rename-section')) return 3;
+    if (conOpzione(args, 'rename-section')) return 3;
     const pos = gitConfigOperandi(args);
     const ops = pos.map((i) => args[i]);
     const chiave = (ops[0] || '').toLowerCase();
     // Le chiavi che decidono dove va il codice al prossimo push: l'indirizzo è `git remote set-url` per un'altra strada
     // (#530), il remoto di un ramo o quello predefinito accettano anche un indirizzo al posto di un nome, e un file
     // incluso può scrivere ognuna di queste (#2623).
-    const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
+    const scrive = ops.length >= 2 || conOpzione(args, 'add', 'replace-all');
     if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$|^branch\..+\.(push)?remote$|^remote\.pushdefault$|^include(if\..+)?\.path$/
       .test(chiave)) return 3;
     // Il valore scritto, tolti gli interruttori senza valore di git config. Un'opzione col valore dopo la chiave resta
@@ -197,11 +209,11 @@
     if (scrive && !low.some((a) => /^--get(-|$)/.test(a))) {
       return gitChiaveScrittaInerte(chiave, args.slice(pos[0] + 1).filter((a, k) => !GIT_CONFIG_INTERRUTTORE.test(low[pos[0] + 1 + k]))) ? 2 : 3;
     }
-    if (low.some((a) => a === '-e' || a === '--edit')) return 2;
+    if (low.includes('-e') || conOpzione(args, 'edit')) return 2;
     // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
     // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
     // conversazione → conferma (#587). Una chiave innocua (`user.email`) resta 1.
-    if (low.some((a) => a === '--list' || a === '-l' || a === '--get-regexp' || a === '--get-urlmatch')) return 2;
+    if (low.includes('-l') || conOpzione(args, 'list', 'get-regexp', 'get-urlmatch')) return 2;
     return /(^|\.)url$|credential|password|token/.test(chiave) ? 2 : 1;
   }
 
@@ -213,11 +225,10 @@
     const verbo = i === undefined ? '' : args[i].toLowerCase();
     if (!/^(list|get|set|unset|edit|rename-section|remove-section|get-color|get-colorbool)$/.test(verbo)) return gitConfigForma(args);
     const resto = args.filter((_, k) => k !== i);
-    const low = resto.map((a) => a.toLowerCase());
     if (verbo === 'unset' || verbo === 'remove-section' || verbo === 'rename-section') return 3;
     if (verbo === 'list' || verbo === 'edit') return 2;
-    if (verbo === 'set') return Math.max(2, gitConfigForma(low.includes('--append') ? resto.concat('--add') : resto));
-    if (low.some((a) => /^--(regexp|url)(=|$)/.test(a))) return 2;
+    if (verbo === 'set') return Math.max(2, gitConfigForma(conOpzione(resto, 'append') ? resto.concat('--add') : resto));
+    if (conOpzione(resto, 'regexp', 'url')) return 2;
     return gitConfigForma(resto);
   }
 
@@ -249,9 +260,9 @@
       if (args.includes('--')) return 3;
       // Flag che dichiarano «sto lavorando sui FILE» anche senza scrivere il percorso:
       // `--pathspec-from-file`, `-p`/`--patch`, `--ours`/`--theirs` scartano comunque modifiche.
-      if (args.some((a) => /^(--pathspec-from-file(=|$)|--pathspec-file-nul$|-p$|--patch$|--ours$|--theirs$)/.test(a))) return 3;
+      if (args.includes('-p') || conOpzione(args, 'pathspec-from-file', 'pathspec-file-nul', 'patch', 'ours', 'theirs')) return 3;
       // `-b`/`-B`/`--orphan`/`--detach` creano o spostano un ramo, non toccano i path.
-      if (args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a))) return 2;
+      if (args.some((a) => a === '-b' || a === '-B') || conOpzione(args, 'orphan', 'detach')) return 2;
       const ops = args.filter((a) => !a.startsWith('-'));
       if (ops.some(looksLikePathspec)) return 3; // scarta le modifiche dei file
       if (ops.length >= 2) return 3;             // `<ref> <path>` senza `--`
@@ -267,9 +278,10 @@
     },
     config: gitConfigVerbi,
     remote: (cmd) => {
-      const ops = gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'));
+      const args = gitArgsAfterSub(cmd);
+      const ops = args.filter((a) => !a.startsWith('-'));
       // `git remote -v` elenca gli URL, che possono contenere un token → conferma.
-      if (!ops.length) return /(^|\s)(-v|--verbose)(\s|$)/.test(cmd) ? 2 : 1;
+      if (!ops.length) return args.some((a) => /^-v+$/.test(a)) || conOpzione(args, 'verbose') ? 2 : 1;
       const action = ops[0].toLowerCase();
       if (action === 'show' || action === 'get-url') return 2; // stampano l'URL col token
       if (action === 'remove' || action === 'rm' || action === 'prune') return 3; // cancellazioni
@@ -296,9 +308,8 @@
   // Il file su cui scrive una lettura di git con `--output` ('' se non si sa quale), o null se stampa e basta (#2292).
   function gitUscita(args) {
     for (let i = 0; i < args.length; i++) {
-      if (args[i] === '--output') return args[i + 1] || '';
-      const m = /^--output=(.*)$/.exec(args[i]);
-      if (m) return m[1];
+      const v = opzioneLunga(args[i], 'output', 2);
+      if (v != null) return args[i].includes('=') ? v : args[i + 1] || '';
     }
     return null;
   }
@@ -422,7 +433,8 @@
     }
     // Il push verso il remoto già configurato si rimedia; verso un indirizzo scritto nel comando manda il codice
     // a un server qualsiasi, e non torna indietro (#530).
-    if (sub === 'push' && gitArgsAfterSub(cmd).some((a) => /:\/\//.test(a) || /^(--repo=)?[^\s/:=-][^\s/:=]*@[^\s:]+:/.test(a))) return 3;
+    const indirizzo = (a) => /:\/\//.test(a) || /^[^\s/:=-][^\s/:=]*@[^\s:]+:/.test(a);
+    if (sub === 'push' && gitArgsAfterSub(cmd).some((a) => indirizzo(a) || (gitOpzione(a, ['repo']) && indirizzo(opzioneLunga(a, 'repo', 1))))) return 3;
     if (GIT_WRITE.has(sub)) return 2;
     return 3; // sotto-comando git sconosciuto → cautela
   }
@@ -446,5 +458,5 @@
     return 3; // run/exec/start/test/publish/sconosciuti → 3
   }
 
-  Object.assign(P, { GIT_READ, GIT_GLOBALE_CARTELLA, gitChiaveInerte, gitScriveFile, gitUscita, gitProgrammaScritto, classifyGit, classifyNpm });
+  Object.assign(P, { GIT_READ, GIT_GLOBALI_INNOCUE, GIT_GLOBALE_CARTELLA, gitChiaveInerte, gitScriveFile, gitUscita, gitProgrammaScritto, classifyGit, classifyNpm });
 })(typeof globalThis !== 'undefined' ? globalThis : self);
