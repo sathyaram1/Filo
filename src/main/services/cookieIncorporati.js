@@ -44,6 +44,10 @@ const inArrivo = new Map();
 // sito → nomi dei cookie partizionati dei suoi riquadri: Electron non sa riscriverli senza scadenza, quindi si
 // tolgono a fine visita (o all'uscita da Filo).
 const partizionati = new Map();
+// Le nostre riscritture (dominio|percorso|nome): Electron non sa scrivere «solo se è ancora il cookie letto», quindi
+// una partita da una lettura vecchia può coprire un valore più nuovo del sito; lo dice l'avviso che la segue (#2637).
+const nostre = new Map();
+const NOSTRE_MS = 30 * 1000;
 
 let modo = 'default';
 let fidati = new Sito.ElencoSiti();
@@ -174,7 +178,7 @@ async function declassa(ses, c0) {
     if (lista.some((x) => stesso(x) && !x.session && (!c || x.value !== c.value))) return 'partizionato';
   }
   if (!c || c.session) return false;
-  await ses.cookies.set({ ...posto(c), value: c.value });
+  await scriviNostra(ses, c, { ...posto(c), value: c.value });
   // Da Electron 44 anche la ricerca per indirizzo trova i partizionati: se l'originale è ancora lì era partizionato, e
   // la copia appena nata, un cookie di terza parte che varrebbe su ogni sito, si scade subito.
   const dopo = await ses.cookies.get({ domain: String(c.domain || '').replace(/^\./, '') });
@@ -251,7 +255,7 @@ async function togliPartizionati(ses, sito, nomi) {
     });
     for (const c of normali) {
       preesistenti.set(chiaveCookie(c), Date.now());
-      try { await ses.cookies.set({ ...posto(c), value: c.value, expirationDate: c.expirationDate }); } catch (_) {}
+      try { await scriviNostra(ses, c, { ...posto(c), value: c.value, expirationDate: c.expirationDate }); } catch (_) {}
     }
   }
 }
@@ -286,6 +290,48 @@ function segnaAccesso(sito) {
 
 function chiaveCookie(c) {
   return `${String(c.domain || '').toLowerCase()}|${c.path || '/'}|${c.name}`;
+}
+
+async function scriviNostra(ses, c, dati) {
+  const k = chiaveCookie(c);
+  let v = nostre.get(k);
+  if (!v) {
+    v = { inVolo: [], ultimo: null, rimosso: null, at: 0 };
+    nostre.set(k, v);
+    while (nostre.size > MAX_NOMI) nostre.delete(nostre.keys().next().value);
+  }
+  const valore = String(dati.value == null ? '' : dati.value);
+  v.inVolo.push(valore);
+  v.at = Date.now();
+  try {
+    await ses.cookies.set(dati);
+  } catch (e) {
+    const i = v.inVolo.indexOf(valore);
+    if (i >= 0) v.inVolo.splice(i, 1);
+    throw e;
+  }
+}
+
+// L'arrivo di una nostra riscrittura dopo la rimozione per sovrascrittura di un valore che non era né quello scritto né
+// il nostro di prima: il sito l'aveva aggiornato fra lettura e scrittura. Torna com'era, e si giudica come ogni arrivo.
+function osservaNostra(ses, k, c, causa, rimosso) {
+  const v = nostre.get(k);
+  if (!v) return;
+  if (Date.now() - v.at > NOSTRE_MS) { nostre.delete(k); return; }
+  if (rimosso) {
+    if (causa === 'overwrite' && v.inVolo.length) v.rimosso = c;
+    return;
+  }
+  const coperto = v.rimosso;
+  v.rimosso = null;
+  const i = v.inVolo.indexOf(String(c.value));
+  if (i < 0) return;
+  v.inVolo.splice(i, 1);
+  const prima = v.ultimo;
+  v.ultimo = String(c.value);
+  if (!coperto || coperto.value === c.value || coperto.value === prima) return;
+  const dati = { ...posto(coperto), value: coperto.value, ...(coperto.session ? {} : { expirationDate: coperto.expirationDate }) };
+  scriviNostra(ses, coperto, dati).catch(() => {});
 }
 
 async function cookieCambiato(ses, c, removed, giaLi = false) {
@@ -440,6 +486,7 @@ function aggancia(ses) {
     ses.cookies.on('changed', (_e, c, cause, removed) => {
       if (!c || !c.name) return;
       const k = chiaveCookie(c);
+      try { osservaNostra(ses, k, c, cause, removed); } catch (_) {}
       if (removed) {
         if (cause === 'overwrite' && !c.session) {
           preesistenti.set(k, Date.now());
