@@ -165,6 +165,25 @@ test('Indietro subito dopo il crollo della scheda torna alla pagina di prima, e 
   await expect.poll(() => schedaMostra(app, dopo), { timeout: 10_000 }).toBe(`${dopo} dopo`);
 });
 
+test('una voce dell\'elenco di Indietro scelta subito dopo il crollo della scheda si apre', async ({ app, openTab, testServer }) => {
+  const prima = testServer.html('<!DOCTYPE html><title>prima</title><p>uno</p>');
+  const dopo = testServer.html('<!DOCTYPE html><title>dopo</title><p>due</p>');
+  await openTab(prima);
+  await app.evaluate(({ BrowserWindow }, [da, verso]) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w._filoTabs.navigate(w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === da).id, verso);
+  }, [prima, dopo]);
+  await expect.poll(() => schedaMostra(app, dopo), { timeout: 10_000 }).toBe(`${dopo} dopo`);
+  const indice = await app.evaluate(({ BrowserWindow }, da) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === da);
+    return w._filoTabs.vociCronologia(tab.id, 'indietro')[0].indice;
+  }, dopo);
+  await gestoSubitoDopoIlCrollo(app, dopo, 'vaiAllaVoce', indice);
+  await expect.poll(() => schedaMostra(app, prima), { timeout: 10_000 }).toBe(`${prima} prima`);
+  expect(paginaDellaSchedaCaduta(app)).toBe(false);
+});
+
 test('renderer crashato: pagina d\'errore "scheda bloccata" invece del bianco', async ({ app, shell, openTab, testServer }) => {
   const url = testServer.html('<!DOCTYPE html><title>viva</title><p>contenuto</p>');
   await openTab(url);
