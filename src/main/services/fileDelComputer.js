@@ -177,8 +177,7 @@ async function servi(partizione, req) {
     return new Response('', { status: 404 });
   }
   const h = new Headers(r.headers);
-  const pdf = /^application\/pdf\b/i.test(h.get('content-type') || '');
-  h.set('Content-Security-Policy', pdf ? CSP_DOCUMENTO : `${CSP_DOCUMENTO}; ${ISOLATA}`);
+  h.set('Content-Security-Policy', CSP_DOCUMENTO);
   return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
 }
 
