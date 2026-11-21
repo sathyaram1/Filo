@@ -127,7 +127,8 @@
     const y = Number(msg.y);
     const S = global.SN_SCHEDE_IN_CHAT;
     const scheda = S ? S.normalizza(msg.scheda) : null;
-    const grezza = scheda ? null : qualunque(msg.scheda);
+    // Una scheda che non è un sito la prende solo chi decide da sé (`ogniScheda`), con la stessa pulizia dei gettoni.
+    const grezza = scheda || !S ? null : S.ripulita(msg.scheda);
     const b = msg.fase === 'esci' || !(scheda || grezza) || !Number.isFinite(x) || !Number.isFinite(y) ? null : bersaglio(doc, x, y, !!scheda);
     const fr = b || msg.fase === 'esci' || !scheda || !Number.isFinite(x) || !Number.isFinite(y) ? null : riquadroSotto(doc, x, y);
     if (riquadroOra && riquadroOra !== fr) { inoltra(doc, riquadroOra, 'esci', 0, 0); riquadroOra = null; }
