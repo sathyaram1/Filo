@@ -15,14 +15,23 @@ const VISIBILI = new Set([
   'mp4', 'webm', 'ogv', 'ogg', 'mp3', 'wav', 'm4a', 'flac', 'opus',
 ]);
 
-// Con i privilegi di Electron su file:// una pagina locale leggerebbe con fetch ogni file del disco: nei documenti
-// le richieste e i riquadri vanno solo verso il web, e il resto lo ferma la cartella concessa (servi).
+// Una pagina del computer si mostra senza rete: carica solo file della sua concessione (servi), così quello che riesce
+// a leggere non ha dove andare. Niente richieste di dati, riquadri, worker né moduli inviati.
+const LOCALI = 'file: data: blob:';
 const CSP_DOCUMENTO = [
-  'connect-src http: https: ws: wss: data: blob:',
-  'frame-src http: https: data: blob:',
-  'worker-src http: https: data: blob:',
-  "object-src 'none'",
+  "default-src 'none'",
+  `script-src ${LOCALI} 'unsafe-inline' 'unsafe-eval'`,
+  `style-src ${LOCALI} 'unsafe-inline'`,
+  `img-src ${LOCALI}`,
+  `media-src ${LOCALI}`,
+  `font-src ${LOCALI}`,
+  'connect-src data: blob:',
+  "form-action 'none'",
 ].join('; ');
+// Origine opaca come in Chrome, che i privilegi di Electron su file:// tolgono: le immagini della cartella sporcano la
+// tela, e fetch, moduli e font file: diventano di un'altra origine. Non al PDF, che in un documento isolato non si vede.
+const ISOLATA = 'sandbox allow-scripts allow-forms allow-modals allow-popups allow-downloads';
+const RETE = ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'];
 
 const fileDi = (input) => globalThis.SN_URL_NAV.fileDiQuestoComputer(input);
 
