@@ -11,8 +11,8 @@ const { zoomDaTasto, rotellaZoom } = require('./tabs/tabZoom');
 const INDIRIZZO = 'filo://riquadri/riquadri.html';
 const PRELOAD = 'src/preload/riquadri-preload.js';
 const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta', 'aiuto', 'trascrizione']);
-require('../shared/trascrizioneRighe.js');
-const { IMMAGINE } = globalThis.SN_TRASCRIZIONE_RIGHE;
+require('../shared/immaginiChat.js');
+const IMMAGINE = globalThis.SN_IMMAGINI_CHAT.INTERA;
 // L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): cosa può chiederle e quanto aspetta la risposta. Un'azione
 // può aspettare il sì dell'utente; le altre sono letture o tocchi che finiscono in pochi secondi.
 const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000, campo: 15000 });
@@ -204,8 +204,9 @@ class StratoDeiRiquadri {
       const dataUrl = IMMAGINE.test(testo(dati.dataUrl)) ? testo(dati.dataUrl) : '';
       const r = principale && dati.rect && typeof dati.rect === 'object' ? dati.rect : null;
       const v = r ? ['x', 'y', 'w', 'h'].map((k) => numero(r[k])) : [];
-      const rect = v.length && v.every((n) => n !== undefined) && v[2] > 0 && v[3] > 0
-        ? { x: v[0] * zoom, y: v[1] * zoom, w: v[2] * zoom, h: v[3] * zoom } : null;
+      const a = v.length && v.every((n) => n !== undefined) && v[2] > 0 && v[3] > 0
+        ? ancoraNellaVista({ left: v[0], top: v[1], right: v[0] + v[2], bottom: v[1] + v[3] }, zoom) : null;
+      const rect = a && a.right > a.left && a.bottom > a.top ? { x: a.left, y: a.top, w: a.right - a.left, h: a.bottom - a.top } : null;
       return { dataUrl, rect };
     }
     // Un riquadro incorporato conosce solo la sua finestra: l'ancora è l'ultimo punto del puntatore sulla scheda.

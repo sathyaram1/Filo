@@ -38,6 +38,57 @@ test('riquadro rovesciato o fuori scala: raddrizzato e tenuto dentro l\'immagine
   assert.deepEqual([Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h)], [100, 150, 800, 350]);
 });
 
+// Una riga disegnata a blocchi: ogni lettera è un rettangolo d'inchiostro largo `lettera`, staccato di `fra` dalla
+// prossima; fra le parole un buco di `spazio`. Torna l'immagine in grigi e dove sta ogni parola.
+function rigaDisegnata(parole, { lettera = 12, fra = 3, spazio = 15, chiaro = false, x0 = 20 } = {}) {
+  const w = 900;
+  const h = 60;
+  const fondo = chiaro ? 20 : 250;
+  const ink = chiaro ? 245 : 30;
+  const luma = new Uint8Array(w * h).fill(fondo);
+  const dove = [];
+  let x = x0;
+  for (const p of parole) {
+    const da = x;
+    for (let i = 0; i < p.length; i++) {
+      for (let y = 15; y < 45; y++) for (let k = 0; k < lettera; k++) luma[y * w + x + k] = ink;
+      x += lettera + (i < p.length - 1 ? fra : 0);
+    }
+    dove.push({ da, a: x });
+    x += spazio;
+  }
+  return { luma, w, h, dove };
+}
+
+test('le parole cadono dove sono disegnate, con un carattere qualunque', () => {
+  const riga = 'PANE INTEGRALE KG 0,350 EUR 1,40';
+  const d = rigaDisegnata(riga.split(' '));
+  const ink = R.inchiostro(d.luma, d.w, d.h, { x: 10, y: 5, w: 880, h: 50 });
+  assert.deepEqual(R.parole(riga, ink), d.dove);
+});
+
+test('scritta chiara su fondo scuro: l\'inchiostro è la parte chiara', () => {
+  const d = rigaDisegnata(['BENVENUTI', '2026'], { chiaro: true });
+  const ink = R.inchiostro(d.luma, d.w, d.h, { x: 0, y: 0, w: 900, h: 60 });
+  assert.deepEqual(R.parole('BENVENUTI 2026', ink), d.dove);
+});
+
+test('spazi che non si contano: niente posizioni, il testo si stira sulla riga', () => {
+  // Il lettore dà tre parole, nei pixel ce ne sono due.
+  const due = rigaDisegnata(['Totale', '1250']);
+  assert.equal(R.parole('Totale 1250 euro', R.inchiostro(due.luma, due.w, due.h, { x: 0, y: 0, w: 900, h: 60 })), null);
+  // Spazi larghi quanto i buchi fra le lettere: non si sa quali sono gli spazi.
+  const pari = rigaDisegnata(['ab', 'cd'], { fra: 6, spazio: 6 });
+  assert.equal(R.parole('ab cd', R.inchiostro(pari.luma, pari.w, pari.h, { x: 0, y: 0, w: 900, h: 60 })), null);
+  // Un riquadro tutto uguale non ha inchiostro.
+  assert.equal(R.inchiostro(new Uint8Array(900 * 60).fill(200), 900, 60, { x: 0, y: 0, w: 900, h: 60 }), null);
+});
+
+test('una parola sola va dalla prima all\'ultima colonna d\'inchiostro', () => {
+  const d = rigaDisegnata(['4821']);
+  assert.deepEqual(R.parole('4821', R.inchiostro(d.luma, d.w, d.h, { x: 0, y: 0, w: 900, h: 60 })), d.dove);
+});
+
 test('il prompt chiede le righe col riquadro nella forma che la lettura capisce', async () => {
   await import('../../src/shared/constants.js');
   const p = globalThis.SN_CONST.PROMPTS.transcribeImage();

@@ -8,39 +8,38 @@
   const MSG = (global.SN_MSG && global.SN_MSG.MSG) || {};
   const ACTIONS = (global.SN_CONST && global.SN_CONST.ACTIONS) || {};
   const t = (k) => (global.SN_I18N ? global.SN_I18N.t(k) : k);
-  // Quante volte si rimpicciolisce un'immagine che lo strato rifiuta col suo limite, prima di dirlo.
-  const RIDUZIONI = 3;
   // Più piccola di così una porzione non si legge dove sta: si ingrandisce al centro.
   const MINIMO = { w: 160, h: 40 };
   const MARGINE = 16;
   const BARRA_H = 44;
   const INGRANDISCI_MAX = 2;
+  // Il lato dell'immagine in grigi su cui si cercano le parole: oltre, la misura non migliora e costa memoria.
+  const LATO_GRIGI = 2400;
 
   let aperto = null;
 
-  // { dataUrl, rect: {x,y,w,h} in px CSS della vista, o null }. Su un sito chiede lo strato; se lo strato non si può
-  // fare si disegna nel documento, in un'ombra chiusa, come gli altri riquadri.
+  // { dataUrl, rect: {x,y,w,h} in px CSS della vista, o null, fondo: '#rrggbb' sotto l'immagine nella pagina }. Formato,
+  // peso e trasparenza li decide SN_IMMAGINI_CHAT, come per le immagini date all'Aiuto. Su un sito chiede lo strato; se
+  // lo strato non si può fare si disegna nel documento, in un'ombra chiusa, come gli altri riquadri.
   async function apri(opz = {}) {
-    let dataUrl = String(opz.dataUrl || '');
-    if (!/^data:image\//i.test(dataUrl)) return false;
-    const { IMMAGINE } = global.SN_TRASCRIZIONE_RIGHE;
-    if (!IMMAGINE.test(dataUrl)) dataUrl = await inJpeg(dataUrl);
-    if (!IMMAGINE.test(dataUrl)) {
+    const grezza = String(opz.dataUrl || '');
+    if (!/^data:image\//i.test(grezza)) return false;
+    const IC = global.SN_IMMAGINI_CHAT;
+    const blob = IC ? IC.blobDa(grezza) : null;
+    const dataUrl = blob ? await IC.perLaChat(blob, { fondo: opz.fondo }).catch(() => '') : '';
+    if (!dataUrl || !IC.INTERA.test(dataUrl)) {
       global.SN_POPUP?.showToast?.(t('menu_image_unreadable'));
       return false;
     }
     const rect = rettangolo(opz.rect);
-    if (sopra(dataUrl, rect, RIDUZIONI)) return true;
+    if (sopra(dataUrl, rect)) return true;
     disegna({ dataUrl, rect });
     return true;
   }
 
-  // Il limite dello strato lo dice lo strato quando rifiuta: l'immagine si rimpicciolisce sotto quello e si riprova.
-  function sopra(dataUrl, rect, restano) {
+  function sopra(dataUrl, rect) {
     const nelDocumento = () => disegna({ dataUrl, rect });
-    return global.SN_RIQUADRI_SOPRA?.apri('trascrizione', { dataUrl, rect }, nelDocumento, async (limite) => {
-      const ridotta = restano > 0 && limite > 0 ? await inJpeg(dataUrl, limite) : '';
-      if (ridotta && ridotta.length < dataUrl.length && sopra(ridotta, rect, restano - 1)) return;
+    return global.SN_RIQUADRI_SOPRA?.apri('trascrizione', { dataUrl, rect }, nelDocumento, () => {
       global.SN_POPUP?.showToast?.(t('trascrivi_troppo_grande'));
     });
   }
@@ -52,27 +51,22 @@
     return { x: v[0], y: v[1], w: v[2], h: v[3] };
   }
 
-  // Con `limite` (byte) il lato si riduce perché il JPEG ci stia sotto con margine.
-  function inJpeg(dataUrl, limite = 0) {
-    return new Promise((fatto) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          if (!img.naturalWidth || !img.naturalHeight) { fatto(dataUrl); return; }
-          const k = limite > 0 ? Math.min(0.9, Math.sqrt((limite * 0.8) / dataUrl.length)) : 1;
-          const c = document.createElement('canvas');
-          c.width = Math.max(1, Math.round(img.naturalWidth * k));
-          c.height = Math.max(1, Math.round(img.naturalHeight * k));
-          const g = c.getContext('2d');
-          g.fillStyle = '#fff';
-          g.fillRect(0, 0, c.width, c.height);
-          g.drawImage(img, 0, 0, c.width, c.height);
-          fatto(c.toDataURL('image/jpeg', 0.9));
-        } catch (_) { fatto(dataUrl); }
-      };
-      img.onerror = () => fatto(dataUrl);
-      img.src = dataUrl;
-    });
+  // L'immagine in grigi, per ritrovare nei pixel dove cadono le parole di ogni riga. null se il canvas non la legge.
+  function grigi(img) {
+    try {
+      const k = Math.min(1, LATO_GRIGI / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * k));
+      const h = Math.max(1, Math.round(img.naturalHeight * k));
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0, w, h);
+      const d = g.getImageData(0, 0, w, h).data;
+      const luma = new Uint8Array(w * h);
+      for (let i = 0, j = 0; j < luma.length; i += 4, j++) luma[j] = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
+      return { w, h, luma };
+    } catch (_) { return null; }
   }
 
   function chiudi() {
@@ -150,6 +144,7 @@
     img.onload = () => {
       if (aperto !== a) return;
       a.nat = { w: img.naturalWidth, h: img.naturalHeight };
+      a.grigi = grigi(img);
       posa(a);
       try { radice.focus({ preventScroll: true }); } catch (_) {}
     };
@@ -190,32 +185,62 @@
     disponi(a);
   }
 
-  // Ogni riga sta nel suo riquadro: altezza dal riquadro, larghezza col testo stirato o stretto (scaleX), così le parole
-  // cadono sopra quelle disegnate e una si seleziona da sola.
+  // Ogni riga sta nel suo riquadro. Dentro, ogni parola e ogni spazio stanno dove sono disegnati, ritrovati nei pixel
+  // della riga, col testo stirato o stretto (scaleX) sulla loro larghezza: il carattere dell'immagine non è quello di
+  // Filo, e una parola trascinata dalla prima all'ultima lettera visibile si prende intera. Se nei pixel le parole non
+  // si contano, il testo si stira sulla riga intera.
   function disponi(a) {
     if (!a.box || !a.righe.length) return;
     const R = global.SN_TRASCRIZIONE_RIGHE;
     a.testo.textContent = '';
     const scatole = R.scatole(a.righe, a.box.w, a.box.h);
+    const gx = a.grigi ? a.grigi.w / a.box.w : 0;
+    const gy = a.grigi ? a.grigi.h / a.box.h : 0;
     // Le righe stanno fuori dal flusso, e una selezione che ne attraversa due le incollerebbe: un a capo nel testo fra
     // l'una e l'altra lo mette in ogni copia (Ctrl+C, il tasto destro, Traduci, Cerca), che legga la selezione o il range.
-    const nodi = scatole.map((s, i) => {
+    const pezzi = [];
+    scatole.forEach((s, i) => {
       if (i) a.testo.appendChild(document.createTextNode('\n'));
-      const n = el('div', 'sn-tr-riga', s.testo);
+      const n = el('div', 'sn-tr-riga');
       const alta = s.stimata ? Math.min(s.h, 22) : s.h;
       Object.assign(n.style, {
         left: `${s.x}px`, top: `${s.y}px`, height: `${alta}px`, lineHeight: `${alta}px`,
         fontSize: `${Math.max(4, alta * 0.82)}px`,
       });
+      // Il riquadro del lettore spesso sfiora la riga sopra e quella sotto: le parole si cercano nella sua fascia centrale.
+      const ink = !s.stimata && a.grigi
+        ? R.inchiostro(a.grigi.luma, a.grigi.w, a.grigi.h, { x: s.x * gx, y: (s.y + s.h * 0.1) * gy, w: s.w * gx, h: s.h * 0.8 * gy })
+        : null;
+      const dove = ink ? R.parole(s.testo, ink) : null;
+      if (!dove) {
+        n.textContent = s.testo;
+        a.testo.appendChild(n);
+        pezzi.push({ n, w: s.w, stimata: s.stimata });
+        return;
+      }
+      n.style.width = `${s.w}px`;
+      // I pezzi restano nel flusso della riga, uno dopo l'altro: posati fuori dal flusso, un trascinamento dentro la
+      // stessa riga non allargava la selezione. Il margine porta il pezzo dopo dove inizia il suo disegno.
+      const parti = s.testo.trim().split(/(\s+)/);
+      for (let j = 0; j < parti.length; j++) {
+        const p = Math.floor(j / 2);
+        const da = j % 2 ? dove[p].a : dove[p].da;
+        const a2 = j % 2 ? dove[p + 1].da : dove[p].a;
+        const pezzo = el('span', 'sn-tr-pezzo', parti[j]);
+        if (!j) pezzo.style.marginLeft = `${da / gx - s.x}px`;
+        n.appendChild(pezzo);
+        pezzi.push({ n: pezzo, w: Math.max(1, (a2 - da) / gx), nelFlusso: true });
+      }
       a.testo.appendChild(n);
-      return [n, s];
     });
-    for (const [n, s] of nodi) {
-      const naturale = n.scrollWidth;
-      if (!naturale) continue;
-      const k = s.w / naturale;
-      if (!s.stimata || k < 1) n.style.transform = `scaleX(${k})`;
-    }
+    const naturali = pezzi.map((p) => (p.nelFlusso ? p.n.getBoundingClientRect().width : 0) || p.n.scrollWidth);
+    pezzi.forEach((p, i) => {
+      const naturale = naturali[i];
+      if (!naturale) return;
+      const k = p.w / naturale;
+      if (!p.stimata || k < 1) p.n.style.transform = `scaleX(${k})`;
+      if (p.nelFlusso) p.n.style.marginRight = `${p.w - naturale}px`;
+    });
   }
 
   async function leggi(a, dataUrl) {
@@ -259,12 +284,13 @@
     global.SN_ACTIONS?.copyToClipboard?.(testo);
   }
 
-  // Il Copia del sistema su questo testo: le righe una per riga, senza gli spazi in coda che la selezione si porta dietro.
+  // Il Copia del sistema su questo testo, con la regola del Copia del tasto destro: le righe una per riga.
   function copiaSelezione(a, e) {
     const radiceOmbra = a.radice.getRootNode && a.radice.getRootNode();
     let sel = null;
     try { sel = (radiceOmbra && radiceOmbra.getSelection && radiceOmbra.getSelection()) || document.getSelection(); } catch (_) { sel = null; }
-    const testo = String((sel && sel.toString()) || '').replace(/[ \t]+\n/g, '\n').trim();
+    const grezzo = String((sel && sel.toString()) || '');
+    const testo = global.SN_ACTIONS?.testoCopiato ? global.SN_ACTIONS.testoCopiato(grezzo) : grezzo.trim();
     if (!testo || !e.clipboardData) return;
     e.preventDefault();
     e.clipboardData.setData('text/plain', testo);

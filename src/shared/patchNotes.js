@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.298', date: '2026-11-21',
+      fixes: [
+        { testo: 'Trascrivi mostra e legge anche i loghi con la scritta chiara su fondo trasparente, e una parola trascinata dalla prima all\'ultima lettera si copia intera anche quando l\'immagine usa un carattere diverso da quello di Filo.', segnalazione: 2374 },
+        { testo: '«Copia» del tasto destro su un testo che va a capo, come un indirizzo o un elenco, lo copia con le sue righe, come Ctrl+C.', segnalazione: 2374 },
+      ],
+    },
+    {
       version: '0.2.297', date: '2026-11-21',
       features: [
         { testo: 'Incolla in chat il percorso di un file del computer, una pagina HTML, un PDF o un\'immagine, e Filo lo apre in una scheda così com\'è. La pagina non legge i file fuori dalla sua cartella e non si collega a internet.', segnalazione: 1905 },

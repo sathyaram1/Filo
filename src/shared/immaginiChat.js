@@ -1,12 +1,15 @@
-// Un'immagine data a una chat di Filo (#1623) o allegata a una segnalazione (#1664), nella forma che chi la riceve
-// legge: PNG, JPEG, WebP o GIF entro il tetto. Gira solo dove c'è un canvas (pagine e content script), mai nel main.
+// Un'immagine data a una chat di Filo (#1623), allegata a una segnalazione (#1664) o da trascrivere (#2374), nella forma
+// che chi la riceve legge: PNG, JPEG, WebP o GIF entro il tetto. Converte solo dove c'è un canvas; il main ne usa INTERA.
 // Regole: patterns/un-file-lasciato-dove-la-pagina-non-lo-vuole-va-alla-chat.md
 
 (function (global) {
   'use strict';
 
-  // I formati che i fornitori accettano tutti: il resto (SVG, BMP, TIFF, AVIF…) si ridisegna.
-  const LETTA = /^data:image\/(png|jpeg|webp|gif);base64,/i;
+  // I formati che i fornitori accettano tutti: il resto (SVG, BMP, TIFF, AVIF…) si ridisegna. INTERA è il controllo di
+  // chi riceve il data: da un altro processo (lo strato sopra la scheda).
+  const FORMATI = 'png|jpeg|webp|gif';
+  const LETTA = new RegExp(`^data:image\\/(${FORMATI});base64,`, 'i');
+  const INTERA = new RegExp(`^data:image\\/(${FORMATI});base64,[A-Za-z0-9+/=]+$`);
   const tetti = () => (global.SN_CONST && global.SN_CONST.ALLEGATI_CHAT) || {};
   const byteDi = (dataUrl) => Math.floor((dataUrl.length - dataUrl.indexOf(',') - 1) * 3 / 4);
 
@@ -51,40 +54,83 @@
     }
   }
 
-  function disegna(im, lato, tipo) {
+  function disegna(im, lato, tipo, fondo = '') {
     const k = Math.min(1, lato / Math.max(im.w, im.h));
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(im.w * k));
     c.height = Math.max(1, Math.round(im.h * k));
     const g = c.getContext('2d');
-    if (tipo === 'image/jpeg') {
-      g.fillStyle = '#fff';
+    if (fondo || tipo === 'image/jpeg') {
+      g.fillStyle = fondo || '#fff';
       g.fillRect(0, 0, c.width, c.height);
     }
     g.drawImage(im.src, 0, 0, c.width, c.height);
     return c.toDataURL(tipo, 0.85);
   }
 
-  // Torna il data: da mandare, o '' se l'immagine non si apre (anche un file rovinato col nome giusto: il modello
-  // lo rifiuterebbe). Entro il tetto e in un formato letto resta com'è; un altro formato diventa PNG (tiene la
-  // trasparenza di un logo); oltre il tetto si rimpicciolisce in JPEG finché ci sta.
-  function perLaChat(blob) {
-    return entroIlTetto(blob, tetti().tettoImmagineByte || 4 * 1024 * 1024, tetti().latoRimpicciolita || 2048);
+  const COLORE = /^#[0-9a-f]{6}$/i;
+  const luce = (r, g, b) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const SCURO = '#1f1d1a';
+  const CHIARO = '#ffffff';
+  // Sotto quanto stacco fra il disegno e il fondo della pagina una scritta non si legge più (luminosità 0..1).
+  const STACCO_MINIMO = 0.25;
+
+  // Il fondo su cui posare un'immagine con parti trasparenti, perché resti com'era sulla pagina: il colore della pagina
+  // sotto di lei, o l'opposto del disegno se su quel colore non si staccherebbe (un logo bianco pensato per una foto
+  // scura). '' se l'immagine è tutta piena: allora non si ridisegna.
+  function fondoDietro(im, fondo) {
+    let d;
+    try {
+      const k = Math.min(1, 256 / Math.max(im.w, im.h));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(im.w * k));
+      c.height = Math.max(1, Math.round(im.h * k));
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(im.src, 0, 0, c.width, c.height);
+      d = g.getImageData(0, 0, c.width, c.height).data;
+    } catch (_) { return fondo; }
+    let trasparente = false;
+    let somma = 0;
+    let peso = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3] / 255;
+      if (a < 0.98) trasparente = true;
+      somma += a * luce(d[i], d[i + 1], d[i + 2]);
+      peso += a;
+    }
+    if (!trasparente) return '';
+    if (!peso) return fondo;
+    const disegno = somma / peso;
+    const n = Number.parseInt(fondo.slice(1), 16);
+    const pagina = luce((n >> 16) & 255, (n >> 8) & 255, n & 255);
+    if (Math.abs(disegno - pagina) >= STACCO_MINIMO) return fondo;
+    return disegno > 0.5 ? SCURO : CHIARO;
   }
 
-  async function entroIlTetto(blob, tetto, lato) {
+  // Torna il data: da mandare, o '' se l'immagine non si apre (anche un file rovinato col nome giusto: il modello
+  // lo rifiuterebbe). Entro il tetto e in un formato letto resta com'è; un altro formato diventa PNG (tiene la
+  // trasparenza di un logo); oltre il tetto si rimpicciolisce in JPEG finché ci sta. Con `fondo` ('#rrggbb', il colore
+  // della pagina sotto l'immagine) una trasparenza si riempie come la mostrava la pagina: chi legge vede quello che
+  // vedeva l'utente, non una scritta chiara su bianco.
+  function perLaChat(blob, { fondo = '' } = {}) {
+    const f = COLORE.test(String(fondo)) ? String(fondo) : '';
+    return entroIlTetto(blob, tetti().tettoImmagineByte || 4 * 1024 * 1024, tetti().latoRimpicciolita || 2048, f);
+  }
+
+  async function entroIlTetto(blob, tetto, lato, fondo = '') {
     if (!blob) return '';
     const im = await apri(blob);
     if (!im) return '';
     try {
+      const sotto = fondo && !/^image\/jpeg$/i.test(blob.type || '') ? fondoDietro(im, fondo) : '';
       if (blob.size <= tetto) {
         const originale = await comeDataUrl(blob);
-        if (LETTA.test(originale)) return originale;
-        const png = disegna(im, Math.min(lato, Math.max(im.w, im.h)), 'image/png');
+        if (!sotto && LETTA.test(originale)) return originale;
+        const png = disegna(im, Math.min(lato, Math.max(im.w, im.h)), 'image/png', sotto);
         if (LETTA.test(png) && byteDi(png) <= tetto) return png;
       }
       for (let l = lato; l >= 256; l = Math.floor(l * 0.7)) {
-        const url = disegna(im, l, 'image/jpeg');
+        const url = disegna(im, l, 'image/jpeg', sotto);
         if (LETTA.test(url) && byteDi(url) <= tetto) return url;
       }
       return '';
@@ -160,5 +206,5 @@
     }
   }
 
-  global.SN_IMMAGINI_CHAT = { perLaChat, perLaSegnalazione, daRidisegnare, fotogrammiGif, blobDa, byteDi, LETTA };
+  global.SN_IMMAGINI_CHAT = { perLaChat, perLaSegnalazione, daRidisegnare, fotogrammiGif, blobDa, byteDi, LETTA, INTERA };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

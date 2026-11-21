@@ -578,7 +578,10 @@
   transition: background calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .sn-tr-riga:hover { background: rgba(var(--sn-accent-rgb, 196, 90, 59), 0.08); }
-.sn-tr-riga::selection { background: rgba(var(--sn-accent-rgb, 196, 90, 59), 0.35); color: transparent; }
+.sn-tr-riga::selection,
+.sn-tr-pezzo::selection { background: rgba(var(--sn-accent-rgb, 196, 90, 59), 0.35); color: transparent; }
+/* Una parola o uno spazio dove sono disegnati nella riga. */
+.sn-tr-pezzo { display: inline-block; white-space: pre; transform-origin: 0 0; }
 .sn-tr-barra {
   position: absolute;
   display: flex;

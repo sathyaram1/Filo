@@ -20,7 +20,7 @@ const APERTURE = [
   ['src/content/editBox.js', 'function openEditBox(', 'modifica'],
   ['src/content/popup.js', 'function openStreaming(', 'risposta'],
   ['src/content/sidebar.js', 'function open(', 'aiuto'],
-  // `apri` converte l'immagine e passa da `sopra`, che chiede lo strato e ci riprova rimpicciolita.
+  // `apri` converte l'immagine e passa da `sopra`, che chiede lo strato.
   ['src/content/trascrizione.js', 'function sopra(', 'trascrizione'],
 ];
 
