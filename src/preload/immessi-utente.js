@@ -121,6 +121,7 @@ function ascoltaImmessi(invia) {
   globalThis.SN_IMMESSI = Object.freeze({
     inserisce(el, testo) { principale.inserisce(el, testo); },
   });
+  return { diTutto: principale.diTutto };
 }
 
 // Una finestra: la pagina, o un riquadro vuoto (about:blank) che la pagina scrive da sé, come gli editor delle webmail,
