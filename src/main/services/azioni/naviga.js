@@ -2,7 +2,7 @@
 // Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const PageRead = require('../pageRead');
-const { daFilo, origineDi } = require('../handlers/origine');
+const { daFilo, origineDi, paginaNonDiFilo } = require('../handlers/origine');
 const SempreAperte = require('../sempreAperte');
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const { winOf, targetWebTab, nomeDellaScheda } = require('../handlersComuni');
