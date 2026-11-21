@@ -195,13 +195,21 @@
     if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
     if (v.autore === 'segnalazione') out.autore = 'segnalazione';
     if (typeof v.segnalazione === 'string' && v.segnalazione.trim()) out.segnalazione = v.segnalazione.slice(0, MAX_AZIONE);
+    if (typeof v.titoloSegnalazione === 'string' && v.titoloSegnalazione.trim()) out.titoloSegnalazione = v.titoloSegnalazione.slice(0, MAX_AZIONE);
     return out;
   }
-  // Il testo di una segnalazione resta con la sua voce, confermata, rifiutata o in attesa (#2371): l'assistente deve
-  // poterla spiegare anche dopo un no.
-  function segnalazioneDi(type, x) {
-    if (type !== 'INVIA_FEEDBACK' || !x) return '';
-    return typeof x.segnalazione === 'string' ? x.segnalazione : (typeof x.testo === 'string' ? x.testo : '');
+  // Titolo e testo di una segnalazione restano con la sua voce, confermata, rifiutata o in attesa (#2371): l'assistente
+  // deve poterla spiegare anche dopo un no, e la chat riaperta mostrarla nel fumetto della riga (#1704.1).
+  function segnalazioneDi(type, x, giaFatta) {
+    if (type !== 'INVIA_FEEDBACK' || !x) return {};
+    if (giaFatta) return { segnalazione: x.segnalazione, titoloSegnalazione: x.titoloSegnalazione };
+    const S = campiSegnalazione(x);
+    return { segnalazione: S.testo, titoloSegnalazione: S.titolo };
+  }
+  function campiSegnalazione(x) {
+    if (!global.SN_ALLEGATI_SEGNALAZIONE && typeof require === 'function') { try { require('./allegatiSegnalazione.js'); } catch (_) {} }
+    const S = global.SN_ALLEGATI_SEGNALAZIONE;
+    return S ? S.campi(x) : { titolo: '', testo: '' };
   }
   // La conferma ancora da dare (#1685): riaperta, la chat ridisegna il suo bottone con l'azione e la domanda di allora.
   // Solo dati semplici e corti: quello che non ci sta non si ridisegna, e resta la riga.
