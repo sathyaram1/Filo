@@ -88,12 +88,10 @@ async function azioneInviaFeedback(action, {
   // procedere solo con confirmed:true). Il feedback parte come quelli
   // inviati dal box: stesso schema, ma clientId 'filo:chat' così in
   // dashboard si vede che l'ha mandato Filo. Dall'owner porta la sua prova; è suo solo a compito pulito (#953).
-  const testo = String(action.testo ?? action.text ?? action.messaggio ?? '').trim();
+  const { titolo, testo } = globalThis.SN_ALLEGATI_SEGNALAZIONE.campi(action);
   if (!testo) return { executed: false, kept: false };
   const FB = globalThis.SN_FEEDBACK;
   if (!FB || typeof FB.submit !== 'function') return { executed: false, kept: false };
-  const titolo = String(action.titolo ?? action.title ?? action.name ?? '').trim()
-    || (typeof FB.fallbackName === 'function' ? FB.fallbackName(testo) : '');
   let userAgent = 'Filo desktop';
   try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
   try {
