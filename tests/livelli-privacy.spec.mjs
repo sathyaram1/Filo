@@ -5,7 +5,9 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { home } from './helpers/chatFinta.mjs';
+import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { createServer } from 'node:http';
 
 const SANITA = 'sanita-di-prova.test';
 const POSTA = 'posta-di-prova.test';
@@ -54,6 +56,15 @@ async function tastoDestroSullaFoto(page) {
   const sezione = menuDi(page).locator('.sn-menu-inline[data-subject="image"]');
   await expect(sezione).toBeVisible({ timeout: 10_000 });
   return sezione;
+}
+// Su un sito il pannello dell'Aiuto sta nello strato sopra la scheda (#1509.3).
+async function apriAiuto(app, shell, page) {
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const aiuto = await paginaDellAiuto(app, page);
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  return aiuto;
 }
 
 test.describe('nel sito', () => {
@@ -137,6 +148,66 @@ test.describe('nel sito', () => {
     await expect(controlla).toBeVisible({ timeout: 10_000 });
     await controlla.click();
     await expect.poll(delCampo, { timeout: 10_000 }).toBeGreaterThan(0);
+  });
+
+  // #1589.8 — dove il livello chiede prima il nome del sito non va al server dei percorsi noti; l'Aiuto risponde lo stesso.
+  test('l\'Aiuto su una pagina di sanità col livello di serie non chiede al server i percorsi noti; sulla posta sì', async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(120_000);
+    await siteDiProva(app);
+    await modelliFinti(app);
+    await app.evaluate(() => {
+      globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback;
+      const P = globalThis.SN_PATHS;
+      globalThis.__percorsiVeri = P.listByDomain;
+      globalThis.__percorsi = [];
+      P.listByDomain = async (dominio) => { globalThis.__percorsi.push(dominio); return []; };
+    });
+    try {
+      for (const host of [SANITA, POSTA]) {
+        const pagina = await apriSu(openTab, testServer, host, '<!doctype html><title>Area personale</title><body><p>I tuoi documenti</p></body>');
+        const prima = await app.evaluate(() => globalThis.__mandato.length);
+        const aiuto = await apriAiuto(app, shell, pagina);
+        await aiuto.fill('.sn-sidebar-input textarea', 'dove trovo i miei documenti?');
+        await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+        await expect.poll(() => app.evaluate(() => globalThis.__mandato.length), { timeout: 20_000 }).toBeGreaterThan(prima);
+        await expect(aiuto.locator('.sn-sidebar')).toContainText('Descrizione finta.', { timeout: 10_000 });
+      }
+      expect(await app.evaluate(() => globalThis.__percorsi)).toEqual([POSTA]);
+    } finally {
+      await app.evaluate(() => { globalThis.SN_PATHS.listByDomain = globalThis.__percorsiVeri; });
+    }
+  });
+
+  test('una pagina d\'errore su un sito dove Filo chiede prima non va al riconoscimento dei blocchi geografici; altrove sì', async ({ app, openTab }) => {
+    test.setTimeout(90_000);
+    await siteDiProva(app);
+    const server = createServer((_req, res) => {
+      // Un 403 generico: le regole locali non lo riconoscono, e senza il livello andrebbe al classificatore.
+      res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<title>403</title><h1 id="msg">Access denied to this resource.</h1>');
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const porta = server.address().port;
+    try {
+      await app.evaluate(async () => {
+        await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: 'socks5://127.0.0.1:9' } });
+        globalThis.__geoVeri = globalThis.SN_GEO_CLASSIFY;
+        globalThis.__classificati = [];
+        globalThis.SN_GEO_CLASSIFY = async (input) => { globalThis.__classificati.push(input.host); return { skipped: true }; };
+      });
+      const classificati = () => app.evaluate(() => globalThis.__classificati);
+      const sanita = await openTab(`http://${SANITA}:${porta}/esami`);
+      await sanita.waitForSelector('#msg');
+      const posta = await openTab(`http://${POSTA}:${porta}/casella`);
+      await posta.waitForSelector('#msg');
+      await expect.poll(classificati, { timeout: 15_000 }).toContain(POSTA);
+      await pausa(2500);
+      expect(await classificati(), 'la pagina della sanità resta sul computer').not.toContain(SANITA);
+    } finally {
+      await app.evaluate(() => { globalThis.SN_GEO_CLASSIFY = globalThis.__geoVeri; });
+      server.closeAllConnections?.();
+      await new Promise((r) => server.close(r));
+    }
   });
 });
 
@@ -411,6 +482,59 @@ test('annullare dalla home un livello abbassato vuole «conferma»; il ripristin
   await casa.evaluate(() => self.SN_STORAGE.updateSettings({ security: { pagineDelicate: { siti: ['studio-medico.it'] } } }));
   await casa.evaluate(() => chrome.runtime.sendMessage({ type: 'reset_settings' }));
   await expect.poll(async () => (await privacy(app)).sitiChiedi, { timeout: 4000 }).toContain('studio-medico.it');
+});
+
+// #1589.8 — le strade che annullano dalla chat chiedono la parola come l'elenco della home, e poi rimettono com'era.
+test('«annulla» sul segno del messaggio e dal tasto destro sulla bolla rimette un livello più largo dopo «conferma»', async ({ app }) => {
+  test.setTimeout(90_000);
+  const casa = await home(app);
+  await modelloFinto(app, [
+    { text: 'Fatto.', toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"livello_privacy","valore":"meno"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  try {
+    await chiedi(casa, 'manda meno roba ai modelli');
+    await expect.poll(async () => (await privacy(app)).livello, { timeout: 15_000 }).toBe('delicate');
+    const bolla = casa.locator('.dash-bubble-user', { hasText: 'manda meno roba ai modelli' });
+    const segno = bolla.locator('.dash-cambi-segno');
+    const bottone = bolla.locator('.dash-cambi-annulla');
+    await expect(segno).toBeVisible({ timeout: 10_000 });
+
+    await segno.hover();
+    await bottone.click();
+    await expect(casa.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5000 });
+    expect((await confirmState(casa)).hasInput, 'rialzare quanto esce vuole la parola scritta').toBe(true);
+    await clickConfirm(casa, 'cancel');
+    await casa.waitForTimeout(400);
+    expect((await privacy(app)).livello, 'detto no, resta stretto').toBe('delicate');
+    await segno.hover();
+    await expect(bottone, 'detto no non è un errore').toHaveText('annulla');
+    await bottone.click();
+    await fillConfirmInput(casa, 'conferma');
+    await scrollConfirmToEnd(casa);
+    await clickConfirm(casa, 'danger');
+    await expect.poll(async () => (await privacy(app)).livello, { timeout: 5000 }).toBe('anticipo');
+    await segno.hover();
+    await expect(bottone).toHaveText('rifai');
+    // Rifare stringe di nuovo: parte senza la parola.
+    await bottone.click();
+    await expect.poll(async () => (await privacy(app)).livello, { timeout: 5000 }).toBe('delicate');
+    await expect(casa.locator(CONFIRM_HOST)).toHaveCount(0);
+
+    await casa.mouse.move(5, 400);
+    const menu = menuDi(casa).locator('.sn-menu');
+    await bolla.click({ button: 'right', position: { x: 20, y: 10 } });
+    await expect(menu).toBeVisible();
+    await menu.getByText(/^Annulla · .*livello di privacy/).click();
+    await expect(casa.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5000 });
+    await fillConfirmInput(casa, 'conferma');
+    await scrollConfirmToEnd(casa);
+    await clickConfirm(casa, 'danger');
+    await expect.poll(async () => (await privacy(app)).livello, { timeout: 5000 }).toBe('anticipo');
+    await casa.screenshot({ path: 'tests/.shots/1589-8-annulla-dal-segno.png' });
+  } finally {
+    await ripristina(app);
+  }
 });
 
 test.describe('nell\'intervista di benvenuto', () => {
