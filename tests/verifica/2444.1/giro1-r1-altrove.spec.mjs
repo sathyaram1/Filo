@@ -39,3 +39,20 @@ test('r1 tasto destro, poi clic su un\'altra scheda prima che Filo sia pronto: t
   await page.screenshot({ path: 'tests/.shots/2444.1-r1-altra-scheda.png' }).catch(() => {});
   await expect(menuDi(page).principale).toHaveCount(0);
 });
+
+test('r1 tasto destro, poi la rotella scorre la pagina prima che Filo sia pronto: il menu non compare sulla voce sparita', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await trattieniImpostazioni(app);
+  const page = await openTab('filo://preferences/preferences.html');
+  const etichetta = page.locator('label', { has: page.locator('#tabPreviewEnabled') });
+  await expect(etichetta).toBeVisible({ timeout: 10_000 });
+  await etichetta.click({ button: 'right' });
+  const prima = await page.evaluate(() => scrollY);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(prima + 200);
+  await apriImpostazioni(app);
+  await pronta(page);
+  await page.waitForTimeout(1_000);
+  await page.screenshot({ path: 'tests/.shots/2444.1-r1-rotella.png' }).catch(() => {});
+  await expect(menuDi(page).principale).toHaveCount(0);
+});
