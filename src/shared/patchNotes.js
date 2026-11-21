@@ -16,7 +16,6 @@
       fixes: [
         { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
         { testo: 'Se il computer risponde lento una volta, la home torna da sola a leggere subito Bluetooth e Wi-Fi, senza riavviare Filo, e dopo una pausa del computer non ti mostra come attuale lo stato di prima.', segnalazione: 2394 },
-        'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che l\'assistente ti propone. Le password e le carte che metti in un modulo non arrivano al modello.',
         { testo: 'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che accetti dall\'assistente o fai scrivere a Filo.', segnalazione: 810 },
       ],
     },
