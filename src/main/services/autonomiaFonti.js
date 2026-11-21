@@ -36,7 +36,7 @@ function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false
 // letto testo di altri: lo stato dei livelli di autonomia, mai più largo della classe 2; dall'Aiuto di un sito mai.
 function compitoSenzaTestoDiAltri(sender, { contesto = null, fontiLette = null, assistente = false, impostazioni = null } = {}) {
   try {
-    if (/^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))) return false;
+    if (daPaginaNonDiFilo(sender)) return false;
     const A = globalThis.SN_AUTONOMIA;
     const aut = (impostazioni && impostazioni.autonomia) || {};
     const attivo = A.livelloAttivo(aut.livello);
