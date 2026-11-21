@@ -139,10 +139,11 @@ test('un collegamento simbolico nella cartella vale per il file vero: se punta f
   writeFileSync(join(casa, 'Immagini', 'passaporto.png'), 'PNG');
   writeFileSync(join(dir, 'vera.png'), 'PNG');
   writeFileSync(join(dir, 'index.html'), '<img src="foto.png"><img src="chiave.png">');
-  symlinkSync(join(casa, 'Immagini', 'passaporto.png'), join(dir, 'foto.png'));
-  symlinkSync(join(casa, '.ssh', 'id_rsa'), join(dir, 'chiave.png'));
-  symlinkSync(join(casa, 'Immagini'), join(dir, 'album'));
-  symlinkSync(join(dir, 'vera.png'), join(dir, 'copia.png'));
+  const negato = collegaFile(join(casa, 'Immagini', 'passaporto.png'), join(dir, 'foto.png'));
+  if (negato) { t.skip(negato); return; }
+  collegaFile(join(casa, '.ssh', 'id_rsa'), join(dir, 'chiave.png'));
+  collegaCartella(join(casa, 'Immagini'), join(dir, 'album'));
+  collegaFile(join(dir, 'vera.png'), join(dir, 'copia.png'));
   const c = F.concessioneDi(join(dir, 'index.html'));
   assert.equal(F.permesso(c, join(dir, 'vera.png')), true);
   assert.equal(F.permesso(c, join(dir, 'copia.png')), true, 'un collegamento dentro la cartella resta');
