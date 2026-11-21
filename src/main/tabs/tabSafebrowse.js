@@ -168,7 +168,7 @@ const safebrowseMethods = {
       timer = setTimeout(() => {
         timer = null;
         // Una pagina del computer non ha rete, nemmeno per la finestra nascosta che prova il link (#1905).
-        if (wc.isDestroyed() || (!process.env.PROVA_SENZA && require('../services/fileDelComputer').inSessioneDiFile(wc))) return;
+        if (wc.isDestroyed() || require('../services/fileDelComputer').inSessioneDiFile(wc)) return;
         try { this._sbPreverifica(url, wc.getURL(), wc.session); } catch (_) {}
       }, SOSTA_MS);
     };
