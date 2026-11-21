@@ -49,6 +49,13 @@ test('esplora 3', async ({ app, avvisi }) => {
   log('attesa', Date.now());
   log('wft', await corsa(p.waitForTimeout(3000), 6000));
   log('attesa fine', Date.now());
+  log('schede dopo sosta', await schede(app));
+  log('crash?', await app.evaluate(({ BrowserWindow }, i) => {
+    const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.id === i);
+    return t ? { crashed: t.view.webContents.isCrashed(), destroyed: t.view.webContents.isDestroyed(), url: t.view.webContents.getURL(), id: t.view.webContents.id } : 'scheda sparita';
+  }, id));
+  p = await paginaDellaScheda(app, id, (x) => x.url().startsWith('file:'));
+  log('pagina nuova', p ? await p.evaluate(() => [document.title, document.body.innerText.slice(0, 100)]) : null);
   log('dopo sosta', arrivi);
   await p.locator('#web').click({ button: 'right', noWaitAfter: true });
   await expect(menuDi(p).locator('.sn-menu')).toBeVisible({ timeout: 8000 });
