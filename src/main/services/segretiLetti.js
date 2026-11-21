@@ -238,5 +238,5 @@ function usaDeposito(d) { deposito = d; caricato = false; letti.svuota(); immess
 
 module.exports = {
   ricorda, ricordaBuste, registro, aggiungi, aggiungiTutti, tutti, svuota, usaDeposito, immessoDallUtente,
-  FONTI_BUSTA, GIORNI_RICORDO,
+  primaDiLeggere, FONTI_BUSTA, GIORNI_RICORDO,
 };
