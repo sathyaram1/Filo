@@ -27,6 +27,7 @@ const ReteDiCasa = require('./services/homeNetwork');
 const FileDelComputer = require('./services/fileDelComputer');
 const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
 const { navigazioneVersoFilo, paginaDeiBloccati } = require('./services/navigazioneVersoFilo');
+const { paginaNonDiFilo } = require('./services/handlers/origine');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
