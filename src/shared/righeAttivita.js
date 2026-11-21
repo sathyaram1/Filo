@@ -218,7 +218,8 @@
     // nessuna parte: proprio quelle che non si disfano più.
     CANCELLA_MEMORIA: () => ({ icon: '🧠', text: 'Memoria cancellata' }),
     INVIA_FEEDBACK: (a) => {
-      const t = pulito(a.titolo || a.title);
+      const S = segnalazione();
+      const t = pulito(S ? S.campi(a).titolo : '');
       return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t}` : ''}` };
     },
     ONBOARDING: (a) => {
