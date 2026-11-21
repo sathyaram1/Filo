@@ -54,10 +54,9 @@ test('cinque azioni nel turno: riaperta, la segnalazione inviata mostra ancora t
     const bolla = di.locator('.dash-bubble-filo').last();
     await expect(bolla).toBeVisible({ timeout: 10_000 });
     await di.waitForTimeout(1500);
-    console.log('BOLLE', JSON.stringify(await di.locator('.dash-bubble-filo').evaluateAll((l) => l.map((e) => e.innerHTML.slice(0, 1500)))));
-    console.log('ESITI', JSON.stringify(await app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l.filter((c) => !c.app).map((c) => c.messages.map((m) => m.esiti || null))))));
-    const riga = bolla.locator('.dash-activity-row', { hasText: 'Segnalazione inviata' });
-    const nota = bolla.locator('.dash-bubble-note').first();
+    console.log('NOTE', JSON.stringify(await di.locator('.dash-bubble-note, .dash-activity-row').evaluateAll((l) => l.map((e) => [e.className, e.textContent, e.title]))));
+    const riga = di.locator('.dash-activity-row', { hasText: 'Segnalazione inviata' });
+    const nota = di.locator('.dash-bubble-note').last();
     const dove = (await riga.count()) ? riga.first() : nota;
     await passaSopra(di, dove);
     await expect(fumetto(di)).toBeVisible({ timeout: 3000 });
