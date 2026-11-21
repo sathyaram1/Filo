@@ -249,6 +249,8 @@ function ascoltaIn(w, invia) {
     // Il main toglie dal registro solo i segreti letti da quando questo pezzo è partito, non da quando il campo è
     // cominciato: un codice letto prima e scritto in fondo a una nota vecchia resta letto (giro 6).
     if (!t.inViaggio) t.inViaggio = Date.now();
+    if (!caselle.inViaggio) caselle.inViaggio = t.inViaggio;
+    toccati.add(el);
     if (dati) contati(t, dati);
     const nuovo = fn ? fn(t.testo) : t.testo;
     if (nuovo !== t.testo) t.testo = taglia(nuovo);
