@@ -18,6 +18,11 @@
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
   const restanoAperte = (o) => global.SN_ESITO.restanoAperte(o);
+  // Titolo e testo di una segnalazione li sceglie src/shared/allegatiSegnalazione.js, come l'invio e il riquadro.
+  function segnalazione() {
+    if (!global.SN_ALLEGATI_SEGNALAZIONE && typeof require === 'function') { try { require('./allegatiSegnalazione.js'); } catch (_) {} }
+    return global.SN_ALLEGATI_SEGNALAZIONE || null;
+  }
   // «lunedì 28 set»: il giorno di una conversazione senza titolo.
   function quandoBreve(ts) {
     const d = new Date(ts);
