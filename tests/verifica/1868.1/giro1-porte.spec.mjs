@@ -1,8 +1,6 @@
 // #1868.1 giro 1 — gesti subito dopo il crollo di una scheda: le porte vicine a Ricarica e Indietro.
 import { test, expect } from '../../fixtures/electron.mjs';
 
-const finestra = `const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);`;
-
 // La scheda su `url` cade; si torna appena il main la sa caduta, prima della rimessa in piedi (300 ms).
 async function crolla(app, url) {
   return app.evaluate(async ({ BrowserWindow }, target) => {
