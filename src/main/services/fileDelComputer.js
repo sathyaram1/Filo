@@ -155,29 +155,36 @@ function permesso(c, percorso) {
   if (!c || !percorso) return false;
   const p = chiave(percorso);
   if (c.file.has(p)) return true;
-  return c.cartella != null && dentro(c.cartella, p) && permessoNellaCartella(c.cartella, p);
+  return c.cartelle.some((d) => dentro(d, p) && permessoNellaCartella(d, p));
 }
 
 // Cosa legge la pagina del file `percorso`: la sua cartella, o in una troppo larga solo lei e i file che nomina.
+// Vale il percorso vero: la cartella col nome scritto e quella dove sta davvero (/var e /private/var del Mac).
 function concessioneDi(percorso) {
   const cartella = path.dirname(percorso);
-  const larga = cartellaTroppoLarga(cartella);
+  const larga = cartellaTroppoLarga(cartella) || cartellaTroppoLarga(vero(cartella));
   return {
-    cartella: larga ? null : chiave(cartella),
-    file: new Set([chiave(percorso), ...(larga ? nominati(percorso, cartella) : [])]),
+    cartelle: larga ? [] : [...new Set([chiave(cartella), chiave(vero(cartella))])],
+    file: new Set([chiave(percorso), chiave(vero(percorso)), ...(larga ? nominati(percorso, cartella) : [])]),
   };
 }
 
 // Ogni risposta, di qualunque tipo: un XML o un file senza estensione che Chromium riconosce come HTML eseguono script.
+// Il nome e il file vero devono stare tutti e due nella concessione: un «foto.png» che punta fuori non passa.
 async function servi(partizione, req) {
+  const c = concessioni.get(partizione);
   const percorso = percorsoDi(req.url);
-  if (!permesso(concessioni.get(partizione), percorso)) return new Response('', { status: 403 });
+  if (!permesso(c, percorso)) return new Response('', { status: 403 });
+  let reale = null;
+  try { reale = await fs.promises.realpath(percorso); } catch (_) {}
+  if (reale && !permesso(c, reale)) return new Response('', { status: 403 });
   let r;
   try { r = await require('electron').net.fetch(req, { bypassCustomProtocolHandlers: true }); } catch (_) {
     return new Response('', { status: 404 });
   }
   const h = new Headers(r.headers);
-  h.set('Content-Security-Policy', CSP_DOCUMENTO);
+  const pdf = /^application\/pdf\b/i.test(h.get('content-type') || '');
+  h.set('Content-Security-Policy', pdf ? CSP_DOCUMENTO : `${CSP_DOCUMENTO}; ${ISOLATA}`);
   return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
 }
 
