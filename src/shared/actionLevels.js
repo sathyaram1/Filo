@@ -598,8 +598,7 @@
         // può leggere per intero non è un consenso. Se è lungo, è il popup a
         // scorrere (src/shared/confirmUi.js), non il testo ad accorciarsi.
         // Il titolo parte con il testo: si vede anche lui, intero.
-        const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
-        const titolo = String(a.titolo ?? a.title ?? a.name ?? '').trim();
+        const { titolo, testo } = campiSegnalazione(a);
         return ['Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n', ...(titolo ? ['Titolo:\n', cit(titolo), '\nTesto:\n'] : []),
           testo ? cit(testo) : '(vuoto)'];
       },
