@@ -53,6 +53,17 @@ function registro(max = MAX_LETTI, { cambiato = () => {}, saturo = () => {} } = 
     },
     tutti: () => [...voci.values()].map(({ valore, regola, fonte }) => ({ valore, regola, fonte })),
     svuota() { voci.clear(); lotti.clear(); },
+    togli(scarta) {
+      let tolti = false;
+      for (const [k, v] of voci) {
+        if (!scarta(v)) continue;
+        voci.delete(k);
+        const chiavi = lotti.get(v.lotto);
+        if (chiavi) { chiavi.delete(k); if (!chiavi.size) lotti.delete(v.lotto); }
+        tolti = true;
+      }
+      if (tolti) cambiato();
+    },
     esporta: () => [...voci.values()].map(({ valore, regola, fonte, lotto, at }) => ({ valore, regola, fonte, lotto, at })),
     // Le voci salvate, meno quelle più vecchie del ricordo: tornano coi loro lotti, così lo sfoltimento resta giusto.
     ripristina(lista, ora = Date.now()) {
@@ -129,8 +140,47 @@ function carica() {
 function ricorda(testo, fonte) {
   const G = globalThis.SN_GUARDIANO_STATICO;
   if (!G || typeof testo !== 'string' || !testo.trim()) return;
+  aggiungiTutti(G.segretiNelTesto(testo), fonte);
+}
+
+// Quello che l'utente ha immesso in una pagina in questa sessione (#810.8): i suoi tasti, incolla e trascina in un campo,
+// in una casella libera o nella chat dell'assistente, e i testi che Filo vi mette per lui. Dove una pagina lo mostra non
+// è letto da fuori. Mai da quello che sta nella pagina: un sito ci metterebbe ogni codice. Solo in memoria.
+const MAX_IMMESSI = 5000;
+const MAX_CARATTERI_IMMESSI = 20000000;
+const immessi = new Map();
+let caratteriImmessi = 0;
+const compatto = (t) => String(t || '').replace(/[\s-]/g, '').toLowerCase();
+// Chi compone la provenienza di una pagina e chi la riconosce sono la stessa regola, in src/shared/urlExfil.js.
+const daPagina = (fonte) => !!globalThis.SN_URL_EXFIL?.fonteDiPagina?.(fonte);
+const copre = (r, x) => { const v = compatto(x && x.valore); return !!v && r.includes(v); };
+function dellUtente(x, fonte) {
+  if (!immessi.size || !daPagina(fonte)) return false;
+  for (const r of immessi.values()) if (copre(r, x)) return true;
+  return false;
+}
+// `desde`: quando è partito il pezzo che l'utente ha appena immesso. Un codice letto prima resta letto: riscriverlo non
+// lo fa diventare suo (giri 5 e 6).
+function tieni(chiave, r, desde = 0) {
+  const prima = immessi.get(chiave);
+  if (prima === r) return;
+  if (prima !== undefined) { immessi.delete(chiave); caratteriImmessi -= prima.length; }
+  immessi.set(chiave, r);
+  caratteriImmessi += r.length;
+  while (immessi.size > 1 && (immessi.size > MAX_IMMESSI || caratteriImmessi > MAX_CARATTERI_IMMESSI)) {
+    const [k, v] = immessi.entries().next().value;
+    immessi.delete(k);
+    caratteriImmessi -= v.length;
+  }
+  // Quello che una lettura ha messo da parte mentre il testo era in viaggio si toglie adesso.
   carica();
-  letti.aggiungiTutti(G.segretiNelTesto(testo), fonte);
+  const da = Number.isFinite(desde) ? desde : 0;
+  letti.togli((v) => daPagina(v.fonte) && (Number(v.at) || 0) >= da && copre(r, v));
+}
+// `chiave` è l'elemento della pagina: il suo testo cresce mentre l'utente scrive, e sostituisce il precedente.
+function immessoDallUtente(chiave, testo, desde) {
+  const r = compatto(testo);
+  if (r) tieni(`immesso:${chiave}`, r, Number(desde));
 }
 
 // Il testo scritto da altri entra in un modello dentro una busta (src/shared/contenutoEsterno.js), da qualunque
@@ -169,13 +219,17 @@ function ricordaBuste(valore) {
 }
 
 function tutti() { carica(); return letti.tutti(); }
-function aggiungi(x, fonte) { carica(); letti.aggiungi(x, fonte); }
-function aggiungiTutti(lista, fonte) { carica(); letti.aggiungiTutti(lista, fonte); }
+function aggiungi(x, fonte) { if (dellUtente(x, fonte)) return; carica(); letti.aggiungi(x, fonte); }
+function aggiungiTutti(lista, fonte) {
+  carica();
+  letti.aggiungiTutti(immessi.size && Array.isArray(lista) ? lista.filter((x) => !dellUtente(x, fonte)) : lista, fonte);
+}
 // Come a un riavvio: la memoria si svuota e alla prossima lettura torna quello che era salvato.
 function svuota() { if (inAttesa) salvaOra(); letti.svuota(); caricato = false; }
 // Per gli unit test: un deposito finto (null = nessuno).
-function usaDeposito(d) { deposito = d; caricato = false; letti.svuota(); }
+function usaDeposito(d) { deposito = d; caricato = false; letti.svuota(); immessi.clear(); caratteriImmessi = 0; }
 
 module.exports = {
-  ricorda, ricordaBuste, registro, aggiungi, aggiungiTutti, tutti, svuota, usaDeposito, FONTI_BUSTA, GIORNI_RICORDO,
+  ricorda, ricordaBuste, registro, aggiungi, aggiungiTutti, tutti, svuota, usaDeposito, immessoDallUtente,
+  FONTI_BUSTA, GIORNI_RICORDO,
 };

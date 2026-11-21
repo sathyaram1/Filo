@@ -1990,6 +1990,9 @@
   // Filo scrive `testo` nella casella (una correzione, l'Incolla del menu, la dettatura): vale come scritto dall'utente.
   // Gli editor che rifanno il testo dopo l'evento lo mostrano al giro dopo: lì si guarda ancora, poi si chiude.
   function scriveFilo(el, testo) {
+    // E quello che porta è dell'utente, non letto dalla pagina (#810.8), detto prima che entri: la pagina non lo vede
+    // arrivare. Qui passa ogni testo che Filo mette in un campo per lui (incolla, dettatura, Accetta, Modifica).
+    try { global.SN_IMMESSI?.inserisce?.(el, testo); } catch (_) {}
     let state = el ? monitored.get(el) : null;
     // Chi scrive in un editor ricco può avere in mano un nodo dentro il campo, o il campo dentro il nodo.
     if (!state && el && activeEl && (activeEl.contains(el) || (typeof el.contains === 'function' && el.contains(activeEl)))) state = monitored.get(activeEl);

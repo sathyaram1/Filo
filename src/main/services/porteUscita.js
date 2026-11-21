@@ -296,7 +296,8 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
   const wc = sender?.wc;
   if (!G || !wc) return;
   const p = await testoDellaPagina(sender);
-  const dallaPagina = p && p.host ? `dalla pagina ${p.host}` : 'dalla pagina';
+  const dallaPagina = globalThis.SN_URL_EXFIL.fonteDallaPagina(p && p.host);
+  // Quello che l'utente ha immesso qui lo ferma la porta di questa pagina, ma il registro che resta non lo tiene (#810.8).
   const fonti = [{ testo: p ? p.testo : '', fonte: dallaPagina }];
   if (payload && typeof payload.outline === 'string') fonti.push({ testo: payload.outline, fonte: dallaPagina });
   const risultati = payload && payload.esterno && payload.esterno.ricercaWeb && payload.esterno.ricercaWeb.results;
@@ -322,6 +323,7 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
     SegretiLetti.aggiungiTutti(trovati, f.fonte);
   }
 }
+
 
 function ricordaLettoInChat(azioni, storia = []) {
   const Exfil = globalThis.SN_URL_EXFIL;

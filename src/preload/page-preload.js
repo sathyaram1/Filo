@@ -29,6 +29,9 @@ try {
   globalThis.SN_RIQUADRI_IN_ARRIVO.osserva(window);
 } catch (e) { console.error('[Filo CS] riquadri in arrivo', e); }
 
+// In ogni frame e da subito, anche nei riquadri che Filo non ha ancora montato: quello che l'utente scrive è suo (#810.8).
+try { require('./immessi-utente.js')((n, testo, desde) => ipcRenderer.send('filo:immesso-utente', n, testo, desde)); } catch (e) { console.error('[Filo CS] immessi', e); }
+
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
 //
 // Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in

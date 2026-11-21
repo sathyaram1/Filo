@@ -532,7 +532,7 @@
         if (!out.ok) continue;
         nonFidato = true;
         if (out.url) linkNoti.add(chiaveLink(out.url));
-        daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, out.url ? `dalla pagina ${hostDi(out.url)}` : 'da una pagina letta');
+        daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, fonteDallaPagina(out.url ? hostDi(out.url) : '', FONTI_DI_PAGINA.letta));
       } else if (type === 'SCHEDE_CHIUSE' || type === 'RIAPRI_SCHEDA') {
         // #884 — titoli e riassunti delle schede chiuse li hanno scritti i siti (o un modello leggendoli): testo di fuori.
         const schede = type === 'RIAPRI_SCHEDA' ? (out.titolo || out.riassunto ? [out] : [])
@@ -802,7 +802,7 @@
     if (!G || !uscente.trim()) return valutaAvvisi(tipo, action, avvisi, niente);
     const fonti = contestoDaAzioni(azioni).esterni.slice();
     if (pagina && typeof pagina.testo === 'string' && pagina.testo.trim()) {
-      fonti.push({ testo: pagina.testo, fonte: pagina.host ? `dalla pagina ${pagina.host}` : 'dalla pagina' });
+      fonti.push({ testo: pagina.testo, fonte: fonteDallaPagina(pagina.host) });
     }
     const candidati = [];
     const saturi = [];
@@ -970,7 +970,20 @@
     return niente;
   }
 
+  // La provenienza di un segreto letto da una pagina: la frase è per l'utente, e il registro dei segreti letti la
+  // riconosce da qui per sapere che può essere dell'utente (#810.8). Una frase nuova si aggiunge qui, non altrove.
+  // Sentinella: tests/unit/usciteSegreti.test.mjs.
+  const FONTI_DI_PAGINA = Object.freeze({ conSito: 'dalla pagina', senzaSito: 'dalla pagina', busta: 'da una pagina', letta: 'da una pagina letta' });
+  function fonteDallaPagina(host, senzaSito = FONTI_DI_PAGINA.senzaSito) {
+    return host ? `${FONTI_DI_PAGINA.conSito} ${host}` : senzaSito;
+  }
+  function fonteDiPagina(fonte) {
+    const f = String(fonte || '');
+    return Object.values(FONTI_DI_PAGINA).includes(f) || f.startsWith(`${FONTI_DI_PAGINA.conSito} `);
+  }
+
   global.SN_URL_EXFIL = {
+    FONTI_DI_PAGINA, fonteDallaPagina, fonteDiPagina,
     assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
     DAI_SITI, testoDeiSitiComeAzione, indirizziDelComando, comandoInRete,
     taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,

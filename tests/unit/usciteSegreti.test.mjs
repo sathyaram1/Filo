@@ -1322,3 +1322,100 @@ describe('sentinella: nessun chiamante della porta prende un guasto per via libe
     assert.ok(!/catch \(_\) \{ return ''; \}/.test(campo), 'un errore della porta lascia scrivere il campo');
   });
 });
+
+// #810.8 — un valore che l'utente ha messo in un campo non è letto da fuori dove una pagina lo ripete, in qualunque
+// ordine arrivino le due cose; un comando che lo stampa invece resta letto.
+test('i valori dell’utente nei campi non restano fra i segreti letti da una pagina', () => {
+  SL.usaDeposito(null);
+  const carte = () => SL.tutti().filter((x) => x.valore === '5555555555554444').map((x) => x.fonte);
+  SL.ricorda('Numero della carta 5555 5555 5555 4444', 'da una pagina');
+  SL.immessoDallUtente('1:1-1:1', '5555 5555 55');
+  assert.deepEqual(carte(), ['da una pagina'], 'un pezzo del numero non copre il numero intero');
+  SL.immessoDallUtente('1:1-1:1', '5555 5555 5555 4444');
+  assert.deepEqual(carte(), []);
+  SL.ricorda('Anteprima 5555 5555 5555 4444', 'dalla pagina negozio.example');
+  assert.deepEqual(carte(), []);
+  SL.ricorda('Carta 5555-5555-5555-4444', "dall'output di un comando");
+  assert.deepEqual(carte(), ["dall'output di un comando"]);
+  SL.usaDeposito(null);
+});
+
+// #810.8 giro 11 — dell'utente può essere solo un segreto letto da una pagina: ogni provenienza di pagina che Filo
+// compone la riconosce la stessa regola, e una frase riscritta in un posto solo non fa tornare i suoi valori nel file.
+test('ogni provenienza di pagina dei segreti letti è riconosciuta come tale', () => {
+  const F = X.FONTI_DI_PAGINA;
+  for (const f of [X.fonteDallaPagina('banca.example'), X.fonteDallaPagina(''), X.fonteDallaPagina('', F.letta), ...Object.values(F)]) {
+    assert.ok(X.fonteDiPagina(f), `«${f}» non è riconosciuta come pagina`);
+  }
+  for (const k of ['ELEMENTO_PAGINA', 'DATI_PAGINA', 'TESTO_IN_PAGINA', 'OUTLINE_PAGINA']) {
+    assert.ok(X.fonteDiPagina(SL.FONTI_BUSTA[k]), `la busta ${k} non è riconosciuta come pagina`);
+  }
+  for (const f of ["dall'output di un comando", 'dai risultati di una ricerca', 'da un sito', 'da un documento', 'dal filo riletto']) {
+    assert.ok(!X.fonteDiPagina(f), `«${f}» presa per una pagina`);
+  }
+  // Chi compone una provenienza di pagina passa dalla regola: una frase scritta a mano altrove sfuggirebbe.
+  const sorgenti = ['src/shared/urlExfil.js', 'src/main/services/porteUscita.js', 'src/main/services/segretiLetti.js'];
+  for (const s of sorgenti) {
+    const codice = readFileSync(join(ROOT, s), 'utf8').replace(/FONTI_DI_PAGINA = Object\.freeze\([^)]*\)/, '');
+    assert.ok(!/[`'"]dalla pagina \$\{|[`'"]dalla pagina[`'"]|[`'"]da una pagina letta[`'"]/.test(codice), `${s} compone a mano una provenienza di pagina`);
+  }
+});
+
+// #810.8 giro 3 — il valore vero di un campo è dell'utente se è fatto dei caratteri che lui ci ha messo: una maschera
+// o una correzione in mezzo li riordinano, un sito che ci aggiunge del suo no.
+test('il valore di un campo è dell’utente solo se è fatto dei suoi caratteri', () => {
+  const { fattoDiCaratteri, MAX_INCOLLA } = require(join(ROOT, 'src', 'preload', 'immessi-utente.js'));
+  const conti = (s) => { const m = new Map(); for (const c of s.toLowerCase()) if (/[\p{L}\p{N}]/u.test(c)) m.set(c, (m.get(c) || 0) + 1); return m; };
+  assert.ok(fattoDiCaratteri('4111 1111 1111 1111', conti('4111111111111111')), 'la maschera aggiunge solo spazi');
+  assert.ok(fattoDiCaratteri('4111 1111 1131 1111', conti('41111111112111111' + '3')), 'correzione in mezzo');
+  assert.ok(!fattoDiCaratteri('4111 1111 1111 1111', conti('411111111111111')), 'una cifra in più è del sito');
+  assert.ok(!fattoDiCaratteri('a'.repeat(5) + '731942', conti('aaaaa')), 'il testo del sito non diventa dell’utente');
+  assert.ok(!fattoDiCaratteri('', conti('abc')));
+  // Giro 8: il paese che la maschera mette davanti all'IBAN resta con l'utente, come il prefisso già nel campo; di più no.
+  const { fattoAiBordi } = require(join(ROOT, 'src', 'preload', 'immessi-utente.js'));
+  assert.ok(fattoAiBordi('IT60X0542811101000000123456', conti('60X0542811101000000123456')));
+  assert.ok(!fattoAiBordi('a'.repeat(5) + '731942', conti('aaaaa')), 'il codice del sito attaccato diventa dell’utente');
+  assert.ok(!fattoAiBordi('abc12cd', conti('12')), 'più di pochi caratteri del sito ai bordi');
+  assert.ok(!fattoAiBordi('12' + '731942'.repeat(100), conti('12')), 'un campo lungo del sito');
+  assert.ok(MAX_INCOLLA >= 256 && MAX_INCOLLA <= 10000, 'un incolla lungo coprirebbe migliaia di codici');
+});
+
+// #810.8 giro 5 — conta la parte del valore cambiata da quando l'utente ci scrive: il testo che il sito aveva già messo
+// (saluto e firma, il prefisso dell'IBAN) non la sporca, e solo pochi suoi caratteri attaccati restano con lei.
+test('dell’utente è la parte del campo cambiata da quando ci scrive, coi pochi caratteri del sito attaccati', () => {
+  const { parteNuova, diUnIncolla, MAX_INCOLLA } = require(join(ROOT, 'src', 'preload', 'immessi-utente.js'));
+  assert.deepEqual(parteNuova('IT60X0542811101000000123456', 'IT'),
+    { nuova: '60X0542811101000000123456', estesa: 'IT60X0542811101000000123456' });
+  const mail = parteNuova('Ciao Marco,\nla carta è 4111 1111 1111 1111\nA presto, Giulia', 'Ciao Marco,\n\nA presto, Giulia');
+  assert.equal(mail.nuova, 'la carta è 4111 1111 1111 1111');
+  assert.equal(parteNuova('4111', '').nuova, '4111');
+  // Un campo del sito con tutti i codici: quello che l'utente aggiunge non se li porta dietro.
+  const codici = '0123456789'.repeat(10);
+  const giro2 = parteNuova(`${codici}a`, codici);
+  assert.equal(giro2.nuova, 'a');
+  assert.ok(giro2.estesa.replace(/\D/g, '').length <= 4, 'il sito attacca più di pochi caratteri suoi');
+  // Di un incolla lungo restano i pochi segreti che contiene, di una fila di codici niente.
+  const lettera = `Gentile ufficio,\n${'vi scrivo per il rimborso della fattura di marzo. '.repeat(30)}\nIl mio IBAN è IT60X0542811101000000123456.`;
+  assert.ok(lettera.length > MAX_INCOLLA);
+  assert.equal(diUnIncolla(lettera), 'IT60X0542811101000000123456');
+  assert.equal(diUnIncolla('Codice 123456'), 'Codice 123456');
+  assert.equal(diUnIncolla(Array.from({ length: 50 }, (_, i) => `Il tuo codice monouso è ${482900 + i}.`).join('\n')), '');
+  assert.equal(diUnIncolla('0123456789'.repeat(1000)), '');
+});
+
+// #810.8 giro 5 — un codice letto prima che l'utente cominciasse a scriverlo resta letto anche se lui lo riscrive;
+// quello letto mentre il suo testo era in viaggio si toglie.
+test('riscrivere un codice già letto non lo toglie dai segreti letti', () => {
+  const prima = Date.now() - 60_000;
+  SL.usaDeposito({
+    leggi: () => JSON.stringify([{ valore: '482913', regola: 'codice', fonte: 'dalla pagina banca.example', lotto: 1, at: prima }]),
+    scrivi: () => {},
+  });
+  const letto = () => SL.tutti().some((x) => x.valore === '482913');
+  assert.ok(letto());
+  SL.immessoDallUtente('1:1-1:1:7', 'il codice 482913 dove lo metto?', Date.now());
+  assert.ok(letto(), 'il codice letto prima è sparito dal registro');
+  SL.immessoDallUtente('1:1-1:1:8', 'il codice 482913 è questo', prima - 5_000);
+  assert.ok(!letto(), 'il codice letto mentre l’utente lo scriveva è rimasto');
+  SL.usaDeposito(null);
+});
