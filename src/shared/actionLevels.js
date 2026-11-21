@@ -436,7 +436,7 @@
       // (#530). Il campo può solo alzare il costo, quindi chi lo forgia non ottiene niente.
       costo: (a) => costoIndirizzo(a, a && a.cerca ? 2 : 1),
       campo: 'web',
-      uscita: (a) => indirizzoDi(a),
+      uscita: indirizzoCheEsce,
       describe: (a) => {
         const url = indirizzoDi(a) || 'una pagina';
         const N0 = global.SN_URL_NAV;
