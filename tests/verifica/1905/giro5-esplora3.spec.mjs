@@ -35,7 +35,7 @@ test('esplora 3', async ({ app, avvisi }) => {
   await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
   let p = null;
   await expect.poll(async () => Boolean(p = await paginaDellaScheda(app, id, (x) => x.url().startsWith('file:'))), { timeout: 10_000 }).toBe(true);
-  const v = app.windows().find((w) => w.url().startsWith('filo://shell/avvisi.html')) || null;
+  const v = { locator: () => ({ allInnerTexts: async () => { const w = app.windows().find((x) => x.url().startsWith('filo://shell/avvisi.html')); return w ? w.locator('.shell-notif.show').allInnerTexts() : null; } }) };
   void avvisi;
 
   log('pagina', p.url());
