@@ -582,8 +582,10 @@
         aperti.set(m.chat, t);
         out.push(t);
       }
-      const testo = String(m.text || '').replace(/\s+/g, ' ').trim();
-      if (testo) t.righe.push(`${m.role === 'user' ? 'Utente' : 'Filo'}: ${testo}`);
+      // La stessa riga della rilettura per id: le parole e com'è andata ogni azione (#1685.3).
+      const CA = global.SN_CHAT_ARCHIVE;
+      const riga = CA ? CA.rigaTrascritta(m) : '';
+      if (riga) t.righe.push(riga);
       t.daFuori.push(...daFuoriDi([m]));
       t.classeLetta = Math.max(t.classeLetta, classeDelMessaggio(m));
       t.fine = m.ts;
