@@ -271,11 +271,11 @@ function ascoltaIn(w, invia) {
   w.addEventListener(eco, () => { sentito = true; });
   function vivo() {
     sentito = false;
-    try { w.dispatchEvent(new w.Event(eco)); } catch (_) { return false; }
+    try { if (w.closed) return false; w.dispatchEvent(new w.Event(eco)); } catch (_) { return false; }
     return sentito;
   }
 
-  return { vivo, inserisce(el, testo) { if (scrivibile(el)) incollato(el, String(testo || '')); } };
+  return { vivo, diTutto, inserisce(el, testo) { if (scrivibile(el)) incollato(el, String(testo || '')); } };
 }
 
 module.exports = ascoltaImmessi;
