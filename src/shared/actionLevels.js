@@ -69,6 +69,10 @@
     const A = global.SN_ALLEGATI_SEGNALAZIONE;
     return A ? A.haAllegati(a) : !!(a && a.allegati && [].concat(a.allegati).length);
   };
+  const campiSegnalazione = (a) => {
+    if (!global.SN_ALLEGATI_SEGNALAZIONE && typeof require === 'function') { try { require('./allegatiSegnalazione.js'); } catch (_) {} }
+    return global.SN_ALLEGATI_SEGNALAZIONE.campi(a);
+  };
 
   // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
   // Decide urlExfil, la stessa regola del controllo delle uscite (#2293); caricato senza, un indirizzo o l'elenco dei
