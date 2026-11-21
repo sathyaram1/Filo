@@ -44,6 +44,8 @@ test('#1840.5: ogni forma che ferma un\'uscita chiesta in chat la tiene anche il
     assert.equal(A.segreto(testo), tipo, `${nome}: la porta delle uscite`);
     assert.ok(G.segretiNelTesto(testo).some((x) => x.valore === valore), `${nome}: il registro dei letti`);
   }
+  // Le chiavi col loro prefisso fermano anche un avviso, dalla stessa lista.
+  for (const chiave of [GITLAB, TAVILY, JWT, STRIPE]) assert.equal(G.controlla(`Promemoria: ${chiave}`).regola, 'chiave', chiave);
 });
 
 test('#1840.5: letto in un comando, il segreto ferma poi il link che lo porterebbe fuori', () => {
