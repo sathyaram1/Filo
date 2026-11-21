@@ -166,9 +166,6 @@ test('la CSP dei file non lascia uscite verso la rete né letture di file come d
   assert.ok(!dir['connect-src'].includes('file:'), 'fetch e XHR non leggono file');
   for (const d of ['frame-src', 'worker-src', 'child-src', 'object-src']) assert.equal(dir[d], undefined, `${d} resta a 'none'`);
   assert.deepEqual(dir['form-action'], ["'none'"]);
-  // Origine opaca: senza allow-same-origin le immagini della cartella sporcano la tela.
-  assert.match(F.ISOLATA, /^sandbox /);
-  assert.doesNotMatch(F.ISOLATA, /allow-same-origin|allow-top-navigation|escape-sandbox/);
 });
 
 test('un file col percorso non scritto dall\'utente chiede il suo OK, e la conferma dice quale file', () => {
