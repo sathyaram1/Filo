@@ -268,6 +268,10 @@ test('un\'immagine più pesante del limite dello strato si rimpicciolisce e si a
   const strato = await trascriviDalTastoDestro(app, page);
   await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 30_000 });
   await expect(strato.locator('.sn-tr-riga')).toHaveText(['rumore']);
+  // Al lettore arriva col tetto delle immagini date all'Aiuto, non col limite dello strato.
+  const [data] = await app.evaluate(() => globalThis.__immagini);
+  const tetto = await app.evaluate(() => globalThis.SN_CONST.ALLEGATI_CHAT.tettoImmagineByte);
+  expect(Math.floor((data.length - data.indexOf(',') - 1) * 3 / 4)).toBeLessThanOrEqual(tetto);
 });
 
 test('l\'Aiuto aperto su un sito trascrive l\'immagine indicata e fa scegliere una porzione della pagina sotto', async ({ app, openTab, testServer }) => {
