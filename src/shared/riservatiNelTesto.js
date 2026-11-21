@@ -27,8 +27,9 @@ const RICHIESTA = new RegExp([
   // «ti ricordi la password», «come è la password», «che password ha il wifi», «e la password del wifi».
   '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?:^|:\\s*)e\\s+(?:la|il))',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
-// La richiesta più corta è il solo nome in fondo alla frase («sono arrivato, password del wifi», «Marco: pw di casa»):
-// dopo l'ultima virgola o i due punti al più un articolo o un saluto, dopo il nome solo di cosa è (#2638).
+// La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
+// dopo l'ultima virgola o i due punti al più un articolo o un saluto, dopo il nome solo di cosa è e poi la fine della
+// riga; «Il pw del documento. Il documento è pronto» continua, e non chiede (#2638).
 const ELLITTICA_PRIMA = /^\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|ciao+|ehi|hey|hi|wi-?fi|router|home)\s+))*$/u;
 const DI_COSA = String.raw`(?:(?:del(?:la|lo)?|dell['’]|di|de|per|for|of)\s*(?:(?:la|il|lo|l['’]|the|my|mio|mia|tuo|tua)\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
 const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:grazie|thanks|thx))?[^\\p{L}\\p{N}]*$`, 'u');
