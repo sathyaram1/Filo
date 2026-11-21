@@ -4,12 +4,32 @@
 
 **Regola.** Un file locale si apre in una scheda solo in una sessione `file-del-computer:<n>` tutta sua, dove Filo
 serve da sé ogni richiesta `file:` (`protocol.handle`): passa solo ciò che la scheda ha avuto in concessione, e a ogni
-risposta, di qualunque tipo, va una CSP che toglie `file:` a fetch, XHR, riquadri e worker. La concessione è della
-scheda e si toglie quando si chiude. Mai un `file://` in un'altra sessione, nemmeno in quella del proxy.
+risposta, di qualunque tipo, va una CSP che carica solo `file:`, `data:` e `blob:` e mette il documento in `sandbox`
+senza `allow-same-origin`. La concessione è della scheda e si toglie quando si chiude. Mai un `file://` in un'altra
+sessione, nemmeno in quella del proxy.
 
 Cosa si concede: la cartella del file, con le sottocartelle, senza file o cartelle nascoste e solo tipi da pagina
 (immagini, stili, script, caratteri, media). Se quella cartella è la casa, una che la contiene o la radice di un
-disco, solo il file e i file che nomina.
+disco, solo il file e i file che nomina. Conta il percorso vero: un collegamento simbolico vale per il file a cui
+punta, e il nome e il file vero devono passare tutti e due.
+
+## La pagina del computer non ha rete
+
+Quello che una pagina legge non deve avere dove andare. Tre strati, perché ognuno ha buchi che l'altro chiude:
+
+- la CSP: niente `http(s):` né `ws(s):` per nessun tipo di risorsa, niente riquadri, worker né invii di moduli;
+- la sessione: `onBeforeRequest` annulla ogni richiesta web, e un proxy che non risponde (anche per il loopback)
+  prende preconnessioni e WebRTC, che la CSP non vede; WebRTC solo via proxy (`chiudiRete`);
+- i salti: `will-navigate` e `setWindowOpenHandler` in `tabs.js` fermano ogni indirizzo web chiesto da una pagina
+  della sessione, clic dell'utente compreso, perché l'indirizzo lo scrive la pagina e può portare i dati.
+
+Ogni rifiuto lo dice una volta per pagina (`_senzaRete`: la CSP lo riferisce dal preload, i salti dal main). Non c'è
+un «Apri con la rete»: scelta dell'owner, per ora.
+
+`sandbox` dà l'origine opaca che Chrome dà a `file://` e che i privilegi di Electron tolgono: le immagini della
+cartella sporcano la tela, fetch, moduli ES, JSON importati e font `file:` diventano di un'altra origine. Costa quello
+che costa in Chrome (moduli e font locali non partono) più `localStorage` e cookie, che in un'origine opaca non ci
+sono. Il PDF non va in `sandbox`: in un documento isolato il visore non parte.
 
 ## Perché
 
