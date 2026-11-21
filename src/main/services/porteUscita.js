@@ -599,7 +599,7 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
   }
-  const daSito = /^https?:/i.test(pagina);
+  const daSito = paginaNonDiFilo(pagina);
   const k = VerdettiUscite.chiave(indirizzo);
   const v = /^https?:/i.test(indirizzo) ? VerdettiUscite.alClic(indirizzo, { chiedi, proposta }) : { daChiedere: false, motivo: '' };
   const motivo = v.motivo;
