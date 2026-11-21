@@ -1,5 +1,5 @@
-// Gli allegati di una segnalazione mandata dalla chat (#1668): cosa ha indicato il modello, cosa c'è nella
-// conversazione, cosa parte. PURA: il modello indica e basta, i byte li prende il main dalla conversazione.
+// Titolo, testo e allegati di una segnalazione mandata dalla chat (#1668, #1704.1): cosa ha indicato il modello, cosa c'è
+// nella conversazione, cosa parte. PURA: il modello indica e basta, i byte li prende il main dalla conversazione.
 // Limiti e tipi sono quelli del riquadro «Invia feedback» (src/shared/feedbackAttachTypes.js); oltre, si rifiuta col numero.
 
 (function (global) {
