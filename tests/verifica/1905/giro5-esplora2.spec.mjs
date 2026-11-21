@@ -62,7 +62,7 @@ test('esplora 2', async ({ app, avvisi }) => {
   log('menu sito', await menuDi(p).locator('.sn-menu').innerText());
   await p.screenshot({ path: join(SHOTS, 'g5-menu-sito.png') });
   await p.keyboard.press('Escape');
-  await p.locator('#cap').click({ button: 'right' });
+  await p.locator('#cap').click({ button: 'right', noWaitAfter: true });
   await expect(menuDi(p).locator('.sn-menu')).toBeVisible({ timeout: 8000 });
   log('menu fratello', await menuDi(p).locator('.sn-menu').innerText());
   const voce = menuDi(p).locator('.sn-menu').getByText(/nuova scheda/i).first();
