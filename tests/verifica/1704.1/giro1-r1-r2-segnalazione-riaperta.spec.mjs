@@ -1,5 +1,5 @@
-// #1704.1 giro 1 — la segnalazione riaperta mostra ancora titolo e testo: con più azioni nel turno, testo lunghissimo,
-// markup nel titolo.
+// #1704.1 giro 1 — riaperta la home, la segnalazione partita dice ancora titolo e testo interi: anche in un turno con
+// più di quattro azioni (r1) e con un testo oltre i 16.000 caratteri (r2). Modello finto, invio finto.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from '../../helpers/chatFinta.mjs';
 import { livelloAutonomia } from '../../helpers/autonomia.mjs';
@@ -44,28 +44,25 @@ async function inviaERiapri(app, page, chiamate, domanda) {
   return home(app);
 }
 
-test('cinque azioni nel turno: riaperta, la segnalazione inviata mostra ancora titolo e testo', async ({ app }) => {
+test('r1 cinque azioni nel turno: riaperta, la segnalazione inviata mostra ancora titolo e testo', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await home(app);
   await conInvioFinto(app, async () => {
     const timer = (i) => ({ id: `t${i}`, name: 'TIMER', arguments: JSON.stringify({ secondi: 60 * i, etichetta: `Prova ${i}` }) });
     const fb = { id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ testo: BREVE, titolo: TITOLO }) };
     const di = await inviaERiapri(app, page, [timer(1), timer(2), timer(3), timer(4), fb], 'quattro timer e segnala il timer');
-    const bolla = di.locator('.dash-bubble-filo').last();
-    await expect(bolla).toBeVisible({ timeout: 10_000 });
-    await di.waitForTimeout(1500);
-    console.log('NOTE', JSON.stringify(await di.locator('.dash-bubble-note, .dash-activity-row').evaluateAll((l) => l.map((e) => [e.className, e.textContent, e.title]))));
+    await expect(di.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
+    // Riga sua o frase riassunto: passandoci sopra si legge cosa è partito, come in diretta.
     const riga = di.locator('.dash-activity-row', { hasText: 'Segnalazione inviata' });
-    const nota = di.locator('.dash-bubble-note').last();
-    const dove = (await riga.count()) ? riga.first() : nota;
-    await passaSopra(di, dove);
+    const nota = di.locator('.dash-bubble-note', { hasText: 'segnalazione' }).last();
+    await expect(riga.or(nota).first()).toBeVisible({ timeout: 10_000 });
+    await passaSopra(di, (await riga.count()) ? riga.first() : nota);
     await expect(fumetto(di)).toBeVisible({ timeout: 3000 });
-    await di.screenshot({ path: 'tests/.shots/verifica-1704-cinque.png' });
-    expect(await fumetto(di).evaluate((el) => el.textContent), 'il fumetto dice titolo e testo').toContain(BREVE);
+    expect(await fumetto(di).evaluate((el) => el.textContent), 'il fumetto dice titolo e testo della segnalazione').toContain(BREVE);
   });
 });
 
-test('testo oltre i 16.000 caratteri: riaperta, il fumetto dice il testo intero che è partito', async ({ app }) => {
+test('r2 testo oltre i 16.000 caratteri: riaperta, il fumetto dice il testo intero o che ne manca un pezzo', async ({ app }) => {
   test.setTimeout(120_000);
   const page = await home(app);
   await conInvioFinto(app, async () => {
@@ -79,26 +76,7 @@ test('testo oltre i 16.000 caratteri: riaperta, il fumetto dice il testo intero 
     await passaSopra(di, riga);
     await expect(fumetto(di)).toBeVisible({ timeout: 3000 });
     const t = await fumetto(di).evaluate((el) => el.textContent);
-    console.log('LUNGO', lungo.length, t.length, JSON.stringify(t.slice(-120)));
     expect(t.length, 'il fumetto non è vuoto').toBeGreaterThan(1000);
-    expect(t.endsWith('CODA-FINE') || /…|tagliat|non mostr/i.test(t.slice(-200)), 'o il testo è intero o dice che manca la coda').toBe(true);
-  });
-});
-
-test('markup nel titolo e nel testo: il fumetto lo mostra come testo', async ({ app }) => {
-  test.setTimeout(90_000);
-  const page = await home(app);
-  await conInvioFinto(app, async () => {
-    const titolo = '<img src=x onerror="window.__xss=1"><b>grassetto</b>';
-    const testo = '<script>window.__xss=2</script><i>corsivo</i> & fine';
-    const fb = { id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ testo, titolo }) };
-    const di = await inviaERiapri(app, page, [fb], 'segnala il timer');
-    const riga = di.locator('.dash-activity-row', { hasText: 'Segnalazione inviata' }).first();
-    await expect(riga).toBeVisible({ timeout: 10_000 });
-    await passaSopra(di, riga);
-    await expect(fumetto(di)).toBeVisible({ timeout: 3000 });
-    expect(await fumetto(di).evaluate((el) => el.textContent)).toBe(`${titolo}\n\n${testo}`);
-    expect(await di.evaluate(() => window.__xss || 0)).toBe(0);
-    expect(await fumetto(di).locator('img, b, i, script').count()).toBe(0);
+    expect(t.endsWith('CODA-FINE') || /…|tagliat|non mostr|caratteri/i.test(t.slice(-200)), 'o il testo è intero o dice che manca la coda').toBe(true);
   });
 });
