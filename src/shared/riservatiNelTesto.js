@@ -25,7 +25,7 @@ const RICHIESTA = new RegExp([
   '(?:(?:mi|ci) serv(?:e|irebbe)|ho bisogno|per\\s*favore|perfavore|x\\s*favore|pls|plz|please)',
   '(?:send|give|tell|share|what|need|can\\s+you|could\\s+you|do\\s+you)',
   // «ti ricordi la password», «come è la password», «che password ha il wifi», «e la password del wifi».
-  '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?:^|:\\s*)e\\s+(?:la|il))',
+  '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?<=^|:\\s*)e\\s+(?:la|il))',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
 // La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
 // dopo l'ultima virgola o i due punti al più un articolo o un saluto, dopo il nome solo di cosa è e poi la fine della
