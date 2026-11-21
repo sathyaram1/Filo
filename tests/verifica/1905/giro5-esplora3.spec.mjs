@@ -37,7 +37,10 @@ test('esplora 3', async ({ app, avvisi }) => {
   await expect.poll(async () => Boolean(p = await paginaDellaScheda(app, id, (x) => x.url().startsWith('file:'))), { timeout: 10_000 }).toBe(true);
   const v = await avvisi().catch(() => null);
 
-  await p.locator('#web').hover();
+  log('pagina', p.url());
+  const box = await p.locator('#web').boundingBox();
+  log('box', box);
+  await p.mouse.move(box.x + 5, box.y + 5);
   await new Promise((r) => setTimeout(r, 3000));
   log('dopo sosta', arrivi);
   await p.locator('#web').click({ button: 'right', noWaitAfter: true });
