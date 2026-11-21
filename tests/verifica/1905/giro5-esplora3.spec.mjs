@@ -35,7 +35,8 @@ test('esplora 3', async ({ app, avvisi }) => {
   await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
   let p = null;
   await expect.poll(async () => Boolean(p = await paginaDellaScheda(app, id, (x) => x.url().startsWith('file:'))), { timeout: 10_000 }).toBe(true);
-  const v = await avvisi().catch(() => null);
+  const v = app.windows().find((w) => w.url().startsWith('filo://shell/avvisi.html')) || null;
+  void avvisi;
 
   log('pagina', p.url());
   const box = await p.locator('#web').boundingBox();
