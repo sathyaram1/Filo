@@ -42,6 +42,7 @@ async function lettoreFinto(app, righe, { attesaMs = 0, tema = 'light' } = {}) {
       const t = JSON.stringify(opts.messages || '');
       if (!t.includes('Trascrivi ESATTAMENTE il testo')) return vero(opts);
       globalThis.__letture.push({ immagine: /data:image\/(png|jpeg)/.test(t) });
+      globalThis.__immagini = (globalThis.__immagini || []).concat([(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+/.exec(t) || [''])[0]]);
       if (attesaMs) await new Promise((r) => setTimeout(r, attesaMs));
       return { text: JSON.stringify({ righe }), model: 'finto', provider: 'finto', costEur: 0, usage: {} };
     };
