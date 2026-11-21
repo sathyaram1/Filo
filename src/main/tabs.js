@@ -3920,6 +3920,11 @@ class TabManager {
         }).catch(() => {});
         return { action: 'deny' };
       }
+      // Come per i salti: da una pagina del computer niente finestre sul web (#1905).
+      if (FileDelComputer.inSessioneDiFile(wc) && WEB.test(String(url || ''))) {
+        this._senzaRete(tab, url);
+        return { action: 'deny' };
+      }
       // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
