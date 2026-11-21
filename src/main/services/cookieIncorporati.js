@@ -178,7 +178,7 @@ async function declassa(ses, c0) {
     if (lista.some((x) => stesso(x) && !x.session && (!c || x.value !== c.value))) return 'partizionato';
   }
   if (!c || c.session) return false;
-  await ses.cookies.set({ ...posto(c), value: c.value });
+  await scriviNostra(ses, c, { ...posto(c), value: c.value });
   // Da Electron 44 anche la ricerca per indirizzo trova i partizionati: se l'originale è ancora lì era partizionato, e
   // la copia appena nata, un cookie di terza parte che varrebbe su ogni sito, si scade subito.
   const dopo = await ses.cookies.get({ domain: String(c.domain || '').replace(/^\./, '') });
