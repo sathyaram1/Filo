@@ -43,7 +43,8 @@ test('esplora 3', async ({ app, avvisi }) => {
   const corsa = (pr, ms) => Promise.race([pr.then(() => 'ok', (e) => String(e).slice(0, 200)), new Promise((r) => setTimeout(() => r('APPESO'), ms))]);
   log('ping main prima', await corsa(app.evaluate(() => 1), 5000));
   log('ping pagina prima', await corsa(p.evaluate(() => 1), 5000));
-  log('move', await corsa(p.mouse.move(box.x + 5, box.y + 5), 10000));
+  for (let i = 0; i < 12 && process.env.G5_SENZA_MOVE; i++) log(`ping ${i}`, await corsa(app.evaluate(() => new Promise((r) => setTimeout(() => r(1), 500))), 3000));
+  if (!process.env.G5_SENZA_MOVE) log('move', await corsa(p.mouse.move(box.x + 5, box.y + 5), 10000));
   log('ping main dopo', await corsa(app.evaluate(() => 1), 5000));
   log('ping pagina dopo', await corsa(p.evaluate(() => 1), 5000));
   log('attesa', Date.now());
