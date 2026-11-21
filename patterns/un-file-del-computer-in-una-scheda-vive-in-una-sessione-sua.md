@@ -31,5 +31,13 @@ il percorso scritto dall'utente in chat, un suo clic su una pagina di Filo, la s
 chiuse. Un percorso che l'utente non ha scritto passa dal suo OK (costo 2 di NAVIGA). Il percorso di rete lo ferma
 `concedi`, la porta comune di tutte le strade.
 
+## Una pagina del computer chiede come un sito
+
+Aperta, la pagina locale esegue script e ha il preload delle pagine, Aiuto compreso: per il main è un sito. I cancelli
+che distinguono «da un sito» da «da Filo» (memoria, conversazioni, fonti del compito, segnalazioni fidate, «questo
+sito», porta delle uscite) chiedono a `daPaginaNonDiFilo` in `src/main/services/handlers/origine.js`, mai allo schema
+`http(s):` di chi manda: con quel test un `file://` passava per Filo (controllo di sicurezza di #1905). Sentinella in
+`tests/unit/fileDelComputer.test.mjs`.
+
 Codice: `src/main/services/fileDelComputer.js`; prove: `tests/file-del-computer.spec.mjs`,
 `tests/unit/fileDelComputer.test.mjs`.
