@@ -14,6 +14,7 @@
         { testo: 'La traduzione della pagina si chiede anche a Filo, nella chat o nell\'Aiuto della pagina: «traducimi questa pagina», «riprendi la traduzione», «torna all\'originale». Se la pagina è già tradotta o già com\'era, te lo dice. Il tasto che traduce la selezione, premuto senza niente di selezionato, traduce la pagina.', segnalazione: 504 },
       ],
       fixes: [
+        { testo: 'Se chiedi a Filo di mettere nella barra dei siti un sito che c\'è già, o di rinominarlo col nome che ha, la conversazione te lo dice invece di raccontarlo come fatto.', segnalazione: 1803 },
         { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
         { testo: 'Se il computer risponde lento una volta, la home torna da sola a leggere subito Bluetooth e Wi-Fi, senza riavviare Filo, e dopo una pausa del computer non ti mostra come attuale lo stato di prima.', segnalazione: 2394 },
         { testo: 'In modalità terminale, un comando git che cambia il server dove finisce il prossimo push, scegliendo il remoto di un ramo o quello predefinito, ti chiede di digitare «conferma», come quando cambi l\'indirizzo di un remoto. Prima bastava un OK, e il push dopo mandava il codice lì.', segnalazione: 2623 },
