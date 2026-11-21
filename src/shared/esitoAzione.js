@@ -201,13 +201,21 @@
     if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
     if (v.autore === 'segnalazione') out.autore = 'segnalazione';
     if (typeof v.segnalazione === 'string' && v.segnalazione.trim()) out.segnalazione = v.segnalazione.slice(0, MAX_AZIONE);
+    if (typeof v.titoloSegnalazione === 'string' && v.titoloSegnalazione.trim()) out.titoloSegnalazione = v.titoloSegnalazione.slice(0, MAX_AZIONE);
     return out;
   }
-  // Il testo di una segnalazione resta con la sua voce, confermata, rifiutata o in attesa (#2371): l'assistente deve
-  // poterla spiegare anche dopo un no.
-  function segnalazioneDi(type, x) {
-    if (type !== 'INVIA_FEEDBACK' || !x) return '';
-    return typeof x.segnalazione === 'string' ? x.segnalazione : (typeof x.testo === 'string' ? x.testo : '');
+  // Titolo e testo di una segnalazione restano con la sua voce, confermata, rifiutata o in attesa (#2371): l'assistente
+  // deve poterla spiegare anche dopo un no, e la chat riaperta mostrarla nel fumetto della riga (#1704.1).
+  function segnalazioneDi(type, x, giaFatta) {
+    if (type !== 'INVIA_FEEDBACK' || !x) return {};
+    if (giaFatta) return { segnalazione: x.segnalazione, titoloSegnalazione: x.titoloSegnalazione };
+    const S = moduloSegnalazione();
+    const c = S ? S.campi(x) : { titolo: '', testo: '' };
+    return { segnalazione: c.testo, titoloSegnalazione: c.titolo };
+  }
+  function moduloSegnalazione() {
+    if (!global.SN_ALLEGATI_SEGNALAZIONE && typeof require === 'function') { try { require('./allegatiSegnalazione.js'); } catch (_) {} }
+    return global.SN_ALLEGATI_SEGNALAZIONE || null;
   }
   // La conferma ancora da dare (#1685): riaperta, la chat ridisegna il suo bottone con l'azione e la domanda di allora.
   // Solo dati semplici e corti: quello che non ci sta non si ridisegna, e resta la riga.
@@ -256,7 +264,7 @@
         proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
         evento: type === 'EVENTO_CALENDARIO' && x.esito === PROPOSTO && x.evento ? eventoDi(x.evento) : null,
         partita: x.esito === FALLITO && x.partita === true, riprova: x.esito === FALLITO && x.riprova === true,
-        no: x.esito === FALLITO && x.no === true, autore: x.autore, segnalazione: segnalazioneDi(type, x),
+        no: x.esito === FALLITO && x.no === true, autore: x.autore, ...segnalazioneDi(type, x, true),
         ...(generica ? {} : bottoneDi(x.esito, type, x.azione, x.conferma)),
       });
     }
@@ -270,7 +278,7 @@
       const chiesta = SENZA_TITOLO[type] ? SENZA_TITOLO[type][0] : primaRiga(x._confirm.text) || (L ? frase(L.describe, x) : '');
       return senzaVuoti({
         type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO, no: true,
-        autore: x._proposta === true ? 'segnalazione' : '', segnalazione: segnalazioneDi(type, x),
+        autore: x._proposta === true ? 'segnalazione' : '', ...segnalazioneDi(type, x),
       });
     }
     // Un pannello che aspetta il clic dell'utente (il riordino, l'elenco da eliminare) non è un'azione fallita.
@@ -297,7 +305,7 @@
       // Un no della regola di autonomia: riaperta, la riga dice «Non dimenticato» come il diario in diretta.
       no: esito === FALLITO && !!(o && o.no),
       // La proposta della segnalazione automatica (#360) non l'ha scritta l'assistente: il modello lo deve sapere (#2371).
-      autore: x._proposta === true ? 'segnalazione' : '', segnalazione: segnalazioneDi(type, x),
+      autore: x._proposta === true ? 'segnalazione' : '', ...segnalazioneDi(type, x),
       ...(SENZA_TITOLO[type] || !x._confirm ? {} : bottoneDi(esito, type, x, x._confirm, x._domanda)),
     });
   }
@@ -339,8 +347,15 @@
     return { resto, toccati };
   }
 
-  // La riga che la chat riaperta mostra per una voce: la stessa forma del diario in diretta.
+  // La riga che la chat riaperta mostra per una voce: la stessa forma del diario in diretta. `fumetto`: titolo e testo di
+  // una segnalazione, come la riga in diretta; una voce salvata senza titolo non ne riceve uno di ripiego, che non era partito.
   function rigaDellaVoce(v) {
+    const r = rigaSenzaFumetto(v);
+    const S = r && v.type === 'INVIA_FEEDBACK' && v.segnalazione ? moduloSegnalazione() : null;
+    const fumetto = S ? S.fumetto({ titolo: v.titoloSegnalazione, testo: v.segnalazione }, { ripiego: false }) : '';
+    return fumetto ? { ...r, fumetto } : r;
+  }
+  function rigaSenzaFumetto(v) {
     if (!v || !v.type) return null;
     const riga = pulito(v.riga);
     if (v.type === 'FERMATA') return { icona: '🔒', testo: riga || 'Fermata: avrebbe portato fuori un segreto', fallita: true };

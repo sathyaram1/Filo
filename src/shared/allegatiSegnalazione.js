@@ -1,5 +1,5 @@
-// Gli allegati di una segnalazione mandata dalla chat (#1668): cosa ha indicato il modello, cosa c'è nella
-// conversazione, cosa parte. PURA: il modello indica e basta, i byte li prende il main dalla conversazione.
+// Titolo, testo e allegati di una segnalazione mandata dalla chat (#1668, #1704.1): cosa ha indicato il modello, cosa c'è
+// nella conversazione, cosa parte. PURA: il modello indica e basta, i byte li prende il main dalla conversazione.
 // Limiti e tipi sono quelli del riquadro «Invia feedback» (src/shared/feedbackAttachTypes.js); oltre, si rifiuta col numero.
 
 (function (global) {
@@ -193,8 +193,25 @@
     });
   }
 
+  // Titolo e testo come partono: invio, riquadro di conferma, fumetto e chat riaperta leggono da qui, così nessuno mostra
+  // altro da quello che parte. Senza titolo scritto parte quello di ripiego del riquadro «Invia feedback», e si mostra lui.
+  const primo = (...v) => v.map((x) => (typeof x === 'string' || typeof x === 'number' ? String(x).trim() : '')).find(Boolean) || '';
+  // `ripiego: false` per una segnalazione già salvata: il titolo che non ha, ricavato oggi, non è quello partito allora.
+  function campi(action, { ripiego = true } = {}) {
+    const a = action && typeof action === 'object' ? action : {};
+    const testo = primo(a.testo, a.text, a.messaggio);
+    const scritto = primo(a.titolo, a.title, a.name);
+    const FB = global.SN_FEEDBACK;
+    const ricavato = ripiego && !scritto && testo && FB && typeof FB.fallbackName === 'function' ? primo(FB.fallbackName(testo)) : '';
+    return { titolo: scritto || ricavato, testo };
+  }
+  function fumetto(action, opzioni) {
+    const { titolo, testo } = campi(action, opzioni);
+    return [titolo, testo].filter(Boolean).join('\n\n');
+  }
+
   global.SN_ALLEGATI_SEGNALAZIONE = {
     richiesti, haAllegati, inventario, scegli, soloQuesti, problemaDi, oltreIlimiti, payload, anteprime, conPreparati, vociAiuto,
-    nomeDi, limiti,
+    nomeDi, limiti, campi, fumetto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

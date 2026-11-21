@@ -1,11 +1,13 @@
 // #1635 — nella chat della home il tasto della segnalazione proposta e la riga «Segnalazione inviata» mostrano al
 // passaggio del mouse il fumetto di Filo con titolo e testo interi: un testo lungo scorre con la rotella, il fumetto non
-// copre il tasto, sparisce all'uscita e non cambia quello che parte. Modello finto, invio finto, nessuna rete.
+// copre il tasto, sparisce all'uscita e non cambia quello che parte. Riaperta la home, le righe lo dicono ancora (#1704.1),
+// e fumetto, riquadro e invio dicono lo stesso titolo anche quando il modello lo scrive sotto un altro nome o non lo scrive.
+// Modello finto, invio finto, nessuna rete.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
-import { clickConfirm, scrollConfirmToEnd, fillConfirmInput, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, scrollConfirmToEnd, fillConfirmInput, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 const TITOLO = 'Timer muto';
 const CODA = 'Questa è la coda della segnalazione.';
@@ -92,3 +94,88 @@ test('#1635 la segnalazione proposta e quella inviata mostrano titolo e testo ne
     await ripristina(app);
   }
 });
+
+async function conInvioFinto(app, fn) {
+  await app.evaluate(() => {
+    globalThis.__fbInviati = [];
+    globalThis.__submitVero = globalThis.SN_FEEDBACK.submit;
+    globalThis.SN_FEEDBACK.submit = async (p) => { globalThis.__fbInviati.push(p); return { id: 'fb-1704' }; };
+  });
+  try {
+    await fn();
+  } finally {
+    await app.evaluate(() => { if (globalThis.__submitVero) globalThis.SN_FEEDBACK.submit = globalThis.__submitVero; });
+    await ripristina(app);
+  }
+}
+
+async function confermaInvio(page) {
+  if (await page.locator(`${CONFIRM_HOST} input`).count()) await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+}
+
+const BREVE = 'Il timer non suona mai quando la scheda è dietro.';
+
+for (const esito of ['inviata', 'non inviata']) {
+  test(`#1704.1 riaperta la home, la riga «Segnalazione ${esito}» mostra ancora titolo e testo nel fumetto`, async ({ app }) => {
+    test.setTimeout(90_000);
+    const page = await home(app);
+    await conInvioFinto(app, async () => {
+      await livelloAutonomia(app, 'conservativo');
+      await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ testo: BREVE, titolo: TITOLO }) }] }, { text: 'Fatto.' }]);
+      await chiedi(page, 'segnala il timer');
+      await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+      if (esito === 'inviata') {
+        await confermaInvio(page);
+        await expect(page.locator('.dash-bubble-filo .dash-action-btn', { hasText: '✓' }).first()).toBeVisible({ timeout: 10_000 });
+      } else {
+        await clickConfirm(page, 'cancel');
+        await expect(page.locator('.dash-bubble-filo .dash-action-btn', { hasNotText: '✓' }).first()).toBeVisible({ timeout: 5000 });
+      }
+      await page.reload();
+      const di = await home(app);
+      const riga = di.locator('.dash-activity-row', { hasText: esito === 'inviata' ? `Segnalazione inviata · ${TITOLO}` : 'Segnalazione non inviata' }).first();
+      await expect(riga).toBeVisible({ timeout: 10_000 });
+      await passaSopra(di, riga);
+      const tip = fumetto(di);
+      await expect(tip, 'riaperta, la riga ha il suo fumetto').toBeVisible({ timeout: 3000 });
+      expect(await tip.evaluate((el) => el.textContent)).toBe(`${TITOLO}\n\n${BREVE}`);
+      await di.screenshot({ path: `tests/.shots/home-fumetto-segnalazione-riaperta-${esito.replace(' ', '-')}.png` });
+    });
+  });
+}
+
+// Il titolo sotto il terzo nome, o non scritto: il fumetto dice quello che il riquadro chiede e l'invio manda.
+for (const [nome, campi] of [['sotto «name»', { testo: BREVE, name: TITOLO }], ['senza titolo', { testo: BREVE }]]) {
+  test(`#1704.1 titolo ${nome}: fumetto, riquadro e invio dicono lo stesso titolo`, async ({ app }) => {
+    test.setTimeout(90_000);
+    const page = await home(app);
+    await conInvioFinto(app, async () => {
+      await livelloAutonomia(app, 'conservativo');
+      await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify(campi) }] }, { text: 'Fatto.' }]);
+      await chiedi(page, 'segnala il timer');
+      const riquadro = page.locator(CONFIRM_HOST);
+      await expect(riquadro).toBeVisible({ timeout: 10_000 });
+      await clickConfirm(page, 'cancel');
+      const tasto = page.locator('.dash-bubble-filo .dash-action-btn', { hasNotText: '✓' }).first();
+      await expect(tasto).toBeVisible({ timeout: 5000 });
+      await passaSopra(page, tasto);
+      await expect(fumetto(page)).toBeVisible({ timeout: 3000 });
+      const [titolo, testo] = (await fumetto(page).evaluate((el) => el.textContent)).split('\n\n');
+      expect(testo).toBe(BREVE);
+      expect(titolo, 'il fumetto ha un titolo').toBeTruthy();
+      if (campi.name) expect(titolo).toBe(TITOLO);
+      await page.mouse.move(5, 5);
+
+      await tasto.click();
+      await expect(riquadro).toBeVisible({ timeout: 5000 });
+      await expect.poll(() => confirmText(page), { message: 'il riquadro chiede lo stesso titolo' }).toMatch(new RegExp(`Titolo:[\\s\\S]*${titolo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*Testo:`));
+      await confermaInvio(page);
+      await expect.poll(() => app.evaluate(() => globalThis.__fbInviati.length), { timeout: 10_000 }).toBe(1);
+      const [inviato] = await app.evaluate(() => globalThis.__fbInviati);
+      expect(inviato.name, 'parte il titolo che il fumetto diceva').toBe(titolo);
+      expect(inviato.text).toBe(testo);
+    });
+  });
+}

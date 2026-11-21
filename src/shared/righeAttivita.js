@@ -18,6 +18,11 @@
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
   const restanoAperte = (o) => global.SN_ESITO.restanoAperte(o);
+  // Titolo e testo di una segnalazione li sceglie src/shared/allegatiSegnalazione.js, come l'invio e il riquadro.
+  function segnalazione() {
+    if (!global.SN_ALLEGATI_SEGNALAZIONE && typeof require === 'function') { try { require('./allegatiSegnalazione.js'); } catch (_) {} }
+    return global.SN_ALLEGATI_SEGNALAZIONE || null;
+  }
   // «lunedì 28 set»: il giorno di una conversazione senza titolo.
   function quandoBreve(ts) {
     const d = new Date(ts);
@@ -213,7 +218,8 @@
     // nessuna parte: proprio quelle che non si disfano più.
     CANCELLA_MEMORIA: () => ({ icon: '🧠', text: 'Memoria cancellata' }),
     INVIA_FEEDBACK: (a) => {
-      const t = pulito(a.titolo || a.title);
+      const S = segnalazione();
+      const t = pulito(S ? S.campi(a).titolo : '');
       return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t}` : ''}` };
     },
     ONBOARDING: (a) => {
@@ -513,8 +519,8 @@
   const DOMANDE_PANNELLO = { PULISCI_TAB: 'riordino delle schede', CANCELLA_ARCHIVIO: 'eliminazione dall’archivio' };
   // Titolo e testo di una segnalazione, interi: al passaggio del mouse su ogni suo tasto e riga si legge cosa parte (#1635).
   function testoSegnalazione(a) {
-    if (!isType(a, 'INVIA_FEEDBACK')) return '';
-    return [a.titolo ?? a.title, a.testo ?? a.text ?? a.messaggio].map((x) => String(x ?? '').trim()).filter(Boolean).join('\n\n');
+    const S = isType(a, 'INVIA_FEEDBACK') ? segnalazione() : null;
+    return S ? S.fumetto(a) : '';
   }
   function rigaAttivita(a) {
     const r = rigaSenzaFumetto(a);

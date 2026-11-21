@@ -71,6 +71,10 @@
     const A = global.SN_ALLEGATI_SEGNALAZIONE;
     return A ? A.haAllegati(a) : !!(a && a.allegati && [].concat(a.allegati).length);
   };
+  const campiSegnalazione = (a) => {
+    if (!global.SN_ALLEGATI_SEGNALAZIONE && typeof require === 'function') { try { require('./allegatiSegnalazione.js'); } catch (_) {} }
+    return global.SN_ALLEGATI_SEGNALAZIONE.campi(a);
+  };
 
   // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
   // Decide urlExfil, la stessa regola del controllo delle uscite (#2293); caricato senza, un indirizzo o l'elenco dei
@@ -592,7 +596,7 @@
       // quando si chiede, il popup mostra il testo che partirebbe.
       costo: 2,
       campo: null,
-      uscita: (a) => [a.titolo ?? a.title ?? '', a.testo ?? a.text ?? a.messaggio ?? ''].join('\n'),
+      uscita: (a) => { const c = campiSegnalazione(a); return [c.titolo, c.testo].join('\n'); },
       // Il prompt fa proporre a Filo la segnalazione quando ammette una mancanza: se l'utente non ha chiesto
       // di segnalare, l'uscita è fuori dal perimetro del compito e chiede, anche a compito pulito.
       // Con degli allegati chiede sempre: le miniature di quello che parte stanno nel riquadro (#1668).
@@ -604,8 +608,7 @@
         // può leggere per intero non è un consenso. Se è lungo, è il popup a
         // scorrere (src/shared/confirmUi.js), non il testo ad accorciarsi.
         // Il titolo parte con il testo: si vede anche lui, intero.
-        const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
-        const titolo = String(a.titolo ?? a.title ?? a.name ?? '').trim();
+        const { titolo, testo } = campiSegnalazione(a);
         return ['Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n', ...(titolo ? ['Titolo:\n', cit(titolo), '\nTesto:\n'] : []),
           testo ? cit(testo) : '(vuoto)'];
       },

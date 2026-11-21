@@ -13,6 +13,7 @@
       fixes: [
         { testo: 'Trascrivi mostra e legge anche i loghi con la scritta chiara su fondo trasparente, e una parola trascinata dalla prima all\'ultima lettera si copia intera anche quando l\'immagine usa un carattere diverso da quello di Filo.', segnalazione: 2374 },
         { testo: '«Copia» del tasto destro su un testo che va a capo, come un indirizzo o un elenco, lo copia con le sue righe, come Ctrl+C.', segnalazione: 2374 },
+        { testo: 'Anche dopo aver riaperto la home, col mouse sulla riga di una segnalazione inviata o non inviata rileggi titolo e testo. Il titolo che vedi lì e nella richiesta di conferma è quello che parte.', segnalazione: 1704 },
       ],
     },
     {
