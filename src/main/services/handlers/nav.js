@@ -1,7 +1,7 @@
 // Handler di dominio: navigazione, apertura/chiusura tab, fullscreen e comandi shell.
 
 const { app } = require('electron');
-const { soloFilo, filoNegatoAllaPagina } = require('./origine');
+const { soloFilo, filoNegatoAllaPagina, paginaNonDiFilo, daPaginaNonDiFilo } = require('./origine');
 const { azione: contata } = require('../azioniContate');
 const Strade = require('../contatoriStrade');
 
