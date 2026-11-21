@@ -34,7 +34,7 @@ test('r1 tasto destro, poi clic su un\'altra scheda prima che Filo sia pronto: t
   await apriImpostazioni(app);
   await pronta(page);
   await page.waitForTimeout(1_000);
-  await shell.locator('#tabs .tab').last().click();
+  await shell.locator('#tabs .tab', { hasText: 'Preferenze' }).click();
   await page.waitForTimeout(500);
   await page.screenshot({ path: 'tests/.shots/2444.1-r1-altra-scheda.png' }).catch(() => {});
   await expect(menuDi(page).principale).toHaveCount(0);
