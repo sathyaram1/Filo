@@ -149,6 +149,7 @@ const CHI_SCRIVE = new Set(['io', 'tu', 'me', 'you', 'i']);
 const pulito = (v) => String(v || '').replace(/[.,;:!?)\]»”"']+$/u, '');
 // La riga porta già il dato: in testa («Gatto2024 (con la G maiuscola)», «certo, Gatto2024») o dopo una parola che lo
 // presenta («è gattonero tutto minuscolo», «eccola: gattonero»). Il nome di chi parla non presenta, una domanda non porta.
+// 'debole' quando il dato è di sole lettere: «sono arrivato», «è urgente» hanno la stessa forma.
 function portaIlDato(riga, tipo, inTesta) {
   const X = globalThis.SN_URL_EXFIL;
   const chi = chiParla(riga);
