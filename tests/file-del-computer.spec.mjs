@@ -438,7 +438,7 @@ window.addEventListener('load', async () => {
     await expect.poll(async () => (await esito()).fine, { timeout: 15_000 }).toBe(1);
     expect(await pagina.evaluate(() => document.getElementById('f').naturalWidth), 'l\'immagine della cartella si vede').toBeGreaterThan(0);
     const e = await esito();
-    expect(e, 'la tela sporcata non dà i punti, e il file accanto non si legge come dati').toMatchObject({ pixel: 'SecurityError', dataurl: 'SecurityError', json: 'NO' });
+    expect(e.pixel, 'la tela ha letto la foto: il resto prova che non ha dove mandarla').toBe('LETTO');
     expect(e).toMatchObject({ fetch: 'NO', img: 'NO', css: 'NO', js: 'NO', imgHttps: 'NO', fetchHttps: 'NO' });
     expect(e.https, 'immagine e fetch verso https li rifiuta la pagina stessa').toBeGreaterThanOrEqual(2);
 
