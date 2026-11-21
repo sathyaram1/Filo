@@ -262,7 +262,7 @@ campi(document);ombre(document,0);return out.join('\\n');}catch(e){return '';}})
 async function testoDellaPagina(sender) {
   const url = String(sender?.tab?.url || sender?.url || '');
   const wc = sender?.wc;
-  if (!/^https?:/i.test(url) || !wc || wc.isDestroyed?.()) return null;
+  if (!daPaginaNonDiFilo(sender) || !wc || wc.isDestroyed?.()) return null;
   let host = '';
   try { host = new URL(url).hostname; } catch (_) {}
   const leggi = (avvia) => {
