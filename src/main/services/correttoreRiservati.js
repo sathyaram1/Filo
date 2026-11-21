@@ -162,7 +162,7 @@ function portaIlDato(riga, tipo, inTesta) {
     if (w.endsWith(':') || w === '=' || PRESENTA_DATO.has(t)) { presentato = true; continue; }
     if (!t || (testa && (AVVII.has(t) || SALUTO.test(t)))) continue;
     if ((testa || presentato) && formaDiPassword(t)) return true;
-    if (presentato && X.segretiDetti(`${tipo} ${t}`).length) return true;
+    if (presentato && X.segretiDetti(`${tipo} ${t}`).length) return /\d/.test(t) ? true : 'debole';
     testa = false;
     presentato = false;
   }
