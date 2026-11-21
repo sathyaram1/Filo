@@ -4444,7 +4444,7 @@ class TabManager {
   apriDaCollegamento(url, { sfondo = false, daScheda = null, gesto = false, fromUrl = '', azioneMisurata = null } = {}) {
     if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
-    const origine = /^https?:/i.test(String(fromUrl || '')) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
+    const origine = paginaNonDiFilo(fromUrl) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
     // Un collegamento da una pagina di Filo a un'altra, in una scheda nuova (#1468).
     if (/^filo:/i.test(String(url || '')) && daScheda && /^filo:/i.test(String(daScheda.url || ''))) {
       Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
