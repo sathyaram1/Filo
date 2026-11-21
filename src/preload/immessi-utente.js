@@ -212,6 +212,7 @@ function ascoltaIn(w, invia) {
       try { invia(`${documento}.0`, fila.testo, fila.inViaggio || Date.now()); } catch (_) {}
     }
     fila.inViaggio = 0;
+    if (fila.quanti) diCaselle();
   }
   const presto = () => { if (!timer) timer = setTimeout(di, ATTESA_MS); };
   const bersaglio = (e) => {
