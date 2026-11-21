@@ -231,6 +231,36 @@ test('#1657 #1662 a parole: Filo mette un sito nella barra e ripiega la chat, da
   await expect(page.locator('#ripiegaChat')).toBeVisible();
 });
 
+// La riga la scrive la home mentre Filo lavora, coi moduli che la pagina carica: qui, non nel main, si legge il sinonimo.
+test('#1803.2 nella chat della home la riga dice cosa è successo alla barra: messo, già lì, letta, tolto, ripiegata', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  const metti = { operazione: 'metti', elemento: 'youtube.com', nome: 'YouTube' };
+  const turni = [
+    ['metti youtube nella barra', metti, 'Messo nella barra dei siti · YouTube'],
+    ['rimettilo', metti, 'È già nella barra dei siti · YouTube'],
+    ['cosa c\'è nella barra?', { operazione: 'leggi' }, 'Letta la barra dei siti'],
+    ['toglilo', { operazione: 'rimuovi', elemento: 'YouTube' }, 'Tolto dalla barra dei siti · YouTube'],
+    ['ripiega la chat', { operazione: 'ripiega' }, 'Chat della home ripiegata'],
+  ];
+  await modelloFinto(app, turni.flatMap(([, args], i) => [
+    { toolCalls: [{ id: `r${i}`, name: 'BARRA_SITI', arguments: JSON.stringify(args) }] },
+    { text: `Risposta ${i}.` },
+  ]));
+  try {
+    for (const [i, [chiesto, , riga]] of turni.entries()) {
+      await page.locator('#ripiegaChat').evaluate((b) => { if (b.title === 'Riapri la chat') b.click(); });
+      await page.locator('#input').fill(chiesto);
+      await page.locator('#sendBtn').click();
+      await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i}.` })).toBeVisible({ timeout: 10_000 });
+      if (i === turni.length - 1) await page.locator('#ripiegaChat').click();
+      await expect(page.locator('#bubbles')).toContainText(riga);
+    }
+    await expect(page.locator('#bubbles')).not.toContainText('Barra dei siti · ');
+    await scatta(page, 'righe-chat');
+  } finally { await ripristina(app); }
+});
+
 test('#1657 tante voci si raggiungono tutte; Canc toglie; trascinata nel campo scrive l\'indirizzo; il tasto destro nasconde la barra', async ({ app }) => {
   test.setTimeout(60_000);
   let page = await home(app);
