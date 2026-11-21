@@ -453,7 +453,11 @@ window.addEventListener('load', async () => {
       try { await session.fromPartition(t.partition).fetch(u); return 'PARTITO'; } catch (_) { return 'NO'; }
     }, { i: id, u: `${r.origine}/main` });
     expect(dalMain).toBe('NO');
-    await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'Le pagine aperte dal computer si mostrano senza rete' })).toBeVisible({ timeout: 8000 });
+    const vistaAvvisi = await avvisi();
+    await expect(vistaAvvisi.locator('.shell-notif.show', { hasText: 'Le pagine aperte dal computer si mostrano senza rete' })).toBeVisible({ timeout: 8000 });
+    mkdirSync(SHOTS, { recursive: true });
+    await vistaAvvisi.screenshot({ path: join(SHOTS, 'file-del-computer-senza-rete-avviso.png') });
+    await expect(vistaAvvisi.locator('.shell-notif.show', { hasText: 'senza rete' }), 'una volta per pagina').toHaveCount(1);
     await pagina.waitForTimeout(2000);
     expect(pagina.url(), 'la scheda resta sul file').toMatch(/fattura\.html$/);
     expect(await schedeFile(app)).toBe(1);
