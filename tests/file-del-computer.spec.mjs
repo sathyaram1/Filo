@@ -433,6 +433,8 @@ window.addEventListener('load', async () => {
     let id = null;
     await expect.poll(async () => (id = await schedaFile(app, 'fattura.html')), { timeout: 10_000 }).toBeTruthy();
     await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+    expect(await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs
+      .find((x) => x.id === i).view.webContents.getWebRTCIPHandlingPolicy(), id)).toBe('disable_non_proxied_udp');
     const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
     const esito = async () => JSON.parse((await pagina.locator('body').getAttribute('data-esito')) || '{}');
     await expect.poll(async () => (await esito()).fine, { timeout: 15_000 }).toBe(1);
