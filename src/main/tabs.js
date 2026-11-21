@@ -2773,9 +2773,7 @@ class TabManager {
     // confine di fiducia interno↔esterno: il preload e contextIsolation sono
     // fissati alla creazione della view e un loadURL non li rivaluta, quindi
     // riusare la view caricherebbe il contenuto col preload sbagliato.
-    // Sulla scheda appena caduta la vista rinasce verso l'indirizzo chiesto: la rimessa in piedi la lascia stare (#1868).
-    let caduta = false;
-    try { caduta = tab.view.webContents.isCrashed(); } catch (_) {}
+    const caduta = this._caduta(tab);
     Permessi.navigazioneDiFilo(tab.view.webContents);
     if (caduta || this._needsRecreate(tab, target)) {
       this._recreateView(tab, target, { nuova: true });
@@ -2868,11 +2866,28 @@ class TabManager {
     } catch (_) { return ''; }
   }
 
+  // Sulla vista caduta ogni gesto la fa rinascere verso dove chiede, e la rimessa in piedi, che parte solo se la vista è
+  // ancora quella caduta, lo lascia stare (#1868). Indirizzo, Ricarica, Indietro, Avanti ed elenco passano di qui.
+  _caduta(tab) {
+    try { return tab.view.webContents.isCrashed(); } catch (_) { return false; }
+  }
+
+  _passoDallaCaduta(tab, passo) {
+    const salto = Storia.daCaduta(tab.storia, this._vociDellaVista(tab), passo);
+    if (!salto) return false;
+    if (passo && this._maybeBlockNavigation(tab, salto.meta.url)) return true;
+    tab.storia = salto.storia;
+    this._recreateView(tab, salto.meta.url, { storia: true, titolo: salto.meta.titolo });
+    AzioniContate.scheda(tab.view.webContents);
+    return true;
+  }
+
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     tab._gestoFiloAt = Date.now();
     if (!canGoBack(tab.view.webContents)) { this._vaiFuori(tab, 'indietro', 0); return; }
+    if (this._caduta(tab) && this._passoDallaCaduta(tab, -1)) return;
     const meta = this._vocePassoStoria(tab, -1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
     tab._passoStoria = true;
@@ -3020,6 +3035,11 @@ class TabManager {
     tab._gestoFiloAt = Date.now();
     const f = Storia.fuori(i, h.length());
     if (f) { this._vaiFuori(tab, f.verso, f.k); return; }
+    if (this._caduta(tab)) {
+      const vista = this._vociDellaVista(tab);
+      const dove = vista.indici.indexOf(i);
+      if (dove >= 0 && this._passoDallaCaduta(tab, dove - vista.attiva)) return;
+    }
     tab._passoStoria = true;
     h.goToIndex(i);
   }
@@ -3079,6 +3099,7 @@ class TabManager {
     if (!tab) return;
     tab._gestoFiloAt = Date.now();
     if (!canGoFwd(tab.view.webContents)) { this._vaiFuori(tab, 'avanti', 0); return; }
+    if (this._caduta(tab) && this._passoDallaCaduta(tab, 1)) return;
     const meta = this._vocePassoStoria(tab, 1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
     tab._passoStoria = true;
@@ -3099,6 +3120,7 @@ class TabManager {
       if (!this.codaRiapertura.subito(tab)) this._caricaRinviata(tab);
       return;
     }
+    if (this._caduta(tab) && this._passoDallaCaduta(tab, 0)) return;
     // #327 — parità di cammini: ricaricare una scheda che mostra la pagina
     // d'errore deve RITENTARE il sito fallito (come il bottone "Riprova"),
     // non ricaricare la pagina d'errore stessa.
@@ -3560,7 +3582,7 @@ class TabManager {
       setTimeout(() => {
         try {
           if (!this.tabs.some((t) => t.id === tab.id)) return; // scheda chiusa nel frattempo
-          // Rinata intanto verso un indirizzo chiesto dopo il crollo: quella navigazione vince.
+          // Rinata intanto per un gesto fatto dopo il crollo (_passoDallaCaduta): quella navigazione vince.
           if (tab.view.webContents !== wc) return;
           this._recreateView(tab, current, { loadUrl: NE.buildUrl(current, NE.CRASH_CODE, reason) });
         } catch (_) {}

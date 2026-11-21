@@ -113,6 +113,77 @@ test('un indirizzo chiesto subito dopo il crollo della scheda si apre, e la pagi
   expect(app.windows().some((p) => { try { return p.url().startsWith('filo://error/'); } catch (_) { return false; } })).toBe(false);
 });
 
+// La scheda su `url` cade e, appena il main la sa caduta, prima della rimessa in piedi, riceve `gesto` (#1868).
+async function gestoSubitoDopoIlCrollo(app, url, gesto, ...argomenti) {
+  await app.evaluate(async ({ BrowserWindow }, [target, nome, resto]) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === target);
+    const wc = tab.view.webContents;
+    process.kill(wc.getOSProcessId(), 'SIGKILL');
+    for (let i = 0; i < 200 && !wc.isCrashed(); i++) await new Promise((r) => setTimeout(r, 10));
+    w._filoTabs[nome](tab.id, ...resto);
+  }, [url, gesto, argomenti]);
+  // Oltre la rimessa in piedi (300 ms): se il gesto non avesse vinto, la pagina della scheda caduta sarebbe qui.
+  await new Promise((r) => setTimeout(r, 1500));
+}
+
+// Cosa mostra davvero la scheda: l'indirizzo e il titolo della pagina caricata in una vista viva.
+const schedaMostra = (app, url) => app.evaluate(async ({ BrowserWindow }, target) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+  const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === target);
+  if (!tab || tab.view.webContents.isCrashed()) return '';
+  return `${target} ${await tab.view.webContents.executeJavaScript('document.title').catch(() => '')}`;
+}, url);
+
+const paginaDellaSchedaCaduta = (app) => app.windows().some((p) => { try { return p.url().startsWith('filo://error/'); } catch (_) { return false; } });
+
+test('Ricarica subito dopo il crollo della scheda riapre il sito, non la pagina della scheda caduta', async ({ app, openTab, testServer }) => {
+  const url = testServer.html('<!DOCTYPE html><title>viva</title><p>contenuto</p>');
+  await openTab(url);
+  await gestoSubitoDopoIlCrollo(app, url, 'reload');
+  await expect.poll(() => schedaMostra(app, url), { timeout: 10_000 }).toBe(`${url} viva`);
+  expect(paginaDellaSchedaCaduta(app)).toBe(false);
+});
+
+test('Indietro subito dopo il crollo della scheda torna alla pagina di prima, e Avanti riporta a quella caduta', async ({ app, openTab, testServer }) => {
+  const prima = testServer.html('<!DOCTYPE html><title>prima</title><p>uno</p>');
+  const dopo = testServer.html('<!DOCTYPE html><title>dopo</title><p>due</p>');
+  await openTab(prima);
+  await app.evaluate(({ BrowserWindow }, [da, verso]) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === da);
+    w._filoTabs.navigate(tab.id, verso);
+  }, [prima, dopo]);
+  await expect.poll(() => schedaMostra(app, dopo), { timeout: 10_000 }).toBe(`${dopo} dopo`);
+  await gestoSubitoDopoIlCrollo(app, dopo, 'goBack');
+  await expect.poll(() => schedaMostra(app, prima), { timeout: 10_000 }).toBe(`${prima} prima`);
+  expect(paginaDellaSchedaCaduta(app)).toBe(false);
+  await app.evaluate(({ BrowserWindow }, da) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w._filoTabs.goForward(w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === da).id);
+  }, prima);
+  await expect.poll(() => schedaMostra(app, dopo), { timeout: 10_000 }).toBe(`${dopo} dopo`);
+});
+
+test('una voce dell\'elenco di Indietro scelta subito dopo il crollo della scheda si apre', async ({ app, openTab, testServer }) => {
+  const prima = testServer.html('<!DOCTYPE html><title>prima</title><p>uno</p>');
+  const dopo = testServer.html('<!DOCTYPE html><title>dopo</title><p>due</p>');
+  await openTab(prima);
+  await app.evaluate(({ BrowserWindow }, [da, verso]) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w._filoTabs.navigate(w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === da).id, verso);
+  }, [prima, dopo]);
+  await expect.poll(() => schedaMostra(app, dopo), { timeout: 10_000 }).toBe(`${dopo} dopo`);
+  const indice = await app.evaluate(({ BrowserWindow }, da) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === da);
+    return w._filoTabs.vociCronologia('indietro', tab.id)[0].indice;
+  }, dopo);
+  await gestoSubitoDopoIlCrollo(app, dopo, 'vaiAllaVoce', indice);
+  await expect.poll(() => schedaMostra(app, prima), { timeout: 10_000 }).toBe(`${prima} prima`);
+  expect(paginaDellaSchedaCaduta(app)).toBe(false);
+});
+
 test('renderer crashato: pagina d\'errore "scheda bloccata" invece del bianco', async ({ app, shell, openTab, testServer }) => {
   const url = testServer.html('<!DOCTYPE html><title>viva</title><p>contenuto</p>');
   await openTab(url);

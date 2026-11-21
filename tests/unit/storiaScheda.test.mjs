@@ -65,6 +65,31 @@ test('le voci della vista: la pagina d\'errore vale per l\'indirizzo fallito, ab
   assert.equal(r.attiva, 1);
 });
 
+test('vista caduta (#1868): Ricarica riapre la stessa pagina, Indietro e Avanti le vicine, e la cronologia resta intera', () => {
+  const s0 = { prima: [v('filo://newtab/')], dopo: [v('https://x/')] };
+  const vista = { voci: [v('https://a/1'), v('https://a/2'), v('https://a/3')], attiva: 1 };
+  const ricarica = Storia.daCaduta(s0, vista, 0);
+  assert.equal(ricarica.meta.url, 'https://a/2');
+  assert.deepEqual(urls(ricarica.storia.prima), ['filo://newtab/', 'https://a/1']);
+  assert.deepEqual(urls(ricarica.storia.dopo), ['https://a/3', 'https://x/']);
+  const indietro = Storia.daCaduta(s0, vista, -1);
+  assert.equal(indietro.meta.url, 'https://a/1');
+  assert.deepEqual(urls(indietro.storia.dopo), ['https://a/2', 'https://a/3', 'https://x/']);
+  assert.equal(Storia.daCaduta(s0, vista, -2).meta.url, 'filo://newtab/');
+  assert.equal(Storia.daCaduta(s0, vista, 2).meta.url, 'https://x/');
+  assert.equal(Storia.daCaduta(s0, vista, -3), null);
+  assert.equal(Storia.daCaduta(s0, vista, 3), null);
+});
+
+test('vista caduta senza voci: sta fra il dietro e il davanti, e Ricarica non ha niente da riaprire', () => {
+  const s0 = { prima: [v('https://a/1')], dopo: [v('https://a/2')] };
+  const vuota = { voci: [], attiva: 0 };
+  assert.equal(Storia.daCaduta(s0, vuota, 0), null);
+  assert.equal(Storia.daCaduta(s0, vuota, -1).meta.url, 'https://a/1');
+  assert.equal(Storia.daCaduta(s0, vuota, 1).meta.url, 'https://a/2');
+  assert.deepEqual(Storia.vociDellaVista([{ url: 'about:blank' }, { url: 'https://a/' }], 1).indici, [1]);
+});
+
 test('una pagina nuova nella vista toglie il davanti; un passo chiesto da Filo o indietro no', () => {
   assert.equal(Storia.paginaNuova({ n: 1, a: 0 }, { n: 2, a: 1 }, false), true);
   assert.equal(Storia.paginaNuova({ n: 3, a: 0 }, { n: 2, a: 1 }, false), true);
