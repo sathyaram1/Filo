@@ -2599,6 +2599,7 @@ class TabManager {
     this.anteprime.mostrata(tab);
     this.activeId = id;
     if (cambiata && !this._restoring) this._nelFilo('schedaDavanti', tab);
+    if (tab._senzaReteInAttesa) this._senzaRete(tab, tab._senzaReteInAttesa);
     Strade.misura('inVista', this, tab, tab.url, { incognito: this.incognito });
     // §2.1 — una scheda che diventa attiva è "usata adesso". Approssimazione
     // grossolana: il content script la raffina con gli eventi veri.
