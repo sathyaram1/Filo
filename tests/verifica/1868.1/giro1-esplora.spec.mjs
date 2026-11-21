@@ -14,6 +14,8 @@ test('esplora: Ricarica nello stesso istante del crollo', async ({ app, openTab,
     return { id: tab.id, ms: Date.now() - t0, n };
   }, url);
   console.log('crollo visto dopo', JSON.stringify(info));
+  const url2 = testServer.html('<!DOCTYPE html><title>due</title><p>contenuto</p>');
+  await openTab(url2);
   await app.evaluate(async ({ BrowserWindow }, target) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === target);
