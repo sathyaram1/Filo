@@ -185,31 +185,58 @@
     disponi(a);
   }
 
-  // Ogni riga sta nel suo riquadro: altezza dal riquadro, larghezza col testo stirato o stretto (scaleX), così le parole
-  // cadono sopra quelle disegnate e una si seleziona da sola.
+  // Ogni riga sta nel suo riquadro. Dentro, ogni parola e ogni spazio stanno dove sono disegnati, ritrovati nei pixel
+  // della riga, col testo stirato o stretto (scaleX) sulla loro larghezza: il carattere dell'immagine non è quello di
+  // Filo, e una parola trascinata dalla prima all'ultima lettera visibile si prende intera. Se nei pixel le parole non
+  // si contano, il testo si stira sulla riga intera.
   function disponi(a) {
     if (!a.box || !a.righe.length) return;
     const R = global.SN_TRASCRIZIONE_RIGHE;
     a.testo.textContent = '';
     const scatole = R.scatole(a.righe, a.box.w, a.box.h);
+    const gx = a.grigi ? a.grigi.w / a.box.w : 0;
+    const gy = a.grigi ? a.grigi.h / a.box.h : 0;
     // Le righe stanno fuori dal flusso, e una selezione che ne attraversa due le incollerebbe: un a capo nel testo fra
     // l'una e l'altra lo mette in ogni copia (Ctrl+C, il tasto destro, Traduci, Cerca), che legga la selezione o il range.
-    const nodi = scatole.map((s, i) => {
+    const pezzi = [];
+    scatole.forEach((s, i) => {
       if (i) a.testo.appendChild(document.createTextNode('\n'));
-      const n = el('div', 'sn-tr-riga', s.testo);
+      const n = el('div', 'sn-tr-riga');
       const alta = s.stimata ? Math.min(s.h, 22) : s.h;
       Object.assign(n.style, {
         left: `${s.x}px`, top: `${s.y}px`, height: `${alta}px`, lineHeight: `${alta}px`,
         fontSize: `${Math.max(4, alta * 0.82)}px`,
       });
+      // Il riquadro del lettore spesso sfiora la riga sopra e quella sotto: le parole si cercano nella sua fascia centrale.
+      const ink = !s.stimata && a.grigi
+        ? R.inchiostro(a.grigi.luma, a.grigi.w, a.grigi.h, { x: s.x * gx, y: (s.y + s.h * 0.1) * gy, w: s.w * gx, h: s.h * 0.8 * gy })
+        : null;
+      const dove = ink ? R.parole(s.testo, ink) : null;
+      if (!dove) {
+        n.textContent = s.testo;
+        a.testo.appendChild(n);
+        pezzi.push({ n, w: s.w, stimata: s.stimata });
+        return;
+      }
+      n.classList.add('sn-tr-parole');
+      n.style.width = `${s.w}px`;
+      const parti = s.testo.trim().split(/(\s+)/);
+      for (let j = 0; j < parti.length; j++) {
+        const p = Math.floor(j / 2);
+        const da = j % 2 ? dove[p].a : dove[p].da;
+        const a2 = j % 2 ? dove[p + 1].da : dove[p].a;
+        const pezzo = el('span', 'sn-tr-pezzo', parti[j]);
+        pezzo.style.left = `${da / gx - s.x}px`;
+        n.appendChild(pezzo);
+        pezzi.push({ n: pezzo, w: Math.max(1, (a2 - da) / gx) });
+      }
       a.testo.appendChild(n);
-      return [n, s];
     });
-    for (const [n, s] of nodi) {
-      const naturale = n.scrollWidth;
+    for (const p of pezzi) {
+      const naturale = p.n.scrollWidth || p.n.offsetWidth;
       if (!naturale) continue;
-      const k = s.w / naturale;
-      if (!s.stimata || k < 1) n.style.transform = `scaleX(${k})`;
+      const k = p.w / naturale;
+      if (!p.stimata || k < 1) p.n.style.transform = `scaleX(${k})`;
     }
   }
 
