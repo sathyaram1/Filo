@@ -2029,10 +2029,34 @@
       const dataUrl = await scaricaImmagine(src, imgEl).catch(() => null);
       if (!dataUrl) { Popup.showToast(I18n.t('menu_image_unreadable')); return; }
       const r = imgEl.getBoundingClientRect();
-      await global.SN_TRASCRIZIONE.apri({ dataUrl, rect: soloNelFramePrincipale({ x: r.left, y: r.top, w: r.width, h: r.height }) });
+      const rect = soloNelFramePrincipale({ x: r.left, y: r.top, w: r.width, h: r.height });
+      await global.SN_TRASCRIZIONE.apri({ dataUrl, rect, fondo: coloreSotto(imgEl) });
     } catch (_) {
       Popup.toastErrore('err_provider_failed');
     }
+  }
+
+  // Il colore che la pagina mostra sotto un elemento ('#rrggbb'): i fondi dell'elemento e dei suoi antenati, sovrapposti
+  // con la loro trasparenza; senza un fondo pieno sotto, il bianco della pagina.
+  function coloreSotto(el) {
+    const strati = [];
+    for (let n = el, i = 0; n && n.nodeType === 1 && i < 64; i++) {
+      let c = null;
+      try { c = /rgba?\(([^)]+)\)/.exec(getComputedStyle(n).backgroundColor); } catch (_) { c = null; }
+      const v = c ? c[1].split(/[\s,/]+/).filter(Boolean).map(Number) : [];
+      const alfa = v.length >= 4 ? v[3] : 1;
+      if (v.length >= 3 && alfa > 0) {
+        strati.push({ rgb: v.slice(0, 3), alfa });
+        if (alfa >= 0.99) break;
+      }
+      n = n.parentElement || (n.getRootNode && n.getRootNode().host) || null;
+    }
+    let rgb = [255, 255, 255];
+    for (let i = strati.length - 1; i >= 0; i--) {
+      const { rgb: s, alfa } = strati[i];
+      rgb = rgb.map((x, j) => x * (1 - alfa) + s[j] * alfa);
+    }
+    return `#${rgb.map((x) => Math.round(Math.min(255, Math.max(0, x))).toString(16).padStart(2, '0')).join('')}`;
   }
 
   // Lo strato è grande quanto la scheda: un punto di un riquadro incorporato lì non cade dove sta, e si va al centro.
