@@ -468,11 +468,11 @@ window.addEventListener('load', async () => {
 });
 
 test('un collegamento simbolico verso un file fuori dalla cartella non si apre, né come immagine né come pagina', async ({ app }) => {
-  test.skip(process.platform === 'win32', 'i collegamenti simbolici su Windows chiedono i permessi di amministratore');
   const { dir, fuori } = preparaReport();
   writeFileSync(join(fuori, 'altra.html'), '<!doctype html><title>Altra</title><p>fuori</p>');
-  symlinkSync(join(fuori, 'privata.png'), join(dir, 'collegata.png'));
-  symlinkSync(join(fuori, 'altra.html'), join(dir, 'collegata.html'));
+  const negato = collegaFile(join(fuori, 'privata.png'), join(dir, 'collegata.png'));
+  test.skip(Boolean(negato), negato || '');
+  collegaFile(join(fuori, 'altra.html'), join(dir, 'collegata.html'));
   writeFileSync(join(dir, 'indice.html'), '<!doctype html><title>Indice</title><img id="c" src="collegata.png"><img id="v" src="foto.png"><a id="l" href="collegata.html">altra</a>');
   await home(app);
   const file = join(dir, 'indice.html');
