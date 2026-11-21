@@ -53,6 +53,9 @@ test('cinque azioni nel turno: riaperta, la segnalazione inviata mostra ancora t
     const di = await inviaERiapri(app, page, [timer(1), timer(2), timer(3), timer(4), fb], 'quattro timer e segnala il timer');
     const bolla = di.locator('.dash-bubble-filo').last();
     await expect(bolla).toBeVisible({ timeout: 10_000 });
+    await di.waitForTimeout(1500);
+    console.log('BOLLE', JSON.stringify(await di.locator('.dash-bubble-filo').evaluateAll((l) => l.map((e) => e.innerHTML.slice(0, 1500)))));
+    console.log('ESITI', JSON.stringify(await app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l.filter((c) => !c.app).map((c) => c.messages.map((m) => m.esiti || null))))));
     const riga = bolla.locator('.dash-activity-row', { hasText: 'Segnalazione inviata' });
     const nota = bolla.locator('.dash-bubble-note').first();
     const dove = (await riga.count()) ? riga.first() : nota;
