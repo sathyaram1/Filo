@@ -1419,3 +1419,26 @@ test('riscrivere un codice già letto non lo toglie dai segreti letti', () => {
   assert.ok(!letto(), 'il codice letto mentre l’utente lo scriveva è rimasto');
   SL.usaDeposito(null);
 });
+
+// #2641 — un invio dallo strato (l'Aiuto, un Accetta) la pagina non lo vede: prima di leggere una scheda il main chiede
+// a ogni suo frame quello che l'utente ha appena immesso, e chi legge lo fa prima di leggere.
+test('prima di leggere una scheda il main chiede a ogni frame quello che l’utente ha appena immesso', () => {
+  const chiesti = [];
+  const frame = (n) => ({ send: (canale) => chiesti.push(`${n}:${canale}`) });
+  const rotto = { send: () => { throw new Error('frame andato'); } };
+  SL.primaDiLeggere({ isDestroyed: () => false, mainFrame: { framesInSubtree: [frame('pagina'), rotto, frame('riquadro')] } });
+  assert.deepEqual(chiesti, ['pagina:filo:immessi-subito', 'riquadro:filo:immessi-subito']);
+  SL.primaDiLeggere({ isDestroyed: () => true, mainFrame: { framesInSubtree: [frame('chiusa')] } });
+  SL.primaDiLeggere(null);
+  assert.equal(chiesti.length, 2);
+  const corpo = (file, nome) => {
+    const s = readFileSync(join(ROOT, 'src', 'main', 'services', file), 'utf8');
+    return s.slice(s.indexOf(`async function ${nome}(`), s.indexOf('\n}\n', s.indexOf(`async function ${nome}(`)));
+  };
+  for (const [file, nome, lettura] of [['porteUscita.js', 'testoDellaPagina', 'executeJavaScriptInIsolatedWorld'], ['pageRead.js', 'leggiDallaScheda', 'conMisuraVera']]) {
+    const c = corpo(file, nome);
+    assert.ok(c.includes('primaDiLeggere(wc)') && c.indexOf('primaDiLeggere(wc)') < c.indexOf(lettura), `${nome} legge la scheda senza chiedere prima quello che l’utente ha immesso`);
+  }
+  const preload = readFileSync(join(ROOT, 'src', 'preload', 'page-preload.js'), 'utf8');
+  assert.match(preload, /ipcRenderer\.on\('filo:immessi-subito'/, 'il preload non risponde alla domanda del main');
+});

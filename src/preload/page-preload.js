@@ -30,7 +30,11 @@ try {
 } catch (e) { console.error('[Filo CS] riquadri in arrivo', e); }
 
 // In ogni frame e da subito, anche nei riquadri che Filo non ha ancora montato: quello che l'utente scrive è suo (#810.8).
-try { require('./immessi-utente.js')((n, testo, desde) => ipcRenderer.send('filo:immesso-utente', n, testo, desde)); } catch (e) { console.error('[Filo CS] immessi', e); }
+try {
+  const immessi = require('./immessi-utente.js')((n, testo, desde) => ipcRenderer.send('filo:immesso-utente', n, testo, desde));
+  // Il main lo chiede prima di leggere il frame: la risposta parte prima della lettura, sullo stesso canale (#2641).
+  if (immessi) ipcRenderer.on('filo:immessi-subito', () => { try { immessi.diTutto(); } catch (_) {} });
+} catch (e) { console.error('[Filo CS] immessi', e); }
 
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
 //

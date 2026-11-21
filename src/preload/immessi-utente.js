@@ -121,6 +121,7 @@ function ascoltaImmessi(invia) {
   globalThis.SN_IMMESSI = Object.freeze({
     inserisce(el, testo) { principale.inserisce(el, testo); },
   });
+  return { diTutto: principale.diTutto };
 }
 
 // Una finestra: la pagina, o un riquadro vuoto (about:blank) che la pagina scrive da sé, come gli editor delle webmail,
@@ -236,8 +237,15 @@ function ascoltaIn(w, invia) {
     if (scrivibile(el)) aggiorna(el, null, e.key);
   }, true);
   // Un invio (Invio o un clic) porta con sé quello che l'utente ha appena scritto: il main lo sa prima di leggere la pagina.
-  function subito(e) { if (e.isTrusted && (daDire.size || fila.testo !== fila.detto)) { if (timer) clearTimeout(timer); di(); } }
+  function diSubito() { if (daDire.size || fila.testo !== fila.detto) { if (timer) clearTimeout(timer); di(); } }
+  function subito(e) { if (e.isTrusted) diSubito(); }
   w.addEventListener('pointerdown', subito, true);
+  // Un invio dallo strato sopra la scheda (l'Aiuto, un Accetta) la pagina non lo vede: chi legge lo chiede prima (#2641).
+  const figli = new Set();
+  function diTutto() {
+    diSubito();
+    for (const f of figli) { if (f.vivo()) f.diTutto(); else figli.delete(f); }
+  }
 
   // Un riquadro vuoto si segue quando è pronto (load) e quando l'utente ci entra (la finestra perde il fuoco). Una
   // pagina che lo riscrive con document.open toglie gli ascoltatori: chi non risponde più si rimette.
@@ -250,7 +258,10 @@ function ascoltaIn(w, invia) {
       if (!cw || cw.SN_IMMESSI || !cw.document) return;
       const prima = seguiti.get(cw);
       if (prima && prima.vivo()) return;
-      seguiti.set(cw, ascoltaIn(cw, invia));
+      const nuovo = ascoltaIn(cw, invia);
+      seguiti.set(cw, nuovo);
+      if (prima) figli.delete(prima);
+      figli.add(nuovo);
     } catch (_) { /* d'altra origine: il suo preload c'è */ }
   }
   w.addEventListener('load', (e) => segui(e.target), true);
@@ -260,11 +271,11 @@ function ascoltaIn(w, invia) {
   w.addEventListener(eco, () => { sentito = true; });
   function vivo() {
     sentito = false;
-    try { w.dispatchEvent(new w.Event(eco)); } catch (_) { return false; }
+    try { if (w.closed) return false; w.dispatchEvent(new w.Event(eco)); } catch (_) { return false; }
     return sentito;
   }
 
-  return { vivo, inserisce(el, testo) { if (scrivibile(el)) incollato(el, String(testo || '')); } };
+  return { vivo, diTutto, inserisce(el, testo) { if (scrivibile(el)) incollato(el, String(testo || '')); } };
 }
 
 module.exports = ascoltaImmessi;

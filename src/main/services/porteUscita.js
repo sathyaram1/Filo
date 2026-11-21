@@ -273,6 +273,7 @@ async function testoDellaPagina(sender) {
       new Promise((res) => { const t = setTimeout(() => res(''), 3000); t.unref?.(); }),
     ]);
   };
+  SegretiLetti.primaDiLeggere(wc);
   const letture = [leggi(() => wc.executeJavaScriptInIsolatedWorld(MONDO_USCITE, [{ code: LEGGI_PAGINA_JS }]))];
   let riquadri = [];
   try { riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || []; } catch (_) {}
