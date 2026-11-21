@@ -96,6 +96,10 @@
   const HOST_NUDO = /(?<![\w@.\/-])((?:[\w-]+\.)+[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?![\w-])/gi;
   // La regola è quella dei link (src/shared/urlNav.js); senza il modulo ogni indirizzo vale fuori.
   const questoComputer = (host) => !!(global.SN_URL_NAV && global.SN_URL_NAV.questoComputer(host));
+  const restaSulComputer = (url) => !!(global.SN_URL_NAV && global.SN_URL_NAV.restaSulComputer(url));
+  const URL_INTERO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s"'`^<>|;]+/gi;
+  // Il testo che un link o una lettura portano fuori: niente se l'indirizzo è del computer stesso, come un comando (#2255).
+  const indirizzoCheEsce = (a) => { const url = indirizzoDi(a); return restaSulComputer(url) ? '' : url; };
   // I client dei database e i login ai registri si collegano al server che nominano (#1312): un database senza
   // server nominato è quello del computer, un login senza registro va al registro pubblico. Una cartella è un socket.
   const CLIENT_DB = /\b(?:mysql|mariadb|mysqldump|psql|pg_dump|pg_dumpall|pg_restore|mongo|mongosh|mongodump|mongorestore|redis-cli|sqlcmd|cqlsh|clickhouse-client)\b/i;
