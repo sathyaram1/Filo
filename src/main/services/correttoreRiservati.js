@@ -93,7 +93,7 @@ function richieste(l, tutte = false) {
     const a = f ? m.j + f.index + f[0].length : Math.min(l.length, m.j + FRASE_MAX);
     const frase = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop() + l.slice(m.i, a);
     const chiesta = !!((f && f[0].includes('?')) || RICHIESTA.test(frase()));
-    if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, fine: a, tipo: m.tipo, chiesta });
+    if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, nome: m.j, fine: a, tipo: m.tipo, chiesta });
   }
   return out;
 }
