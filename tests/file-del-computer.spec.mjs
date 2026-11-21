@@ -2,7 +2,7 @@
 // legge altri file del disco. Un percorso che l'utente non ha scritto chiede il suo OK; un file che non c'è lo dice.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { writeFileSync, mkdirSync, copyFileSync, rmSync, symlinkSync } from 'node:fs';
+import { writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createSocket } from 'node:dgram';
 import { join } from 'node:path';
