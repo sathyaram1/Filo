@@ -1403,6 +1403,26 @@ test('dell’utente è la parte del campo cambiata da quando ci scrive, coi poch
   assert.equal(diUnIncolla('0123456789'.repeat(1000)), '');
 });
 
+// #810.21 — un numero che la pagina divide in più caselle, o che scrive lei casella per casella, è dell'utente; un
+// codice che il sito aveva già messo, o caselle in più fatte degli stessi caratteri, no.
+test('le caselle vicine sono dell’utente se sono fatte dei suoi caratteri, presi una volta sola', () => {
+  const { caselleDellUtente } = require(join(ROOT, 'src', 'preload', 'immessi-utente.js'));
+  const conti = (s) => { const m = new Map(); for (const c of s.toLowerCase()) if (/[\p{L}\p{N}]/u.test(c)) m.set(c, (m.get(c) || 0) + 1); return m; };
+  const campo = (value, type = 'text') => ({ value, type });
+  const carta = ['4532', '0151', '1283', '0366'].map((v) => campo(v));
+  assert.deepEqual(caselleDellUtente(carta, conti('4532015112830366')), ['4532015112830366']);
+  // Il codice del sito che stava nel campo prima che l'utente scrivesse resta del sito, anche se ne ha le cifre.
+  const codice = campo('264087');
+  const conCodice = [codice, ...carta];
+  assert.deepEqual(caselleDellUtente(conCodice, conti('4532015112830366264087'), { prima: (el) => (el === codice ? '264087' : '') }),
+    ['4532015112830366']);
+  // I caratteri si prendono una volta sola: un sito non ripete le caselle per coprire altri numeri.
+  const doppie = [...carta, campo('x', 'hidden'), ...carta.map((c) => campo(c.value))];
+  assert.equal(caselleDellUtente(doppie, conti('4532015112830366')).length, 1);
+  assert.deepEqual(caselleDellUtente([campo('4532'), campo('9999')], conti('4532')), []);
+  assert.deepEqual(caselleDellUtente([campo('4532')], conti('4532')), [], 'una casella sola ha già la sua voce');
+});
+
 // #810.8 giro 5 — un codice letto prima che l'utente cominciasse a scriverlo resta letto anche se lui lo riscrive;
 // quello letto mentre il suo testo era in viaggio si toglie.
 test('riscrivere un codice già letto non lo toglie dai segreti letti', () => {

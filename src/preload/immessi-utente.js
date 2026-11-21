@@ -1,6 +1,6 @@
 // Il testo che l'utente immette nella pagina, in ogni frame, detto al main: un segreto che la pagina mostra ed è suo non
-// è letto da fuori (#810.8). Dell'utente è la parte del valore cambiata da quando ci scrive, se è fatta dei caratteri che
-// ci ha messo lui (tasti, incolla, inserimenti di Filo chiesti da lui); se no, solo quei caratteri in fila, nel campo e nel documento.
+// è letto da fuori (#810.8). Suo è ciò che è fatto dei caratteri che ci ha messo lui (tasti, incolla, inserimenti di Filo, anche
+// quando il sito li ferma e fa da sé): la parte cambiata del campo, la fila nel documento, le caselle vicine.
 
 // Largo: un documento incollato intero resta dell'utente; oltre, si tiene la coda.
 const MAX_TESTO = 1000000;
@@ -20,8 +20,7 @@ const conta = /[\p{L}\p{N}]/u;
 
 // Le lettere e cifre di `valore` stanno tutte, quante volte servono, fra quelle che l'utente ha messo nel campo: un sito
 // che riscrive il valore (maschera, correzione in mezzo) non aggiunge niente di suo.
-function fattoDiCaratteri(valore, conti) {
-  const resto = new Map(conti);
+function fattoDiCaratteri(valore, conti, resto = new Map(conti)) {
   let qualcosa = false;
   for (const ch of String(valore || '')) {
     if (!conta.test(ch)) continue;
@@ -113,6 +112,39 @@ function fattoAiBordi(valore, conti) {
   return false;
 }
 
+const NON_TESTO = /^(hidden|checkbox|radio|submit|button|reset|file|image|range|color)$/i;
+const MAX_CASELLE = 2000;
+
+// Un valore diviso in più caselle (la carta in quattro, il codice in sei) è dell'utente anche se la pagina le riempie
+// da sé: caselle vicine, cambiate da quando lui scrive nel documento, fatte dei suoi caratteri presi una volta sola.
+function caselleDellUtente(campi, conti, { toccato = () => false, prima = () => undefined } = {}) {
+  const resto = new Map(conti);
+  const gruppi = [];
+  let corrente = [];
+  let lungo = 0;
+  const chiudi = () => {
+    if (corrente.length > 1) gruppi.push(corrente.join(''));
+    corrente = [];
+    lungo = 0;
+  };
+  let visti = 0;
+  for (const el of campi) {
+    if (++visti > MAX_CASELLE) break;
+    let v;
+    try { if (NON_TESTO.test(el.type || '')) continue; v = String(el.value || ''); } catch (_) { continue; }
+    if (!v) continue;
+    const prova = new Map(resto);
+    const suo = v.length <= MAX_SEGRETO && (toccato(el) || prima(el) !== v) && fattoDiCaratteri(v, null, prova);
+    if (!suo || lungo + v.length > 4 * MAX_SEGRETO) chiudi();
+    if (!suo) continue;
+    for (const [k, n] of prova) resto.set(k, n);
+    corrente.push(v);
+    lungo += v.length;
+  }
+  chiudi();
+  return gruppi;
+}
+
 function ascoltaImmessi(invia) {
   if (typeof window === 'undefined' || typeof invia !== 'function') return;
   const principale = ascoltaIn(window, invia);
@@ -134,7 +166,29 @@ function ascoltaIn(w, invia) {
   let numero = 0;
   let timer = null;
   // Tutto quello che l'utente immette nel documento, in fila: un numero diviso in più caselle ci sta intero.
-  const fila = { testo: '', detto: '', inViaggio: 0 };
+  const fila = { testo: '', detto: '', inViaggio: 0, conti: new Map(), quanti: 0 };
+  // I valori dei campi quando l'utente ha cominciato a scrivere nel documento: quello che c'era già è del sito.
+  const prima = new WeakMap();
+  const toccati = new WeakSet();
+  const caselle = { detto: '', inViaggio: 0 };
+
+  function fotoDiPrima() {
+    try { for (const el of w.document.querySelectorAll('input, textarea')) if (!prima.has(el)) prima.set(el, String(el.value || '')); } catch (_) {}
+  }
+
+  function diCaselle() {
+    let campi = [];
+    try { campi = w.document.querySelectorAll('input, textarea'); } catch (_) { return; }
+    const testo = caselleDellUtente(campi, fila.conti, {
+      toccato: (el) => toccati.has(el),
+      prima: (el) => (prima.has(el) ? prima.get(el) : ''),
+    }).join('\u0001');
+    if (testo !== caselle.detto) {
+      caselle.detto = testo;
+      if (testo) { try { invia(`${documento}.c`, testo, caselle.inViaggio || Date.now()); } catch (_) {} }
+    }
+    caselle.inViaggio = 0;
+  }
 
   function di() {
     timer = null;
@@ -158,6 +212,7 @@ function ascoltaIn(w, invia) {
       try { invia(`${documento}.0`, fila.testo, fila.inViaggio || Date.now()); } catch (_) {}
     }
     fila.inViaggio = 0;
+    if (fila.quanti) diCaselle();
   }
   const presto = () => { if (!timer) timer = setTimeout(di, ATTESA_MS); };
   const bersaglio = (e) => {
@@ -167,6 +222,7 @@ function ascoltaIn(w, invia) {
 
   // Si chiama PRIMA che il testo entri: `base` è quello che c'era, e a campo vuoto si riparte (la chat dopo un invio).
   function voce(el) {
+    if (!fila.quanti) fotoDiPrima();
     let t = testi.get(el);
     if (!t) {
       t = { n: ++numero, testo: '', conti: new Map(), quanti: 0, base: valoreVero(el) || '', inViaggio: 0 };
@@ -176,10 +232,13 @@ function ascoltaIn(w, invia) {
   }
   function contati(t, dati) {
     for (const ch of dati) {
-      if (!conta.test(ch) || t.quanti >= MAX_TESTO) continue;
+      if (!conta.test(ch)) continue;
       const k = contaDi(ch);
-      t.conti.set(k, (t.conti.get(k) || 0) + 1);
-      t.quanti++;
+      for (const c of [t, fila]) {
+        if (c.quanti >= MAX_TESTO) continue;
+        c.conti.set(k, (c.conti.get(k) || 0) + 1);
+        c.quanti++;
+      }
     }
   }
   const taglia = (s) => (s.length > MAX_TESTO ? s.slice(-MAX_TESTO) : s);
@@ -190,6 +249,8 @@ function ascoltaIn(w, invia) {
     // Il main toglie dal registro solo i segreti letti da quando questo pezzo è partito, non da quando il campo è
     // cominciato: un codice letto prima e scritto in fondo a una nota vecchia resta letto (giro 6).
     if (!t.inViaggio) t.inViaggio = Date.now();
+    if (!caselle.inViaggio) caselle.inViaggio = t.inViaggio;
+    toccati.add(el);
     if (dati) contati(t, dati);
     const nuovo = fn ? fn(t.testo) : t.testo;
     if (nuovo !== t.testo) t.testo = taglia(nuovo);
@@ -203,8 +264,30 @@ function ascoltaIn(w, invia) {
     aggiorna(el, (s) => (suo === dati ? s + dati : `${s}\n${suo}\n`), suo);
   }
 
+  // Un tasto, un incolla o un trascina che la pagina ferma e fa da sé non arriva come inserimento: si aspetta la fine
+  // del gesto, e se l'inserimento non è venuto conta lo stesso (le caselle che scrivono da sé, l'incolla ripulito).
+  let fermo = null;
+  function seNonArriva(el, fai) {
+    if (!scrivibile(el)) return;
+    voce(el.isContentEditable ? radiceModificabile(el) : el);
+    const mio = { arrivato: false };
+    fermo = mio;
+    setTimeout(() => { if (!mio.arrivato) fai(); }, 0);
+  }
+  const arrivato = () => { if (fermo) { fermo.arrivato = true; fermo = null; } };
+  for (const [tipo, dati] of [['paste', (e) => e.clipboardData], ['drop', (e) => e.dataTransfer]]) {
+    w.addEventListener(tipo, (e) => {
+      if (!e.isTrusted) return;
+      let testo = '';
+      try { testo = String(dati(e)?.getData('text/plain') || ''); } catch (_) {}
+      const el = bersaglio(e);
+      if (testo) seNonArriva(el, () => incollato(el, testo));
+    }, true);
+  }
+
   w.addEventListener('beforeinput', (e) => {
     if (!e.isTrusted || e.isComposing) return;
+    arrivato();
     const tipo = String(e.inputType || '');
     if (tipo === 'deleteContentBackward') { aggiorna(bersaglio(e), (s) => s.slice(0, -1)); return; }
     if (/^delete/.test(tipo)) { aggiorna(bersaglio(e), null); return; }
@@ -234,7 +317,8 @@ function ascoltaIn(w, invia) {
     if (e.isComposing || typeof e.key !== 'string' || [...e.key].length !== 1) return;
     if ((e.ctrlKey || e.metaKey) && !(e.getModifierState && e.getModifierState('AltGraph'))) return;
     const el = bersaglio(e);
-    if (scrivibile(el)) aggiorna(el, null, e.key);
+    const tasto = e.key;
+    seNonArriva(el, () => aggiorna(el, (s) => s + tasto, tasto));
   }, true);
   // Un invio (Invio o un clic) porta con sé quello che l'utente ha appena scritto: il main lo sa prima di leggere la pagina.
   function diSubito() { if (daDire.size || fila.testo !== fila.detto) { if (timer) clearTimeout(timer); di(); } }
@@ -243,7 +327,8 @@ function ascoltaIn(w, invia) {
   // Un invio dallo strato sopra la scheda (l'Aiuto, un Accetta) la pagina non lo vede: chi legge lo chiede prima (#2641).
   const figli = new Set();
   function diTutto() {
-    diSubito();
+    // Anche senza niente in attesa: una pagina può riempire le caselle dopo il gesto, a tempo.
+    if (fila.quanti) { if (timer) clearTimeout(timer); di(); } else diSubito();
     for (const f of figli) { if (f.vivo()) f.diTutto(); else figli.delete(f); }
   }
 
@@ -283,4 +368,5 @@ module.exports.fattoDiCaratteri = fattoDiCaratteri;
 module.exports.fattoAiBordi = fattoAiBordi;
 module.exports.parteNuova = parteNuova;
 module.exports.diUnIncolla = diUnIncolla;
+module.exports.caselleDellUtente = caselleDellUtente;
 module.exports.MAX_INCOLLA = MAX_INCOLLA;
