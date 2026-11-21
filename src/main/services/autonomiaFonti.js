@@ -19,7 +19,7 @@ function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false
   const fonti = Array.isArray(fontiLette) ? fontiLette.filter(Boolean) : [];
   if (assistente) fonti.push(...fontiDellAiuto(sender));
   const origine = String(sender?.tab?.url || sender?.url || '');
-  if (/^https?:/i.test(origine)) {
+  if (daPaginaNonDiFilo(sender)) {
     let host = '';
     try { host = new URL(origine).hostname; } catch (_) {}
     fonti.push({ classe: 5, campo: 'web', chiave: `sito:${host}`, motivo: 'ho letto una pagina web' });
