@@ -20,8 +20,7 @@ const conta = /[\p{L}\p{N}]/u;
 
 // Le lettere e cifre di `valore` stanno tutte, quante volte servono, fra quelle che l'utente ha messo nel campo: un sito
 // che riscrive il valore (maschera, correzione in mezzo) non aggiunge niente di suo.
-function fattoDiCaratteri(valore, conti) {
-  const resto = new Map(conti);
+function fattoDiCaratteri(valore, conti, resto = new Map(conti)) {
   let qualcosa = false;
   for (const ch of String(valore || '')) {
     if (!conta.test(ch)) continue;
