@@ -228,4 +228,4 @@ function concessoDaLink(partizione, input) {
 }
 
 module.exports = { PARTIZIONE, VISIBILI, percorsoDi, indirizzoDi, giudica, scrittoDallUtente, concedi, revoca, concessoDaLink, preparaSessione,
-  concessioneDi, permesso, inSessioneDiFile, chiudiRete, CSP_DOCUMENTO, ISOLATA };
+  concessioneDi, permesso, inSessioneDiFile, chiudiRete, CSP_DOCUMENTO };
