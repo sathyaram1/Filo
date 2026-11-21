@@ -52,6 +52,22 @@ test('debug', async ({ app, openTab, testServer }) => {
       scena: o.querySelector('.sn-tr-scena').getBoundingClientRect().toJSON(),
     };
   }, { x: box.x + 20 + da + 2, y: box.y + 40 });
-  console.log(JSON.stringify({ box, da, ...info }, null, 1));
+  console.log(JSON.stringify({ punto: info.punto }, null, 1));
+  const lunga = await page.evaluate(() => window.misura('INTEGRALE'));
+  await strato.mouse.move(box.x + 20 + da + 2, box.y + 40);
+  await strato.mouse.down();
+  await strato.mouse.move(box.x + 20 + da + lunga - 2, box.y + 40, { steps: 6 });
+  await strato.mouse.up();
+  const sel = await strato.evaluate(() => {
+    const o = document.querySelector('.sn-tr-overlay');
+    const root = o.getRootNode();
+    const s = (root.getSelection && root.getSelection()) || document.getSelection();
+    return { s: s.toString(), d: document.getSelection().toString(), tipo: s.type, a: s.anchorNode && s.anchorNode.textContent, f: s.focusNode && s.focusNode.textContent };
+  });
+  console.log(JSON.stringify(sel));
+  await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
+  await strato.keyboard.press('ControlOrMeta+c');
+  await new Promise((r) => setTimeout(r, 1000));
+  console.log('appunti', await app.evaluate(({ clipboard }) => clipboard.readText()));
   await strato.screenshot({ path: 'tests/.shots/debug-tr.png' });
 });
