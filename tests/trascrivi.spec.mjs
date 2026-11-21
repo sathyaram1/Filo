@@ -321,7 +321,8 @@ const paginaScura = (disegna, fondo = '#151515') => `<!doctype html><html><head>
 <img id="foto" width="600" height="120" alt="insegna">
 <script>${disegna}</script></body></html>`;
 
-// Quanta parte dell'immagine si stacca dal suo colore più comune: è la scritta che si vede. Una pagina bianca dà 0.
+// Quanta parte dell'immagine si stacca dal suo colore più comune, vista su bianco come la mostra chi ignora la
+// trasparenza: è la scritta che si vede. Una pagina bianca dà 0.
 async function scrittaNellImmagine(page, png64) {
   return page.evaluate(async (src) => {
     const bmp = await createImageBitmap(await (await fetch(src)).blob());
