@@ -290,7 +290,7 @@ async function eseguiAzioneFilo(action, {
 
   // #1295 — la conversazione la trova il main (l'id detto, o quella di adesso), prima del gate: il popup dice quale.
   if (type === 'TOGLI_CHAT' || type === 'RIMETTI_CHAT') {
-    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+    if (daPaginaNonDiFilo(sender)) {
       return { executed: false, kept: false, rejected: true, error: 'le conversazioni si toccano solo dalle pagine di Filo' };
     }
     const detto = String(action.id ?? action.chatId ?? '').trim();
