@@ -73,8 +73,9 @@
     return out;
   }
 
+  // Un dominio vale anche per i suoi sottodomini; un host vuoto non è in nessun elenco.
   function dentro(h, lista) {
-    return lista.some((d) => h === d || h.endsWith(`.${d}`));
+    return Boolean(h) && (Array.isArray(lista) ? lista : []).some((d) => h === d || h.endsWith(`.${d}`));
   }
 
   // Le categorie in uso: quelle di serie, con sopra quelle della configurazione remota (ognuna sostituisce la sua).
@@ -148,6 +149,7 @@
     return NOMI[motivo] || String(motivo || '');
   }
 
-  global.SN_PAGINE_DELICATE = { PREDEFINITI, CLASSI, host, elenco, sitiUtente, nonDelicati, classifica, nome, risolviSchede };
+  // `pulisci` e `dentro` sono la forma unica degli elenchi di siti: li usano anche i livelli di privacy.
+  global.SN_PAGINE_DELICATE = { PREDEFINITI, CLASSI, host, pulisci, dentro, elenco, sitiUtente, nonDelicati, classifica, nome, risolviSchede };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAGINE_DELICATE;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

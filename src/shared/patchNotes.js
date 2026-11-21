@@ -18,6 +18,9 @@
         { testo: 'Se il computer risponde lento una volta, la home torna da sola a leggere subito Bluetooth e Wi-Fi, senza riavviare Filo, e dopo una pausa del computer non ti mostra come attuale lo stato di prima.', segnalazione: 2394 },
         { testo: 'In modalità terminale, un comando git che cambia il server dove finisce il prossimo push, scegliendo il remoto di un ramo o quello predefinito, ti chiede di digitare «conferma», come quando cambi l\'indirizzo di un remoto. Prima bastava un OK, e il push dopo mandava il codice lì.', segnalazione: 2623 },
         { testo: 'Quando in una chat hai già dato la password a chi te l\'ha chiesta, il correttore torna a controllare intere le frasi che scrivi dopo. Una password scritta come «Pass: …», accanto al nome utente o come seconda password nella stessa risposta resta fuori da quello che legge.', segnalazione: 1723 },
+        { testo: 'Se avevi la protezione delle pagine delicate accesa, dopo l\'aggiornamento Filo resta su «Chiedi sulle delicate»: da posta, banca, sanità, enti pubblici e pagine con una password non parte niente da solo finché non lo cambi tu.', segnalazione: 1589 },
+        { testo: '«Annulla» sul segno di un tuo messaggio in chat, e dal tasto destro sulla bolla, rimette anche un livello di privacy più largo: ti chiede di scrivere «conferma», come l\'elenco dei cambi nella home.', segnalazione: 1589 },
+        { testo: 'Una password scritta a mano in una chat, come risposta sotto chi te la chiede, non arriva ai modelli né alla ricerca web, neanche quando chiedi a Filo di spiegare la pagina.', segnalazione: 1589 },
       ],
     },
     {

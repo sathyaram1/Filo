@@ -20,10 +20,17 @@
     return /^-?\d+$/.test(i) ? `${intero(Number(i))}${d ? `,${d}` : ''}` : String(Number(v)).replace('.', ',');
   };
   const percento = (v) => `${Math.round(Number(v) * 100)}%`;
-  // I livelli di privacy (#1589) coi nomi che l'utente vede in Sicurezza.
-  const LIVELLI_PRIVACY = { anticipo: 'tutto in anticipo', delicate: 'chiedi sulle delicate', sempre: 'chiedi sempre' };
-  const CATEGORIE_PRIVACY = { posta: 'posta', banche: 'banca', sanita: 'sanità', pa: 'enti pubblici', campi: 'pagine con una password' };
-  const nomeCategoria = (c) => CATEGORIE_PRIVACY[c] || String(c);
+  // I livelli di privacy (#1589) coi nomi che l'utente vede in Sicurezza: li dice livelliPrivacy.js.
+  function livelliPrivacy() {
+    if (!global.SN_LIVELLI_PRIVACY && typeof require === 'function') require('./livelliPrivacy.js');
+    return global.SN_LIVELLI_PRIVACY;
+  }
+  const nomeLivelloPrivacy = (v) => {
+    const L = livelliPrivacy();
+    const l = L && L.LIVELLI.find((x) => x.id === v);
+    return l ? l.nome.toLowerCase() : (v == null ? 'nessuno' : String(v));
+  };
+  const nomeCategoria = (c) => { const L = livelliPrivacy(); return L ? L.nomeCategoria(c) : String(c); };
   const millisecondi = (v) => `${intero(Math.round(Number(v)))} ms`;
   const lettereDoppie = (l) => {
     const D = global.SN_DOPPIO_TOCCO;
@@ -230,8 +237,8 @@
     'security.downloads.trustedSites': { nome: 'siti fidati per i programmi', elenco: true, livello: 2 },
     'security.pagineDelicate.siti': { nome: 'siti dove Filo chiede sempre', elenco: true, livello: 2 },
     'security.pagineDelicate.nonDelicati': { nome: 'siti non delicati per te, anche col campo password', elenco: true, livello: 2 },
-    'security.privacy.livello': { nome: 'livello di privacy', valori: LIVELLI_PRIVACY, livello: 2 },
-    'security.privacy.incognito': { nome: 'livello di privacy in incognito', valori: LIVELLI_PRIVACY, livello: 2 },
+    'security.privacy.livello': { nome: 'livello di privacy', valore: nomeLivelloPrivacy, livello: 2 },
+    'security.privacy.incognito': { nome: 'livello di privacy in incognito', valore: nomeLivelloPrivacy, livello: 2 },
     'security.privacy.chiedi': { nome: 'categorie su cui Filo chiede', elenco: true, leggibile: nomeCategoria, livello: 2 },
     'security.privacy.sitiAnticipo': { nome: 'siti dove Filo manda in anticipo', elenco: true, livello: 2 },
     'security.autoFeedback': { nome: 'segnalazione automatica dei problemi', valore: ATTIVA, livello: 2 },

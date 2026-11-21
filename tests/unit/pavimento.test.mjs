@@ -457,3 +457,21 @@ test('con la password a puntini o un bottone accanto all\'etichetta, la parola d
   }
   assert.ok(!P.oscura('Password ••••••• Mostra\nGirasole2024').includes('Girasole2024'));
 });
+
+// #1589.8 — le password scritte a mano le riconosce un posto solo (riservatiNelTesto.js), per il correttore e per il
+// pavimento: la stessa pagina non le fa uscire né dal campo né verso la spiegazione o la chat.
+test('la risposta sotto chi chiede la password esce come segnaposto dal pavimento come dal correttore', () => {
+  require('../../src/shared/urlExfil.js');
+  const R = require('../../src/main/services/correttoreRiservati.js');
+  const pagina = 'Marco: mi mandi la password del wifi?\nIo: certo, Brezza7Mare';
+  assert.equal(P.oscura(pagina), `Marco: mi mandi la password del wifi?\nIo: certo, ${S}`);
+  const campo = R.richiestaSenzaRiservati({ prima: '', nuovo: 'certo, Brezza7Mare', dopo: '', sopra: 'Marco: mi mandi la password del wifi?' });
+  assert.ok(!campo.nuovo.includes('Brezza7Mare'), 'il correttore la toglie dal campo');
+  assert.equal(P.oscura('Username / Password: mario / Girasole2024'), `Username / Password: mario / ${S}`, 'le forme libere del correttore');
+  assert.equal(P.oscura('SSID: CasaRossi\nKey: Faro7Blu55'), `SSID: CasaRossi\nKey: ${S}`);
+  // Il resto di una pagina che parla di password resta: una parola qualunque, e la domanda con la risposta sulla stessa riga.
+  for (const t of ['mi mandi la password del wifi?\ncerto, girasole', 'Come cambio la password di Gmail? Ordine 1234567890123.']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+  assert.ok(P.trova(pagina).some((x) => x.valore === 'Brezza7Mare'), 'il valore si toglie com\'è scritto, maiuscole comprese');
+});

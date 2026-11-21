@@ -27,15 +27,17 @@
 
   const livelloValido = (v, ripiego) => (ORDINE.includes(v) ? v : ripiego);
 
-  function pulisciSiti(lista) {
-    if (!Array.isArray(lista)) return [];
-    const out = [];
-    for (const x of lista) {
-      if (typeof x !== 'string') continue;
-      const d = x.trim().toLowerCase().replace(/^\*?\.+/, '').replace(/\.+$/, '').replace(/^www\./, '');
-      if (d && !out.includes(d)) out.push(d);
-    }
-    return out;
+  // Gli elenchi di siti si puliscono e si confrontano come quelli delle pagine delicate: la forma è una sola.
+  function delicate() {
+    if (!global.SN_PAGINE_DELICATE && typeof require === 'function') require('./pagineDelicate.js');
+    return global.SN_PAGINE_DELICATE;
+  }
+  const pulisciSiti = (lista) => delicate().pulisci(lista);
+  const dentro = (h, lista) => delicate().dentro(h, lista);
+  // I siti di `prima` che in `dopo` non ci sono più.
+  function sitiTolti(prima, dopo) {
+    const restano = pulisciSiti(dopo);
+    return pulisciSiti(prima).filter((s) => !restano.includes(s));
   }
 
   // La regola in vigore, da impostazioni qualunque (assenti, vecchie, manomesse): mai un throw.
@@ -55,8 +57,6 @@
       sitiChiedi: pulisciSiti(del.siti),
     };
   }
-
-  const dentro = (h, lista) => Boolean(h) && lista.some((d) => h === d || h.endsWith(`.${d}`));
 
   // Il motivo per cui da questa pagina non parte niente da solo (e Filo chiede), o null se parte. `motivo` è quello che la
   // pagina è (pagineDelicate.classifica: 'utente', una categoria, 'campi'), `campi` se la pagina mostra un campo password
@@ -93,11 +93,8 @@
     const p = (s) => (sec(s).privacy && typeof sec(s).privacy === 'object' ? sec(s).privacy : {});
     const del = (s) => (sec(s).pagineDelicate && typeof sec(s).pagineDelicate === 'object' ? sec(s).pagineDelicate : {});
     if (alza(p(primaSettings), p(dopoSettings))) return true;
-    const chiediPrima = pulisciSiti(del(primaSettings).siti);
-    const chiediDopo = pulisciSiti(del(dopoSettings).siti);
-    if (chiediPrima.some((s) => !chiediDopo.includes(s))) return true;
-    const toltiPrima = pulisciSiti(del(primaSettings).nonDelicati);
-    return pulisciSiti(del(dopoSettings).nonDelicati).some((s) => !toltiPrima.includes(s));
+    if (sitiTolti(del(primaSettings).siti, del(dopoSettings).siti).length) return true;
+    return sitiTolti(del(dopoSettings).nonDelicati, del(primaSettings).nonDelicati).length > 0;
   }
 
   // I siti delle pagine delicate dopo un ripristino o un backup: quelli dove Filo chiede sempre restano, e fra i segnati
@@ -196,9 +193,16 @@
     };
   }
 
+  // Prima dei livelli c'era un interruttore solo: accese, le pagine delicate non mandavano niente da sole, cioè «Chiedi
+  // sulle delicate». Il livello da cui riparte chi aggiorna, o null se l'interruttore non c'era o era spento.
+  function livelloDiPrima(pagineDelicate) {
+    const p = pagineDelicate && typeof pagineDelicate === 'object' ? pagineDelicate : {};
+    return 'enabled' in p && p.enabled !== false ? 'delicate' : null;
+  }
+
   global.SN_LIVELLI_PRIVACY = {
-    LIVELLI, ORDINE, CATEGORIE, PREDEFINITA, regola, chiede, alza, alzaTutto, piuStretta, delicateStrette, frase, confermaAlzata,
-    confermaSitiTolti, confermaAnnullo, nomeLivello, nomeCategoria,
+    LIVELLI, ORDINE, CATEGORIE, PREDEFINITA, regola, chiede, alza, alzaTutto, piuStretta, delicateStrette, sitiTolti, frase,
+    confermaAlzata, confermaSitiTolti, confermaAnnullo, nomeLivello, nomeCategoria, livelloDiPrima,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_LIVELLI_PRIVACY;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
