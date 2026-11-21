@@ -10,6 +10,7 @@ const { contaSe, winOf } = require('./handlersComuni');
 const {
   cartellaDelComando, displayCwd, pendingConfirmKey, perimetroLettura, segretiCustoditi,
 } = require('./porteUscita');
+const { daPaginaNonDiFilo } = require('./handlers/origine');
 // Questi vivono in moduli che caricano questo: si chiedono al momento della chiamata, non al caricamento.
 const eseguiAzioneFilo = (...a) => require('./handlers').eseguiAzioneFilo(...a);
 
@@ -19,7 +20,7 @@ function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false
   const fonti = Array.isArray(fontiLette) ? fontiLette.filter(Boolean) : [];
   if (assistente) fonti.push(...fontiDellAiuto(sender));
   const origine = String(sender?.tab?.url || sender?.url || '');
-  if (/^https?:/i.test(origine)) {
+  if (daPaginaNonDiFilo(sender)) {
     let host = '';
     try { host = new URL(origine).hostname; } catch (_) {}
     fonti.push({ classe: 5, campo: 'web', chiave: `sito:${host}`, motivo: 'ho letto una pagina web' });
@@ -36,7 +37,7 @@ function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false
 // letto testo di altri: lo stato dei livelli di autonomia, mai più largo della classe 2; dall'Aiuto di un sito mai.
 function compitoSenzaTestoDiAltri(sender, { contesto = null, fontiLette = null, assistente = false, impostazioni = null } = {}) {
   try {
-    if (/^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))) return false;
+    if (daPaginaNonDiFilo(sender)) return false;
     const A = globalThis.SN_AUTONOMIA;
     const aut = (impostazioni && impostazioni.autonomia) || {};
     const attivo = A.livelloAttivo(aut.livello);
@@ -272,7 +273,7 @@ function fraseNo(ing, decisione, sender) {
   return globalThis.SN_AUTONOMIA.fraseNo({
     regola: decisione.regola, segreto: ing.segreto, dove: ing.dove,
     fonte: decisione.stato && decisione.stato.fonte,
-    daPagina: /^https?:/i.test(String(sender?.tab?.url || sender?.url || '')),
+    daPagina: daPaginaNonDiFilo(sender),
     nuovaUguale: !!decisione.nuovaUguale,
   });
 }

@@ -89,6 +89,12 @@
       if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
     }
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.blocked === 'file') {
+      return {
+        assente: 'file non trovato', cartella: 'è una cartella', tipo: 'una scheda non mostra questo tipo di file',
+        assistente: 'si apre dalla chat della home', rete: 'percorso di rete non ammesso',
+      }[o.motivo] || 'file non aperto';
+    }
     if (o.cartellaDiRete) return 'la cartella sta su un altro computer della rete';
     if (o.errore === 'fuori_perimetro') return 'la cartella sta fuori dalla tua cartella personale';
     if (o.blocked === 'site') {

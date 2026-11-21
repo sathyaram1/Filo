@@ -39,6 +39,8 @@
     + 'Un indirizzo inventato può portare fuori tuoi dati anche scritto con parole normali. Conferma solo se l\'hai chiesto tu.';
   function costoIndirizzo(a, base) {
     if (a && a._nonCompare) return 3;
+    // Un file del computer col percorso che l'utente non ha scritto (#1905): `_fileNonScritto` lo scrive il main.
+    if (a && a._fileNonScritto) return Math.max(base, 2);
     return a && a._exfil ? Math.max(base, 2) : base;
   }
 
@@ -432,6 +434,14 @@
       uscita: (a) => indirizzoDi(a),
       describe: (a) => {
         const url = indirizzoDi(a) || 'una pagina';
+        const N0 = global.SN_URL_NAV;
+        const file = a && typeof a._fileDelComputer === 'string' && N0 && N0.fileDiQuestoComputer && N0.fileDiQuestoComputer(url)
+          ? a._fileDelComputer : '';
+        if (file) {
+          return a._fileNonScritto
+            ? ['Aprire in una scheda il file del computer ', cit(file, true), '\n\nIl percorso non l\'hai scritto tu: apri solo se l\'hai chiesto tu.']
+            : ['Aprire il file ', cit(file, true)];
+        }
         if (a && a._nonCompare) {
           const primo = a._exfilReason ? `Aprire un link che ${a._exfilReason}, scritto a memoria da Filo` : 'Aprire un indirizzo scritto a memoria da Filo';
           return [`${primo}:\n`, cit(url, true), `\n\n${RISCHIO_INVENTATO}`];

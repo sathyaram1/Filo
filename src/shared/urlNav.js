@@ -177,6 +177,22 @@
     return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
   }
 
+  // Un file di QUESTO computer (indirizzo file: o percorso scritto com'è), come indirizzo file:; '' per tutto il resto,
+  // compresa una cartella di rete (file://nas/…, \\nas\…), che aprendosi consegna l'hash NTLM (#1905).
+  function fileDiQuestoComputer(input) {
+    const raw = String(input || '').trim();
+    if (!raw) return '';
+    const url = /^[a-z][a-z0-9+.-]*:/i.test(raw) && !/^[a-z]:[\\/]/i.test(raw) ? raw : (percorsoDelComputer(raw) || '');
+    let u;
+    try { u = new URL(url); } catch (_) { return ''; }
+    if (u.protocol !== 'file:' || (u.hostname && u.hostname.toLowerCase() !== 'localhost')) return '';
+    // «file:////nas/x» ha l'host vuoto ma il percorso è di rete lo stesso.
+    let p = u.pathname;
+    try { p = decodeURIComponent(p); } catch (_) {}
+    if (/^[\\/]{2}/.test(p) || p.includes('\u0000')) return '';
+    return u.href.replace(/^file:\/\/localhost\//i, 'file:///');
+  }
+
   // Stretta di proposito: deve distinguere un indirizzo da un comando shell. Niente spazi,
   // i path locali li esegue la shell, e un host a etichetta singola senza porta è un comando.
   function looksLikeAddress(raw) {
@@ -293,7 +309,7 @@
   global.SN_URL_NAV = {
     isLocalHost, questoComputer, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
-    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress, collegamentoScritto, ricercaDi, eRicercaDi,
+    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, fileDiQuestoComputer, isShareableAddress, collegamentoScritto, ricercaDi, eRicercaDi,
     indirizzoRicerca, indirizzoRicercaImmagine, invioRicercaImmagine, LENS_CARICA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

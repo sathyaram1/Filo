@@ -25,8 +25,11 @@ const Permessi = require('./services/permessiPagine');
 // sincrono, e un modulo caricato dentro `_makeView` lì si trova ancora senza esportazioni.
 const Downloads = require('./services/downloads');
 const ReteDiCasa = require('./services/homeNetwork');
-const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
+const FileDelComputer = require('./services/fileDelComputer');
+const { avvisoIndirizzoFermato, avvisoSenzaRete } = require('./services/indirizzoFermato');
+const WEB = /^(?:https?|wss?):/i;
 const { navigazioneVersoFilo, paginaDeiBloccati } = require('./services/navigazioneVersoFilo');
+const { paginaNonDiFilo } = require('./services/handlers/origine');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
@@ -507,7 +510,10 @@ class TabManager {
     VociMenuUsate.servizio().carica().catch(() => {});
     this.codaRiapertura = new CodaRiapertura({ carica: (tab) => this._caricaRinviata(tab) });
     if (window && typeof window.once === 'function') {
-      window.once('closed', () => { this.chiudiSessione(); this.anteprime.chiudi(); for (const r of riserveDi(this)) r.spegni(); this.codaRiapertura.chiudi(); });
+      window.once('closed', () => {
+        this.chiudiSessione(); this.anteprime.chiudi(); for (const r of riserveDi(this)) r.spegni(); this.codaRiapertura.chiudi();
+        for (const t of this.tabs) FileDelComputer.revoca(t._fileConcesso);
+      });
     }
     this.avvisi = new AvvisiSopraPagina(window, {
       dopoInCima: () => { if (this.propostaEmail) this.propostaEmail.inCima(); this.conferme.inCima(); if (this.strato) this.strato.inCima(); },
@@ -713,7 +719,8 @@ class TabManager {
     try {
       // In una scheda proxata WebRTC non deve MAI aprire UDP diretto: con STUN qualsiasi sito
       // leggerebbe l'IP vero. Non disattivabile, vince sull'impostazione dell'utente.
-      const policy = tab.proxy
+      // Così una pagina del computer, che non ha rete (fileDelComputer.js).
+      const policy = tab.proxy || FileDelComputer.inSessioneDiFile(tab.view.webContents)
         ? 'disable_non_proxied_udp'
         : (this.security.protectIpLeak ? 'default_public_interface_only' : 'default');
       tab.view.webContents.setWebRTCIPHandlingPolicy(policy);
@@ -924,6 +931,8 @@ class TabManager {
   // In privacy ogni sito ha la sua sessione, isolata dagli altri. Le pagine filo:// restano
   // SEMPRE su quella della finestra: lì vivono storage e protocollo.
   _partitionFor(url) {
+    // Un file del computer sta nella sessione che gli tiene chiuso il resto del disco (fileDelComputer.js).
+    if (/^file:/i.test(String(url || ''))) return FileDelComputer.PARTIZIONE;
     if (this.incognito) return this.partition || null;
     if (!url || url.startsWith('filo://')) return null;
     if (this.cookieMode === Cookies.MODES.PRIVACY) {
@@ -940,6 +949,8 @@ class TabManager {
   // Una scheda proxata vive in proxy:<tabId> finché vive: partizione diversa vuol dire cookie
   // separati, quindi niente login condivisi, ed è voluto. Le filo:// restano interne.
   _partitionForTab(tab, url) {
+    // Prima del proxy: un file:// fuori dalla sua sessione leggerebbe tutto il disco.
+    if (/^file:/i.test(String(url || ''))) return (tab && tab._fileConcesso) || FileDelComputer.PARTIZIONE;
     if (tab && tab.proxy && url && !url.startsWith('filo://')) {
       return `proxy:${tab.id}`;
     }
@@ -1013,7 +1024,8 @@ class TabManager {
   // `adotta`: { webContents, partition, sito } della finestra che una pagina ha aperto e tiene; si carica da sé.
   // `rinvia`: la scheda dietro nasce senza caricarsi; la carica la coda della riapertura, o chi la apre (_caricaRinviata).
   // `idRimessa`: l'id che la scheda aveva prima di chiudere Filo, se nessuna lo porta già.
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false, invio = null, origine = null, azioneMisurata = null, idRimessa = null } = {}) {
+  // `fileDelComputer`: chi apre ha già deciso che il file locale l'ha chiesto l'utente (fileDelComputer.js).
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false, invio = null, origine = null, azioneMisurata = null, idRimessa = null, fileDelComputer = false } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -1053,19 +1065,21 @@ class TabManager {
     }
     // SICUREZZA (#247) — un loadURL programmatico non emette will-navigate: qui convergono
     // TUTTI gli handler IPC che aprono una scheda, e il cammino IPC → file:// va tenuto chiuso.
-    if (isWebUnsafeNav(url)) {
+    const fileConcesso = fileDelComputer && !adotta ? FileDelComputer.concedi(url) : null;
+    if (!fileConcesso && isWebUnsafeNav(url)) {
       fermaNavigazione(url, { win: this.win }); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
       return null;
     }
     const bloccata = apriComunque ? null : this._decisioneBlocco(null, url);
     if (bloccata && !bloccoInPagina) {
+      FileDelComputer.revoca(fileConcesso);
       this._notifyBlocked(bloccata);
       this._contaBloccato(bloccata);
       return null;
     }
     const isInternal = url.startsWith('filo://');
     const rinviata = !!rinvia && !activate && !adotta;
-    const partition = adotta ? adotta.partition : this._partitionFor(url);
+    const partition = adotta ? adotta.partition : (fileConcesso || this._partitionFor(url));
     // La home già pronta (#1128) vale per la scheda che si apre davanti e non ha niente da rifare al caricamento.
     const pronta = activate && !adotta && !bloccata && restoreScrollPct == null && restoreZoomLevel == null
       ? this._prendiPronta(url, this._sessionePer(partition))
@@ -1103,6 +1117,8 @@ class TabManager {
       // Zoom da ripristinare in una copia (0 = 100%), una volta a fine carico.
       restoreZoomLevel: typeof restoreZoomLevel === 'number' ? restoreZoomLevel : null,
       partition,
+      // La sessione del file che questa scheda ha aperto: vale finché la scheda vive (FileDelComputer.revoca).
+      _fileConcesso: fileConcesso || null,
       partitionSite: isInternal ? null : (adotta && adotta.sito) || Cookies.registrableOf(url),
       // Proxy per-tab ("Apri da un altro paese"): { country, tier } finché la
       // tab è instradata da un altro paese, null altrimenti. Vedi setTabProxy.
@@ -1416,6 +1432,7 @@ class TabManager {
     // distruggere la vista, o non c'è più niente da leggere.
     this._archiveClosedTab(tab, 'manual', { daSola, motivo, voce: this._ricordaChiusa(tab) });
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+    FileDelComputer.revoca(tab._fileConcesso);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
   }
@@ -1508,6 +1525,7 @@ class TabManager {
       this._nelFilo('schedaChiusa', tab);
       this._archiveClosedTab(tab, 'manual', { voce: this._ricordaChiusa(tab) }); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+      FileDelComputer.revoca(tab._fileConcesso);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
       ChiusuraConCaselle.chiudi(tab.view.webContents);
     }
@@ -1594,13 +1612,15 @@ class TabManager {
   // Riapre una scheda chiusa com'era: indirizzo, scroll, zoom e paese; dalla pila anche posto e cronologia.
   // Una porta sola per la scorciatoia, la barra dei menu e la ricerca del filo (REOPEN_ARCHIVED_TAB).
   // `activate: false` per chi ne riporta più d'una insieme (il «Riapri» della pulizia).
-  async riapri(voce, { activate = true } = {}) {
+  // `fileDelComputer`: la voce viene dalla pila o dall'archivio, dove un file c'è solo se l'utente l'aveva aperto.
+  async riapri(voce, { activate = true, fileDelComputer = false } = {}) {
     const url = voce && typeof voce.url === 'string' ? voce.url : '';
     if (!url) return null;
     const prima = new Set(this.tabs.map((t) => t.id));
     // Per il giudizio sui siti la riapertura è di Filo (#814).
     const id = this.openTab(url, {
       activate,
+      fileDelComputer,
       restoreScrollPct: typeof voce.scroll === 'number' ? voce.scroll : null,
       restoreZoomLevel: typeof voce.zoom === 'number' && voce.zoom ? voce.zoom : null,
       origine: { tipo: 'filo' },
@@ -1758,7 +1778,7 @@ class TabManager {
     const pila = typeof e.id === 'string' && !this.incognito ? this._pilaChiuse() : null;
     if (pila) pila.segnaRiaperta(e.id);
     let id = null;
-    try { id = await this.riapri(SchedeChiuse.daArchivio(e), opts); } catch (_) {}
+    try { id = await this.riapri(SchedeChiuse.daArchivio(e), { ...opts, fileDelComputer: true }); } catch (_) {}
     if (pila && id) this._contaTornata(e);
     else if (pila) pila.annullaRiaperta(e.id);
     return id;
@@ -1768,7 +1788,7 @@ class TabManager {
   // nell'archivio torna riapribile.
   async _riapriDallaPila(v, opts = {}) {
     let id = null;
-    try { id = await this.riapri(v, opts); } catch (_) {}
+    try { id = await this.riapri(v, { ...opts, fileDelComputer: true }); } catch (_) {}
     if (id && v.voceArchivio) this._contaTornata(v.voceArchivio);
     else if (!id && v.archivio) this._pilaChiuse().annullaRiaperta(v.archivio);
     return id;
@@ -2358,6 +2378,7 @@ class TabManager {
       }
       this._archiveClosedTab(tab, reason, { voce, giro: via === 'chat' ? 'chat' : giro });
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+      FileDelComputer.revoca(tab._fileConcesso);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
         // Solo se c'è ancora: chiusa mentre il modello decideva, l'ha già detto chi l'ha chiusa.
@@ -2401,7 +2422,7 @@ class TabManager {
       if (voce && voce.riaperta) continue;
       const presa = voce ? pila.riprendi(voce) : null;
       if (presa && presa.voceArchivio) this._contaTornata(presa.voceArchivio);
-      const nuova = await this.riapri(presa || riserva, { activate: false });
+      const nuova = await this.riapri(presa || riserva, { activate: false, fileDelComputer: true });
       if (!nuova) continue;
       riaperte += 1;
       aperte.add(chiave(riserva.url));
@@ -2579,6 +2600,7 @@ class TabManager {
     this.anteprime.mostrata(tab);
     this.activeId = id;
     if (cambiata && !this._restoring) this._nelFilo('schedaDavanti', tab);
+    if (tab._senzaReteInAttesa) this._senzaRete(tab, tab._senzaReteInAttesa);
     Strade.misura('inVista', this, tab, tab.url, { incognito: this.incognito });
     // §2.1 — una scheda che diventa attiva è "usata adesso". Approssimazione
     // grossolana: il content script la raffina con gli eventi veri.
@@ -3388,9 +3410,17 @@ class TabManager {
     // Un invito chiesto da un riquadro della pagina (un pulsante che lo apre in un iframe nascosto) segue la regola della pagina intera (#664).
     wc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc }));
     wc.on('will-navigate', (event, url) => {
+      // Da un file aperto un collegamento a un altro della sua cartella si segue (#1905).
+      const fraFile = /^file:/i.test(String(wc.getURL() || '')) && FileDelComputer.concessoDaLink(tab._fileConcesso, url);
+      // Una pagina del computer non porta sul web quello che ha letto, nemmeno nell'indirizzo di un salto (#1905).
+      if (!fraFile && FileDelComputer.inSessioneDiFile(wc) && WEB.test(String(url || ''))) {
+        event.preventDefault();
+        this._senzaRete(tab, url);
+        return;
+      }
       // SICUREZZA: niente schemi non-web in cima. mailto/tel/sms non sono
       // pagine e vanno consegnati al sistema invece di fallire.
-      if (isWebUnsafeNav(url) || this._versoFiloDaFuori(tab, url)) {
+      if (!fraFile && (isWebUnsafeNav(url) || this._versoFiloDaFuori(tab, url))) {
         event.preventDefault();
         if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, undefined, { navigazione: true });
         else fermaNavigazione(url, { win: this.win, wc });
@@ -3871,6 +3901,11 @@ class TabManager {
         }).catch(() => {});
         return { action: 'deny' };
       }
+      // Come per i salti: da una pagina del computer niente finestre sul web (#1905).
+      if (FileDelComputer.inSessioneDiFile(wc) && WEB.test(String(url || ''))) {
+        this._senzaRete(tab, url);
+        return { action: 'deny' };
+      }
       // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
@@ -4257,6 +4292,20 @@ class TabManager {
     openExternalScheme(url);
   }
 
+  // Una pagina del computer che cerca il web lo trova chiuso (fileDelComputer.js): lo dice una volta per pagina, sulla
+  // scheda davanti; per una dietro, quando passa davanti.
+  _senzaRete(tab, url) {
+    if (!tab || !this.tabs.includes(tab)) return;
+    let pagina = '';
+    try { pagina = String(tab.view.webContents.getURL() || '').split('#')[0]; } catch (_) {}
+    if (tab._senzaReteDetto === pagina) return;
+    if (this.activeId !== tab.id) { tab._senzaReteInAttesa = url; return; }
+    tab._senzaReteDetto = pagina;
+    tab._senzaReteInAttesa = null;
+    const a = avvisoSenzaRete(url);
+    try { this.win.webContents.send('shell:toast', { text: a.testo, opts: { unica: `${a.chiave}:${tab.id}`, tipo: 'indirizzo_fermato' } }); } catch (_) {}
+  }
+
   // Il collegamento file: che Chromium ha rifiutato a una pagina (page-preload.js): vale solo dopo un input vero, che
   // la pagina non può fingere.
   indirizzoRifiutatoDallaPagina(wc, url) {
@@ -4366,6 +4415,7 @@ class TabManager {
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+    FileDelComputer.revoca(tab._fileConcesso);
     this.tabs.splice(idx, 1);
     if (this.activeId === tab.id) {
       const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
@@ -4402,7 +4452,7 @@ class TabManager {
   apriDaCollegamento(url, { sfondo = false, daScheda = null, gesto = false, fromUrl = '', azioneMisurata = null } = {}) {
     if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
-    const origine = /^https?:/i.test(String(fromUrl || '')) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
+    const origine = paginaNonDiFilo(fromUrl) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
     // Un collegamento da una pagina di Filo a un'altra, in una scheda nuova (#1468).
     if (/^filo:/i.test(String(url || '')) && daScheda && /^filo:/i.test(String(daScheda.url || ''))) {
       Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
@@ -4946,7 +4996,8 @@ class TabManager {
       const perIndice = urls.map((url, i) => {
         // Una scheda su un sito della lista torna sulla pagina «Sito bloccato»:
         // non sparisce dalla sessione e il sito non si riapre da solo (#590).
-        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i] });
+        // Un file del computer nella sessione salvata l'aveva aperto l'utente: torna com'era.
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i], fileDelComputer: true });
         const nata = id ? this.tabs.find((t) => t.id === id) : null;
         if (!nata) return null;
         Strade.misura('pagina', url, 'sessione_ripristinata', { incognito: this.incognito });

@@ -312,6 +312,15 @@ function registerIpcHandlers() {
       if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
     } catch (_) {}
   });
+  // Lo dice solo per una pagina che sta davvero nella sessione di un file: un sito qualunque non lo fa comparire.
+  ipcMain.on('filo:senza-rete', (event, url) => {
+    try {
+      const wc = event.sender;
+      if (!require('./services/fileDelComputer').inSessioneDiFile(wc)) return;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      if (win) win._filoTabs._senzaRete(win._filoTabs.tabs.find((t) => t.view.webContents === wc), String(url || ''));
+    } catch (_) {}
+  });
   // #1623 — le immagini lasciate sulla fila delle schede: solo dalla barra di una finestra, mai da una pagina.
   ipcMain.on('shell:rilascio-nella-chat', (event, voci) => {
     const win = finestraDellaBarra(event.sender);

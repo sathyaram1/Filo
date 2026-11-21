@@ -10,6 +10,9 @@
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
       version: '0.2.297', date: '2026-11-21',
+      features: [
+        { testo: 'Incolla in chat il percorso di un file del computer, una pagina HTML, un PDF o un\'immagine, e Filo lo apre in una scheda così com\'è. La pagina non legge i file fuori dalla sua cartella e non si collega a internet.', segnalazione: 1905 },
+      ],
       fixes: [
         { testo: 'Il correttore non manda ai modelli la password che scrivi sotto chi te la chiede in due parole, come «sono arrivato, password del wifi», anche quando è fatta di sole lettere.', segnalazione: 2638 },
         { testo: 'Nelle Preferenze e nelle altre pagine di Filo, se dai il tasto destro mentre la pagina si sta ancora aprendo e poi clicchi altrove o premi Esc, il menu non ti compare più un attimo dopo.', segnalazione: 2444 },

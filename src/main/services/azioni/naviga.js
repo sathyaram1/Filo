@@ -2,7 +2,7 @@
 // Nata da handlers.js: esporta la tabella tipo -> funzione che eseguiAzioneFilo consulta dopo il preambolo.
 
 const PageRead = require('../pageRead');
-const { daFilo, origineDi } = require('../handlers/origine');
+const { daFilo, origineDi, paginaNonDiFilo } = require('../handlers/origine');
 const SempreAperte = require('../sempreAperte');
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const { winOf, targetWebTab, nomeDellaScheda } = require('../handlersComuni');
@@ -22,9 +22,15 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
   // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
   // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
   // cliccabile per riaprirlo (kept:true).
-  const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+  let url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
   if (!url) return { executed: false, kept: false };
-  // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
+  // Un file del computer passa solo col giudizio scritto prima del gate (handlers.js, #1905): lì si apre com'è sul disco.
+  const file = globalThis.SN_URL_NAV.fileDiQuestoComputer(url);
+  if (file) {
+    if (typeof action._fileDelComputer !== 'string' || !action._fileDelComputer) return { executed: false, kept: true, output: { blocked: 'file', motivo: 'non_giudicato' } };
+    url = require('../fileDelComputer').indirizzoDi(action._fileDelComputer);
+  }
+  // SICUREZZA: oltre al file giudicato qui sopra, l'agente non apre schemi non-web. Una pagina ostile può
   // iniettare istruzioni nel modello (prompt injection) per fargli aprire
   // un file://attacker (leak hash NTLM su Windows) o data:/javascript:.
   // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui. Un URL
@@ -34,7 +40,7 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
   const caricato = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : (globalThis.SN_URL_NAV?.normalizeUrl?.(url) || url);
   try {
     const proto = new URL(caricato).protocol.toLowerCase();
-    if (!['http:', 'https:', 'filo:'].includes(proto)) {
+    if (!file && !['http:', 'https:', 'filo:'].includes(proto)) {
       return { executed: false, kept: true, output: { blocked: 'scheme' } };
     }
   } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
@@ -55,9 +61,9 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
       const chiesto = !!String(parole || '').trim() || require('../permessiPagine').gestoDellUtente(sender && sender.wc);
       let daPagina = '';
       try { daPagina = assistente && sender && sender.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
-      const origine = /^https?:/i.test(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
+      const origine = paginaNonDiFilo(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
       contaPaginaDallaChat(url, win);
-      tabId = tm.openTab(url, { activate: !background, origine });
+      tabId = tm.openTab(url, { activate: !background, origine, fileDelComputer: !!file });
       // Gli schemi non web sono esclusi qui sopra: una scheda che non
       // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
       // L'assistente sulla pagina può poi chiedere «Apri comunque» solo per quello che gli è stato fermato.

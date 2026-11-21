@@ -1733,6 +1733,11 @@
       // SEMPRE avere un'etichetta leggibile: il favicon da solo, senza testo, era
       // il bottone "misterioso" del feedback. Mostriamo favicon + nome del sito.
       let label = String(a.label || a.etichetta || '').trim();
+      // Un file del computer (#1905) si chiama col suo nome; il link nudo lo rifiuterebbe Chromium, lo riapre il main.
+      const file = window.SN_URL_NAV && window.SN_URL_NAV.fileDiQuestoComputer ? window.SN_URL_NAV.fileDiQuestoComputer(a.url) : '';
+      if (!label && file) {
+        try { label = decodeURIComponent(new URL(file).pathname.split('/').pop()); } catch (_) { label = 'file'; }
+      }
       if (!label) {
         try { label = new URL(a.url).hostname.replace(/^www\./, ''); } catch (_) { label = a.url || 'Apri'; }
       }
@@ -1756,6 +1761,15 @@
         btn.target = '_blank';
         btn.rel = 'noopener';
         btn.title = `Riapri ${label}`;
+        if (file) {
+          const riapri = (e) => {
+            if (e.type === 'auxclick' && e.button !== 1) return;
+            e.preventDefault();
+            send({ type: MSG.OPEN_URL, url: file }).catch(() => {});
+          };
+          btn.addEventListener('click', riapri);
+          btn.addEventListener('auxclick', riapri);
+        }
       }
       btn.className = 'dash-action-btn dash-action-link-chip';
       if (a._callId) btn.dataset.callId = String(a._callId);

@@ -1,7 +1,7 @@
 // Handler di dominio: navigazione, apertura/chiusura tab, fullscreen e comandi shell.
 
 const { app } = require('electron');
-const { soloFilo, filoNegatoAllaPagina } = require('./origine');
+const { soloFilo, filoNegatoAllaPagina, paginaNonDiFilo, daPaginaNonDiFilo } = require('./origine');
 const { azione: contata } = require('../azioniContate');
 const Strade = require('../contatoriStrade');
 
@@ -111,8 +111,20 @@ module.exports = function register(on, ctx) {
       return { ok: true, ...r };
     }
     if (filoNegatoAllaPagina(url, sender, origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    const daPagina = /^https?:/i.test(String(sender?.url || ''));
+    const daPagina = daPaginaNonDiFilo(sender);
     const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
+    // Un file del computer da una pagina di Filo (il collegamento in chat, il filo della home) lo apre il clic dell'utente (#1905).
+    if (isFilo(origin) && gesto && globalThis.SN_URL_NAV.fileDiQuestoComputer(url)) {
+      const FileDelComputer = require('../fileDelComputer');
+      const g = await FileDelComputer.giudica(url);
+      if (!g.ok) {
+        const a = require('../indirizzoFermato').avvisoFileNonAperto(g);
+        try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave, tipo: 'indirizzo_fermato' } }); } catch (_) {}
+        return { ok: false, motivo: g.motivo };
+      }
+      const id = win._filoTabs.openTab(g.url, { fileDelComputer: true, origine: { tipo: 'filo', gesto: true } });
+      return { ok: !!id };
+    }
     if (/^filo:/i.test(url) && isFilo(origin)) contaPagina(url, msg.via, win);
     win._filoTabs.openTab(url, daPagina ? { origine: { tipo: 'link', da: sender.url, gesto } } : {});
     return { ok: true };
@@ -135,7 +147,7 @@ module.exports = function register(on, ctx) {
     let da = '';
     try { da = String(sender.wc.getURL() || ''); } catch (_) {}
     const gesto = require('../permessiPagine').gestoDellUtente(sender && sender.wc);
-    win._filoTabs.openTab(url, { origine: /^https?:/i.test(da) ? { tipo: 'link', da, gesto } : { tipo: 'filo', gesto } });
+    win._filoTabs.openTab(url, { origine: paginaNonDiFilo(da) ? { tipo: 'link', da, gesto } : { tipo: 'filo', gesto } });
     return { ok: true };
   });
 

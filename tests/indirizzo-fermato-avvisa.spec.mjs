@@ -158,7 +158,8 @@ for (const [percorso, testo] of [
     await expect.poll(() => { home = app.windows().find((w) => w.url().startsWith('filo://newtab')); return Boolean(home); }).toBe(true);
     await home.waitForFunction(() => typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
     const r = await home.evaluate((u) => chrome.runtime.sendMessage({ type: 'filo_run_action', action: { type: 'NAVIGA', url: u } }), percorso);
-    expect(r && r.output && r.output.blocked, 'l\'assistente non sa che il file è stato fermato').toBe('scheme');
+    // Un file di questo computer che non c'è lo dice come file (#1905); una cartella di rete resta un indirizzo fermato.
+    expect(r && r.output && r.output.blocked, 'l\'assistente non sa che il file è stato fermato').toBe(percorso.startsWith('\\\\') ? 'scheme' : 'file');
 
     const prima = await schede(app);
     await shell.evaluate((u) => window.filoShell.tabs.open(u), percorso);

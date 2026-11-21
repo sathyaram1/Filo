@@ -6,7 +6,7 @@ const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
 const { fillMovedSlots } = require('./resolveSupportModel');
 const { azioneAmmessaDa } = require('./impostazioniPerOrigine');
-const { origineDi } = require('./handlers/origine');
+const { origineDi, daPaginaNonDiFilo } = require('./handlers/origine');
 const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
 const Compattazione = require('./compattazioneFilo');
@@ -120,7 +120,7 @@ async function eseguiAzioneFilo(action, {
         || setter.scrive.includes('blocklist') || setter.scrive.includes('security.safeBrowse.trustedSites')
         || setter.scrive.includes('security.cookies.bannerSites'))) {
         // Dall'Aiuto di un sito «questo sito» è lui, e le altre schede non si nominano (#843).
-        const daSito = /^https?:/i.test(sender?.tab?.url || sender?.url || '');
+        const daSito = daPaginaNonDiFilo(sender);
         const { tm, tab } = daSito ? { tm: null, tab: { url: sender?.tab?.url || sender?.url } } : targetWebTab(sender);
         const schede = tm ? tm.tabs.filter((t) => !t.isInternal).map((t) => ({ url: t.url, title: t.title })) : [];
         const r = globalThis.SN_PAGINE_DELICATE.risolviSchede(
@@ -210,6 +210,23 @@ async function eseguiAzioneFilo(action, {
     if (esito) return esito;
   }
 
+  // Un file del computer (#1905): si sa prima del gate se si apre, e col percorso non scritto dall'utente chiede il
+  // suo OK. `_fileDelComputer` e `_fileNonScritto` li scrive solo questo punto, mai l'LLM.
+  if (type === 'NAVIGA') {
+    delete action._fileDelComputer;
+    delete action._fileNonScritto;
+    const indirizzo = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+    if (globalThis.SN_URL_NAV.fileDiQuestoComputer(indirizzo)) {
+      const FileDelComputer = require('./fileDelComputer');
+      const g = await FileDelComputer.giudica(indirizzo);
+      // L'assistente sopra una pagina vive nel DOM del sito, che può scrivergli le parole e premergli i bottoni.
+      if (assistente) return { executed: false, kept: true, output: { blocked: 'file', motivo: 'assistente', percorso: g.percorso } };
+      if (!g.ok) return { executed: false, kept: true, output: { blocked: 'file', motivo: g.motivo, percorso: g.percorso } };
+      action._fileDelComputer = g.percorso;
+      if (!FileDelComputer.scrittoDallUtente(g.percorso, parole)) action._fileNonScritto = true;
+    }
+  }
+
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
@@ -251,7 +268,7 @@ async function eseguiAzioneFilo(action, {
   }
 
   // Le righe della memoria non arrivano a una pagina visitata: né nel popup che le mostra né lette dal modello.
-  if ((type === 'DIMENTICA' || type === 'CORREGGI_MEMORIA' || type === 'LEGGI_MEMORIA') && /^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+  if ((type === 'DIMENTICA' || type === 'CORREGGI_MEMORIA' || type === 'LEGGI_MEMORIA') && daPaginaNonDiFilo(sender)) {
     return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
   }
 
@@ -273,7 +290,7 @@ async function eseguiAzioneFilo(action, {
 
   // #1295 — la conversazione la trova il main (l'id detto, o quella di adesso), prima del gate: il popup dice quale.
   if (type === 'TOGLI_CHAT' || type === 'RIMETTI_CHAT') {
-    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+    if (daPaginaNonDiFilo(sender)) {
       return { executed: false, kept: false, rejected: true, error: 'le conversazioni si toccano solo dalle pagine di Filo' };
     }
     const detto = String(action.id ?? action.chatId ?? '').trim();

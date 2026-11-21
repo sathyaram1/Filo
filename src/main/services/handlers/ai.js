@@ -14,6 +14,7 @@ module.exports = function register(on, ctx) {
   require('../fontiSegnaposto');
   const ContatoriSicurezza = require('../contatoriSicurezza');
   const ContatoriServizio = require('../contatoriServizio');
+  const { daPaginaNonDiFilo } = require('./origine');
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = ContatoriSicurezza.contaUscite(portaUscite);
 
@@ -376,7 +377,7 @@ module.exports = function register(on, ctx) {
     }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
-    const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
+    const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && daPaginaNonDiFilo(sender)
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
     // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).

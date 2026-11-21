@@ -4,7 +4,7 @@
 const PageRead = require('./pageRead');
 const { riquadroArrivato } = require('./riquadroArrivato');
 const { spingiAllaScheda } = require('./impostazioniPerOrigine');
-const { daFilo, origineDi } = require('./handlers/origine');
+const { daFilo, origineDi, paginaNonDiFilo, daPaginaNonDiFilo } = require('./handlers/origine');
 const SegretiLetti = require('./segretiLetti');
 const VerdettiUscite = require('./verdettiUscite');
 const ContatoriSicurezza = require('./contatoriSicurezza');
@@ -262,7 +262,7 @@ campi(document);ombre(document,0);return out.join('\\n');}catch(e){return '';}})
 async function testoDellaPagina(sender) {
   const url = String(sender?.tab?.url || sender?.url || '');
   const wc = sender?.wc;
-  if (!/^https?:/i.test(url) || !wc || wc.isDestroyed?.()) return null;
+  if (!daPaginaNonDiFilo(sender) || !wc || wc.isDestroyed?.()) return null;
   let host = '';
   try { host = new URL(url).hostname; } catch (_) {}
   const leggi = (avvia) => {
@@ -364,8 +364,7 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
-  const origine = sender?.tab?.url || sender?.url || '';
-  const daPagina = /^https?:/i.test(origine);
+  const daPagina = daPaginaNonDiFilo(sender);
   const indirizzo = (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
   const delComando = tipo === 'ESEGUI_COMANDO' ? Exfil.indirizziDelComando(action) : [];
   let memoria = '';
@@ -584,7 +583,7 @@ function paginaDi(wc) {
 // Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente in un collegamento di Filo chiede l'OK come per
 // NAVIGA. La stessa domanda la fa l'anteprima prima del clic (contattabilePrimaDelClic).
 async function exfilChiedeOk(indirizzo, u, { wc = null, pagina = '' } = {}) {
-  if (!u || !u.exfil || !/^https?:/i.test(pagina) || !/^https?:/i.test(indirizzo)) return false;
+  if (!u || !u.exfil || !paginaNonDiFilo(pagina) || !/^https?:/i.test(indirizzo)) return false;
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
@@ -602,7 +601,7 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
   }
-  const daSito = /^https?:/i.test(pagina);
+  const daSito = paginaNonDiFilo(pagina);
   const k = VerdettiUscite.chiave(indirizzo);
   const v = /^https?:/i.test(indirizzo) ? VerdettiUscite.alClic(indirizzo, { chiedi, proposta }) : { daChiedere: false, motivo: '' };
   const motivo = v.motivo;

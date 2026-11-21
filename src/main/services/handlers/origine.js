@@ -19,6 +19,21 @@ function origineDi(sender) {
   return sender && sender.interna === false && /^filo:/i.test(u) ? '' : u;
 }
 
+// Un indirizzo di pagina che non è di Filo: un sito, un file del computer (#1905), una pagina vuota. Vuoto è una
+// chiamata interna. PURA.
+function paginaNonDiFilo(url) {
+  const u = String(url || '');
+  return !!u && !/^filo:/i.test(u);
+}
+
+// La richiesta viene da una pagina che non è di Filo. I cancelli che tengono i siti fuori da memoria, conversazioni,
+// fonti pulite e uscite chiedono a questo, mai allo schema http: un file:// li scavalcava (#1905). PURA.
+function daPaginaNonDiFilo(sender) {
+  if (!sender || sender.isShell) return false;
+  if (sender.interna === false) return true;
+  return paginaNonDiFilo((sender.tab && sender.tab.url) || sender.url);
+}
+
 /** La richiesta arriva da una superficie di Filo? PURA. */
 function daFilo(origin, sender) {
   if (sender && sender.interna === false) return false;
@@ -40,4 +55,4 @@ function soloFilo(handler) {
   };
 }
 
-module.exports = { daFilo, soloFilo, vistaInterna, origineDi, filoNegatoAllaPagina };
+module.exports = { daFilo, soloFilo, vistaInterna, origineDi, filoNegatoAllaPagina, paginaNonDiFilo, daPaginaNonDiFilo };

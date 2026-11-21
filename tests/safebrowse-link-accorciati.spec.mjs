@@ -4,6 +4,10 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { paginaDellaScheda } from './helpers/schede.mjs';
 
 const CORTO = 'bit.ly';
 const TRUFFA = 'conto-truffa966.com';
@@ -260,6 +264,35 @@ test('l\'interruttore in Sicurezza si vede, e spento la finestra nascosta non pa
     await sicurezza.bringToFront();
     await casella.check();
     await expect.poll(() => app.evaluate(() => globalThis.SN_SAFEBROWSE.activeProviders().destinazione)).toBe(true);
+  } finally {
+    await app.evaluate(() => clearInterval(globalThis.__campiona966)).catch(() => {});
+    await t.after();
+  }
+});
+
+// #1905 — una pagina del computer non ha rete: nemmeno la finestra nascosta prova il link che la pagina ha scritto.
+test('fermo su un link accorciato di una pagina del computer: nessuna finestra nascosta va in rete', async ({ app }) => {
+  const t = {};
+  const s = await siti(t);
+  try {
+    await listaNeraLenta(app);
+    const dir = cartellaTemporanea('accorciato-');
+    const file = join(dir, 'pagina.html');
+    writeFileSync(file, `<!doctype html><title>Locale966</title><a id="corto" style="display:block;width:320px;height:60px;background:#eee" href="http://${CORTO}:${s.porta}/x7k?dati=SEGRETI">link corto</a>`);
+    const r = await app.evaluate((_e, { file }) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` }), { file });
+    expect(r.executed).toBe(true);
+    let id = null;
+    await expect.poll(async () => (id = await app.evaluate(({ BrowserWindow }) => (BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs
+      .find((x) => /pagina\.html$/.test(x.url || '')) || {}).id || null)), { timeout: 10_000 }).toBeTruthy();
+    await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+    const page = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+    await expect(page).toHaveTitle('Locale966');
+    await page.hover('#corto');
+    await page.mouse.move(20, 20);
+    await page.hover('#corto');
+    await page.waitForTimeout(2500);
+    expect(s.quante(`${CORTO}/`)).toBe(0);
+    expect(await app.evaluate(() => globalThis.SN_SAFEBROWSE.sandbox.stats().live)).toBe(0);
   } finally {
     await app.evaluate(() => clearInterval(globalThis.__campiona966)).catch(() => {});
     await t.after();

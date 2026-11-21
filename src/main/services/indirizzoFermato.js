@@ -43,4 +43,27 @@ function avvisoIndirizzoFermato(rawUrl) {
   return { testo, chiave: `indirizzo-fermato:${testo}` };
 }
 
-module.exports = { avvisoIndirizzoFermato };
+// Un file del computer chiesto dall'utente che non si apre in una scheda per un motivo suo, non di sicurezza (#1905).
+function avvisoFileNonAperto({ motivo, percorso } = {}) {
+  const p = accorciato(percorso);
+  const testo = motivo === 'assente' ? `File non trovato: ${p}`
+    : motivo === 'cartella' ? `È una cartella, non un file: ${p}`
+      : motivo === 'tipo' ? `Questo tipo di file non si mostra in una scheda: ${p}`
+        : null;
+  if (!testo) {
+    const url = /^file:/i.test(String(percorso || '')) ? percorso : (globalThis.SN_URL_NAV?.normalizeUrl?.(percorso) || '');
+    return avvisoIndirizzoFermato(url) || { testo: 'File del computer bloccato per sicurezza', chiave: 'indirizzo-fermato:file' };
+  }
+  return { testo, chiave: `indirizzo-fermato:${testo}` };
+}
+
+// Una pagina aperta dal computer che chiede il web: non c'è niente da riaprire con la rete, solo da sapere (#1905).
+function avvisoSenzaRete(rawUrl) {
+  let host = '';
+  try { host = new URL(String(rawUrl || '').trim()).hostname; } catch (_) {}
+  const testo = host ? `Le pagine aperte dal computer si mostrano senza rete: ${accorciato(host)} resta fuori`
+    : 'Le pagine aperte dal computer si mostrano senza rete';
+  return { testo, chiave: 'senza-rete' };
+}
+
+module.exports = { avvisoIndirizzoFermato, avvisoFileNonAperto, avvisoSenzaRete };
