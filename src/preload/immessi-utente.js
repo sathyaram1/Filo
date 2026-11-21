@@ -166,7 +166,29 @@ function ascoltaIn(w, invia) {
   let numero = 0;
   let timer = null;
   // Tutto quello che l'utente immette nel documento, in fila: un numero diviso in più caselle ci sta intero.
-  const fila = { testo: '', detto: '', inViaggio: 0 };
+  const fila = { testo: '', detto: '', inViaggio: 0, conti: new Map(), quanti: 0 };
+  // I valori dei campi quando l'utente ha cominciato a scrivere nel documento: quello che c'era già è del sito.
+  const prima = new WeakMap();
+  const toccati = new WeakSet();
+  const caselle = { detto: '', inViaggio: 0 };
+
+  function fotoDiPrima() {
+    try { for (const el of w.document.querySelectorAll('input, textarea')) if (!prima.has(el)) prima.set(el, String(el.value || '')); } catch (_) {}
+  }
+
+  function diCaselle() {
+    let campi = [];
+    try { campi = w.document.querySelectorAll('input, textarea'); } catch (_) { return; }
+    const testo = caselleDellUtente(campi, fila.conti, {
+      toccato: (el) => toccati.has(el),
+      prima: (el) => (prima.has(el) ? prima.get(el) : ''),
+    }).join('\u0001');
+    if (testo !== caselle.detto) {
+      caselle.detto = testo;
+      if (testo) { try { invia(`${documento}.c`, testo, caselle.inViaggio || Date.now()); } catch (_) {} }
+    }
+    caselle.inViaggio = 0;
+  }
 
   function di() {
     timer = null;
