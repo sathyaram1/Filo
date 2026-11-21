@@ -258,7 +258,10 @@ function ascoltaIn(w, invia) {
       if (!cw || cw.SN_IMMESSI || !cw.document) return;
       const prima = seguiti.get(cw);
       if (prima && prima.vivo()) return;
-      seguiti.set(cw, ascoltaIn(cw, invia));
+      const nuovo = ascoltaIn(cw, invia);
+      seguiti.set(cw, nuovo);
+      if (prima) figli.delete(prima);
+      figli.add(nuovo);
     } catch (_) { /* d'altra origine: il suo preload c'è */ }
   }
   w.addEventListener('load', (e) => segui(e.target), true);
