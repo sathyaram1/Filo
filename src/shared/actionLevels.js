@@ -854,7 +854,7 @@
       // La scheda già aperta si legge senza uscire: resta in chat. `_nonCompare` ed `_exfil` li scrive il main, mai l'LLM.
       costo: (a) => costoIndirizzo(a, indirizzoDi(a) ? 1 : 0),
       campo: 'web',
-      uscita: (a) => indirizzoDi(a),
+      uscita: indirizzoCheEsce,
       // Chi scrive la pagina è un autore ignoto, anche quando la pagina è una scheda dell'utente.
       fonte: (a, out) => (out && (out.testo || out.text)
         ? { classe: 5, campo: 'web', chiave: 'web:pagina', motivo: out.fonte === 'scheda' ? 'ho letto una pagina aperta in una tua scheda' : 'ho letto una pagina web' }
