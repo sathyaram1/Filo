@@ -230,7 +230,6 @@ function ascoltaIn(w, invia) {
     return t;
   }
   function contati(t, dati) {
-    if (!fila.quanti) fotoDiPrima();
     for (const ch of dati) {
       if (!conta.test(ch)) continue;
       const k = contaDi(ch);
