@@ -46,7 +46,9 @@ test('esplora 3', async ({ app, avvisi }) => {
   log('move', await corsa(p.mouse.move(box.x + 5, box.y + 5), 10000));
   log('ping main dopo', await corsa(app.evaluate(() => 1), 5000));
   log('ping pagina dopo', await corsa(p.evaluate(() => 1), 5000));
+  log('attesa', Date.now());
   await new Promise((r) => setTimeout(r, 3000));
+  log('attesa fine', Date.now());
   log('dopo sosta', arrivi);
   await p.locator('#web').click({ button: 'right', noWaitAfter: true });
   await expect(menuDi(p).locator('.sn-menu')).toBeVisible({ timeout: 8000 });
