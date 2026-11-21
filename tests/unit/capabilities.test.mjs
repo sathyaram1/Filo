@@ -613,3 +613,15 @@ test('il manifesto non promette di non cancellare mai per sempre: dice che vuole
   const conLaParola = testi.filter((t) => /cancellare per sempre[^.]*"conferma"/.test(t));
   assert.ok(conLaParola.length >= 2, 'le voci dell’assistente e dei livelli dicono che cancellare per sempre vuole «conferma»');
 });
+
+// #1909.3: i file per richiesta che si cancellano e si rinominano hanno un numero solo, quello che usa il main; il
+// manifesto dice lo stesso numero.
+test('il manifesto dice quanti file per richiesta si cancellano e si rinominano col numero che usa il main', () => {
+  const L = globalThis.SN_ACTION_LEVELS;
+  assert.ok(Number.isInteger(L.LOTTO_ELIMINA) && Number.isInteger(L.LOTTO_RINOMINA));
+  assert.match(CAP.get('delete-files').doesNot, new RegExp(`ne sposta al massimo ${L.LOTTO_ELIMINA},`));
+  assert.match(CAP.get('file-names').doesNot, new RegExp(`rinomina al massimo ${L.LOTTO_RINOMINA} file`));
+  const porte = readFileSync(join(ROOT, 'src', 'main', 'services', 'porteUscita.js'), 'utf8');
+  assert.doesNotMatch(porte, /LOTTO_(ELIMINA|RINOMINA)\s*=\s*\d/, 'il main non tiene un numero suo');
+  assert.match(porte, /const \{ LOTTO_ELIMINA, LOTTO_RINOMINA \} = globalThis\.SN_ACTION_LEVELS/);
+});

@@ -1438,6 +1438,27 @@ test('cancellaPerSempre: rsync con --delete e rclone sync chiedono la parola com
   }
 });
 
+// #1909.3: chi lancia il comando con opzioni che hanno un valore, o un lanciatore che nessun elenco conosce.
+test('cancellaPerSempre: il comando che cancella si trova dopo opzioni con un valore e dopo lanciatori non in elenco', () => {
+  const f = '/home/u/a.txt';
+  for (const cmd of [
+    `pwsh -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item '${f}'"`, `powershell.exe -ExecutionPolicy Bypass -c "del '${f}'"`,
+    `powershell -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File x.ps1 ; Remove-Item x`,
+    `pwsh -ExecutionPolicy Bypass -NoLogo -NonInteractive -Command Remove-Item -Recurse d`,
+    `timeout 5 rm "${f}"`, `busybox rm "${f}"`, `timeout -s KILL 10 busybox rm -rf d`, `stdbuf -oL rm x`,
+    `perl -e 'unlink "${f}"'`, `perl -e 'unlink"${f}"'`, `perl -MFile::Path -e 'File::Path::rmtree "d"'`,
+    `ruby -e 'File.delete "${f}"'`, `ruby -rfileutils -e 'FileUtils.rm_rf "d"'`, 'sudo -u root -g wheel rm x',
+    'chroot /mnt /bin/rm x', 'nice -n 10 ionice -c 3 rm -rf d', 'su -c "rm x" root', 'wsl -d Ubuntu rm x',
+    'pwsh -EncodedCommand UgBlAG0AbwB2AGUA', 'powershell -enc UgBlAG0AbwB2AGUA', 'C:\\tools\\echo.exe rm x',
+  ]) assert.equal(C.cancellaPerSempre(cmd), true, cmd);
+  // Dopo un programma che non lancia niente, le parole restano dati.
+  for (const cmd of ['echo unlink this', 'grep -r "File.delete" src', 'git log --grep=unlink', 'Write-Output rm',
+    'cat notes.rm', 'pwsh -ExecutionPolicy Bypass -File build.ps1', 'timeout 5 ls', 'busybox ls', 'perl -e "print 1"',
+    'git commit -m "timeout rm"', 'pwsh -Command Get-ChildItem']) {
+    assert.equal(C.cancellaPerSempre(cmd), false, cmd);
+  }
+});
+
 // Un elenco solo dei programmi che cancellano: chi chiede la parola è anche al costo più alto.
 test('cancellaPerSempre: ogni programma che cancella senza cestino è anche livello 3', () => {
   for (const cmd of ['rm x', 'srm x', 'wipe x', 'rimraf x', 'Remove-Item x', 'ri x', 'Clear-RecycleBin', 'shred x', 'deltree x']) {

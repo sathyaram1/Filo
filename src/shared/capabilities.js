@@ -503,13 +503,13 @@
       id: 'file-names', title: 'Nome sensato ai tuoi file', category: 'assistant',
       desc: 'Filo legge l’inizio di un file (PDF, anche scansionato a colori o in bianco e nero, immagini, documenti Word e LibreOffice, testo) e propone un nome che dice cosa contiene, nella lingua del computer: «Bolletta luce marzo 2026.pdf» al posto di «scan_00231.pdf». Il nome arriva già scritto in una casella che puoi correggere; «Rinomina» lo applica e «Annulla» rimette quello di prima. In chat puoi chiederlo per più file insieme («rinomina i file in Download con nomi che abbiano senso»): Filo ti mostra l’elenco vecchio → nuovo, rinomina solo dopo il tuo OK, e sotto lascia «Annulla» per rimettere tutto com’era. Di una cartella prende i file col nome che non dice niente (scan_…, IMG_…, documento (3)); se vuoi anche gli altri, diglielo. Un file trascinato nel campo dove scrivi a Filo entra nel messaggio col suo percorso, e dal suo tasto destro gli dai un nome prima di mandarlo. In Preferenze puoi far dare da solo un nome sensato ai file che scarichi.',
       invoke: 'Tasto destro su un file → «Dai un nome sensato»: nei Download (pagina o pannello delle domande sui programmi), sui file che Filo ti trova in chat, su un file trascinato nel campo dove scrivi a Filo; dallo stesso tasto destro, dopo, «Rimetti il nome di prima». Oppure chiedilo a parole all’assistente (nuova scheda). Il nome automatico degli scaricamenti si accende in Preferenze → «Nomi dei file scaricati» (spento di serie), o chiedendolo a Filo.',
-      doesNot: 'Non cambia mai l’estensione e non sovrascrive mai un file: se il nome è già preso aggiunge un numero. Non legge archivi, programmi, audio e video: la voce lì non compare. Di un file oltre i 256 MB il nome lo scrivi tu. In chat rinomina al massimo 40 file per volta (ti dice quanti ne restano) e non tocca file fuori dalla tua cartella personale. Il nome automatico degli scaricamenti vale solo per i nomi che non dicono niente, non nelle finestre in incognito né per i file nati su una pagina delicata o della rete di casa. Per leggere il file manda a un modello l’inizio del testo o una miniatura.',
+      doesNot: 'Non cambia mai l’estensione e non sovrascrive mai un file: se il nome è già preso aggiunge un numero. Non legge archivi, programmi, audio e video: la voce lì non compare. Di un file oltre i 256 MB il nome lo scrivi tu. In chat rinomina al massimo {tetto:rinomina} file per volta (ti dice quanti ne restano) e non tocca file fuori dalla tua cartella personale. Il nome automatico degli scaricamenti vale solo per i nomi che non dicono niente, non nelle finestre in incognito né per i file nati su una pagina delicata o della rete di casa. Per leggere il file manda a un modello l’inizio del testo o una miniatura.',
     },
     {
       id: 'delete-files', title: 'Cancella file e cartelle nel cestino', category: 'assistant',
       desc: 'Chiedi a Filo di cancellare un file o una cartella del computer («cancella il file della bolletta in Download», «elimina queste foto») e lui lo sposta nel cestino del sistema, da dove lo rimetti al suo posto. Prima ti mostra cosa sta per spostare, col nome vero e la cartella (di una cartella dice quanti elementi contiene), e parte con un clic, a ogni livello di autonomia. Se dici «per sempre» o «definitivamente» lo cancella senza passare dal cestino, dopo che hai scritto «conferma».',
       invoke: 'Chiedilo a parole all’assistente (nuova scheda), anche per più file insieme.',
-      doesNot: 'Non tocca file fuori dalla tua cartella personale, file nascosti o dei programmi, file su un altro computer della rete, né la cartella personale intera: te lo dice e lascia tutto com’è. In una richiesta ne sposta al massimo 200, e ti dice quanti ne restano. Dal cestino i file li rimetti tu, dal cestino del sistema. Per cancellare non usa il terminale: un comando che cancella senza cestino vuole sempre la parola «conferma».',
+      doesNot: 'Non tocca file fuori dalla tua cartella personale, file nascosti o dei programmi, file su un altro computer della rete, né la cartella personale intera: te lo dice e lascia tutto com’è. In una richiesta ne sposta al massimo {tetto:elimina}, e ti dice quanti ne restano. Dal cestino i file li rimetti tu, dal cestino del sistema. Per cancellare non usa il terminale: un comando che cancella senza cestino vuole sempre la parola «conferma».',
     },
     {
       id: 'terminal-mode', title: 'Filo usa il terminale del computer', category: 'assistant',
@@ -906,9 +906,16 @@
       out[k] = c[k]
         .replace(/\{se:([a-z-]+)\}([\s\S]*?)(?:\{altrimenti\}([\s\S]*?))?\{\/se\}/g,
           (_, nome, si, no) => (aperto(aperti, nome) ? si : (no || '')))
-        .replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id));
+        .replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id))
+        .replace(/\{tetto:(elimina|rinomina)\}/g, (_, n) => tetto(n));
     }
     return out;
+  }
+  // Quanti file per richiesta si cancellano o rinominano: il numero lo tiene il registro delle azioni, che usa il main.
+  function tetto(nome) {
+    if (!global.SN_ACTION_LEVELS && typeof require === 'function') require('./actionLevels.js');
+    const L = global.SN_ACTION_LEVELS;
+    return String(L ? L[nome === 'elimina' ? 'LOTTO_ELIMINA' : 'LOTTO_RINOMINA'] : '');
   }
 
   // Indice COMPATTO (id + titolo + categoria), pensato per stare sempre in

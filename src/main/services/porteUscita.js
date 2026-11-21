@@ -708,9 +708,17 @@ function idDelCambio(action) {
   return id || null;
 }
 
+// I file che il modello nomina per cancellarli o rinominarli: una lettura sola, o con due campi le due azioni ne
+// prenderebbero uno diverso (#1909.3).
+function percorsiDellAzione(action) {
+  return [].concat(action.percorsi ?? action.percorso ?? action.path ?? action.file ?? action.files ?? [])
+    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
+    .filter((x) => typeof x === 'string' && x.trim());
+}
+
 // #1909 — cosa finisce nel cestino lo trova il main prima del gate: il popup nomina gli elementi veri, e all'OK si
 // tocca solo quello che ha mostrato. Fuori dal perimetro, su un altro computer o la cartella personale intera: mai.
-const LOTTO_ELIMINA = 200;
+const { LOTTO_ELIMINA, LOTTO_RINOMINA } = globalThis.SN_ACTION_LEVELS;
 // Perché un file resta dov'è, detto all'utente: la stessa frase per chi cancella e chi rinomina.
 function fraseFuori(m) {
   if (/rete/.test(m)) return 'sta su un altro computer della rete';
@@ -753,9 +761,7 @@ async function preparaEliminazione(action, sender) {
   const perimetro = perimetroLettura(sender);
   const cwd = cartellaDelComando(getAssistantCwd(sender));
   const stato = async (p) => { try { return await fsp.lstat(p); } catch (_) { return null; } };
-  const elenco = [].concat(action.percorsi ?? action.percorso ?? action.path ?? action.file ?? action.files ?? [])
-    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
-    .filter((x) => typeof x === 'string' && x.trim());
+  const elenco = percorsiDellAzione(action);
   if (!elenco.length) return { file: [], saltati: [], oltre: 0, errore: 'indica i file o le cartelle da cancellare, coi loro percorsi' };
   let file = [];
   const saltati = [];
@@ -791,9 +797,6 @@ function motivoNonEliminato(e) {
 
 // Ogni stato che l'azione scrive diventa un evento del filo nel salvataggio (registroCambi.js):
 // qui si dichiara solo che li ha chiesti la chat, e si raccolgono per il segno sulla bolla.
-// #950 — quanti file per volta: ognuno costa una lettura e una chiamata al modello, e l'elenco va letto prima
-// dell'OK. Oltre, il popup dice quanti ne restano.
-const LOTTO_RINOMINA = 40;
 async function preparaRinomina(action, sender, avanzamento = null) {
   const NF = globalThis.SN_NOMI_FILE;
   const Nomi = require('./nomiFile');
@@ -814,9 +817,7 @@ async function preparaRinomina(action, sender, avanzamento = null) {
     return '';
   };
   const saltaFuori = (p, m) => ({ nome: nodePath.basename(p) || p, perche: fraseFuori(m) });
-  const elenco = [].concat(action.percorsi ?? action.file ?? action.files ?? action.percorso ?? action.path ?? [])
-    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
-    .filter((x) => typeof x === 'string' && x.trim());
+  const elenco = percorsiDellAzione(action);
   let candidati = [];
   for (const x of elenco) {
     let full = DR.normalizePath(x, cwd);

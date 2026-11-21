@@ -188,57 +188,59 @@
   // Cancellare senza cestino (#1909): un comando che lo fa vuole la parola «conferma» a ogni livello, come ogni «per
   // sempre». Si guarda il programma di ogni pezzo (anche dopo sudo, xargs, `cmd /c`, `find -exec`, `git rebase -x` e negli scriptblock):
   // sbagliare per eccesso costa una parola da scrivere, per difetto il comando resta comunque al costo più alto.
-  // Chi lancia un altro comando, e le parole di shell che lo precedono (`for …; do rm`, `if …; then rm`): dopo di loro si
-  // guarda il comando che segue.
-  const DAVANTI = new Set(['sudo', 'doas', 'nohup', 'time', 'env', 'nice', 'ionice', 'xargs', 'command', 'builtin', 'exec',
-    'start', 'start-process', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call', 'arch',
-    'do', 'then', 'else']);
+  // Dopo un programma che non si sa se lancia altro (sudo, `pwsh -ExecutionPolicy Bypass -Command`, timeout, busybox,
+  // `for …; do`) ogni parola può essere il comando lanciato: le opzioni coi loro valori non si sanno contare (#1909.3).
+  // Gli argomenti sono solo dati dopo un programma che non lancia niente (`echo rm`, `git commit -m "rm"`).
+  // `arch` sta fra le letture ma con un argomento lancia un programma.
+  const INERTI = new Set([...LEVEL1, ...LEVEL2, ...PS_READ, 'git'].filter((p) => p !== 'arch'));
   // Gli script di una riga (python, node, ruby, .NET) che cancellano chiamando una funzione.
   const CANCELLA_IN_UNO_SCRIPT = /(?:\.|::)delete\s*\(|\b(?:os\.(?:remove|unlink|rmdir|removedirs)|shutil\.rmtree|fileutils\.rm(?:_rf|_r|dir)?)\s*\(|(?:\.|\b)(?:unlink|rmsync|unlinksync|rmdirsync|rmtree)\s*\(|\b(?:fs|fsp|promises|fse)\.(?:rm|rmdir|remove)\s*\(/;
   // --delete e le sue varianti (--del, --delete-after, --delete-excluded, --delete-missing-args…).
   const RSYNC_CANCELLA = /^--del(?:ete(?:-[a-z]+)*)?$/;
   const RCLONE_CANCELLA = new Set(['sync', 'bisync', 'delete', 'deletefile', 'purge', 'rmdir', 'rmdirs', 'cleanup']);
+  // Perl e ruby chiamano senza parentesi (`unlink "x"`, `File.delete "x"`): si cercano solo dopo chi lancia altro.
+  const CANCELLA_SENZA_PARENTESI = /(?:\.|::)(?:delete|unlink|rm_rf|rm_r|rm|rmdir|remove_entry(?:_secure)?)\b|\b(?:unlink|rmtree|remove_tree)\b/;
+  // `pwsh -EncodedCommand …` nasconde il comando: non si legge, quindi vale come uno che cancella.
+  const PS_NASCOSTO = /^-e(?:c|n|nc|ncodedcommand|ncodedc\w*)?$/;
   const nomeProgramma = (tok) => String(tok || '').split(/[\\/]/).pop().replace(/\.(exe|cmd|bat|ps1|com)$/, '');
+  // Il comando che parte dalla parola `i` cancella senza cestino?
+  function cancellaDa(tok, i) {
+    const prog = nomeProgramma(tok[i]);
+    if (CANCELLANO.has(prog) || /^mkfs(\.|$)/.test(prog)) return true;
+    if (!/^(find|git|robocopy|rsync|rclone|foreach-object|foreach|%|powershell|pwsh)$/.test(prog)) return false;
+    const resto = tok.slice(i + 1);
+    if (prog === 'find' && resto.includes('-delete')) return true;
+    if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
+    if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
+    // Gli allineamenti di cartelle del Mac e di Linux, come robocopy /MIR: tolgono dalla destinazione quello che
+    // manca nella sorgente (#1909.5). rclone si guarda su ogni parola: un'opzione col valore sposta il sotto-comando.
+    if (prog === 'rsync' && resto.some((x) => RSYNC_CANCELLA.test(x))) return true;
+    if (prog === 'rclone' && resto.some((x) => RCLONE_CANCELLA.has(x))) return true;
+    // `gci | ForEach-Object Delete`, `% Delete`: il metodo che cancella chiamato per nome.
+    if (/^(foreach-object|foreach|%)$/.test(prog) && resto.filter((x) => !x.startsWith('-'))[0] === 'delete') return true;
+    return (prog === 'powershell' || prog === 'pwsh') && resto.some((x) => PS_NASCOSTO.test(x));
+  }
   function cancellaPerSempre(cmd) {
     if (typeof cmd !== 'string' || !cmd.trim()) return false;
     const t = cmd.replace(/[‘-‟'"`^]/g, '').toLowerCase();
     if (CANCELLA_IN_UNO_SCRIPT.test(t)) return true;
     for (const pezzo of t.split(/[;&|(){}\r\n]|\s-(?:exec|execdir|ok|okdir)\s/)) {
       // `$x = Remove-Item …`: l'assegnazione davanti non cambia il comando.
-      const tok = pezzo.replace(/^\s*(?:\[[\w.]+\]\s*)?\$[\w:]+\s*=\s*/, '').trim().split(/\s+/).filter(Boolean);
-      let i = 0;
-      while (i < tok.length) {
-        const prog = nomeProgramma(tok[i]);
-        const resto = tok.slice(i + 1);
-        if (CANCELLANO.has(prog) || /^mkfs(\.|$)/.test(prog)) return true;
-        if (prog === 'find' && resto.includes('-delete')) return true;
-        if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
-        if (prog === 'git') {
-          const p = gitProgrammaScritto(resto);
-          if (!p || !p.length) break;
-          tok.splice(i, tok.length - i, ...p);
-          continue;
-        }
-        if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
-        // Gli allineamenti di cartelle del Mac e di Linux, come robocopy /MIR: tolgono dalla destinazione quello che
-        // manca nella sorgente (#1909.5). rclone si guarda su ogni parola: un'opzione col valore sposta il sotto-comando.
-        if (prog === 'rsync' && resto.some((x) => RSYNC_CANCELLA.test(x))) return true;
-        if (prog === 'rclone' && resto.some((x) => RCLONE_CANCELLA.has(x))) return true;
-        // `gci | ForEach-Object Delete`, `% Delete`: il metodo che cancella chiamato per nome.
-        if (/^(foreach-object|foreach|%)$/.test(prog) && resto.filter((x) => !x.startsWith('-'))[0] === 'delete') return true;
-        // forfiles lancia quello che sta dopo `/c`.
-        if (prog === 'forfiles') { const c = resto.indexOf('/c'); if (c < 0) break; i += c + 2; continue; }
-        if (!DAVANTI.has(prog)) break;
-        i += 1;
-        let opzione = false;
-        while (i < tok.length && (/^-|^\/[a-z?]{1,2}$/.test(tok[i]) || /^\w+=/.test(tok[i]))) { opzione = true; i += 1; }
-        // `sudo -u root rm`: un'opzione può portarsi dietro un valore, e il comando viene dopo.
-        const dopo = nomeProgramma(tok[i]);
-        if (opzione && i + 1 < tok.length && !CANCELLANO.has(dopo) && !DAVANTI.has(dopo)) {
-          const poi = nomeProgramma(tok[i + 1]);
-          if (CANCELLANO.has(poi)) return true;
-        }
+      let testo = pezzo.replace(/^\s*(?:\[[\w.]+\]\s*)?\$[\w:]+\s*=\s*/, '').trim();
+      let tok = testo.split(/\s+/).filter(Boolean);
+      // `git rebase -x "rm …"`, `git submodule foreach rm …`: il programma che git lancia da sé si guarda al posto di git.
+      while (nomeProgramma(tok[0]) === 'git') {
+        const p = gitProgrammaScritto(tok.slice(1));
+        if (!p || !p.length) break;
+        tok = p;
+        testo = p.join(' ');
       }
+      if (!tok.length) continue;
+      if (cancellaDa(tok, 0)) return true;
+      const prog = nomeProgramma(tok[0]);
+      if (INERTI.has(prog) && prog === tok[0]) continue;
+      if (CANCELLA_SENZA_PARENTESI.test(testo.slice(tok[0].length))) return true;
+      for (let i = 1; i < tok.length; i++) if (cancellaDa(tok, i)) return true;
     }
     return false;
   }
