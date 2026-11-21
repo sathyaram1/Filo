@@ -21,7 +21,7 @@ test('esplora: Ricarica nello stesso istante del crollo', async ({ app, openTab,
     const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === target);
     process.kill(tab.view.webContents.getOSProcessId(), 'SIGKILL');
     w._filoTabs.reload(tab.id);
-  }, url).catch(() => {});
+  }, url2).catch(() => {});
   await new Promise((r) => setTimeout(r, 2000));
   const stato = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
