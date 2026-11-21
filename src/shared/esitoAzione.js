@@ -347,8 +347,15 @@
     return { resto, toccati };
   }
 
-  // La riga che la chat riaperta mostra per una voce: la stessa forma del diario in diretta.
+  // La riga che la chat riaperta mostra per una voce: la stessa forma del diario in diretta. `fumetto`: titolo e testo di
+  // una segnalazione, come la riga in diretta; una voce salvata senza titolo non ne riceve uno di ripiego, che non era partito.
   function rigaDellaVoce(v) {
+    const r = rigaSenzaFumetto(v);
+    const S = r && v.type === 'INVIA_FEEDBACK' && v.segnalazione ? (campiSegnalazione({}), global.SN_ALLEGATI_SEGNALAZIONE) : null;
+    const fumetto = S ? S.fumetto({ titolo: v.titoloSegnalazione, testo: v.segnalazione }, { ripiego: false }) : '';
+    return fumetto ? { ...r, fumetto } : r;
+  }
+  function rigaSenzaFumetto(v) {
     if (!v || !v.type) return null;
     const riga = pulito(v.riga);
     if (v.type === 'FERMATA') return { icona: '🔒', testo: riga || 'Fermata: avrebbe portato fuori un segreto', fallita: true };
