@@ -328,7 +328,7 @@
   }
 
   global.SN_URL_NAV = {
-    isLocalHost, questoComputer, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
+    isLocalHost, questoComputer, restaSulComputer, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
     normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, fileDiQuestoComputer, isShareableAddress, collegamentoScritto, ricercaDi, eRicercaDi,
     indirizzoRicerca, indirizzoRicercaImmagine, invioRicercaImmagine, LENS_CARICA,
