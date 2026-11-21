@@ -25,10 +25,10 @@ Quello che una pagina legge non deve avere dove andare. Tre strati, perché ognu
 Ogni rifiuto lo dice una volta per pagina (`_senzaRete`: la CSP lo riferisce dal preload, i salti dal main). Non c'è
 un «Apri con la rete»: scelta dell'owner, per ora.
 
-`sandbox` dà l'origine opaca che Chrome dà a `file://` e che i privilegi di Electron tolgono: le immagini della
-cartella sporcano la tela, fetch, moduli ES, JSON importati e font `file:` diventano di un'altra origine. Costa quello
-che costa in Chrome (moduli e font locali non partono) più `localStorage` e cookie, che in un'origine opaca non ci
-sono. Il PDF non va in `sandbox`: in un documento isolato il visore non parte.
+Le immagini della cartella NON sporcano la tela come in Chrome: con i privilegi di Electron su `file://` la pagina è
+della stessa origine dei suoi file, e un'origine opaca (CSP `sandbox` senza `allow-same-origin`) non mostra più
+nessuna immagine `file:` (provato in #1905). Quello che la pagina legge dei suoi file resta chiuso dalla rete che
+manca, non dall'origine: per questo nessuno dei tre strati si toglie.
 
 ## Perché
 
