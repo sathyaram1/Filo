@@ -130,7 +130,7 @@ test('la radice di un disco e una cartella che contiene la casa non si concedono
   assert.ok(sotto.cartelle.length > 0);
 }));
 
-test('un collegamento simbolico nella cartella vale per il file vero: se punta fuori non si legge', { skip: process.platform === 'win32' }, () => conCasa((casa) => {
+test('un collegamento simbolico nella cartella vale per il file vero: se punta fuori non si legge', (t) => conCasa((casa) => {
   const dir = join(casa, 'Scaricati', 'sito');
   mkdirSync(join(casa, '.ssh'), { recursive: true });
   mkdirSync(join(casa, 'Immagini'), { recursive: true });
