@@ -519,8 +519,8 @@
   const DOMANDE_PANNELLO = { PULISCI_TAB: 'riordino delle schede', CANCELLA_ARCHIVIO: 'eliminazione dall’archivio' };
   // Titolo e testo di una segnalazione, interi: al passaggio del mouse su ogni suo tasto e riga si legge cosa parte (#1635).
   function testoSegnalazione(a) {
-    if (!isType(a, 'INVIA_FEEDBACK')) return '';
-    return [a.titolo ?? a.title, a.testo ?? a.text ?? a.messaggio].map((x) => String(x ?? '').trim()).filter(Boolean).join('\n\n');
+    const S = isType(a, 'INVIA_FEEDBACK') ? segnalazione() : null;
+    return S ? S.fumetto(a) : '';
   }
   function rigaAttivita(a) {
     const r = rigaSenzaFumetto(a);
