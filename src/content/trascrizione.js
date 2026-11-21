@@ -233,7 +233,7 @@
       }
       a.testo.appendChild(n);
     });
-    const naturali = pezzi.map((p) => p.n.scrollWidth || p.n.offsetWidth);
+    const naturali = pezzi.map((p) => (p.nelFlusso ? p.n.getBoundingClientRect().width : 0) || p.n.scrollWidth);
     pezzi.forEach((p, i) => {
       const naturale = naturali[i];
       if (!naturale) return;
