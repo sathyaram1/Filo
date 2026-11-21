@@ -70,10 +70,12 @@ test('git config: una chiave che sceglie un programma vale 3, come `git -c`', ()
     'git config -f .git/config remote.origin.url https://altrove.test/r.git', 'git config core.hooksPath strani',
     'git config --global init.templateDir modelli', 'git config merge.x.driver ./evil.sh', 'git config include.path altro.cfg',
     'git config --global --add credential.helper ./evil.sh', 'git config core.fsmonitor ./evil.sh',
-    'git config --type bool core.sshCommand y', 'git config --rename-section pull core', 'git config rename-section pull core'];
+    'git config --type bool core.sshCommand y', 'git config --rename-section pull core', 'git config rename-section pull core',
+    // #2623: un nome che non è un remoto git lo prende per un indirizzo, quindi anche «origin» sceglie dove va il push.
+    'git config branch.main.remote origin'];
   const due = ['git config user.name Mario', 'git config --global user.email a@b.c', 'git config pull.rebase true',
     'git config --global core.autocrlf false', 'git config core.fsmonitor true', 'git config --add safe.directory /x',
-    'git config branch.main.remote origin', 'git config set user.email a@b'];
+    'git config branch.main.merge refs/heads/main', 'git config set user.email a@b'];
   for (const [nome, ctx] of CONTESTI) {
     const pulito = ctx && { ...ctx, gitLancia: () => '' };
     for (const cmd of tre) assert.equal(C.classify(cmd, pulito), 3, `${nome}: «${cmd}»`);
