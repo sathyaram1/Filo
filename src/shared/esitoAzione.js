@@ -209,13 +209,13 @@
   function segnalazioneDi(type, x, giaFatta) {
     if (type !== 'INVIA_FEEDBACK' || !x) return {};
     if (giaFatta) return { segnalazione: x.segnalazione, titoloSegnalazione: x.titoloSegnalazione };
-    const S = campiSegnalazione(x);
-    return { segnalazione: S.testo, titoloSegnalazione: S.titolo };
+    const S = moduloSegnalazione();
+    const c = S ? S.campi(x) : { titolo: '', testo: '' };
+    return { segnalazione: c.testo, titoloSegnalazione: c.titolo };
   }
-  function campiSegnalazione(x) {
+  function moduloSegnalazione() {
     if (!global.SN_ALLEGATI_SEGNALAZIONE && typeof require === 'function') { try { require('./allegatiSegnalazione.js'); } catch (_) {} }
-    const S = global.SN_ALLEGATI_SEGNALAZIONE;
-    return S ? S.campi(x) : { titolo: '', testo: '' };
+    return global.SN_ALLEGATI_SEGNALAZIONE || null;
   }
   // La conferma ancora da dare (#1685): riaperta, la chat ridisegna il suo bottone con l'azione e la domanda di allora.
   // Solo dati semplici e corti: quello che non ci sta non si ridisegna, e resta la riga.
