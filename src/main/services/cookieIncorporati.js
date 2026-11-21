@@ -44,6 +44,10 @@ const inArrivo = new Map();
 // sito → nomi dei cookie partizionati dei suoi riquadri: Electron non sa riscriverli senza scadenza, quindi si
 // tolgono a fine visita (o all'uscita da Filo).
 const partizionati = new Map();
+// Le nostre riscritture (dominio|percorso|nome): Electron non sa scrivere «solo se è ancora il cookie letto», quindi
+// una partita da una lettura vecchia può coprire un valore più nuovo del sito; lo dice l'avviso che la segue (#2637).
+const nostre = new Map();
+const NOSTRE_MS = 30 * 1000;
 
 let modo = 'default';
 let fidati = new Sito.ElencoSiti();
