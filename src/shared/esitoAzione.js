@@ -299,7 +299,7 @@
       // Un no della regola di autonomia: riaperta, la riga dice «Non dimenticato» come il diario in diretta.
       no: esito === FALLITO && !!(o && o.no),
       // La proposta della segnalazione automatica (#360) non l'ha scritta l'assistente: il modello lo deve sapere (#2371).
-      autore: x._proposta === true ? 'segnalazione' : '', segnalazione: segnalazioneDi(type, x),
+      autore: x._proposta === true ? 'segnalazione' : '', ...segnalazioneDi(type, x),
       ...(SENZA_TITOLO[type] || !x._confirm ? {} : bottoneDi(esito, type, x, x._confirm, x._domanda)),
     });
   }
