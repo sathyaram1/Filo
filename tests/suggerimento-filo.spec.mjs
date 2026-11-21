@@ -434,3 +434,42 @@ test('barra in alto: un tasto disabilitato col data-tip ha il suo fumetto a fine
   await expect.poll(() => fumettoDellaBarra(app), { timeout: 3000 }).toEqual({ testo: 'Spento per una ragione', sfondo: expect.any(String) });
   await shell.mouse.move(400, 300);
 });
+
+// #1704.1 — la rotella sopra un pezzo con un fumetto più lungo dello spazio scorre il fumetto, e arrivato in fondo torna
+// alla pagina; con un fumetto corto resta alla pagina. Se il passaggio si rompe, la pagina smette di scorrere sotto il puntatore.
+test('la rotella scorre il fumetto lungo fino in fondo, poi la pagina; con un fumetto corto scorre la pagina', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await pronta(page);
+  await page.evaluate((lungo) => {
+    const box = document.createElement('div');
+    box.id = 'pScorre';
+    box.style.cssText = 'position:fixed;left:200px;top:60px;width:400px;height:260px;overflow:auto;z-index:2147480000;background:Canvas';
+    box.innerHTML = '<div style="position:sticky;top:0;display:flex;gap:30px"><button id="pLungo" style="font-size:24px">Lungo</button>'
+      + '<button id="pCorto" style="font-size:24px" title="Corto">Corto</button></div><div style="height:4000px"></div>';
+    document.body.appendChild(box);
+    box.querySelector('#pLungo').title = lungo;
+  }, `Inizio del fumetto.\n${'Una riga che allunga il fumetto oltre lo spazio libero. '.repeat(120)}Fine del fumetto.`);
+  const scorso = () => page.evaluate(() => document.querySelector('#pScorre').scrollTop);
+  const tip = fumetto(page);
+  const misure = () => tip.evaluate((el) => ({ su: el.scrollTop, max: el.scrollHeight - el.clientHeight }));
+
+  await page.locator('#pLungo').hover();
+  await expect(tip).toContainText('Inizio del fumetto.');
+  expect((await misure()).max, 'il fumetto è più lungo dello spazio e scorre').toBeGreaterThan(0);
+  for (let i = 0; i < 60 && (await misure()).su < (await misure()).max - 1; i++) {
+    await page.mouse.wheel(0, 300);
+    expect(await scorso(), 'mentre il fumetto ha testo da mostrare la pagina resta ferma').toBe(0);
+  }
+  const m = await misure();
+  expect(m.su, 'la rotella porta in fondo al fumetto').toBeGreaterThanOrEqual(m.max - 1);
+  await page.mouse.wheel(0, 300);
+  await expect.poll(scorso, { message: 'in fondo al fumetto la rotella torna alla pagina' }).toBeGreaterThan(0);
+
+  await page.mouse.move(1, 1);
+  await page.evaluate(() => { document.querySelector('#pScorre').scrollTop = 0; });
+  await expect(tip).toBeHidden();
+  await page.locator('#pCorto').hover();
+  await expect(tip).toHaveText('Corto');
+  await page.mouse.wheel(0, 300);
+  await expect.poll(scorso, { message: 'con un fumetto corto la rotella scorre la pagina' }).toBeGreaterThan(0);
+});
