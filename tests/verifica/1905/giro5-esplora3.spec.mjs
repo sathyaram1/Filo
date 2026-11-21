@@ -47,7 +47,7 @@ test('esplora 3', async ({ app, avvisi }) => {
   log('ping main dopo', await corsa(app.evaluate(() => 1), 5000));
   log('ping pagina dopo', await corsa(p.evaluate(() => 1), 5000));
   log('attesa', Date.now());
-  await new Promise((r) => setTimeout(r, 3000));
+  log('wft', await corsa(p.waitForTimeout(3000), 6000));
   log('attesa fine', Date.now());
   log('dopo sosta', arrivi);
   await p.locator('#web').click({ button: 'right', noWaitAfter: true });
