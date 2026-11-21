@@ -891,3 +891,105 @@ test('#1294 riaperta, l\'appunto salvato da Filo ha ancora il bottone che apre l
   await expect(page.locator('.dash-bubble-filo [data-action="openNotes"]'), 'riaperta, l\'appunto si apre ancora dal suo bottone').toHaveCount(1, { timeout: 8_000 });
   await ripristina(app);
 });
+
+// Il file .ics che il bottone ha passato al calendario: DTSTART e DTEND, come li legge il programma dell'utente.
+const intervalli = (app) => app.evaluate(() => (globalThis.__icsAperti || []).map((f) => {
+  const testo = require('node:fs').readFileSync(f, 'utf8');
+  return ['SUMMARY', 'DTSTART', 'DTEND'].map((k) => (testo.match(new RegExp(`^${k}[^\\r\\n]*`, 'm')) || [''])[0]).join(' ');
+}));
+
+test('#1685.3 riaperta la chat, «Aggiungi al calendario» mette nel calendario la stessa fine della proposta in diretta', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(({ shell }) => {
+    globalThis.__openPathVero = shell.openPath;
+    globalThis.__icsAperti = [];
+    shell.openPath = async (f) => { globalThis.__icsAperti.push(f); return ''; };
+  });
+  try {
+    const eventi = [
+      { id: 'e1', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ data: '2026-12-10', data_fine: '2026-12-15', titolo: 'Ferie' }) },
+      { id: 'e2', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ data: '2026-12-01', ora: '10:00', durata_min: 120, titolo: 'Riunione' }) },
+      { id: 'e3', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ data: '2026-12-02', ora: '10:00', ora_fine: '13:30', titolo: 'Corso' }) },
+    ];
+    await modelloFinto(app, [{ text: 'Ecco gli eventi.', toolCalls: eventi }, { text: '' }, { text: '' }]);
+    await chiedi(page, 'ferie dal 10 al 15 dicembre, riunione il primo alle 10 per due ore, corso il 2 dalle 10 alle 13:30');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const chat = await chatCon(app, 'ferie dal 10 al 15 dicembre, riunione il primo alle 10 per due ore, corso il 2 dalle 10 alle 13:30');
+    await dimenticaLaMemoria(app, chat.id);
+    await riapri(app, page, chat.id);
+    const bottoni = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Aggiungi al calendario' });
+    await expect(bottoni, 'riaperta, tornano i tre bottoni').toHaveCount(3, { timeout: 8_000 });
+    for (let n = 3; n > 0; n--) {
+      await bottoni.first().click();
+      await expect(bottoni).toHaveCount(n - 1, { timeout: 10_000 });
+    }
+    const aperti = (await intervalli(app)).sort();
+    expect(aperti).toEqual([
+      'SUMMARY:Corso DTSTART:20261202T100000 DTEND:20261202T133000',
+      'SUMMARY:Ferie DTSTART;VALUE=DATE:20261210 DTEND;VALUE=DATE:20261216',
+      'SUMMARY:Riunione DTSTART:20261201T100000 DTEND:20261201T120000',
+    ]);
+  } finally {
+    await app.evaluate(({ shell }) => { if (globalThis.__openPathVero) shell.openPath = globalThis.__openPathVero; });
+    await ripristina(app);
+  }
+});
+
+test('#1685.3 una conversazione riletta da un\'altra dice che il comando non era partito e perché, e la proposta senza testo', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await terminaleSpento(app);
+  await livelloAutonomia(app, 'conservativo');
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: '{"comando":"ls","spiegazione":"Elenco i file"}' }] },
+    { text: 'Ho elencato i file.' },
+    { text: '', toolCalls: [FEEDBACK] },
+  ]);
+  await chiedi(page, 'elenca i file della cartella');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ho elencato i file' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await chiedi(page, 'segnala che il timer non suona');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await clickConfirm(page, 'cancel');
+  const vecchia = await chatCon(app, 'elenca i file della cartella');
+  await expect.poll(async () => (await chatCon(app, 'segnala che il timer non suona'))?.messages.flatMap((m) => m.esiti || []).map((v) => v.esito), { timeout: 8_000 })
+    .toEqual(['fallito', 'fallito']);
+  await chiedi(page, '/clear');
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'r1', name: 'CERCA_CHAT', arguments: JSON.stringify({ id: vecchia.id }) }] },
+    { text: 'No, non era partito.' },
+  ]);
+  await chiedi(page, 'quel comando dell\'altra volta era andato?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'non era partito' })).toBeVisible({ timeout: 10_000 });
+  const ch = await chiamateAlModello(app);
+  const riletta = ch[1].filter((m) => m.role === 'tool').map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+  expect(riletta).toContain('Filo: Ho elencato i file.');
+  expect(riletta, 'il modello legge che il comando non è partito, e perché').toMatch(/NON riuscita: [^\n]*\(perché: la modalità terminale è spenta\)/);
+  expect(riletta, 'la risposta fatta della sola proposta c\'è, col suo no').toMatch(/Utente: segnala che il timer non suona\nFilo:\n[^\n]*\n- NON riuscita: [^\n]*perché: detto no alla conferma/);
+  await ripristina(app);
+});
+
+test('#1685.3 un sì dato dopo che la conversazione del bottone è stata cancellata non la fa rinascere', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await terminaleSpento(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }]);
+  await chiedi(page, 'accendi il terminale');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await clickConfirm(page, 'cancel');
+  const nata = await chatCon(app, 'accendi il terminale');
+  await page.locator('.dash-bubble-filo .dash-action-btn-primary').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  // Mentre il popup aspetta, la conversazione si cancella (dalla Cronologia, o a parole in un'altra scheda).
+  await page.evaluate((id) => chrome.runtime.sendMessage({ type: 'filo_chat_delete', id }), nata.id);
+  await expect.poll(async () => (await chatsDellaHome(app)).some((c) => c.id === nata.id), { timeout: 5_000 }).toBe(false);
+  await confermaScritta(page);
+  await expect.poll(() => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.terminal && s.terminal.enabled)), { timeout: 10_000 })
+    .toBe(true);
+  await page.waitForTimeout(1500);
+  const chats = await chatsDellaHome(app);
+  expect(chats.some((c) => c.id === nata.id), 'la conversazione cancellata resta cancellata').toBe(false);
+  expect(chats.flatMap((c) => c.messages.flatMap((m) => m.esiti || [])), 'nessuna conversazione con dentro solo la conferma').toEqual([]);
+  await ripristina(app);
+});
