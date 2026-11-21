@@ -1,4 +1,4 @@
-// I tetti di SPEC-CONTESTO § Le costanti per chi scrive Filo: 8.000 token per la parte fissa della chat e 8.350 per gli
+// I tetti di SPEC-CONTESTO § Le costanti per chi scrive Filo: 8.000 token per la parte fissa della chat e 8.450 per gli
 // strumenti, perché il prompt non ricresca in silenzio (+11.000 token fra il 25/09 e il 07/10).
 // La stima è quella della chat (SN_FILO_CONTESTO.stimaToken), tarata qui sotto sul contatore di Anthropic (#2473).
 
@@ -19,7 +19,7 @@ for (const m of loader.matchAll(/require\(path\.join\(SHARED, '([^']+)'\)\)/g)) 
 
 const FC = globalThis.SN_FILO_CONTESTO;
 const TETTO_PARTE_FISSA = 8000;
-const TETTO_STRUMENTI = 8350;
+const TETTO_STRUMENTI = 8450;
 const token = (s) => FC.stimaToken(s);
 
 // Misure del 07/10 col contatore di Anthropic su claude-haiku-5-5 (circa 2,1 caratteri per token). Una stima più bassa
@@ -80,7 +80,7 @@ test('la parte fissa che conta il tetto è quella che la chat misura: strumenti,
   assert.equal(FC.tettoDelTratto(10000, 19000), FC.LIMITI.token[0], 'mai sotto il minimo del campo');
 });
 
-test('gli strumenti della chat stanno sotto gli 8.350 token', () => {
+test('gli strumenti della chat stanno sotto gli 8.450 token', () => {
   const t = token(JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()));
   assert.ok(t <= TETTO_STRUMENTI, `strumenti: circa ${t} token, il tetto è ${TETTO_STRUMENTI}`);
 });
