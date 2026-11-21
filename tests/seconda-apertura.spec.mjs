@@ -341,8 +341,12 @@ const finestrellaDavanti = (app, base) => expect.poll(() => app.evaluate(({ Brow
   return BrowserWindow.getFocusedWindow() === f;
 }, base), { message: 'la finestrella non è andata davanti', timeout: 5000 }).toBe(true);
 
-for (const [principale, chiusura] of [['aperta', 'Chiudi finestra'], ['chiusa', 'Chiudi scheda']]) {
-  test(`su Mac, con la finestrella di accesso davanti e la principale ${principale}, le voci della scheda agiscono su di lei`, async ({ app, shell, openTab, testServer }) => {
+// Le due voci che chiudono, ognuna con la principale aperta e chiusa (#2031.3): le altre voci si provano una volta sola.
+for (const [principale, chiusura, conVoci] of [
+  ['aperta', 'Chiudi finestra', true], ['aperta', 'Chiudi scheda', false],
+  ['chiusa', 'Chiudi scheda', true], ['chiusa', 'Chiudi finestra', false],
+]) {
+  test(`su Mac, con la finestrella di accesso davanti e la principale ${principale}, ${conVoci ? 'le voci della scheda agiscono su di lei' : `«${chiusura}» chiude lei`}`, async ({ app, shell, openTab, testServer }) => {
     const { accesso, negozio: html } = negozioConAccesso(testServer);
     await sentinella(app);
     const page = await testServer.openReady(openTab, html);
@@ -358,25 +362,27 @@ for (const [principale, chiusura] of [['aperta', 'Chiudi finestra'], ['chiusa', 
     const normali = (await stato(app, accesso)).normali;
     const voce = async (v) => { await finestrellaDavanti(app, accesso); await voceDellaBarra(app, v); };
 
-    await voce('Ricarica');
-    await expect.poll(async () => (await laFinestrella(app, accesso))?.segno, { message: 'Ricarica non ha ricaricato la finestrella', timeout: 10000 }).toBe(false);
-    await voce('Indietro');
-    await expect.poll(async () => (await laFinestrella(app, accesso))?.hash, { message: 'Indietro non ha portato indietro la finestrella', timeout: 10000 }).toBe('');
-    await voce('Avanti');
-    await expect.poll(async () => (await laFinestrella(app, accesso))?.hash, { message: 'Avanti non ha portato avanti la finestrella', timeout: 10000 }).toBe('#due');
-    await voce('Ingrandisci');
-    await expect.poll(async () => (await laFinestrella(app, accesso))?.zoom, { message: 'Ingrandisci non ha ingrandito la finestrella', timeout: 10000 }).toBeGreaterThan(0);
-    await voce('Dimensione reale');
-    await expect.poll(async () => (await laFinestrella(app, accesso))?.zoom, { message: 'Dimensione reale non ha rimesso la finestrella com\'era', timeout: 10000 }).toBe(0);
-    await voce('Annulla');
-    await voce('Schermo intero');
-    await new Promise((r) => setTimeout(r, 800));
-    const f = await laFinestrella(app, accesso);
-    expect(f.hash, 'Annulla fuori da un campo ha portato indietro la finestrella: Indietro su di lei è un\'altra voce').toBe('#due');
-    expect(f.schermoPieno, 'a schermo intero la finestrella perde la barra col sito').toBe(false);
-    expect((await stato(app, accesso)).normali, 'una voce ha rifatto o chiuso la finestra principale').toBe(normali);
-    if (principale === 'aperta') {
-      expect(await ilSitoDietro(app), 'una voce è finita sul sito che aspetta l\'accesso').toEqual({ hash: '#uno', segno: true, zoom: 0, schermoPieno: false });
+    if (conVoci) {
+      await voce('Ricarica');
+      await expect.poll(async () => (await laFinestrella(app, accesso))?.segno, { message: 'Ricarica non ha ricaricato la finestrella', timeout: 10000 }).toBe(false);
+      await voce('Indietro');
+      await expect.poll(async () => (await laFinestrella(app, accesso))?.hash, { message: 'Indietro non ha portato indietro la finestrella', timeout: 10000 }).toBe('');
+      await voce('Avanti');
+      await expect.poll(async () => (await laFinestrella(app, accesso))?.hash, { message: 'Avanti non ha portato avanti la finestrella', timeout: 10000 }).toBe('#due');
+      await voce('Ingrandisci');
+      await expect.poll(async () => (await laFinestrella(app, accesso))?.zoom, { message: 'Ingrandisci non ha ingrandito la finestrella', timeout: 10000 }).toBeGreaterThan(0);
+      await voce('Dimensione reale');
+      await expect.poll(async () => (await laFinestrella(app, accesso))?.zoom, { message: 'Dimensione reale non ha rimesso la finestrella com\'era', timeout: 10000 }).toBe(0);
+      await voce('Annulla');
+      await voce('Schermo intero');
+      await new Promise((r) => setTimeout(r, 800));
+      const f = await laFinestrella(app, accesso);
+      expect(f.hash, 'Annulla fuori da un campo ha portato indietro la finestrella: Indietro su di lei è un\'altra voce').toBe('#due');
+      expect(f.schermoPieno, 'a schermo intero la finestrella perde la barra col sito').toBe(false);
+      expect((await stato(app, accesso)).normali, 'una voce ha rifatto o chiuso la finestra principale').toBe(normali);
+      if (principale === 'aperta') {
+        expect(await ilSitoDietro(app), 'una voce è finita sul sito che aspetta l\'accesso').toEqual({ hash: '#uno', segno: true, zoom: 0, schermoPieno: false });
+      }
     }
 
     await comeSuMac(app);
