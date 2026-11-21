@@ -18,7 +18,7 @@ Quello che una pagina legge non deve avere dove andare. Tre strati, perché ognu
 
 - la CSP: niente `http(s):` né `ws(s):` per nessun tipo di risorsa, niente riquadri, worker né invii di moduli;
 - la sessione: `onBeforeRequest` annulla ogni richiesta web, e un proxy che non risponde (anche per il loopback)
-  prende preconnessioni e WebRTC, che la CSP non vede; WebRTC solo via proxy (`chiudiRete`);
+  prende preconnessioni e WebRTC, che la CSP non vede; WebRTC solo via proxy (`_applySecurity` in `tabs.js`);
 - i salti: `will-navigate` e `setWindowOpenHandler` in `tabs.js` fermano ogni indirizzo web chiesto da una pagina
   della sessione, clic dell'utente compreso, perché l'indirizzo lo scrive la pagina e può portare i dati.
 
