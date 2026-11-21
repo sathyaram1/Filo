@@ -151,11 +151,11 @@ function permessoNellaCartella(cartella, p) {
   return RISORSE.has(path.extname(p).slice(1).toLowerCase());
 }
 
+// Il nome e il file vero devono stare tutti e due nella concessione: un «foto.png» che punta fuori non passa.
 function permesso(c, percorso) {
   if (!c || !percorso) return false;
-  const p = chiave(percorso);
-  if (c.file.has(p)) return true;
-  return c.cartelle.some((d) => dentro(d, p) && permessoNellaCartella(d, p));
+  const ok = (p) => c.file.has(p) || c.cartelle.some((d) => dentro(d, p) && permessoNellaCartella(d, p));
+  return ok(chiave(percorso)) && ok(chiave(vero(percorso)));
 }
 
 // Cosa legge la pagina del file `percorso`: la sua cartella, o in una troppo larga solo lei e i file che nomina.
