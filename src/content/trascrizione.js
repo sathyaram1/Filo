@@ -219,24 +219,28 @@
         return;
       }
       n.style.width = `${s.w}px`;
+      // I pezzi restano nel flusso della riga, uno dopo l'altro: posati fuori dal flusso, un trascinamento dentro la
+      // stessa riga non allargava la selezione. Il margine porta il pezzo dopo dove inizia il suo disegno.
       const parti = s.testo.trim().split(/(\s+)/);
       for (let j = 0; j < parti.length; j++) {
         const p = Math.floor(j / 2);
         const da = j % 2 ? dove[p].a : dove[p].da;
         const a2 = j % 2 ? dove[p + 1].da : dove[p].a;
         const pezzo = el('span', 'sn-tr-pezzo', parti[j]);
-        pezzo.style.left = `${da / gx - s.x}px`;
+        if (!j) pezzo.style.marginLeft = `${da / gx - s.x}px`;
         n.appendChild(pezzo);
-        pezzi.push({ n: pezzo, w: Math.max(1, (a2 - da) / gx) });
+        pezzi.push({ n: pezzo, w: Math.max(1, (a2 - da) / gx), nelFlusso: true });
       }
       a.testo.appendChild(n);
     });
-    for (const p of pezzi) {
-      const naturale = p.n.scrollWidth || p.n.offsetWidth;
-      if (!naturale) continue;
+    const naturali = pezzi.map((p) => p.n.scrollWidth || p.n.offsetWidth);
+    pezzi.forEach((p, i) => {
+      const naturale = naturali[i];
+      if (!naturale) return;
       const k = p.w / naturale;
       if (!p.stimata || k < 1) p.n.style.transform = `scaleX(${k})`;
-    }
+      if (p.nelFlusso) p.n.style.marginRight = `${p.w - naturale}px`;
+    });
   }
 
   async function leggi(a, dataUrl) {
