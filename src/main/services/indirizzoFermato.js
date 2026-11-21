@@ -57,4 +57,13 @@ function avvisoFileNonAperto({ motivo, percorso } = {}) {
   return { testo, chiave: `indirizzo-fermato:${testo}` };
 }
 
-module.exports = { avvisoIndirizzoFermato, avvisoFileNonAperto };
+// Una pagina aperta dal computer che chiede il web: non c'è niente da riaprire con la rete, solo da sapere (#1905).
+function avvisoSenzaRete(rawUrl) {
+  let host = '';
+  try { host = new URL(String(rawUrl || '').trim()).hostname; } catch (_) {}
+  const testo = host ? `Le pagine aperte dal computer si mostrano senza rete: ${accorciato(host)} resta fuori`
+    : 'Le pagine aperte dal computer si mostrano senza rete';
+  return { testo, chiave: 'senza-rete' };
+}
+
+module.exports = { avvisoIndirizzoFermato, avvisoFileNonAperto, avvisoSenzaRete };
