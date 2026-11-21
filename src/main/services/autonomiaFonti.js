@@ -272,7 +272,7 @@ function fraseNo(ing, decisione, sender) {
   return globalThis.SN_AUTONOMIA.fraseNo({
     regola: decisione.regola, segreto: ing.segreto, dove: ing.dove,
     fonte: decisione.stato && decisione.stato.fonte,
-    daPagina: /^https?:/i.test(String(sender?.tab?.url || sender?.url || '')),
+    daPagina: daPaginaNonDiFilo(sender),
     nuovaUguale: !!decisione.nuovaUguale,
   });
 }
