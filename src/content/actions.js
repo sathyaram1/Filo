@@ -2292,6 +2292,7 @@
     init,
     copyToClipboard,
     copySelection,
+    testoCopiato,
     copyUrlToClipboard,
     isAddress,
     cutSelection,
