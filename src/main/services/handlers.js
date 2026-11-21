@@ -268,7 +268,7 @@ async function eseguiAzioneFilo(action, {
   }
 
   // Le righe della memoria non arrivano a una pagina visitata: né nel popup che le mostra né lette dal modello.
-  if ((type === 'DIMENTICA' || type === 'CORREGGI_MEMORIA' || type === 'LEGGI_MEMORIA') && /^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+  if ((type === 'DIMENTICA' || type === 'CORREGGI_MEMORIA' || type === 'LEGGI_MEMORIA') && daPaginaNonDiFilo(sender)) {
     return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
   }
 
