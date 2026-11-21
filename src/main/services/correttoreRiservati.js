@@ -30,14 +30,18 @@ const FRASE_MAX = 300;
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
   'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks', 'ecco']);
-// Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero»): un elenco solo per la risposta
-// in chat e per le forme libere.
-const ANNUNCI = ['è', "e'", 'e’', 'era', 'sarebbe', 'is', 'was'];
-const ANNUNCIO = `(?:${ANNUNCI.map(esc).join('|')})`;
+// Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero»): l'elenco del filtro delle
+// pagine, che il correttore chiama nello stesso giro.
+const GUARDIANO = () => globalThis.SN_GUARDIANO_STATICO || (require('../../shared/guardianoStatico.js'), globalThis.SN_GUARDIANO_STATICO);
+const ANNUNCI = GUARDIANO().ANNUNCI;
+const ANNUNCIO = `(?:${ANNUNCI.map(esc).join('|')})(?!\\p{L})`;
 const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo']);
 const SALUTO = /^(?:ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera)$/;
+// «check-in», «self-service»: parole col trattino, non password.
+const formaDiPassword = (v) => !!GUARDIANO().sembraPassword(v) && !/^\p{L}+(?:-\p{L}+)+$/u.test(v);
 // Una parola di sole lettere conta come password solo nelle prime parole della risposta o dopo PRESENTA_DATO: più in là
-// è il resto del messaggio. Quelle con cifre o simboli contano fino a RISPOSTA_MAX.
+// è il resto del messaggio. Quelle con cifre o simboli contano nella frase del dato; dopo, fino a RISPOSTA_MAX, solo
+// quelle con la forma di una password (una seconda password sì, un orario no).
 const PAROLE_RISPOSTA = 12;
 const RISPOSTA_MAX = 2000;
 // Il campo risponde all'ultimo messaggio che nomina la password finché sopra non c'è già una risposta (chiusa) e non
