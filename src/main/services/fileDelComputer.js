@@ -28,9 +28,8 @@ const CSP_DOCUMENTO = [
   'connect-src data: blob:',
   "form-action 'none'",
 ].join('; ');
-// Origine opaca come in Chrome, che i privilegi di Electron su file:// tolgono: le immagini della cartella sporcano la
-// tela, e fetch, moduli e font file: diventano di un'altra origine. Non al PDF, che in un documento isolato non si vede.
-const ISOLATA = 'sandbox allow-scripts allow-forms allow-modals allow-popups allow-downloads';
+// Niente `sandbox` per un'origine opaca che sporchi la tela: in un'origine opaca Chromium non mostra le immagini file:
+// (provato in #1905), e la pagina resterebbe vuota. Quello che la tela legge resta qui perché la rete non c'è.
 const RETE = ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'];
 
 const fileDi = (input) => globalThis.SN_URL_NAV.fileDiQuestoComputer(input);
