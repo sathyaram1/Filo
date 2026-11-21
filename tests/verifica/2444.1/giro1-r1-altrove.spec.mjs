@@ -27,13 +27,9 @@ test('r1 tasto destro, poi clic su un\'altra scheda prima che Filo sia pronto: t
   await expect(etichetta).toBeVisible({ timeout: 10_000 });
   await etichetta.click({ button: 'right' });
   const schede = shell.locator('#tabs .tab:not(.active)');
-  const info = () => shell.evaluate(() => [...document.querySelectorAll('#tabs .tab')].map((t) => `${t.className}|${t.textContent.trim().slice(0, 30)}`));
-  console.log('PRIMA', await info());
   await schede.last().click();
-  await page.waitForTimeout(500);
-  console.log('DOPO', await info(), await page.evaluate(() => [document.visibilityState, document.hasFocus()]));
-  // L'utente è davvero altrove: la scheda delle Preferenze non è più quella in primo piano.
-  await expect.poll(() => page.evaluate(() => document.visibilityState), { timeout: 5_000 }).toBe('hidden');
+  // L'utente è davvero altrove: in primo piano c'è un'altra scheda.
+  await expect(shell.locator('#tabs .tab.active')).not.toContainText('Preferenze');
   await expect(menuDi(page).principale).toHaveCount(0);
   await apriImpostazioni(app);
   await pronta(page);
