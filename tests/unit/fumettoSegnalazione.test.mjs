@@ -61,7 +61,7 @@ test('fumetto, riquadro di conferma, controllo delle uscite e riga dicono il tit
     assert.deepEqual(AS.campi(a), { titolo, testo }, nome);
     assert.equal(RA.testoSegnalazione(a), `${titolo}\n\n${testo}`, nome);
     const conferma = L.describe(a);
-    assert.ok(conferma.includes(`Titolo:\n«${titolo}»`) || conferma.includes(titolo), `${nome}: il riquadro dice il titolo`);
+    assert.ok(conferma.includes('Titolo:') && conferma.includes(titolo), `${nome}: il riquadro dice il titolo`);
     assert.ok(conferma.includes(testo), `${nome}: il riquadro dice il testo`);
     assert.equal(L.REGISTRY.INVIA_FEEDBACK.uscita(a), `${titolo}\n${testo}`, `${nome}: il controllo delle uscite guarda quello che parte`);
     assert.equal(RA.riga({ ...a, _executed: true }).text, `Segnalazione inviata · ${titolo}`, nome);
