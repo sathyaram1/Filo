@@ -193,8 +193,24 @@
     });
   }
 
+  // Titolo e testo come partono: invio, riquadro di conferma, fumetto e chat riaperta leggono da qui, così nessuno mostra
+  // altro da quello che parte. Senza titolo scritto parte quello di ripiego del riquadro «Invia feedback», e si mostra lui.
+  const primo = (...v) => v.map((x) => (typeof x === 'string' || typeof x === 'number' ? String(x).trim() : '')).find(Boolean) || '';
+  function campi(action) {
+    const a = action && typeof action === 'object' ? action : {};
+    const testo = primo(a.testo, a.text, a.messaggio);
+    const scritto = primo(a.titolo, a.title, a.name);
+    const FB = global.SN_FEEDBACK;
+    const ripiego = !scritto && testo && FB && typeof FB.fallbackName === 'function' ? primo(FB.fallbackName(testo)) : '';
+    return { titolo: scritto || ripiego, testo };
+  }
+  function fumetto(action) {
+    const { titolo, testo } = campi(action);
+    return [titolo, testo].filter(Boolean).join('\n\n');
+  }
+
   global.SN_ALLEGATI_SEGNALAZIONE = {
     richiesti, haAllegati, inventario, scegli, soloQuesti, problemaDi, oltreIlimiti, payload, anteprime, conPreparati, vociAiuto,
-    nomeDi, limiti,
+    nomeDi, limiti, campi, fumetto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
