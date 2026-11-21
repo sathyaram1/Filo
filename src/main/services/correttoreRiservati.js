@@ -261,6 +261,7 @@ function formeLibere(testo) {
   for (const m of l.matchAll(LIBERE.credenziali)) out.push(...valore(m[2]));
   for (const m of l.matchAll(LIBERE.accesso)) out.push(...forma(m[2]));
   for (const m of l.matchAll(LIBERE.accedi)) out.push(...forma(m[2]));
+  for (const m of l.matchAll(LIBERE.pass)) out.push(...forma(m[1]));
   for (const m of l.matchAll(LIBERE.rete)) out.push(...forma(m[1]));
   for (const m of l.matchAll(LIBERE.chiaveRete)) out.push(...valore(m[1]));
   for (const m of l.matchAll(LIBERE.corte)) {
