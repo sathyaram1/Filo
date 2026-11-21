@@ -165,7 +165,7 @@ function concessioneDi(percorso) {
   const cartella = path.dirname(percorso);
   const larga = cartellaTroppoLarga(cartella) || cartellaTroppoLarga(vero(cartella));
   return {
-    cartelle: larga ? [] : [...new Set([chiave(cartella), chiave(vero(cartella))])],
+    cartelle: larga ? [] : cartelleDi(cartella),
     file: new Set([chiave(percorso), chiave(vero(percorso)), ...(larga ? nominati(percorso, cartella) : [])]),
   };
 }
