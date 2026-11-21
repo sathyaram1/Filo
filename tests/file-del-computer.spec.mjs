@@ -268,6 +268,48 @@ test('l\'Aiuto sopra un sito non apre un file del computer nemmeno col percorso 
   expect(await schedeFile(app)).toBe(0);
 });
 
+// I messaggi partono dal mondo dei content script della scheda del file, come quelli dell'Aiuto sopra la pagina.
+const dalFile = (app, fine) => (m) => app.evaluate(async ({ BrowserWindow }, { fine, m }) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+  const t = tm.tabs.find((x) => String(x.url || '').endsWith(fine));
+  return t.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: `chrome.runtime.sendMessage(${JSON.stringify(m)})` }]);
+}, { fine, m });
+
+// Un HTML sul disco può essere ostile come un sito: da lì memoria e conversazioni restano chiuse, e il compito sa di
+// aver letto una pagina.
+test('da una pagina del computer la memoria non si legge, le conversazioni non si toccano e il compito ha letto una pagina', async ({ app, testServer }) => {
+  test.setTimeout(60_000);
+  const { file } = preparaReport();
+  await home(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Mario Rossi, vive a Bologna.', PREFERENZE: '' });
+    await globalThis.SN_FILO_CHATS.open({ id: 'c-file' });
+    await globalThis.SN_FILO_CHATS.append('c-file', [{ role: 'user', text: 'Come pianto i pomodori?' }]);
+  });
+  const r = await execAction(app, { type: 'NAVIGA', url: file }, { parole: `apri ${file}` });
+  expect(r.executed).toBe(true);
+  await expect.poll(() => schedaFile(app, '2026-10-30-riquadro.html'), { timeout: 10_000 }).toBeTruthy();
+  const manda = dalFile(app, '2026-10-30-riquadro.html');
+  await expect.poll(() => manda({ type: 'ping' }).then(() => true, () => false), { timeout: 10_000 }).toBe(true);
+
+  const leggi = await manda({ type: 'filo_run_action', action: { type: 'LEGGI_MEMORIA' } });
+  expect(leggi.executed).toBeFalsy();
+  expect(JSON.stringify(leggi)).not.toContain('Mario');
+  const dimentica = await manda({ type: 'filo_confirm_action', action: { type: 'DIMENTICA', testo: 'Mario', per_sempre: true } });
+  expect(dimentica.executed).toBeFalsy();
+  const togli = await manda({ type: 'filo_confirm_action', action: { type: 'TOGLI_CHAT', id: 'c-file', per_sempre: true } });
+  expect(togli.executed).toBeFalsy();
+  expect(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getMemory()).PROFILO)).toContain('Mario Rossi');
+  expect(await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list()).map((c) => c.id))).toContain('c-file');
+
+  // Un indirizzo coi dati dell'utente chiesto dall'Aiuto sopra il file: l'OK dice che il compito ha letto una pagina.
+  const url = `${testServer.html('<!doctype html><title>mappa</title><h1>ok</h1>')}&dove=Mario_Rossi_Bologna`;
+  const naviga = await manda({ type: 'filo_run_action', action: { type: 'NAVIGA', url } });
+  expect(naviga.executed).toBeFalsy();
+  expect(naviga.needsConfirm).toBe(2);
+  expect(naviga.describe).toContain('Te lo chiedo perché in questo compito ho letto una pagina web.');
+});
+
 test('riaperto Filo, la scheda del file torna dalla sessione salvata e si vede', async ({ app }) => {
   const { file } = preparaReport();
   await home(app);
