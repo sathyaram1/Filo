@@ -974,10 +974,11 @@ test('#1685.3 un sì dato dopo che la conversazione del bottone è stata cancell
   test.setTimeout(60_000);
   const page = await home(app);
   await terminaleSpento(app);
-  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }]);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }, { text: 'Acceso.' }]);
   await chiedi(page, 'accendi il terminale');
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   await clickConfirm(page, 'cancel');
+  await expect.poll(async () => (await chatCon(app, 'accendi il terminale'))?.messages.flatMap((m) => m.esiti || []).length, { timeout: 8_000 }).toBe(1);
   const nata = await chatCon(app, 'accendi il terminale');
   await page.locator('.dash-bubble-filo .dash-action-btn-primary').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
