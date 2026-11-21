@@ -255,7 +255,7 @@ async function togliPartizionati(ses, sito, nomi) {
     });
     for (const c of normali) {
       preesistenti.set(chiaveCookie(c), Date.now());
-      try { await ses.cookies.set({ ...posto(c), value: c.value, expirationDate: c.expirationDate }); } catch (_) {}
+      try { await scriviNostra(ses, c, { ...posto(c), value: c.value, expirationDate: c.expirationDate }); } catch (_) {}
     }
   }
 }
