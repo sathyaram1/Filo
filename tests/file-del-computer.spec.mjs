@@ -478,7 +478,8 @@ test('un collegamento simbolico verso un file fuori dalla cartella non si apre, 
   expect(await pagina.evaluate(() => document.getElementById('c').naturalWidth)).toBe(0);
   expect(await leggeLaScheda(app, id, pathToFileURL(join(dir, 'collegata.png')).href)).toBe(403);
   expect(await leggeLaScheda(app, id, pathToFileURL(join(dir, 'collegata.html')).href)).toBe(403);
-  await pagina.locator('#l').click();
+  await pagina.locator('#l').click({ noWaitAfter: true });
   await pagina.waitForTimeout(1500);
   expect(await pagina.title()).not.toBe('Altra');
+  expect(await pagina.locator('body').innerText()).not.toContain('fuori');
 });
