@@ -119,7 +119,8 @@ function nominati(percorso, cartella) {
     } finally { fs.closeSync(fd); }
   } catch (_) { return []; }
   const base = indirizzoDi(percorso);
-  const k = chiave(cartella);
+  const cartelle = [...new Set([chiave(cartella), chiave(vero(cartella))])];
+  const nellaCartella = (p) => cartelle.some((c) => dentro(c, p) && permessoNellaCartella(c, p));
   const fuori = [];
   for (const m of testo.matchAll(NOMINA)) {
     const valore = m.slice(1).find((v) => v != null) || '';
@@ -128,10 +129,18 @@ function nominati(percorso, cartella) {
       if (!ref || ref.startsWith('#')) continue;
       let p = null;
       try { p = percorsoDi(new URL(ref, base).href); } catch (_) {}
-      if (p && dentro(k, chiave(p)) && permessoNellaCartella(k, chiave(p))) fuori.push(chiave(p));
+      if (!p) continue;
+      const nome = chiave(p);
+      const reale = chiave(vero(p));
+      if (nellaCartella(nome) && nellaCartella(reale)) fuori.push(nome, reale);
     }
   }
   return fuori;
+}
+
+// Il percorso vero, coi collegamenti simbolici sciolti; quello dato se il file non c'è.
+function vero(p) {
+  try { return fs.realpathSync.native(p); } catch (_) { return p; }
 }
 
 // Sotto la cartella concessa: niente cartelle e file nascosti (.git, .ssh, .env), e solo tipi da pagina, così un file
