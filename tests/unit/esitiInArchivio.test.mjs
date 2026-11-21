@@ -339,3 +339,70 @@ test('un evento aggiunto col bottone chiude la proposta; senza una proposta aper
   assert.equal(sola.messages.length, 3);
   assert.equal(sola.messages[2].confermaDopo, true);
 });
+
+// #1685.3 — il bottone ridisegnato dalla chat riaperta mette nel calendario lo stesso evento di quello in diretta: la
+// fine (ultimo giorno, ora di fine, durata) si salva coi nomi dell'evento già sistemato da Filo.
+test('riaperta, «Aggiungi al calendario» porta la stessa fine dell\'evento proposto in diretta', () => {
+  require(join(ROOT, 'src', 'shared', 'calendarEvent.js'));
+  const C = globalThis.SN_CALENDAR;
+  const casi = [
+    ['ferie dal 10 al 15', { data: '2026-12-10', data_fine: '2026-12-15', titolo: 'Ferie' }],
+    ['riunione di due ore', { data: '2026-12-01', ora: '10:00', durata_min: 120, titolo: 'Riunione' }],
+    ['dalle 10 alle 13:30', { data: '2026-12-01', ora: '10:00', ora_fine: '13:30', titolo: 'Corso' }],
+    ['dalle 22 alle 2', { data: '2026-12-01', ora: '22:00', ora_fine: '02:00', titolo: 'Festa' }],
+    ['da lunedì alle 9 a mercoledì', { data: '2026-12-07', ora: '09:00', data_fine: '2026-12-09', titolo: 'Fiera' }],
+    ['tre giorni interi', { data: '2026-12-07', durata_min: 3 * 24 * 60, titolo: 'Ritiro' }],
+  ];
+  for (const [nome, args] of casi) {
+    const diretta = C.normalize(args);
+    const azione = { type: 'EVENTO_CALENDARIO', ...args, _executed: false, _output: { proposta: true, evento: diretta } };
+    const voce = E.voceArchivio(azione);
+    // Dal disco la voce ripassa da qui (toStoredMessage, chat riaperta): resta la stessa.
+    const riletta = E.voceArchivio(JSON.parse(JSON.stringify(voce)));
+    const riaperta = C.normalize(riletta.evento);
+    assert.ok(riaperta, `${nome}: l'evento riaperto è ancora un evento`);
+    assert.deepEqual([riaperta.inizio, riaperta.fine, riaperta.tuttoIlGiorno], [diretta.inizio, diretta.fine, diretta.tuttoIlGiorno], nome);
+    assert.equal(riletta.evento.quando, diretta.quando, `${nome}: il bottone dice lo stesso «quando»`);
+  }
+  // Gli archivi di prima tengono i nomi del modello: valgono ancora.
+  const vecchia = E.voceArchivio({ type: 'EVENTO_CALENDARIO', esito: 'proposto', riga: 'Evento proposto · Ferie', evento: { data: '2026-12-10', data_fine: '2026-12-15', titolo: 'Ferie' } });
+  assert.equal(C.normalize(vecchia.evento).fine, '20261216');
+});
+
+test('sentinella: ogni campo dell\'evento sistemato che decide la fine si salva con la voce', () => {
+  require(join(ROOT, 'src', 'shared', 'calendarEvent.js'));
+  const ev = globalThis.SN_CALENDAR.normalize({ data: '2026-12-07', ora: '09:00', ora_fine: '18:00', data_fine: '2026-12-09', titolo: 'Fiera', luogo: 'Bologna', dettagli: 'pass' });
+  const voce = E.voceArchivio({ type: 'EVENTO_CALENDARIO', _executed: false, _output: { proposta: true, evento: ev } });
+  // `inizio` e `fine` sono la stampa per il file .ics e `tuttoIlGiorno` l'ora vuota: si rifanno dagli altri.
+  const derivati = ['inizio', 'fine', 'tuttoIlGiorno'];
+  const mancano = Object.keys(ev).filter((k) => !derivati.includes(k) && ev[k] !== '' && !(k in voce.evento));
+  assert.deepEqual(mancano, [], 'un campo nuovo dell\'evento va anche fra quelli che la voce salva');
+});
+
+// #1685.3 — una conversazione riletta per id o ripescata da sola dice com'è andata ogni azione, come quella dei giorni
+// che il modello ha davanti, e non perde la risposta fatta della sola proposta in attesa del sì (#1130.2).
+test('la trascrizione di una conversazione vecchia porta gli esiti e la risposta senza testo', () => {
+  const CA = globalThis.SN_CHAT_ARCHIVE;
+  const FC = globalThis.SN_FILO_CONTESTO;
+  const messaggi = [
+    { role: 'user', text: 'elenca i file', ts: '2026-11-01T10:00:00Z', chat: 'c1' },
+    { role: 'filo', text: 'Ho elencato i file.', ts: '2026-11-01T10:00:05Z', chat: 'c1', esiti: [
+      { type: 'ESEGUI_COMANDO', esito: 'fallito', riga: 'Elenco i file', motivo: 'la modalità terminale è spenta' },
+    ] },
+    { role: 'user', text: 'segnala che il timer non suona', ts: '2026-11-01T10:01:00Z', chat: 'c1' },
+    { role: 'filo', text: '', ts: '2026-11-01T10:01:05Z', chat: 'c1', esiti: [
+      { type: 'INVIA_FEEDBACK', esito: 'chiesto', riga: 'Mandare una segnalazione', segnalazione: 'Il timer non suona.' },
+    ] },
+  ];
+  const riletta = CA.transcriptForReading(messaggi);
+  assert.match(riletta, /Filo: Ho elencato i file\.\n\(com'è andata, dal registro di Filo\)\n- NON riuscita: Elenco i file \(perché: la modalità terminale è spenta\)/);
+  assert.match(riletta, /Utente: segnala che il timer non suona\nFilo:\n\(com'è andata[^\n]*\n- NON fatta: chiesta la conferma[^\n]*Mandare una segnalazione[^\n]*Il timer non suona\./);
+  const tratti = FC.tratti(messaggi);
+  assert.equal(tratti.length, 2);
+  assert.match(tratti[0].testo, /NON riuscita: Elenco i file \(perché: la modalità terminale è spenta\)/);
+  assert.match(tratti[1].testo, /^Utente: segnala che il timer non suona\nFilo:\n[\s\S]*NON fatta: chiesta la conferma/);
+  // Il ricordo che arriva al modello è lo stesso testo.
+  assert.match(FC.ricordoComeAzione([{ tratto: tratti[0] }])._output.results[0].snippet, /perché: la modalità terminale è spenta/);
+  // Un archivio di prima degli esiti resta com'era: le sole parole.
+  assert.equal(CA.transcriptForReading([{ role: 'user', text: 'ciao' }, { role: 'filo', text: 'Ciao.' }, { role: 'filo', text: '' }]), 'Utente: ciao\nFilo: Ciao.');
+});
