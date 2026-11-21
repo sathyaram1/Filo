@@ -33,7 +33,7 @@ test('esplora 2', async ({ app, avvisi }) => {
   const indice = join(dir, 'indice.html');
 
   void page;
-  if (process.env.G5_CONF) await modelloFinto(app, [
+  await modelloFinto(app, [
     { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: pathToFileURL(indice).href }) }] },
     { text: 'Ecco.' },
   ]);
