@@ -230,11 +230,15 @@ function ascoltaIn(w, invia) {
     return t;
   }
   function contati(t, dati) {
+    if (!fila.quanti) fotoDiPrima();
     for (const ch of dati) {
-      if (!conta.test(ch) || t.quanti >= MAX_TESTO) continue;
+      if (!conta.test(ch)) continue;
       const k = contaDi(ch);
-      t.conti.set(k, (t.conti.get(k) || 0) + 1);
-      t.quanti++;
+      for (const c of [t, fila]) {
+        if (c.quanti >= MAX_TESTO) continue;
+        c.conti.set(k, (c.conti.get(k) || 0) + 1);
+        c.quanti++;
+      }
     }
   }
   const taglia = (s) => (s.length > MAX_TESTO ? s.slice(-MAX_TESTO) : s);
