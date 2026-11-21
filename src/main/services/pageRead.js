@@ -313,6 +313,7 @@ async function leggiDallaScheda(wc) {
     await new Promise((r) => setTimeout(r, 500));
   }
   if (typeof wc.isDestroyed === 'function' && wc.isDestroyed()) return null;
+  require('./segretiLetti').primaDiLeggere(wc);
   const r = await conMisuraVera(wc, () => {
     // La scadenza si fissa qui, non nella pagina: conta anche l'attesa di una pagina ancora occupata a fare altro.
     const opz = { scadenza: Date.now() + tempi.scheda, minimo: MAX_TEXT_CHARS * 2 };
