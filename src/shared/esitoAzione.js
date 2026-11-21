@@ -168,8 +168,11 @@
     TOGLI_CHAT: ['Togliere una conversazione dal filo', 'Conversazione tolta dal filo'],
     RIMETTI_CHAT: ['Rimettere una conversazione nel filo', 'Conversazione rimessa nel filo'],
   };
-  // L'evento proposto col bottone (#1685): riaperta, la chat ridisegna «Aggiungi al calendario» con questi campi.
-  const CAMPI_EVENTO = ['data', 'ora', 'titolo', 'dettagli', 'luogo', 'durata_min', 'data_fine', 'ora_fine', 'quando'];
+  // L'evento proposto col bottone (#1685): riaperta, la chat ridisegna «Aggiungi al calendario» con questi campi. Quelli
+  // dell'evento già sistemato (SN_CALENDAR.verifica) e quelli del modello, che tengono gli archivi di prima (#1685.3):
+  // una fine persa fa entrare nel calendario un evento più corto. Sentinella: tests/unit/esitiInArchivio.test.mjs.
+  const CAMPI_EVENTO = ['data', 'ora', 'titolo', 'dettagli', 'luogo', 'dataFine', 'oraFine', 'durataMin', 'quando',
+    'durata_min', 'data_fine', 'ora_fine'];
   function eventoDi(x) {
     const src = (x && x._output && x._output.evento) || (x && x.evento) || x || {};
     const ev = {};
