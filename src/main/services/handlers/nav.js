@@ -111,7 +111,7 @@ module.exports = function register(on, ctx) {
       return { ok: true, ...r };
     }
     if (filoNegatoAllaPagina(url, sender, origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    const daPagina = /^https?:/i.test(String(sender?.url || ''));
+    const daPagina = daPaginaNonDiFilo(sender);
     const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
     // Un file del computer da una pagina di Filo (il collegamento in chat, il filo della home) lo apre il clic dell'utente (#1905).
     if (isFilo(origin) && gesto && globalThis.SN_URL_NAV.fileDiQuestoComputer(url)) {
