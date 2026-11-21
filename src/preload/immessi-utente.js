@@ -368,4 +368,5 @@ module.exports.fattoDiCaratteri = fattoDiCaratteri;
 module.exports.fattoAiBordi = fattoAiBordi;
 module.exports.parteNuova = parteNuova;
 module.exports.diUnIncolla = diUnIncolla;
+module.exports.caselleDellUtente = caselleDellUtente;
 module.exports.MAX_INCOLLA = MAX_INCOLLA;
