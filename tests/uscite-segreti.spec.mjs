@@ -1794,6 +1794,16 @@ for (const [come, campo, scrivi] of [
     await page.keyboard.press('Control+V');
     await expect(page.locator('#c')).toHaveValue(CARTA_VARIA.replace(/ /g, ''));
   }],
+  ['trascinata in un campo che la pagina riempie da sé', `<textarea id="nota">${CARTA_VARIA}</textarea>
+    <label for="c">Numero della carta</label><input id="c"><script>var c=document.getElementById('c');
+    c.addEventListener('dragover',function(e){e.preventDefault();});c.addEventListener('drop',function(e){e.preventDefault();
+    c.value=e.dataTransfer.getData('text/plain').replace(/\\s/g,'');});</script>`, async (_app, page) => {
+    await page.locator('#nota').click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.press('Control+A');
+    await page.locator('#nota').dragTo(page.locator('#c'));
+    await expect(page.locator('#c')).toHaveValue(CARTA_VARIA.replace(/ /g, ''));
+  }],
   ['incollata nella prima di quattro caselle che la pagina divide', `${QUATTRO}<script>cc[0].addEventListener('paste',function(e){
     e.preventDefault();var d=e.clipboardData.getData('text/plain').replace(/\\D/g,'');
     cc.forEach(function(x,i){x.value=d.slice(i*4,i*4+4);});disegna();});</script>`, async (app, page) => {
