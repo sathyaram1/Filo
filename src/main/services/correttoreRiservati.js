@@ -174,10 +174,12 @@ function portaIlDato(riga, tipo, inTesta) {
 // orario, un altro del gruppo o un sollecito di chi ha chiesto non la chiudono (#1723); un dato di sole lettere solo se
 // sotto c'è già un altro messaggio, perché in una chat senza nomi anche «sono arrivato» lo sembra.
 function chiusa(l, r) {
-  if (!r.chiesta && portaIlDato(l.slice(r.nome, r.fine), r.tipo, false)) return true;
   const richiedente = chiParla(l.slice(l.lastIndexOf('\n', r.inizio - 1) + 1, r.fine));
   const righe = l.slice(r.fine).split('\n');
   if (r.fine > 0 && l[r.fine - 1] !== '\n') righe.shift();
+  const sotto = (i) => righe.slice(i).some((s) => s.trim());
+  const datoNellaFrase = r.chiesta ? false : portaIlDato(l.slice(r.nome, r.fine), r.tipo, false);
+  if (datoNellaFrase === true || (datoNellaFrase === 'debole' && sotto(0))) return true;
   return righe.some((riga, i) => {
     const chi = chiParla(riga);
     if (chi !== null && CHI_SCRIVE.has(chi)) return true;
@@ -185,7 +187,7 @@ function chiusa(l, r) {
     const parole = (chi === null ? riga : riga.replace(PARLA, '')).split(/\s+/).filter(Boolean);
     if (parole.length <= 4 && parole.some((w) => formaDiPassword(pulito(w)))) return true;
     const dato = portaIlDato(riga, r.tipo, true);
-    return dato === true || (dato === 'debole' && righe.slice(i + 1).some((s) => s.trim()));
+    return dato === true || (dato === 'debole' && sotto(i + 1));
   });
 }
 
