@@ -893,10 +893,10 @@ test('#1294 riaperta, l\'appunto salvato da Filo ha ancora il bottone che apre l
 });
 
 // Il file .ics che il bottone ha passato al calendario: DTSTART e DTEND, come li legge il programma dell'utente.
-const intervalli = (app) => app.evaluate(() => (globalThis.__icsAperti || []).map((f) => {
-  const testo = require('node:fs').readFileSync(f, 'utf8');
+const intervalli = async (app) => (await app.evaluate(() => globalThis.__icsAperti || [])).map((f) => {
+  const testo = readFileSync(f, 'utf8');
   return ['SUMMARY', 'DTSTART', 'DTEND'].map((k) => (testo.match(new RegExp(`^${k}[^\\r\\n]*`, 'm')) || [''])[0]).join(' ');
-}));
+});
 
 test('#1685.3 riaperta la chat, «Aggiungi al calendario» mette nel calendario la stessa fine della proposta in diretta', async ({ app }) => {
   test.setTimeout(60_000);
