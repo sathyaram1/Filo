@@ -596,7 +596,7 @@
       // quando si chiede, il popup mostra il testo che partirebbe.
       costo: 2,
       campo: null,
-      uscita: (a) => [a.titolo ?? a.title ?? '', a.testo ?? a.text ?? a.messaggio ?? ''].join('\n'),
+      uscita: (a) => { const c = campiSegnalazione(a); return [c.titolo, c.testo].join('\n'); },
       // Il prompt fa proporre a Filo la segnalazione quando ammette una mancanza: se l'utente non ha chiesto
       // di segnalare, l'uscita è fuori dal perimetro del compito e chiede, anche a compito pulito.
       // Con degli allegati chiede sempre: le miniature di quello che parte stanno nel riquadro (#1668).
