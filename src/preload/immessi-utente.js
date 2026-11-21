@@ -327,7 +327,8 @@ function ascoltaIn(w, invia) {
   // Un invio dallo strato sopra la scheda (l'Aiuto, un Accetta) la pagina non lo vede: chi legge lo chiede prima (#2641).
   const figli = new Set();
   function diTutto() {
-    diSubito();
+    // Anche senza niente in attesa: una pagina può riempire le caselle dopo il gesto, a tempo.
+    if (fila.quanti) { if (timer) clearTimeout(timer); di(); } else diSubito();
     for (const f of figli) { if (f.vivo()) f.diTutto(); else figli.delete(f); }
   }
 
