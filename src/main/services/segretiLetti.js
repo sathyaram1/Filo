@@ -182,6 +182,13 @@ function immessoDallUtente(chiave, testo, desde) {
   const r = compatto(testo);
   if (r) tieni(`immesso:${chiave}`, r, Number(desde));
 }
+// Chi legge una scheda lo chiama prima: quello che l'utente ha appena immesso, fermo nell'attesa del preload, parte e
+// arriva qui prima della lettura, che viaggia dopo sullo stesso canale di ogni frame (#2641).
+function primaDiLeggere(wc) {
+  let frames = [];
+  try { frames = (wc && !wc.isDestroyed?.() && wc.mainFrame && wc.mainFrame.framesInSubtree) || []; } catch (_) {}
+  for (const f of frames) { try { f.send('filo:immessi-subito'); } catch (_) {} }
+}
 
 // Il testo scritto da altri entra in un modello dentro una busta (src/shared/contenutoEsterno.js), da qualunque
 // strada arrivi (titoli delle schede, risultati, pagine, comandi): i segreti dentro le buste contano come letti.
