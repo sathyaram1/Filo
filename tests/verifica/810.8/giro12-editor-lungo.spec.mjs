@@ -5,7 +5,7 @@ test('scrivere in fondo a un documento lungo non blocca la pagina per secondi', 
   test.setTimeout(120_000);
   const par = Array.from({ length: 8000 }, (_, i) => `<p>Paragrafo ${i} con un po' di testo per fare volume, parole e ancora parole qui.</p>`).join('');
   const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Doc</title></head><body>
-    <div id="ed" contenteditable="true" spellcheck="false">${par}</div></body></html>`);
+    <div id="ed" contenteditable="true">${par}</div></body></html>`);
   await page.locator('#ed').focus();
   await page.evaluate(() => {
     const ed = document.getElementById('ed');
