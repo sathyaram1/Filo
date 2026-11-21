@@ -249,13 +249,13 @@ test('#1803.2 nella chat della home la riga dice cosa è successo alla barra: me
   ]));
   try {
     for (const [i, [chiesto, , riga]] of turni.entries()) {
-      await page.locator('#ripiegaChat').evaluate((b) => { if (b.title === 'Riapri la chat') b.click(); });
       await page.locator('#input').fill(chiesto);
       await page.locator('#sendBtn').click();
-      await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i}.` })).toBeVisible({ timeout: 10_000 });
-      if (i === turni.length - 1) await page.locator('#ripiegaChat').click();
+      await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i}.` })).toHaveCount(1, { timeout: 10_000 });
       await expect(page.locator('#bubbles')).toContainText(riga);
     }
+    await expect(page.locator('#threadView')).toBeHidden();
+    await page.locator('#ripiegaChat').click();
     await expect(page.locator('#bubbles')).not.toContainText('Barra dei siti · ');
     await scatta(page, 'righe-chat');
   } finally { await ripristina(app); }
