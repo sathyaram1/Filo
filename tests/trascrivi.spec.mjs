@@ -330,7 +330,10 @@ async function scrittaNellImmagine(page, png64) {
     const g = c.getContext('2d'); g.drawImage(bmp, 0, 0);
     const d = g.getImageData(0, 0, c.width, c.height).data;
     const lum = [];
-    for (let i = 0; i < d.length; i += 4) lum.push((0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) * (d[i + 3] / 255));
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3] / 255;
+      lum.push((0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) * a + 255 * (1 - a));
+    }
     const med = [...lum].sort((a, b) => a - b)[Math.floor(lum.length / 2)];
     return lum.filter((l) => Math.abs(l - med) > 60).length / lum.length;
   }, png64);
