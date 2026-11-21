@@ -223,6 +223,7 @@ test('una selezione su più righe si copia con le righe separate, da Ctrl+C, dal
   await seleziona();
   await strato.keyboard.press('ControlOrMeta+c');
   await expect.poll(() => appunti(app), { timeout: 5000 }).toMatch(/^4821\nTotale/);
+  const conCtrlC = await appunti(app);
 
   await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
   await seleziona();
