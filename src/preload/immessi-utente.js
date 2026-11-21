@@ -264,8 +264,30 @@ function ascoltaIn(w, invia) {
     aggiorna(el, (s) => (suo === dati ? s + dati : `${s}\n${suo}\n`), suo);
   }
 
+  // Un tasto, un incolla o un trascina che la pagina ferma e fa da sé non arriva come inserimento: si aspetta la fine
+  // del gesto, e se l'inserimento non è venuto conta lo stesso (le caselle che scrivono da sé, l'incolla ripulito).
+  let fermo = null;
+  function seNonArriva(el, fai) {
+    if (!scrivibile(el)) return;
+    voce(el.isContentEditable ? radiceModificabile(el) : el);
+    const mio = { arrivato: false };
+    fermo = mio;
+    setTimeout(() => { if (!mio.arrivato) fai(); }, 0);
+  }
+  const arrivato = () => { if (fermo) { fermo.arrivato = true; fermo = null; } };
+  for (const [tipo, dati] of [['paste', (e) => e.clipboardData], ['drop', (e) => e.dataTransfer]]) {
+    w.addEventListener(tipo, (e) => {
+      if (!e.isTrusted) return;
+      let testo = '';
+      try { testo = String(dati(e)?.getData('text/plain') || ''); } catch (_) {}
+      const el = bersaglio(e);
+      if (testo) seNonArriva(el, () => incollato(el, testo));
+    }, true);
+  }
+
   w.addEventListener('beforeinput', (e) => {
     if (!e.isTrusted || e.isComposing) return;
+    arrivato();
     const tipo = String(e.inputType || '');
     if (tipo === 'deleteContentBackward') { aggiorna(bersaglio(e), (s) => s.slice(0, -1)); return; }
     if (/^delete/.test(tipo)) { aggiorna(bersaglio(e), null); return; }
