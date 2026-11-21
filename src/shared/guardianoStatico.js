@@ -81,6 +81,10 @@
     ['\\bxox[baprs]-', '[A-Za-z0-9-]', 10],
     ['\\bAIza', '[A-Za-z0-9_-]', 20],
     ['\\bAKIA', '[A-Z0-9]', 12],
+    ['\\bglpat-', '[A-Za-z0-9_-]', 20],
+    ['\\btvly-', '[A-Za-z0-9_-]', 16],
+    // JWT: intestazione e dichiarazioni possono superare MAX_TOKEN (i token aziendali con molti gruppi), la firma no.
+    ['\\beyJ[A-Za-z0-9_-]{10,8192}\\.eyJ[A-Za-z0-9_-]{10,8192}\\.', '[A-Za-z0-9_-]', 10],
   ].map(([testa, corpo, min]) => new RegExp(`${testa}${corpo}{${min},${MAX_TOKEN}}(${corpo})?`))
     .concat([
       /-----BEGIN [A-Z ]{0,64}PRIVATE KEY-----/,
