@@ -227,7 +227,10 @@ const FRA = '(?:\\s*[/|]\\s*|\\s+[-–—]\\s+)';
 const LIBERE = {
   // «Username / Password: mario / Girasole2024»: il valore sta al posto dell'etichetta della password.
   coppia: new RegExp(`(?<![\\p{L}\\p{N}])(${UTENTE}|${PW})${FRA}(${UTENTE}|${PW})\\s*[:=]\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
-  credenziali: new RegExp(`(?<![\\p{L}\\p{N}])(?:credenziali|credentials|dati\\s+(?:di\\s+)?(?:accesso|login))\\s*[:=]?\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
+  credenziali: new RegExp(`(?<![\\p{L}\\p{N}])(?:credenziali|credentials|dati\\s+(?:di\\s+)?(?:accesso|login))(?:\\s+${ANNUNCIO})?\\s*[:=]?\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
+  // «Pass: Girasole2024», «user mario pass Girasole2024»: senza articolo «pass» è anche il pass del concerto, e il
+  // valore deve avere la forma di una password.
+  pass: new RegExp(`(?<![\\p{L}\\p{N}])pass(?![\\p{L}\\p{N}])\\s*(?:[:=]|${ANNUNCIO})?\\s*(\\S+)`, 'gu'),
   // «Login: mario / Girasole2024»: etichette più generiche, il valore deve avere la forma di una password.
   accesso: new RegExp(`(?<![\\p{L}\\p{N}])(?:login|account|accesso|utenza|access)\\s*[:=]\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
   accedi: /(?<![\p{L}\p{N}])(?:accedi|entra|login|log\s*in|sign\s*in)\s+(?:con|with)\s*:?\s*(\S{1,128}?)\s*\/\s*(\S+)/gu,
