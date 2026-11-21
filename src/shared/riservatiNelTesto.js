@@ -130,7 +130,9 @@ function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
     const candidata = t && !w.endsWith(':') && !AVVII.has(t) && !PRESENTA_DATO.has(t) && !presentata.some((re) => re.test(t));
     const segni = /[^\p{L}'’]/u.test(t);
     const qualunque = tipo === 'password' && !saluto && !forte && ((lettere && n <= PAROLE_RISPOSTA) || dopoPresenta);
-    if (candidata && (segni || qualunque)) {
+    if (soloForma) {
+      if (candidata && formaDiPassword(t)) out.push({ valore: t });
+    } else if (candidata && (segni || qualunque)) {
       const v = X.segretiDetti(`${tipo} ${t}`);
       if (v.length) { trovato = true; if (segni) forte = true; }
       out.push(...v);
@@ -138,7 +140,7 @@ function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
     dopoPresenta = w.endsWith(':') || PRESENTA_DATO.has(t);
     if (/[.!?]$/.test(w) || spazio.includes('\n')) {
       if (saluto) saluto = false;
-      else if (forte) break;
+      else if (forte) soloForma = true;
       else if (trovato) lettere = false;
     }
   }
