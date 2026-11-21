@@ -16,7 +16,7 @@
       fixes: [
         { testo: 'Il correttore non manda ai modelli la password che scrivi sotto chi te la chiede in due parole, come «sono arrivato, password del wifi», anche quando è fatta di sole lettere.', segnalazione: 2638 },
         { testo: 'Nelle Preferenze e nelle altre pagine di Filo, se dai il tasto destro mentre la pagina si sta ancora aprendo e poi clicchi altrove o premi Esc, il menu non ti compare più un attimo dopo.', segnalazione: 2444 },
-        { testo: 'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che accetti dall\'assistente o fai scrivere a Filo.', segnalazione: 810 },
+        { testo: 'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che accetti dall\'assistente o fai scrivere a Filo. Vale anche nei moduli che dividono il numero in più caselle o lo ripuliscono da sé quando lo incolli.', segnalazione: 810 },
         'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
       ],
     },
