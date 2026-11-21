@@ -54,6 +54,13 @@ test('debug', async ({ app, openTab, testServer }) => {
   }, { x: box.x + 20 + da + 2, y: box.y + 40 });
   console.log(JSON.stringify({ punto: info.punto }, null, 1));
   const lunga = await page.evaluate(() => window.misura('INTEGRALE'));
+  const punti = await strato.evaluate((xs) => xs.map(([x, y]) => {
+    const e = document.elementFromPoint(x, y);
+    return `${x}:${e && e.className}:${e && e.textContent.slice(0, 12)}`;
+  }), [90, 95, 98, 100, 102, 104, 110, 200, 230, 240].map((x) => [x, box.y + 40]));
+  console.log(punti.join(' | '));
+  const sp = await strato.evaluate(() => [...document.querySelectorAll('.sn-tr-pezzo')].slice(0, 4).map((e) => JSON.stringify(e.getBoundingClientRect().toJSON())));
+  console.log(sp.join('\n'));
   await strato.mouse.move(box.x + 20 + da + 2, box.y + 40);
   await strato.mouse.down();
   await strato.mouse.move(box.x + 20 + da + lunga - 2, box.y + 40, { steps: 6 });
