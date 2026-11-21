@@ -255,7 +255,7 @@ test('chiedi da una sessione porta il segreto del biglietto locale: la fiducia l
   assert.equal(routine.chiamate.length, 0, 'col biglietto delle routine si passa dal canale, non da ownerDomande');
 });
 
-test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima; le fidate no', async () => {
+test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima; le fidate si nominano senza motivo di sporco', async () => {
   const sporca = finto({ mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA, fiducia: 'non_fidato' } } });
   assert.equal(await esegui(['mostra', 'D-3'], sporca.io), 0);
   assert.equal(sporca.sporcate.length, 1);
@@ -269,7 +269,8 @@ test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima
 
   const pulita = finto({ mostra: { ok: true, domanda: { id: 'D-6', ...DOMANDA, fiducia: 'fidato' } } });
   await esegui(['mostra', 'D-6'], pulita.io);
-  assert.equal(pulita.sporcate.length, 0);
+  // Il server decide se lasciarle radici (fidata per timbri): nominata, ma senza dire «non fidata».
+  assert.deepEqual(pulita.sporcate.map((x) => x.motivi), [['domande lette']]);
 
   const elenco = finto({ elenco: { ok: true, domande: [
     { id: 'D-1', titolo: 'a', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' },
@@ -283,7 +284,7 @@ test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima
 
   const tutteFidate = finto({ elenco: { ok: true, domande: [{ id: 'D-1', titolo: 'a', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' }] } });
   await esegui(['elenco'], tutteFidate.io);
-  assert.equal(tutteFidate.sporcate.length, 0);
+  assert.deepEqual(tutteFidate.sporcate.map((x) => x.motivi), [['domande lette']]);
 });
 
 test('il motivo dello sporco: pochi id e mai oltre il tetto del server', () => {

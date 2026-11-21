@@ -1681,21 +1681,46 @@ module.exports = function register(on, ctx) {
   }));
 
   // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
+  // Con `radice` (#1918) il timbro va sulla radice, e il server ricalcola tutto ciò che la porta.
+  async function chiamaFiducia(data) {
+    try {
+      return { r: await callSecurityFunction('ownerFiducia', data) };
+    } catch (e) {
+      if (e?.httpStatus === 404) return { error: 'La funzione «segna fidato» non è ancora pubblicata sul server.' };
+      if (String(e?.code || '').toUpperCase() === 'PERMISSION_DENIED') return { error: 'Il server dice che questo account non può segnare fidato: serve quello del proprietario.' };
+      if (e?.name === 'TypeError') return { error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { error: e?.detail || e?.message || 'Non riuscito.' };
+    }
+  }
   on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
+    const radice = typeof msg?.radice === 'string' ? msg.radice.trim() : '';
     const togli = msg?.fidato === false;
-    if (!feedbackId) return { ok: false, error: 'Manca il feedback da segnare fidato.' };
-    let r;
-    try {
-      r = await callSecurityFunction('ownerFiducia', { op: togli ? 'togli' : 'segna', feedbackId });
-    } catch (e) {
-      if (e?.httpStatus === 404) return { ok: false, error: 'La funzione «segna fidato» non è ancora pubblicata sul server.' };
-      if (String(e?.code || '').toUpperCase() === 'PERMISSION_DENIED') return { ok: false, error: 'Il server dice che questo account non può segnare fidato: serve quello del proprietario.' };
-      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
-      return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
+    if (!feedbackId && !radice) return { ok: false, error: 'Manca il feedback da segnare fidato.' };
+    const { r, error } = await chiamaFiducia(Object.assign({ op: togli ? 'togli' : 'segna' }, radice ? { radice } : { feedbackId }));
+    if (error) return { ok: false, error };
+    if (!r || r.ok === false) {
+      // Una radice: il server di prima non la conosce, e risponde come se mancasse il feedback.
+      if (radice && r && r.reason === 'feedback_non_valido') return { ok: false, error: 'Il server non sa ancora timbrare una radice: arriva col prossimo aggiornamento del server.' };
+      return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
     }
-    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
-    return Object.assign({ ok: true, fiducia: togli ? 'non_fidato' : 'fidato' }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
+    if (radice) return { ok: true, radice: String(r.radice || radice), timbrata: r.timbrata === true, cambiati: r.cambiati || {} };
+    const fiducia = r.fiducia === 'fidato' || r.fiducia === 'non_fidato' ? r.fiducia : (togli ? 'non_fidato' : 'fidato');
+    return Object.assign({ ok: true, fiducia }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
+  }));
+
+  // Le radici di un feedback o di una domanda per il cartellino della fiducia (#1918): le legge solo il server.
+  on(MSG.FIDUCIA_RADICI, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    const domandaId = String(msg?.domandaId || '').trim();
+    if (!feedbackId && !domandaId) return { ok: false, error: 'Manca il feedback o la domanda.' };
+    const { r, error } = await chiamaFiducia(Object.assign({ op: 'radici' }, domandaId ? { domandaId } : { feedbackId }));
+    if (error) return { ok: false, error };
+    if (!r || r.ok === false) {
+      if (r && r.reason === 'op_sconosciuta') return { ok: false, error: 'Il server non sa ancora dire le radici: arriva col prossimo aggiornamento del server.' };
+      return { ok: false, error: (r && (r.detail || r.reason)) || 'Il server non ha detto le radici.' };
+    }
+    return { ok: true, fiducia: r.fiducia === 'fidato' ? 'fidato' : 'non_fidato', radici: Array.isArray(r.radici) ? r.radici : [] };
   }));
 
   // Ramo e note di un lavoro dichiarati fidati com'erano (#2258): il main passa solo la forma; cosa e se lo decide il server.

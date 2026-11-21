@@ -175,6 +175,7 @@
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgFiduciaBtn = document.getElementById('mgFiduciaBtn');
+  const mgRadici = document.getElementById('mgRadici');
   const mgAtteseToggle = document.getElementById('mgAtteseToggle');
   const mgAttese       = document.getElementById('mgAttese');
   const mgAtteseLista  = document.getElementById('mgAtteseLista');
@@ -1595,6 +1596,7 @@
   const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
   const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
   const FIDUCIA_DICHIARA = (window.SN_MSG?.MSG?.FIDUCIA_DICHIARA) || 'fiducia_dichiara';
+  const FIDUCIA_RADICI = (window.SN_MSG?.MSG?.FIDUCIA_RADICI) || 'fiducia_radici';
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVAL_RIAPRI = (window.SN_MSG?.MSG?.MERGE_APPROVAL_RIAPRI) || 'merge_approval_riapri';
@@ -3858,6 +3860,60 @@
     mgFiduciaBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
     mgFiduciaBtn.textContent = on ? '🤝 Fidato' : '🤝 Segna fidato';
     mgFiduciaBtn.title = on ? titoloTogliFiducia(fb) : titoloFiducia(fb);
+    reflectRadici(fb);
+  }
+
+  // ── Le radici della fiducia (#1918, SPEC-DOMANDE.md §1.8) ─────────────────
+  // Accanto a «Segna fidato»: i testi esterni da cui discende la pratica. Il timbro va sulla radice, una volta, e il
+  // server ricalcola tutto ciò che la porta. Le dice solo il server (i timbri non li legge un client).
+  const radiciLette = new Map();
+  const RAD = window.SN_MANAGE_RADICI;
+  const etichettaRadice = (x) => RAD.etichetta(x);
+  function disegnaRadici(fb, lista) {
+    RAD.disegna(mgRadici, lista, (x) => timbraRadice(fb, x));
+  }
+  async function reflectRadici(fb) {
+    if (!mgRadici) return;
+    if (!isAdmin || !fb || !mgFiduciaBtn || mgFiduciaBtn.hidden) { mgRadici.hidden = true; return; }
+    const id = fb._id;
+    // Valgono finché non cambia la fiducia della pratica né arriva un timbro, da qui o dalle Domande.
+    const gia = radiciLette.get(id);
+    if (gia && gia.firma === RAD.firma(id, fb.fiducia)) { disegnaRadici(fb, gia.lista); return; }
+    mgRadici.hidden = true;
+    const r = await sendToMain({ type: FIDUCIA_RADICI, feedbackId: id }).catch(() => null);
+    // Un server di prima non le sa dire: il cartellino non c'è, il tasto resta.
+    if (!r || r.ok === false || !Array.isArray(r.radici)) return;
+    radiciLette.set(id, { firma: RAD.firma(id, r.fiducia), lista: r.radici });
+    if (selectedId !== id) return;
+    // Un timbro dato altrove può averla resa fidata (o tolta): la pagina lo dice subito, la rilettura porterà lo stesso.
+    const ora = allFeedbacks.find((f) => f._id === id) || fb;
+    if (MR.isFidato(ora) !== (r.fiducia === 'fidato')) {
+      ora.fiducia = r.fiducia;
+      reflectFiducia(ora);
+      renderList();
+      updateTabCounts();
+      return;
+    }
+    disegnaRadici(ora, r.radici);
+  }
+  async function timbraRadice(fb, x) {
+    if (!x || x.timbrabile === false) return;
+    const togli = x.timbrata === true;
+    const nome = etichettaRadice(x);
+    for (const b of mgRadici ? mgRadici.querySelectorAll('.mg-radice') : []) b.disabled = true;
+    setManageMsg(togli ? `Tolgo il timbro a «${nome}»…` : `Timbro «${nome}»…`, '');
+    try {
+      const r = await sendToMain(Object.assign({ type: FIDUCIA_SEGNA, radice: x.radice }, togli ? { fidato: false } : {}));
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non ha risposto');
+      const n = Object.values(r.cambiati || {}).reduce((a, v) => a + (Number(v) || 0), 0);
+      // Il ricalcolo tocca altre pratiche e domande: le radici lette prima non valgono più, e la lista si rilegge.
+      RAD.invalida();
+      setManageMsg(`${togli ? `Timbro tolto a «${nome}»` : `«${nome}» timbrata`}: ${n === 1 ? 'una cosa ha cambiato fiducia' : `${n} cose hanno cambiato fiducia`}.`, 'ok');
+    } catch (e) {
+      setManageMsg(`${togli ? 'Timbro non tolto' : 'Non timbrata'}: ${e.message || 'Errore'}`, 'err');
+    } finally {
+      if (selectedId === fb._id) reflectRadici(allFeedbacks.find((f) => f._id === fb._id) || fb);
+    }
   }
   async function impostaFiducia(id, valore) {
     const fb = allFeedbacks.find((f) => f._id === id);
@@ -3871,13 +3927,19 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non ha risposto');
       // Il server l'ha scritto: la rilettura porterà lo stesso valore, intanto la pagina lo dice subito.
       const ora = allFeedbacks.find((f) => f._id === id) || fb;
-      ora.fiducia = valore ? 'fidato' : 'non_fidato';
+      ora.fiducia = r.fiducia === 'fidato' || r.fiducia === 'non_fidato' ? r.fiducia : (valore ? 'fidato' : 'non_fidato');
+      RAD.invalida();
       ora.fiduciaDa = { by: 'owner', at: Date.now() };
       // Chi aspettava la fiducia per il server è ripartito nello stesso gesto, come lavoro server (#1358).
       if (r.rimessoInCoda) Object.assign(ora, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
       if (selectedId === id) { if (r.rimessoInCoda) openDetail(id, { ridisegno: true }); else reflectManage(ora); }
       renderList();
       updateTabCounts();
+      // Il server può dire di no anche al sì dell'owner: una radice che nessun timbro toglie la tiene non fidata.
+      if (valore && ora.fiducia !== 'fidato') {
+        setManageMsg(`Resta non fidato${chi}: porta una radice che nessun timbro toglie, la vedi qui sotto.`, 'err');
+        return;
+      }
       setManageMsg(valore
         ? (r.rimessoInCoda ? `Da ora${chi} è fidato, ed è ripartito In coda come lavoro server.` : `Da ora${chi} è fidato.`)
         : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
@@ -4443,7 +4505,10 @@
         let fiducia = '';
         if (!MR.isFidato(fb)) {
           const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err.message }));
-          if (f && f.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; } else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
+          // Il server può lasciarlo non fidato anche col sì dell'owner (una radice che nessun timbro toglie): vale la sua risposta.
+          if (f && f.ok && f.fiducia !== 'non_fidato') { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; }
+          else if (f && f.ok) fiducia = ' Resta non fidato: porta una radice che nessun timbro toglie, e alla fusione ti chiederà il via libera.';
+          else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
         }
         toast(`${num ? `#${num}` : 'Il feedback'} è In coda come lavoro server.${fiducia}`, fiducia ? 'err' : 'ok');
       }
