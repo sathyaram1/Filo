@@ -351,7 +351,7 @@
   // una segnalazione, come la riga in diretta; una voce salvata senza titolo non ne riceve uno di ripiego, che non era partito.
   function rigaDellaVoce(v) {
     const r = rigaSenzaFumetto(v);
-    const S = r && v.type === 'INVIA_FEEDBACK' && v.segnalazione ? (campiSegnalazione({}), global.SN_ALLEGATI_SEGNALAZIONE) : null;
+    const S = r && v.type === 'INVIA_FEEDBACK' && v.segnalazione ? moduloSegnalazione() : null;
     const fumetto = S ? S.fumetto({ titolo: v.titoloSegnalazione, testo: v.segnalazione }, { ripiego: false }) : '';
     return fumetto ? { ...r, fumetto } : r;
   }
