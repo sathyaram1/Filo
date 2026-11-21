@@ -114,15 +114,15 @@ test('un indirizzo chiesto subito dopo il crollo della scheda si apre, e la pagi
 });
 
 // La scheda su `url` cade e, appena il main la sa caduta, prima della rimessa in piedi, riceve `gesto` (#1868).
-async function gestoSubitoDopoIlCrollo(app, url, gesto) {
-  await app.evaluate(async ({ BrowserWindow }, [target, nome]) => {
+async function gestoSubitoDopoIlCrollo(app, url, gesto, ...argomenti) {
+  await app.evaluate(async ({ BrowserWindow }, [target, nome, resto]) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === target);
     const wc = tab.view.webContents;
     process.kill(wc.getOSProcessId(), 'SIGKILL');
     for (let i = 0; i < 200 && !wc.isCrashed(); i++) await new Promise((r) => setTimeout(r, 10));
-    w._filoTabs[nome](tab.id);
-  }, [url, gesto]);
+    w._filoTabs[nome](tab.id, ...resto);
+  }, [url, gesto, argomenti]);
   // Oltre la rimessa in piedi (300 ms): se il gesto non avesse vinto, la pagina della scheda caduta sarebbe qui.
   await new Promise((r) => setTimeout(r, 1500));
 }
