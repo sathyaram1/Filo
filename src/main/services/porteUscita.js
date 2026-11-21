@@ -4,7 +4,7 @@
 const PageRead = require('./pageRead');
 const { riquadroArrivato } = require('./riquadroArrivato');
 const { spingiAllaScheda } = require('./impostazioniPerOrigine');
-const { daFilo, origineDi } = require('./handlers/origine');
+const { daFilo, origineDi, paginaNonDiFilo, daPaginaNonDiFilo } = require('./handlers/origine');
 const SegretiLetti = require('./segretiLetti');
 const VerdettiUscite = require('./verdettiUscite');
 const ContatoriSicurezza = require('./contatoriSicurezza');
