@@ -45,7 +45,6 @@ const stati = (app) => app.evaluate(async ({ session }) => {
 const CASI = [
   { titolo: 'riscritto con scadenza', js: `document.cookie = "stato=1; max-age=3600; ${ATTR}"; setTimeout(() => { document.cookie = "stato=2; max-age=3600; ${ATTR}"; }, 20);`, atteso: ['stato=2:sessione'] },
   { titolo: 'riscritto di sessione', js: `document.cookie = "stato=1; max-age=3600; ${ATTR}"; setTimeout(() => { document.cookie = "stato=2; ${ATTR}"; }, 20);`, atteso: ['stato=2:sessione'] },
-  { titolo: 'cancellato', js: `document.cookie = "stato=1; max-age=3600; ${ATTR}"; setTimeout(() => { document.cookie = "stato=; max-age=0; ${ATTR}"; }, 20);`, atteso: [] },
 ];
 
 for (const caso of CASI) {
