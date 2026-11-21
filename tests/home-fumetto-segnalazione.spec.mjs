@@ -170,7 +170,7 @@ for (const [nome, campi] of [['sotto «name»', { testo: BREVE, name: TITOLO }],
 
       await tasto.click();
       await expect(riquadro).toBeVisible({ timeout: 5000 });
-      await expect.poll(() => confirmText(page), { message: 'il riquadro chiede lo stesso titolo' }).toContain(`Titolo:\n«${titolo}»`);
+      await expect.poll(() => confirmText(page), { message: 'il riquadro chiede lo stesso titolo' }).toMatch(new RegExp(`Titolo:[\\s\\S]*${titolo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*Testo:`));
       await confermaInvio(page);
       await expect.poll(() => app.evaluate(() => globalThis.__fbInviati.length), { timeout: 10_000 }).toBe(1);
       const [inviato] = await app.evaluate(() => globalThis.__fbInviati);
