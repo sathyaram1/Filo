@@ -1,4 +1,4 @@
-// I controlli che fermano un avviso (#536) o un'uscita (#810) SENZA chiedere a nessun modello.
+// I controlli che fermano un avviso (#536) o un'uscita (#810) SENZA chiedere a nessun modello: l'unico posto delle forme dei segreti.
 // Devono funzionare a rete staccata e sbagliare di rado: solo forme che non hanno nessuna ragione
 // di comparire in un testo onesto. Prove: tests/unit/guardianoStatico.test.mjs, usciteSegreti.test.mjs.
 
