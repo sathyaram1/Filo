@@ -11,7 +11,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { sorgenteDelClassificatore } from '../helpers/sorgenteClassificatore.mjs';
 
 const require = createRequire(import.meta.url);
@@ -446,6 +449,8 @@ test('git config — scrivere una chiave che avvia un programma chiede «conferm
     'git config --worktree diff.external x', 'git config CORE.EDITOR x',
     // `git pop`, che lo farebbe partire, vale già 3 da solo (#2619): `pop` non è un comando di git.
     'git config alias.pop "!python3 evil.py"',
+    // #2623: il remoto di un ramo accetta anche un indirizzo, e decide dove va il prossimo push.
+    'git config branch.main.remote origin',
   ]) {
     assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
   }
@@ -453,7 +458,7 @@ test('git config — scrivere una chiave che avvia un programma chiede «conferm
   for (const cmd of [
     'git config user.name "Mario Rossi"', 'git config --global user.email a@b.c', 'git config pull.rebase true',
     'git config core.autocrlf false', 'git config core.fsmonitor true', 'git config init.defaultBranch main',
-    'git config merge.conflictstyle diff3', 'git config branch.main.remote origin', 'git config --global --add safe.directory /x',
+    'git config merge.conflictstyle diff3', 'git config branch.main.merge refs/heads/main', 'git config --global --add safe.directory /x',
     'git config set user.name Bob', 'git config --type bool commit.gpgsign true', 'git config color.ui auto',
   ]) {
     assert.equal(lvl(cmd), 2, `"${cmd}" dovrebbe restare livello 2`);
@@ -1391,6 +1396,68 @@ test('cancellaPerSempre: il programma che git lancia da sé si guarda come gli a
   for (const cmd of ['git rebase -x "npm test" main', 'git submodule foreach git status', 'git rebase main', 'git submodule update',
     'git rebase -s rm main', 'git clone -c core.autocrlf=false ./a b']) {
     assert.equal(C.cancellaPerSempre(cmd), false, cmd);
+  }
+});
+
+// #2623: il remoto di un ramo e quello predefinito accettano un indirizzo al posto di un nome, un file incluso scrive
+// l'indirizzo di un remoto, e il `git push` nudo che segue (2) li raggiunge: valgono come `git remote set-url`.
+const CHIAVI_DEL_PUSH = ['branch.main.pushRemote', 'remote.pushDefault', 'branch.main.remote'];
+test('git config — il remoto di un ramo o quello predefinito, scritti, decidono dove va il push (3) (#2623)', () => {
+  for (const chiave of [...CHIAVI_DEL_PUSH, 'branch.feature/x.y.pushremote', 'REMOTE.PUSHDEFAULT', 'include.path',
+    'includeIf.gitdir:~/lavoro/.path', 'includeIf.onbranch:main.path']) {
+    for (const cmd of [`git config ${chiave} https://altrove.example/r.git`, `git config ${chiave} altrove.example:r.git`,
+      `git config ${chiave} origin`, `git config --global ${chiave} ../altrove`, `git config --add ${chiave} x`,
+      `git config --replace-all ${chiave} x`, `git config set ${chiave} https://x/r.git`, `git config set --append ${chiave} x`]) {
+      assert.equal(lvl(cmd), 3, `"${cmd}" (sceglie dove va il prossimo push) dovrebbe essere livello 3`);
+    }
+  }
+  // Leggerle resta lettura; le chiavi vicine che non scelgono il server restano 2.
+  for (const cmd of ['git config --get branch.main.remote', 'git config remote.pushDefault', 'git config get branch.main.pushRemote']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  }
+  for (const cmd of ['git config branch.main.merge refs/heads/main', 'git config push.default current', 'git config branch.main.rebase true',
+    'git config remote.origin.push refs/heads/main', 'git config branch.remote.x y']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (non sceglie il server) dovrebbe essere livello 2`);
+  }
+});
+
+const conGit = (() => { try { execFileSync('git', ['--version'], { stdio: 'ignore' }); return true; } catch (_) { return false; } })();
+test('git vero: dopo una di quelle chiavi, il `git push` nudo manda il codice all\'indirizzo scritto (#2623)', { skip: conGit ? false : 'git non installato' }, () => {
+  const base = cartellaTemporanea('filo-2623-push-');
+  // Niente impostazioni della macchina: un insteadOf globale cambierebbe gli indirizzi.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/.test(k)));
+  Object.assign(env, { GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(base, 'nessuna.gitconfig'), GIT_TERMINAL_PROMPT: '0' });
+  const git = (cwd, ...a) => execFileSync('git', a, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  try {
+    const origine = join(base, 'origine.git');
+    git(base, 'init', '-q', '--bare', origine);
+    const lavoro = join(base, 'lavoro');
+    git(base, 'init', '-q', '-b', 'main', lavoro);
+    git(lavoro, 'config', 'user.email', 'prova@example.test');
+    git(lavoro, 'config', 'user.name', 'prova');
+    git(lavoro, 'remote', 'add', 'origin', origine);
+    git(lavoro, 'commit', '-q', '--allow-empty', '-m', 'primo');
+    git(lavoro, 'push', '-q', '-u', 'origin', 'main');
+    // branch.main.remote per ultima: tolta, il ramo resta senza remoto.
+    for (const chiave of ['include.path', ...CHIAVI_DEL_PUSH]) {
+      const altrove = join(base, `altrove-${chiave}.git`);
+      git(base, 'init', '-q', '--bare', altrove);
+      git(lavoro, 'commit', '-q', '--allow-empty', '-m', chiave);
+      // Il file incluso arriva con quello che il comando trova già su disco, per esempio dentro un repository clonato.
+      let valore = altrove;
+      if (chiave === 'include.path') {
+        valore = join(base, 'incluso.gitconfig');
+        writeFileSync(valore, `[remote "origin"]\n\tpushurl = ${altrove.replace(/\\/g, '/')}\n`);
+      }
+      git(lavoro, 'config', chiave, valore);
+      assert.equal(lvl(`git config ${chiave} ${valore}`), 3, `"git config ${chiave} <indirizzo>" dovrebbe chiedere "conferma"`);
+      assert.equal(lvl('git push'), 2);
+      git(lavoro, 'push', '-q');
+      assert.equal(git(altrove, 'rev-parse', 'main'), git(lavoro, 'rev-parse', 'HEAD'), `con ${chiave} il push è arrivato all'indirizzo scritto`);
+      git(lavoro, 'config', '--unset', chiave);
+    }
+  } finally {
+    togliCartella(base);
   }
 });
 
