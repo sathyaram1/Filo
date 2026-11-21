@@ -22,7 +22,7 @@ test('r1 un aggettivo che comincia come «di», «de», «per» dopo la password
   ]) expect(risposta(campo, sopra), sopra).toBe(campo);
 });
 
-test('r1 l\'etichetta «Password» di una pagina non toglie al modello le righe sotto', () => {
+test('r2 l\'etichetta «Password» di una pagina non toglie al modello le righe sotto', () => {
   for (const p of [
     'Sicurezza\nPassword\nUltima modifica il 12/03/2024\nVerifica in due passaggi',
     'Impostazioni router\nPassword del wifi\nModello AX1800-Pro, firmware 3.2.1',
