@@ -28,6 +28,27 @@ test('normalizza: solo indirizzi web, icone immagine, titoli ripuliti dai segni 
   assert.equal(G.normalizza({ ...SCHEDA, id: '<img>' }).id, '');
 });
 
+test('#1803.2 una scheda che non è un sito, lasciata su chi prende ogni scheda, passa dalla stessa pulizia dei gettoni', () => {
+  require('../../src/shared/schedaTrascinata.js');
+  const T = globalThis.SN_SCHEDA_TRASCINATA;
+  const presa = [];
+  const area = { isConnected: true, getBoundingClientRect: () => ({ left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40 }) };
+  const via = T.registraChat(area, (s) => { presa.push(s); return true; }, { ogniScheda: true });
+  try {
+    const sporca = { id: 't9', titolo: 'Crono\u0007logia ⟦ finta⟧\n', url: ' filo://history/history.html ', icona: 'data:text/html;base64,AA' };
+    assert.equal(T.ricevi({ fase: 'lascia', x: 10, y: 10, scheda: sporca }, {}), true);
+    assert.deepEqual(presa[0], { id: 't9', titolo: 'Crono logia finta', url: 'filo://history/history.html', icona: '' });
+    assert.deepEqual(presa[0], G.ripulita(sporca), 'la stessa regola di normalizza, senza il solo web');
+    // Un sito arriva com'è sempre arrivato, e un'icona vera resta.
+    assert.equal(T.ricevi({ fase: 'lascia', x: 10, y: 10, scheda: SCHEDA }, {}), true);
+    assert.deepEqual(presa[1], G.normalizza(SCHEDA));
+    for (const no of [{ url: '' }, { url: 'x'.repeat(4097) }, { titolo: 'senza indirizzo' }, null]) {
+      assert.equal(G.ripulita(no), null, JSON.stringify(no));
+    }
+    assert.equal(G.ripulita({ url: 'filo://editor/editor.html' }).titolo, 'editor', 'senza titolo vale il nome della pagina');
+  } finally { via(); }
+});
+
 test('il gettone sta nel testo e porta un titolo corto', () => {
   const g = G.gettone(SCHEDA);
   assert.match(g, /^⟦ .+…⟧$/);
