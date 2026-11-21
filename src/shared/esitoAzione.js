@@ -414,7 +414,7 @@
   global.SN_ESITO = {
     daRaccontare,
     esitoAzione, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
-    testoSegnalazione,
+    perTrascrizione, testoSegnalazione,
     unisciDopo, primaRigaConferma: primaRiga, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
