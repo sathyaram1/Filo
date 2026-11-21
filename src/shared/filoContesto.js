@@ -583,6 +583,7 @@
         out.push(t);
       }
       // La stessa riga della rilettura per id: le parole e com'è andata ogni azione (#1685.3).
+      if (!global.SN_CHAT_ARCHIVE && typeof require === 'function') { try { require('./chatArchive.js'); } catch (_) {} }
       const CA = global.SN_CHAT_ARCHIVE;
       const riga = CA ? CA.rigaTrascritta(m) : '';
       if (riga) t.righe.push(riga);
