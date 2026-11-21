@@ -40,7 +40,12 @@ test('esplora 3', async ({ app, avvisi }) => {
   log('pagina', p.url());
   const box = await p.locator('#web').boundingBox();
   log('box', box);
-  await p.mouse.move(box.x + 5, box.y + 5);
+  const corsa = (pr, ms) => Promise.race([pr.then(() => 'ok', (e) => String(e).slice(0, 200)), new Promise((r) => setTimeout(() => r('APPESO'), ms))]);
+  log('ping main prima', await corsa(app.evaluate(() => 1), 5000));
+  log('ping pagina prima', await corsa(p.evaluate(() => 1), 5000));
+  log('move', await corsa(p.mouse.move(box.x + 5, box.y + 5), 10000));
+  log('ping main dopo', await corsa(app.evaluate(() => 1), 5000));
+  log('ping pagina dopo', await corsa(p.evaluate(() => 1), 5000));
   await new Promise((r) => setTimeout(r, 3000));
   log('dopo sosta', arrivi);
   await p.locator('#web').click({ button: 'right', noWaitAfter: true });
