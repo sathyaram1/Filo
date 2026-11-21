@@ -170,14 +170,8 @@ function concessioneDi(percorso) {
 }
 
 // Ogni risposta, di qualunque tipo: un XML o un file senza estensione che Chromium riconosce come HTML eseguono script.
-// Il nome e il file vero devono stare tutti e due nella concessione: un «foto.png» che punta fuori non passa.
 async function servi(partizione, req) {
-  const c = concessioni.get(partizione);
-  const percorso = percorsoDi(req.url);
-  if (!permesso(c, percorso)) return new Response('', { status: 403 });
-  let reale = null;
-  try { reale = await fs.promises.realpath(percorso); } catch (_) {}
-  if (reale && !permesso(c, reale)) return new Response('', { status: 403 });
+  if (!permesso(concessioni.get(partizione), percorsoDi(req.url))) return new Response('', { status: 403 });
   let r;
   try { r = await require('electron').net.fetch(req, { bypassCustomProtocolHandlers: true }); } catch (_) {
     return new Response('', { status: 404 });
