@@ -14,6 +14,7 @@
         { testo: 'La traduzione della pagina si chiede anche a Filo, nella chat o nell\'Aiuto della pagina: «traducimi questa pagina», «riprendi la traduzione», «torna all\'originale». Se la pagina è già tradotta o già com\'era, te lo dice. Il tasto che traduce la selezione, premuto senza niente di selezionato, traduce la pagina.', segnalazione: 504 },
       ],
       fixes: [
+        { testo: 'Filo riconosce più segreti letti in una pagina o nell\'uscita di un comando (un token di accesso, la password dentro un indirizzo, le chiavi di GitLab e Tavily) e non li lascia uscire da un link o da una ricerca fatti dopo.', segnalazione: 1840 },
         { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
         { testo: 'Se il computer risponde lento una volta, la home torna da sola a leggere subito Bluetooth e Wi-Fi, senza riavviare Filo, e dopo una pausa del computer non ti mostra come attuale lo stato di prima.', segnalazione: 2394 },
       ],
