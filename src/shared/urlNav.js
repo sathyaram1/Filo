@@ -59,7 +59,7 @@
     // Per i browser `/\sito` vale `//sito`; un host che non si legge vale fuori.
     for (const m of resto.matchAll(/[/\\]{2,}([^/\\?#\s]*)/g)) {
       let host = null;
-      try { host = new URL(`http://${m[1]}`).hostname; } catch (_) { host = null; }
+      try { host = new URL('//' + m[1], u.href).hostname; } catch (_) { host = null; }
       if (host == null || !questoComputer(host)) return false;
     }
     return true;
