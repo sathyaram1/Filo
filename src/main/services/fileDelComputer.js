@@ -202,11 +202,6 @@ function inSessioneDiFile(wc) {
   try { return Boolean(wc && [...sessioni.values()].includes(wc.session)); } catch (_) { return false; }
 }
 
-// WebRTC esce per UDP senza passare né dalla CSP né dal proxy: qui solo per il proxy, che non risponde.
-function chiudiRete(wc) {
-  if (inSessioneDiFile(wc)) { try { wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch (_) {} }
-}
-
 // Da chiamare prima di caricare il file, da ogni strada che lo apre: dà la partizione della scheda nuova, o null.
 function concedi(input) {
   const percorso = percorsoDi(input);
