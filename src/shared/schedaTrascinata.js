@@ -52,15 +52,6 @@
     return f ? { campo: f, el: f } : null;
   }
 
-  // Una scheda qualunque, per chi decide da sé cosa farne: l'indirizzo com'è, il titolo, l'icona se è un'immagine.
-  function qualunque(s) {
-    if (!s || typeof s !== 'object' || typeof s.url !== 'string' || !s.url.trim() || s.url.length > 4096) return null;
-    const titolo = String(s.titolo || '').replace(/\s+/g, ' ').trim().slice(0, 300);
-    const icona = typeof s.icona === 'string' && s.icona.length <= 200000 && /^data:image\//i.test(s.icona) ? s.icona : '';
-    const id = typeof s.id === 'string' && /^[\w-]{1,80}$/.test(s.id) ? s.id : '';
-    return { id, titolo, url: s.url.trim(), icona };
-  }
-
   function illumina(doc, el) {
     if (!el) { if (luce) luce.style.display = 'none'; return; }
     if (!luce || !luce.isConnected) {
