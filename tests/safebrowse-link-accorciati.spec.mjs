@@ -4,6 +4,10 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { paginaDellaScheda } from './helpers/schede.mjs';
 
 const CORTO = 'bit.ly';
 const TRUFFA = 'conto-truffa966.com';
