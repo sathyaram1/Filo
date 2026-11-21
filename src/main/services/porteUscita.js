@@ -362,8 +362,7 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
-  const origine = sender?.tab?.url || sender?.url || '';
-  const daPagina = /^https?:/i.test(origine);
+  const daPagina = daPaginaNonDiFilo(sender);
   const indirizzo = (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
   const delComando = tipo === 'ESEGUI_COMANDO' ? Exfil.indirizziDelComando(action) : [];
   let memoria = '';
