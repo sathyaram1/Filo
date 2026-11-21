@@ -124,18 +124,51 @@ test('aperto un file nella cartella di casa, la pagina legge solo sé e i file c
 }));
 
 test('la radice di un disco e una cartella che contiene la casa non si concedono intere', () => conCasa((casa, radice) => {
-  assert.equal(F.concessioneDi(join(path.parse(casa).root, 'x.html')).cartella, null);
-  assert.equal(F.concessioneDi(join(radice, 'x.html')).cartella, null);
+  assert.deepEqual(F.concessioneDi(join(path.parse(casa).root, 'x.html')).cartelle, []);
+  assert.deepEqual(F.concessioneDi(join(radice, 'x.html')).cartelle, []);
   const sotto = F.concessioneDi(join(casa, 'Desktop', 'x.html'));
-  assert.notEqual(sotto.cartella, null);
+  assert.ok(sotto.cartelle.length > 0);
 }));
 
-test('la CSP dei file toglie file: a fetch, XHR, riquadri e worker', () => {
-  for (const d of ['connect-src', 'frame-src', 'worker-src']) {
-    const v = F.CSP_DOCUMENTO.split(';').map((s) => s.trim()).find((s) => s.startsWith(d));
-    assert.ok(v && !/\bfile:|\*|'self'/.test(v), d);
+test('un collegamento simbolico nella cartella vale per il file vero: se punta fuori non si legge', { skip: process.platform === 'win32' }, () => conCasa((casa) => {
+  const dir = join(casa, 'Scaricati', 'sito');
+  mkdirSync(join(casa, '.ssh'), { recursive: true });
+  mkdirSync(join(casa, 'Immagini'), { recursive: true });
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(casa, '.ssh', 'id_rsa'), 'CHIAVE');
+  writeFileSync(join(casa, 'Immagini', 'passaporto.png'), 'PNG');
+  writeFileSync(join(dir, 'vera.png'), 'PNG');
+  writeFileSync(join(dir, 'index.html'), '<img src="foto.png"><img src="chiave.png">');
+  symlinkSync(join(casa, 'Immagini', 'passaporto.png'), join(dir, 'foto.png'));
+  symlinkSync(join(casa, '.ssh', 'id_rsa'), join(dir, 'chiave.png'));
+  symlinkSync(join(casa, 'Immagini'), join(dir, 'album'));
+  symlinkSync(join(dir, 'vera.png'), join(dir, 'copia.png'));
+  const c = F.concessioneDi(join(dir, 'index.html'));
+  assert.equal(F.permesso(c, join(dir, 'vera.png')), true);
+  assert.equal(F.permesso(c, join(dir, 'copia.png')), true, 'un collegamento dentro la cartella resta');
+  assert.equal(F.permesso(c, join(dir, 'foto.png')), false);
+  assert.equal(F.permesso(c, join(dir, 'chiave.png')), false);
+  assert.equal(F.permesso(c, join(dir, 'album', 'passaporto.png')), false, 'una cartella collegata che porta fuori');
+  // Nella casa contano i file nominati, e anche lì il file vero.
+  writeFileSync(join(casa, 'appunti.html'), '<img src="Scaricati/sito/foto.png"><img src="Scaricati/sito/vera.png">');
+  const h = F.concessioneDi(join(casa, 'appunti.html'));
+  assert.equal(F.permesso(h, join(dir, 'vera.png')), true);
+  assert.equal(F.permesso(h, join(dir, 'foto.png')), false);
+}));
+
+test('la CSP dei file non lascia uscite verso la rete né letture di file come dati', () => {
+  const dir = Object.fromEntries(F.CSP_DOCUMENTO.split(';').map((s) => s.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+  assert.deepEqual(dir['default-src'], ["'none'"]);
+  for (const d of ['script-src', 'style-src', 'img-src', 'media-src', 'font-src', 'connect-src']) {
+    assert.ok(dir[d], d);
+    assert.ok(!dir[d].some((v) => /^(https?|wss?):$|\*|'self'/.test(v) || /\./.test(v)), `${d}: niente rete`);
   }
-  assert.match(F.CSP_DOCUMENTO, /object-src 'none'/);
+  assert.ok(!dir['connect-src'].includes('file:'), 'fetch e XHR non leggono file');
+  for (const d of ['frame-src', 'worker-src', 'child-src', 'object-src']) assert.equal(dir[d], undefined, `${d} resta a 'none'`);
+  assert.deepEqual(dir['form-action'], ["'none'"]);
+  // Origine opaca: senza allow-same-origin le immagini della cartella sporcano la tela.
+  assert.match(F.ISOLATA, /^sandbox /);
+  assert.doesNotMatch(F.ISOLATA, /allow-same-origin|allow-top-navigation|escape-sandbox/);
 });
 
 test('un file col percorso non scritto dall\'utente chiede il suo OK, e la conferma dice quale file', () => {
