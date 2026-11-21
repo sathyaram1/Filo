@@ -663,6 +663,7 @@
     parseTriage,
     transcriptForTriage,
     transcriptForReading,
+    rigaTrascritta,
     PEZZO_RILETTURA,
     toIndexEntry,
     excerptOf,
