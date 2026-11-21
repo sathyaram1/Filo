@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import { createSocket } from 'node:dgram';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { cartellaTemporanea, collegaFile } from './helpers/percorsi.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { paginaDellaScheda } from './helpers/schede.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
