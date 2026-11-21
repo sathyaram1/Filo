@@ -96,7 +96,7 @@
   // dichiarazioni (l'emittente e la chiave di firma sono quelli di tutti): il segreto è la firma.
   const PREFISSO_FISSO = new RegExp(`^(?:-----BEGIN [A-Z ]*PRIVATE KEY-----\\s*)?(?:${[
     'sk-(?:or-v1-|ant-api\\d\\d-|proj-)?', '(?:sk|pk|rk)_(?:live|test)_', 'gh[pousr]_', 'github_pat_', 'xox[baprs]-', 'AIza', 'AKIA',
-    ...INIZI_PKCS8, 'eyJ[\\w-]*\\.eyJ[\\w-]*\\.',
+    'glpat-', 'tvly-(?:dev-)?', ...INIZI_PKCS8, 'eyJ[\\w-]*\\.eyJ[\\w-]*\\.',
   ].join('|')})?`);
   const CODA_FISSA = /\s*-----END [A-Z ]*PRIVATE KEY-----\s*$/;
 
