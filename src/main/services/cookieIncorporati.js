@@ -486,6 +486,7 @@ function aggancia(ses) {
     ses.cookies.on('changed', (_e, c, cause, removed) => {
       if (!c || !c.name) return;
       const k = chiaveCookie(c);
+      try { osservaNostra(ses, k, c, cause, removed); } catch (_) {}
       if (removed) {
         if (cause === 'overwrite' && !c.session) {
           preesistenti.set(k, Date.now());
