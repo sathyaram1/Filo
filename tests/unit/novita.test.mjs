@@ -27,8 +27,14 @@ const FINTO = [
 test('le versioni uscite arrivano dalla più recente, senza il blocco della prossima', () => {
   const v = N.uscite(FINTO, '0.3.1');
   assert.deepEqual(v.map((x) => x.version), ['0.3.1', '0.3.0']);
-  assert.deepEqual(v[0].features[0], { testo: 'La pagina Novità elenca tutte le versioni.', segnalazione: 1956 });
-  assert.deepEqual(v[0].fixes[0], { testo: 'Il download riparte dopo un\'interruzione.', segnalazione: null });
+  assert.deepEqual(v[0].features[0], { testo: 'La pagina Novità elenca tutte le versioni.', segnalazioni: [1956] });
+  assert.deepEqual(v[0].fixes[0], { testo: 'Il download riparte dopo un\'interruzione.', segnalazioni: [] });
+});
+
+// #2270: la riga di un pacchetto collega ogni segnalazione assorbita nata da un utente.
+test('una riga con l’elenco delle segnalazioni arriva alla pagina con tutti i numeri', () => {
+  const v = N.uscite([{ version: '1.0.0', date: '', features: [{ testo: 'Il menu si apre.', segnalazione: [1956, 1960] }], fixes: [] }], '1.0.0');
+  assert.deepEqual(v[0].features[0].segnalazioni, [1956, 1960]);
 });
 
 test('sul registro vero ci sono almeno due versioni, e nessuna sopra quella installata', () => {
@@ -43,7 +49,7 @@ test('il filtro tiene le sole righe con tutte le parole, senza badare a maiuscol
   const v = N.uscite(FINTO, '0.3.1');
   const r = N.filtra(v, 'NOVITA versioni');
   assert.equal(r.righe, 1);
-  assert.equal(r.versioni[0].features[0].segnalazione, 1956);
+  assert.deepEqual(r.versioni[0].features[0].segnalazioni, [1956]);
   assert.deepEqual(r.approssimati, []);
   assert.equal(N.filtra(v, '   ').righe, 4, 'un campo di soli spazi non filtra niente');
   assert.equal(N.filtra(v, 'novità colore').righe, 0, 'due parole di righe diverse non fanno una riga');
@@ -67,7 +73,7 @@ test('una parola sbagliata di una lettera trova lo stesso, e la risposta lo dice
 
 test('i tratti da evidenziare cadono sulle lettere giuste, anche con gli accenti', () => {
   const testo = 'La pagina Novità elenca le novità.';
-  const r = N.filtra([{ version: '1.0.0', date: '', features: [{ testo, segnalazione: null }], fixes: [] }], 'novita');
+  const r = N.filtra([{ version: '1.0.0', date: '', features: [{ testo, segnalazioni: [] }], fixes: [] }], 'novita');
   const tratti = N.tratti(testo, r.termini);
   assert.deepEqual(tratti.map(([a, b]) => testo.slice(a, b)), ['Novità', 'novità']);
 });
@@ -100,12 +106,12 @@ test('una riga legata a una segnalazione resta testo per il recap e le impronte'
   }
 });
 
-test('ogni riga del registro è testo, o un oggetto con testo e numero di segnalazione', () => {
+test('ogni riga del registro è testo, o un oggetto con testo e numero (o elenco di numeri) di segnalazione', () => {
   for (const n of PN.NOTES) {
     for (const r of [...(n.features || []), ...(n.fixes || [])]) {
       if (typeof r === 'string') continue;
       assert.equal(typeof r.testo, 'string', `${n.version}: riga senza testo`);
-      assert.ok(Number.isInteger(r.segnalazione) && r.segnalazione > 0, `${n.version}: «${r.testo.slice(0, 60)}» ha un numero di segnalazione non valido`);
+      assert.ok(PN.segnalazioneValida(r.segnalazione), `${n.version}: «${r.testo.slice(0, 60)}» ha un numero di segnalazione non valido`);
       assert.deepEqual(Object.keys(r).sort(), ['segnalazione', 'testo'], `${n.version}: campi in più`);
     }
   }
@@ -115,7 +121,7 @@ test('ogni riga del registro è testo, o un oggetto con testo e numero di segnal
 // comparirebbe su nessuna riga vera. Una riscrittura del registro che perde i numeri si ferma qui.
 test('una parte vera delle righe uscite si apre sulla sua segnalazione', () => {
   const righe = N.uscite(null, pkg.version).flatMap((v) => [...v.features, ...v.fixes]);
-  const collegate = righe.filter((r) => r.segnalazione);
+  const collegate = righe.filter((r) => r.segnalazioni.length);
   assert.ok(collegate.length >= Math.ceil(righe.length / 10), `${collegate.length} righe collegate su ${righe.length}`);
 });
 

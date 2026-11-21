@@ -131,11 +131,18 @@ export function leggiNote(sorgente) {
   } catch (_) { return null; }
 }
 
+// La stessa forma di SN_PATCH_NOTES.segnalazioneValida, copiata perché qui il registro non si esegue: un intero, o un
+// elenco di interi diversi, uno per segnalazione assorbita da un pacchetto (#2270). Il tetto uguale a quello del
+// registro lo tiene tests/unit/releaseNovita.test.mjs. PURA.
+export const SEGNALAZIONI_MAX = 20;
+const segnalazioneValida = (s) => (Number.isInteger(s) ? s > 0
+  : Array.isArray(s) && s.length >= 1 && s.length <= SEGNALAZIONI_MAX && s.every((n) => Number.isInteger(n) && n > 0) && new Set(s).size === s.length);
+
 /** Una riga del server com'è nel registro: testo, o { testo, segnalazione }; null se non è nessuna delle due. PURA. */
 function rigaValida(r) {
   if (typeof r === 'string') return r.trim() ? r : null;
   if (!r || typeof r !== 'object' || typeof r.testo !== 'string' || !r.testo.trim()) return null;
-  return Number.isInteger(r.segnalazione) && r.segnalazione > 0 ? { testo: r.testo, segnalazione: r.segnalazione } : null;
+  return segnalazioneValida(r.segnalazione) ? { testo: r.testo, segnalazione: r.segnalazione } : null;
 }
 
 /** Le righe di un blocco dopo la riscrittura: le riscritte, poi quelle che il redattore non ha visto (fuse dopo). PURA. */
@@ -153,7 +160,8 @@ function testoDelBlocco(blocco, rientro) {
   const r1 = `${rientro}  `;
   const r2 = `${rientro}    `;
   const chiave = (k) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
-  const riga = (r) => (typeof r === 'string' ? JSON.stringify(r) : `{ testo: ${JSON.stringify(r.testo)}, segnalazione: ${r.segnalazione} }`);
+  const numeri = (s) => (Array.isArray(s) ? `[${s.join(', ')}]` : String(s));
+  const riga = (r) => (typeof r === 'string' ? JSON.stringify(r) : `{ testo: ${JSON.stringify(r.testo)}, segnalazione: ${numeri(r.segnalazione)} }`);
   const lista = (nome, l) => (l.length ? `${r1}${nome}: [\n${l.map((r) => `${r2}${riga(r)},\n`).join('')}${r1}],\n` : `${r1}${nome}: [],\n`);
   const altre = Object.keys(blocco).filter((k) => !['version', 'features', 'fixes'].includes(k))
     .map((k) => `${chiave(k)}: ${JSON.stringify(blocco[k])}`);

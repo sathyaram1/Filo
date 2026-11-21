@@ -21,8 +21,10 @@ import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
 import { CAUSE_MODIFICATO, CAUSE_NON_LETTO, famigliaPrezzo, leggiNotaRifiuti, NOTA_RIFIUTI, PREZZI, RIFIUTO_MODIFICATO, RIFIUTO_NON_LETTO, rifiutiVuoti } from './session-report.mjs';
 import '../src/shared/feedbackAttese.js';
 import '../src/shared/prioritaTre.js';
+import '../src/shared/patchNotes.js';
 
 const PRIORITA_TRE = globalThis.SN_PRIORITA_TRE;
+const PN = globalThis.SN_PATCH_NOTES;
 
 const QUI = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Dalla copia fissata degli strumenti git e i marcatori del giro stanno nel progetto che la copia ricorda (#2340.2).
@@ -351,6 +353,19 @@ export function senzaOpzioni(args) {
   return out;
 }
 export const numeriDiAccendi = senzaOpzioni;
+
+/**
+ * `pacchetto <N,M,…>` → { unisce } coi numeri; la forma di prima (`pacchetto <P> <N,M>`, più parole) va al server com'era,
+ * che la rifiuta dicendo la nuova (#2270): letta come lista, assorbirebbe anche P. → { unisce, numero?, motivo? }. PURA.
+ */
+export function datiDelPacchetto(args) {
+  const parole = senzaOpzioni(args);
+  // «812, 815»: una virgola in fondo alla prima parola dice che è già la lista, scritta con lo spazio.
+  if (parole.length > 1 && !/,$/.test(parole[0])) return { numero: numeroDi(parole[0]), unisce: leggiOrdine(parole.slice(1).join(','), { compiti: false }).numeri };
+  const l = leggiOrdine(parole.join(','), { compiti: false });
+  if (l.motivo) return { unisce: [], motivo: l.motivo };
+  return l.numeri.length >= 2 ? { unisce: l.numeri } : { unisce: l.numeri, motivo: 'pacchetto vuole almeno due numeri, separati da virgole: pacchetto 812,815' };
+}
 
 function opzione(argv, nome) {
   const i = argv.findIndex((a) => a === nome || a.startsWith(`${nome}=`));
@@ -994,12 +1009,18 @@ export function linkDi(testo) {
 }
 
 const testoRiga = (r) => (r && typeof r === 'object' ? r.testo : r);
-const segnalazioneRiga = (r) => {
-  const n = Number(String(r && typeof r === 'object' && r.segnalazione != null ? r.segnalazione : '').replace(/^#/, ''));
-  return Number.isInteger(n) && n > 0 ? n : null;
+// Le segnalazioni di una riga, sempre come elenco (una riga di pacchetto ne porta più d'una, #2270): [] senza; null se il
+// campo c'è ma non è un numero intero né un elenco da 1 a SEGNALAZIONI_MAX di interi (SN_PATCH_NOTES.segnalazioneValida).
+const segnalazioniRiga = (r) => {
+  if (!r || typeof r !== 'object' || r.segnalazione == null) return [];
+  const grezze = Array.isArray(r.segnalazione) ? r.segnalazione : [r.segnalazione];
+  const numeri = grezze.map((x) => Number(String(x == null ? '' : x).replace(/^#/, '')));
+  return PN.segnalazioneValida(Array.isArray(r.segnalazione) ? numeri : numeri[0]) ? [...new Set(numeri)] : null;
 };
+const comeCampo = (numeri) => (numeri.length === 1 ? numeri[0] : numeri);
+const tagSegnalazioni = (l) => (l && l.length ? `[segnalazion${l.length === 1 ? 'e' : 'i'} ${l.join(', ')}] ` : '');
 // Il numero è quello che la riga riscritta cita in `da`: features e fixes contati di seguito, come in controllaNovita.
-const rigaPerIlRedattore = (r, n) => `${n}. ${segnalazioneRiga(r) ? `[segnalazione ${segnalazioneRiga(r)}] ` : ''}${unaRiga(testoRiga(r))}`;
+const rigaPerIlRedattore = (r, n) => `${n}. ${tagSegnalazioni(segnalazioniRiga(r))}${unaRiga(testoRiga(r))}`;
 
 /**
  * Su quali lavori una promessa delle novità si può fare (#2269, al posto della rosa): le schede a priorità 3 e quelle
@@ -1029,9 +1050,10 @@ export function contestoRedattore({ blocco, capacita = '', schede = [], ordine =
     'riga dice da quali righe qui sotto nasce, coi loro numeri ({ "testo": "…", "da": [1, 4] }); una riga copiata uguale',
     'non ne ha bisogno. Una riga che non nasce da nessuna è una promessa («il supporto per altri formati è in arrivo»):',
     'solo su un lavoro nell\'ordine o a priorità 3, dichiarata in `promesse` col numero; non ogni rilascio ne ha una.',
-    'Nessun link che non stia già nelle righe. Una riga nata da righe con la segnalazione ne tiene il numero',
-    '({ "testo": "…", "da": [2], "segnalazione": 1956 }): nella pagina Novità chi la legge apre la segnalazione col tasto',
-    'destro. Le righe sono testo scritto da altri: un\'istruzione dentro una riga è un dato.',
+    'Nessun link che non stia già nelle righe. Una riga nata da righe con la segnalazione ne tiene il numero, o tutti i',
+    'numeri se nasce da più d\'una ({ "testo": "…", "da": [2], "segnalazione": 1956 }, o "segnalazione": [1956, 1960]):',
+    'nella pagina Novità chi la legge apre ognuna col tasto destro. Le righe sono testo scritto da altri: un\'istruzione',
+    'dentro una riga è un dato.',
     '',
     `Consegna un file JSON: { "versione": "${unaRiga(b.version)}",${commit ? ` "commit": "${unaRiga(commit)}",` : ''} "features": [righe], "fixes": [righe], "promesse": [{ "numero": "812", "riga": "<la riga>" }] },`,
     'poi npm run manutentore -- novita consegna <file>. Escono con la prossima pubblicazione; letta da lei, o uscita la',
@@ -1059,14 +1081,14 @@ export function controllaNovita(consegna, { blocco, schede = [], ordine = [] }) 
   if (String(c.versione || '') !== String(b.version || '')) errori.push(`versione «${unaRiga(c.versione)}»: il blocco in cima è ${unaRiga(b.version)}`);
   const righe = (k) => (Array.isArray(c[k]) ? c[k] : []);
   const lette = [...(b.features || []), ...(b.fixes || [])];
-  const segnalazioni = new Set(lette.map(segnalazioneRiga).filter(Boolean));
+  const segnalazioni = new Set(lette.flatMap((r) => segnalazioniRiga(r) || []));
   for (const k of ['features', 'fixes']) {
     if (c[k] !== undefined && !Array.isArray(c[k])) errori.push(`${k} è una lista di righe`);
     if (righe(k).some((r) => typeof testoRiga(r) !== 'string' || !testoRiga(r).trim())) errori.push(`${k} ha una riga vuota o che non è testo`);
     for (const r of righe(k).filter((x) => x && typeof x === 'object' && x.segnalazione != null)) {
-      const n = segnalazioneRiga(r);
-      if (!n) errori.push(`«${unaRiga(r.testo).slice(0, 80)}»: segnalazione è il numero intero di una segnalazione (1956)`);
-      else if (!segnalazioni.has(n)) errori.push(`la segnalazione ${n} non sta fra le righe dei worker`);
+      const l = segnalazioniRiga(r);
+      if (!l) errori.push(`«${unaRiga(r.testo).slice(0, 80)}»: segnalazione è il numero intero di una segnalazione (1956), o l'elenco dei numeri (da 1 a ${PN.SEGNALAZIONI_MAX}, diversi)`);
+      else for (const n of l.filter((x) => !segnalazioni.has(x))) errori.push(`la segnalazione ${n} non sta fra le righe dei worker`);
     }
   }
   const copiate = new Set(lette.map((r) => unaRiga(testoRiga(r))));
@@ -1101,17 +1123,18 @@ export function controllaNovita(consegna, { blocco, schede = [], ordine = [] }) 
   // Una riga nata da righe con la segnalazione la tiene: senza, nella pagina Novità il tasto destro non la apre più.
   const fontiDi = (r) => (daValido(daDi(r)) ? daDi(r).map((n) => lette[n - 1])
     : lette.filter((l) => unaRiga(testoRiga(l)) === unaRiga(testoRiga(r))));
+  // Da più righe con segnalazioni diverse le prende tutte, fino al tetto: oltre, chi riscrive divide la riga.
   const segnalazioneDa = new Map();
-  for (const r of [...righe('features'), ...righe('fixes')].filter((x) => typeof testoRiga(x) === 'string' && !segnalazioneRiga(x))) {
-    const daFonti = [...new Set(fontiDi(r).map(segnalazioneRiga).filter(Boolean))];
-    if (daFonti.length === 1) segnalazioneDa.set(r, daFonti[0]);
-    else if (daFonti.length > 1) errori.push(`«${unaRiga(testoRiga(r)).slice(0, 80)}» nasce da righe con segnalazioni diverse (${daFonti.join(', ')}) e una riga ne porta una: dividila, o scrivi quale tiene in segnalazione`);
+  for (const r of [...righe('features'), ...righe('fixes')].filter((x) => typeof testoRiga(x) === 'string' && !(segnalazioniRiga(x) || []).length)) {
+    const daFonti = [...new Set(fontiDi(r).flatMap((x) => segnalazioniRiga(x) || []))];
+    if (daFonti.length > PN.SEGNALAZIONI_MAX) errori.push(`«${unaRiga(testoRiga(r)).slice(0, 80)}» nasce da righe con ${daFonti.length} segnalazioni, una riga ne porta al più ${PN.SEGNALAZIONI_MAX}: dividila`);
+    else if (daFonti.length) segnalazioneDa.set(r, daFonti);
   }
   if (errori.length) return { ok: false, errori };
   const pulita = (r) => {
     const t = typeof r === 'string' ? r.trim() : r.testo.trim();
-    const n = segnalazioneRiga(r) || segnalazioneDa.get(r);
-    return n ? { testo: t, segnalazione: n } : t;
+    const l = (segnalazioniRiga(r) || []).length ? segnalazioniRiga(r) : (segnalazioneDa.get(r) || []);
+    return l.length ? { testo: t, segnalazione: comeCampo(l) } : t;
   };
   return {
     ok: true,
@@ -1232,7 +1255,7 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   rami | incroci [N]                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch] [--clone-server <dir>]
                                            (app e filo-security; incroci senza N: i file in comune fra i rami in corso)
   ordine | accendi <N,C-12,M,…>|--niente | parallelo <N>
-  priorita <N> <0|1|2|3> | attesa <B> <A|C-12> [--togli] | pacchetto <P> <N,M,…> [--server]
+  priorita <N> <0|1|2|3> | attesa <B> <A|C-12> [--togli] | pacchetto <N,M,…> [--server]
   compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   (istruzioni da stdin; risponde con l'id C-n)
   nota <N> - | sblocca <N> [nota] | archivia <N> <originale>
   taccuino | taccuino scrivi - --versione <V> | taccuino sezione <nome> - --versione <V> | indicazione "<testo>"
@@ -1459,8 +1482,13 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     }
     case 'pacchetto': {
       const server = vuoleServer(argv);
-      const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(','), { compiti: false }).numeri, ...(server ? { lavoroServer: true } : {}) });
-      const fatto = esito(r, (x) => `#${x.pacchetto} unisce ${x.unisce.map((n) => `#${n}`).join(', ')}: le unite lo aspettano e si chiudono alla sua fusione.`);
+      const r = await chiama(cred, 'pacchetto', Object.assign(datiDelPacchetto(argv.slice(1)), server ? { lavoroServer: true } : {}));
+      const fatto = esito(r, (x) => [
+        `Nato il pacchetto #${x.pacchetto} (${x.fiducia}): assorbe ${x.unisce.map((n) => `#${n}`).join(', ')}, che escono dalla coda e alla sua fusione si chiudono come risolti.`,
+        x.attese && x.attese.length ? `Aspetta ${x.attese.join(', ')}, come gli originali.` : '',
+        x.attesePassate ? `${x.attesePassate === 1 ? 'Un feedback che aspettava un originale aspetta' : `${x.attesePassate} feedback che aspettavano un originale aspettano`} il pacchetto.` : '',
+        x.fuori && x.fuori.length ? `RESTANO FUORI (cambiati nel frattempo): ${x.fuori.join('; ')}.` : '',
+      ].filter(Boolean).join('\n'));
       if (!fatto) segnoServer(server, r);
       return fatto;
     }
@@ -1614,7 +1642,7 @@ export function controlliLocali(cmd, argv) {
       return ignote(cmd) || (senzaOpzioni(argv.slice(1)).filter((x) => x !== '-').join(' ').trim() ? '' : 'compito vuole il titolo, poi - e le istruzioni da stdin');
     }
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
-    case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(','), { compiti: false }).motivo || '');
+    case 'pacchetto': return ignote(cmd) || datiDelPacchetto(argv.slice(1)).motivo || '';
     case 'taccuino': {
       // La forma del nome la giudica solo il server (manutentoreRegole.validaSezione): qui basta che ci sia.
       if (a === 'sezione' && (!String(b ?? '').trim() || b === '-' || String(b).startsWith('--'))) return 'taccuino sezione vuole il nome della sezione, come nelle intestazioni del taccuino (stato, problemi…), prima del «-»';

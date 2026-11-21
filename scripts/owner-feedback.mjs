@@ -356,46 +356,6 @@ async function scriviAttese(id, richiestaSu, opts = {}) {
   });
 }
 
-/**
- * Una segnalazione che un pacchetto vuole unire, letta per i controlli di `feedback:apri --pacchetto`
- * (SPEC-RIDISEGNO-LAVORO.md §3, regola 1). `stato` e `priorita` restano '' e null se non si decifrano.
- * @returns {Promise<{ ok: true, id, num, stato, priorita, locale, attese, ramo, unisce, unitoIn, fidato } | { ok: false, motivo, inesistente? }>}
- */
-export async function segnalazioneDaUnire(riferimento, opts = {}) {
-  const ATT = globalThis.SN_FB_ATTESE;
-  const bearer = opts.bearer || await acquireBearer();
-  const r = await risolviFeedback(riferimento, { bearer, base: FIRESTORE_BASE });
-  if (!r.ok) return { ok: false, motivo: r.motivo, inesistente: /^nessun feedback/.test(r.motivo) };
-  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', 'branch', 'unisce', 'unitoIn', 'fiducia', ATT.CAMPO]);
-  if (!doc) return { ok: false, motivo: `nessun feedback ${riferimento}`, inesistente: true };
-  const f = doc.fields || {};
-  const { from, leggibile } = await statoAttuale(doc);
-  return {
-    ok: true, id: r.id,
-    num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)) || String(riferimento),
-    stato: leggibile ? from : '', priorita: await prioritaPrecedente(doc), locale: !!f.localOnly?.mapValue,
-    attese: ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) }),
-    ramo: String(f.branch?.stringValue || '').trim(),
-    unisce: (f.unisce?.arrayValue?.values || []).map((v) => String(v?.mapValue?.fields?.num?.stringValue || '')).filter(Boolean),
-    // Il rimando che il server scrive alla nascita di un pacchetto: una unita rimasta in coda lo porta senza attesa.
-    unitoIn: String(f.unitoIn?.stringValue || '').trim(),
-    // La fiducia la scrive solo il server (#1148): un pacchetto che porta i suoi allegati non è più fidato di lei.
-    fidato: MR.isFidato({ fiducia: f.fiducia?.stringValue }),
-  };
-}
-
-/**
- * Le attese di `id` sulle segnalazioni `togli` (id) diventano una sola su `voce` ({ id, num }), le altre restano: chi
- * aspettava una segnalazione unita in un pacchetto aspetta il pacchetto. Stesse regole di segnaAttese.
- */
-export async function spostaAttese(id, togli, voce, opts = {}) {
-  const via = (Array.isArray(togli) ? togli : []).map(String);
-  // Le unite tolte sono ancora aperte di proposito: si archiviano subito dopo.
-  return scriviAttese(id, (prima) => (prima.some((w) => via.includes(w.id))
-    ? { togli: via, aggiungi: [String(voce.num)], sostituisci: true }
-    : { fine: { ok: true, attese: prima, gia: true } }), opts);
-}
-
 /** Il rifiuto di `--aspetta` che toglierebbe attese non fuse, con le due righe per proseguire. PURA. */
 export function rifiutoSostituzione(rif, numeri, r) {
   const n = String(rif).replace(/^#+/, '');

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { applicaNovita, chiediNovita, impronta, leggiNote, main } from '../../scripts/release-novita.mjs';
+import { SEGNALAZIONI_MAX, applicaNovita, chiediNovita, impronta, leggiNote, main } from '../../scripts/release-novita.mjs';
 
 const note = (testo) => (leggiNote(testo) || {}).note;
 
@@ -57,6 +57,24 @@ describe('applicaNovita sul registro vero', () => {
     assert.equal(dopo[0].fixes[0], 'Una correzione.');
     assert.equal(dopo[0].date, TOP.date);
     assert.deepEqual(dopo.slice(1), NOTE.slice(1));
+  });
+
+  // #2270: la riga di un pacchetto porta l'elenco dei numeri, uno per segnalazione assorbita.
+  test('una riga con l’elenco delle segnalazioni si scrive e si rilegge uguale; un elenco storto no', () => {
+    const r = applicaNovita(SORGENTE, [{ versione: TOP.version, features: [{ testo: 'Il menu si apre.', segnalazione: [1956, 1960] }], fixes: [], originali: righeDi(TOP).map(impronta) }]);
+    assert.equal(r.ok, true, r.reason);
+    assert.match(r.testo, /\{ testo: "Il menu si apre\.", segnalazione: \[1956, 1960\] \}/);
+    assert.deepEqual(note(r.testo)[0].features[0], { testo: 'Il menu si apre.', segnalazione: [1956, 1960] });
+    createRequire(import.meta.url)(FILE);
+    const MAX = globalThis.SN_PATCH_NOTES.SEGNALAZIONI_MAX;
+    assert.equal(SEGNALAZIONI_MAX, MAX, 'il tetto della pubblicazione è quello del registro');
+    const piena = Array.from({ length: MAX }, (_, i) => i + 1);
+    const p = applicaNovita(SORGENTE, [{ versione: TOP.version, features: [{ testo: 'X.', segnalazione: piena }], fixes: [], originali: righeDi(TOP).map(impronta) }]);
+    assert.deepEqual(note(p.testo)[0].features[0], { testo: 'X.', segnalazione: piena }, 'al tetto la riga entra intera');
+    for (const storta of [[1956, 1956], [], [0], Array.from({ length: MAX + 1 }, (_, i) => i + 1)]) {
+      const s = applicaNovita(SORGENTE, [{ versione: TOP.version, features: [{ testo: 'X.', segnalazione: storta }], fixes: [], originali: [] }]);
+      assert.equal(s.ok === true && /segnalazione: \[/.test(s.testo || ''), false, JSON.stringify(storta));
+    }
   });
 
   test('le versioni vecchie tornano riscritte a ogni costruzione; senza impronte la riscrittura copre il blocco', () => {

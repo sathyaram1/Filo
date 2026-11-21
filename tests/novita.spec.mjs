@@ -136,6 +136,35 @@ test('tasto destro su una riga: «Copia il testo» la copia; la segnalazione si 
   await expect(sua.locator('.bd-mia-testo')).toHaveText('Vorrei cercare fra le novità');
 });
 
+// #2270: la riga di un pacchetto porta i numeri di tutte le segnalazioni assorbite; chi ne ha mandata una la apre.
+test('una riga con più segnalazioni: un numero per ognuna delle tue, e il tasto destro dice quale apre', async ({ app, openTab }) => {
+  await app.evaluate(({ app }) => {
+    const PN = globalThis.SN_PATCH_NOTES;
+    PN.NOTES.length = 0;
+    PN.NOTES.push({ version: app.getVersion(), date: '2026-11-16', features: [{ testo: 'Il menu si apre al primo clic.', segnalazione: [4242, 4343, 4444] }], fixes: [] });
+    globalThis.SN_SEGNALAZIONI_MIE.svuota();
+    globalThis.SN_SEGNALAZIONI_MIE.registra({ id: 'fb-4343', testo: 'Il menu non si apre', creataIl: '2026-11-01T10:00:00Z', stato: 'inviata', num: '4343' });
+  });
+  const page = await apriNovita(openTab);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  const r = riga(page, 'Il menu si apre al primo clic.');
+  await expect(r.locator('.nv-segn')).toHaveText(['#4343'], { timeout: 8_000 });
+  await r.click({ button: 'right' });
+  await expect(menuDi(page).voce('Apri la tua segnalazione')).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.registra({ id: 'fb-4242', testo: 'Menu lento', creataIl: '2026-11-02T10:00:00Z', stato: 'inviata', num: '4242' }));
+  await expect(r.locator('.nv-segn')).toHaveText(['#4242', '#4343']);
+  await r.click({ button: 'right' });
+  await expect(menuDi(page).voce('Apri la tua segnalazione #4242')).toBeVisible();
+  await expect(menuDi(page).voce('Apri la tua segnalazione #4343')).toBeVisible();
+  await expect(menuDi(page).voce('Apri la tua segnalazione #4444')).toHaveCount(0);
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: `${SHOTS}/novita-piu-segnalazioni.png` });
+  await menuDi(page).voce('Apri la tua segnalazione #4343').click();
+  await aspettaFinestra(app, (w) => w.url().startsWith('filo://board/board.html#segnalazione=4343'), 'la bacheca non si è aperta sulla #4343');
+});
+
 test('per chi gestisce i feedback, #feedback=N apre in Gestione la segnalazione con quel numero', async ({ openTab }) => {
   const page = await openTab('filo://manage/manage.html');
   await page.waitForFunction(() => !!window.__mgTest);

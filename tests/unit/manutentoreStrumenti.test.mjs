@@ -87,16 +87,29 @@ test('feedback e pacchetto con --server mandano il segno lavoro server, e dicono
   assert.deepEqual(storta.inviati, []);
   assert.match(storta.out, /non conosce --sever/);
 
-  const p = lancia(['pacchetto', '2220', '2215,2216', '--server'], { pacchetto: { ok: true, pacchetto: '2220', unisce: ['2215', '2216'], lavoroServer: true } });
-  assert.deepEqual(p.inviati, [{ op: 'pacchetto', dati: { numero: '2220', unisce: ['2215', '2216'], lavoroServer: true }, cred: 'chiave' }]);
+  const p = lancia(['pacchetto', '2215,2216', '--server'], { pacchetto: { ok: true, pacchetto: '2240', fiducia: 'fidato', unisce: ['2215', '2216'], lavoroServer: true } });
+  assert.deepEqual(p.inviati, [{ op: 'pacchetto', dati: { unisce: ['2215', '2216'], lavoroServer: true }, cred: 'chiave' }]);
+  assert.match(p.out, /Nato il pacchetto #2240 \(fidato\): assorbe #2215, #2216/);
   assert.match(p.out, /Segnato lavoro server/);
-  const pSenza = lancia(['pacchetto', '2220', '2215,2216'], { pacchetto: { ok: true, pacchetto: '2220', unisce: ['2215', '2216'] } });
-  assert.deepEqual(pSenza.inviati[0].dati, { numero: '2220', unisce: ['2215', '2216'] });
+  const pSenza = lancia(['pacchetto', '2215,2216'], { pacchetto: { ok: true, pacchetto: '2240', unisce: ['2215', '2216'] } });
+  assert.deepEqual(pSenza.inviati[0].dati, { unisce: ['2215', '2216'] });
+});
+
+// #2270: la forma di prima va al server com'era, e il server la rifiuta dicendo la nuova; letta come lista assorbirebbe P.
+test('pacchetto <P> <N,M> manda la forma vecchia, che il server rifiuta; uno solo non parte', () => {
+  const vecchia = lancia(['pacchetto', '2220', '2215,2216'], { pacchetto: { ok: false, reason: 'forma_vecchia', detail: 'il pacchetto su un feedback esistente non c’è più: `pacchetto <N,M,…>` …' } });
+  assert.deepEqual(vecchia.inviati[0].dati, { numero: '2220', unisce: ['2215', '2216'] });
+  assert.notEqual(vecchia.status, 0);
+  assert.match(vecchia.out, /pacchetto <N,M,…>/);
+  const uno = lancia(['pacchetto', '2215'], {});
+  assert.notEqual(uno.status, 0);
+  assert.deepEqual(uno.inviati, []);
+  assert.match(uno.out, /almeno due numeri/);
 });
 
 // #2217 giro 1: il segno con l'uguale non lo accende `vuoleServer`, quindi si rifiuta invece di perderlo in silenzio.
 test('--server=valore non parte: il segno non prende valori', () => {
-  for (const argv of [['feedback', 'Titolo', '-', '--server=true'], ['pacchetto', '2220', '2215', '--lavoro-server=si']]) {
+  for (const argv of [['feedback', 'Titolo', '-', '--server=true'], ['pacchetto', '2220,2215', '--lavoro-server=si']]) {
     const r = lancia(argv, {}, 'Testo.');
     assert.notEqual(r.status, 0, argv.join(' '));
     assert.deepEqual(r.inviati, []);
@@ -110,7 +123,7 @@ test('le opzioni che npm si è preso si riprendono dall\'ambiente e si dice; un 
   assert.equal(f.status, 0, f.out);
   assert.deepEqual(f.inviati[0].dati, { titolo: 'Titolo', testo: 'Testo.', priorita: 2, lavoroServer: true });
   assert.match(f.out, /finite a npm invece che a me/);
-  const p = lancia(['pacchetto', '2220', '2215'], { pacchetto: { ok: true, pacchetto: '2220', unisce: ['2215'], lavoroServer: true } }, '', { npm_config_lavoro_server: 'true' });
+  const p = lancia(['pacchetto', '2220,2215'], { pacchetto: { ok: true, pacchetto: '2240', unisce: ['2220', '2215'], lavoroServer: true } }, '', { npm_config_lavoro_server: 'true' });
   assert.equal(p.inviati[0].dati.lavoroServer, true, p.out);
   // `--priorita 2` spezzato da npm: il 2 finirebbe nel titolo.
   const s = lancia(['feedback', 'Titolo', '2', '-'], {}, 'Testo.', { npm_config_priorita: 'true' });

@@ -14,6 +14,7 @@
         { testo: 'Il correttore non manda ai modelli la password che scrivi sotto chi te la chiede in due parole, come «sono arrivato, password del wifi», anche quando è fatta di sole lettere.', segnalazione: 2638 },
         { testo: 'Nelle Preferenze e nelle altre pagine di Filo, se dai il tasto destro mentre la pagina si sta ancora aprendo e poi clicchi altrove o premi Esc, il menu non ti compare più un attimo dopo.', segnalazione: 2444 },
         { testo: 'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che accetti dall\'assistente o fai scrivere a Filo.', segnalazione: 810 },
+        'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
       ],
     },
     {
@@ -122,6 +123,7 @@
         { testo: 'Nella chat della home, passando il mouse su una segnalazione preparata da Filo ne leggi titolo e testo interi; se è lunga scorre con la rotella.', segnalazione: 1635 },
         { testo: 'Quando Filo risponde con un dato letto in una pagina, dopo la frase trovi il nome del sito. Passandoci sopra leggi la frase originale della pagina e quando Filo l\'ha letta; col clic la pagina si apre già sulla frase, evidenziata. Se Filo non ritrova la frase nella pagina, accanto al nome c\'è un punto di domanda.', segnalazione: 2383 },
       ],
+      fixes: [],
     },
     {
       version: '0.2.290', date: '2026-11-17',
@@ -1984,14 +1986,28 @@
     return NOTES.length ? NOTES[0].version : '0.0.0';
   }
 
-  // Una riga è il suo testo, o { testo, segnalazione } quando nasce da una segnalazione (il suo numero): la pagina
-  // Novità la apre dal tasto destro. Recap e impronte vedono solo il testo.
-  function riga(r) {
-    if (r && typeof r === 'object') {
-      const n = Number(String(r.segnalazione == null ? '' : r.segnalazione).replace(/^#/, ''));
-      return { testo: String(r.testo || ''), segnalazione: Number.isInteger(n) && n > 0 ? n : null };
+  // Una riga è il suo testo, o { testo, segnalazione } quando nasce da una segnalazione: il suo numero, o l'elenco dei
+  // numeri per la riga di un pacchetto, uno per ogni segnalazione assorbita (#2270). La pagina Novità li apre dal tasto
+  // destro, uno per uno; recap e impronte vedono solo il testo. `segnalazioni` è sempre un elenco, senza doppioni; il
+  // tetto (quello delle unite di un pacchetto) lo tengono la sentinella del registro e chi scrive le righe, mai un taglio.
+  const SEGNALAZIONI_MAX = 20;
+  function segnalazioniDi(v) {
+    const out = [];
+    for (const x of Array.isArray(v) ? v : (v == null ? [] : [v])) {
+      const n = Number(String(x == null ? '' : x).replace(/^#/, ''));
+      if (Number.isInteger(n) && n > 0 && !out.includes(n)) out.push(n);
     }
-    return { testo: String(r == null ? '' : r), segnalazione: null };
+    return out;
+  }
+  // Com'è scritto nel registro: un intero positivo, o un elenco da 1 a SEGNALAZIONI_MAX interi positivi diversi.
+  function segnalazioneValida(s) {
+    if (Number.isInteger(s)) return s > 0;
+    return Array.isArray(s) && s.length >= 1 && s.length <= SEGNALAZIONI_MAX && s.every((n) => Number.isInteger(n) && n > 0)
+      && new Set(s).size === s.length;
+  }
+  function riga(r) {
+    if (r && typeof r === 'object') return { testo: String(r.testo || ''), segnalazioni: segnalazioniDi(r.segnalazione) };
+    return { testo: String(r == null ? '' : r), segnalazioni: [] };
   }
   function testo(r) { return riga(r).testo; }
   function soloTesto(n) { return { ...n, features: (n.features || []).map(testo), fixes: (n.fixes || []).map(testo) }; }
@@ -2029,5 +2045,5 @@
       .filter((n) => n.features.length || n.fixes.length);
   }
 
-  global.SN_PATCH_NOTES = { NOTES, cmpVersion, since, countBehind, latestVersion, riga, testo, impronta, fotografia, recap };
+  global.SN_PATCH_NOTES = { NOTES, SEGNALAZIONI_MAX, cmpVersion, since, countBehind, latestVersion, segnalazioniDi, segnalazioneValida, riga, testo, impronta, fotografia, recap };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

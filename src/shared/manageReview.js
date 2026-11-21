@@ -615,6 +615,29 @@
     return m;
   }
 
+  // Un originale assorbito in un pacchetto (#2270): archiviato col rimando `unitoIn`, o chiuso dalla fusione del
+  // pacchetto. Il suo lavoro è il pacchetto: esce da liste e conteggi, e si apre dalla scheda del pacchetto. PURA.
+  function assorbito(fb) {
+    if (!fb || typeof fb.unitoIn !== 'string' || !fb.unitoIn.trim()) return false;
+    const { status } = normalizeStatus(fb);
+    return status === 'archived' || status === 'done';
+  }
+  // La scheda in cui una riga si elenca e si conta: quella di manageTabFor, nessuna per un assorbito.
+  const schedaInElenco = (fb, opts) => (assorbito(fb) ? null : manageTabFor(fb, opts));
+
+  /**
+   * Gli originali che il pacchetto `fb` ha assorbito, nell'ordine di `unisce`, con quello che la scheda ne sa:
+   * [{ id, num, titolo, presente }]; `presente` è falso se il documento non è fra quelli letti. PURA.
+   */
+  function assorbitiDi(fb, tutti) {
+    const voci = fb && Array.isArray(fb.unisce) ? fb.unisce : [];
+    const perId = new Map((Array.isArray(tutti) ? tutti : []).map((f) => [String(f && f._id), f]));
+    return voci.filter((v) => v && typeof v === 'object' && v.id).map((v) => {
+      const f = perId.get(String(v.id));
+      return { id: String(v.id), num: `#${String(v.num || '').replace(/^#/, '')}`, titolo: f ? String(f.name || f.title || '') : '', presente: !!f };
+    });
+  }
+
   /** Le domande aperte che fermano questo feedback in coda (#1577): le scrive il server in `domandeBloccanti`. PURA. */
   function domandeBloccantiDi(fb) {
     return DOM().domandeBloccantiDi(fb);
@@ -996,7 +1019,7 @@
   // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti"; `opts.soloNonFidate` è il filtro
   // della fiducia, `opts.livelli` quello dei Ricevuti.
   function listForManageTab(feedbacks, tab, opts) {
-    const items = filtraFiducia((feedbacks || []).filter((f) => manageTabFor(f, opts) === tab), opts && opts.soloNonFidate);
+    const items = filtraFiducia((feedbacks || []).filter((f) => schedaInElenco(f, opts) === tab), opts && opts.soloNonFidate);
     if (tab === 'inbox') return sortReview(filtraLivelli(items, opts && opts.livelli, opts));
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
@@ -1034,7 +1057,7 @@
     const starredOnly = !!(opts && opts.starredOnly);
     const confirmedOnly = !!(opts && opts.confirmedOnly);
     let items = filtraFiducia((feedbacks || []).filter((f) =>
-      starredOnly ? isStarred(f) : manageTabFor(f) === 'archived'), opts && opts.soloNonFidate);
+      starredOnly ? isStarred(f) : schedaInElenco(f) === 'archived'), opts && opts.soloNonFidate);
     if (confirmedOnly) {
       items = items.filter((f) => String(normalizeStatus(f).status).endsWith('_confirmed'));
     }
@@ -1058,7 +1081,7 @@
     const counts = { inbox: 0, queue: 0, waiting: 0, resolved: 0, archived: 0 };
     const inbox = [];
     for (const f of filtraFiducia(list, opts && opts.soloNonFidate)) {
-      const tab = manageTabFor(f, opts);
+      const tab = schedaInElenco(f, opts);
       if (tab === 'inbox') inbox.push(f);
       else if (tab === 'queue' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
     }
@@ -2268,7 +2291,7 @@
     // stessa domanda, quindi la stessa funzione — una seconda copia sarebbe la
     // copia che un giorno dice di sì dove questa dice di no.
     classifyLegacyBlock,
-    classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
+    classifyBlock, sortReview, REASONS, manageTabFor, assorbito, assorbitiDi, listForManageTab, priorityOf,
     workProgress, WORK_STAGES,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,

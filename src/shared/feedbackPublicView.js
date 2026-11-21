@@ -127,6 +127,9 @@
     if (MR().isPrivateLocalWork(fb)) return null;
     const { status } = MR().normalizeStatus(fb);
     if (!PUBLISHABLE_STATUSES.includes(status)) return null;
+    // Un originale assorbito in un pacchetto (#2270) non è chiuso per chi l'ha mandato: la scheda nasce quando la
+    // fusione del pacchetto lo porta a risolto, con la frase, e l'avviso è «risolta» invece di un «chiusa» muto.
+    if (status === 'archived' && MR().assorbito(fb)) return null;
 
     const publicMap = FS().PUBLIC_MAP || {};
     const card = {

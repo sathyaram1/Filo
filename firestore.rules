@@ -122,13 +122,6 @@ service cloud.firestore {
         || (d.waitsFor is list && d.waitsFor.size() >= 1 && d.waitsFor.size() <= 20);
     }
 
-    // `unisce` [{ id, num }]: le segnalazioni che un pacchetto unisce (SPEC-RIDISEGNO-LAVORO.md § 2), scritte alla
-    // nascita del pacchetto; alla sua fusione il server le chiude. Stessa forma e stesso tetto di `waitsFor`.
-    function unisceValido(d) {
-      return !('unisce' in d)
-        || (d.unisce is list && d.unisce.size() >= 1 && d.unisce.size() <= 20);
-    }
-
     // `localMerges` { app?, server?, solo?, ramo? } (#915): quando ogni parte di un
     // lavoro locale è arrivata su main, in millisecondi, `solo` la parte che
     // ha chiuso dicendo che il lavoro stava tutto lì, `ramo` il ramo dell'ultima
@@ -414,12 +407,11 @@ service cloud.firestore {
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
         && localMergesValido(request.resource.data)
         && waitsForValido(request.resource.data)
-        && unisceValido(request.resource.data)
         // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
-        // `riservato`, `tipo` e `unitoIn` (#1153): il segno che segue il testo riservato, la segnalazione, il rimando
-        // dell'unione. Come la fiducia, li scrive solo il server, e così le radici da cui la fiducia discende (#1918) e
-        // `noteFidate`, la fiducia delle note (#1919).
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'radici', 'radiciSuperate', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'unitoIn', 'noteFidate'])
+        // `riservato`, `tipo`, `unisce` e `unitoIn`: il segno che segue il testo riservato, la segnalazione, gli originali
+        // di un pacchetto e il loro rimando (#2270: il pacchetto lo fa nascere solo il server). Come la fiducia, li scrive
+        // solo il server, e così le radici da cui la fiducia discende (#1918) e `noteFidate`, la fiducia delle note (#1919).
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'radici', 'radiciSuperate', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'noteFidate', 'unisce', 'unitoIn'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))

@@ -116,6 +116,7 @@
   const mgLivelliRow  = document.getElementById('mgLivelliRow');
   const mgForme       = document.getElementById('mgForme');
   const mgWorkState   = document.getElementById('mgWorkState');
+  const mgAssorbite   = document.getElementById('mgAssorbite');
   const mgThread      = document.getElementById('mgThread');
 
   const mgSideEmpty  = document.getElementById('mgSideEmpty');
@@ -1854,7 +1855,8 @@
     mostraNelFiltro(fb);
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
-    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, opzSezioni()));
+    // Un assorbito in un pacchetto (#2270) non sta in nessuna scheda: si apre dove si è.
+    if (sezioniAttendibili() && !MR.assorbito(fb)) selectTab(MR.manageTabFor(fb, opzSezioni()));
     // Dal Log o da Automazioni il dettaglio sta in un pannello che non è a schermo.
     else if (!LIST_TABS.includes(schedaAttiva())) selectTab(currentTab);
     openDetail(fb._id);
@@ -3753,6 +3755,7 @@
       mgWorkState.innerHTML = mostra ? workStateHtml(progress, fb) : '';
       if (mostra) aggiungiDichiara(fb);
     }
+    reflectAssorbite(fb);
 
     renderThread(fb);
 
@@ -4258,6 +4261,36 @@
     const tab = sezioneDi(altro);
     if (tab && tab !== currentTab) selectTab(tab);
     openDetail(id);
+  }
+
+  // Il pacchetto mostra gli originali che ha assorbito, che dalle liste escono (#2270); un assorbito il suo pacchetto.
+  function reflectAssorbite(fb) {
+    if (!mgAssorbite) return;
+    const lista = document.getElementById('mgAssorbiteLista');
+    const titolo = document.getElementById('mgAssorbiteTitolo');
+    const voci = MR.assorbitiDi(fb, allFeedbacks);
+    const pacchetto = MR.assorbito(fb) ? allFeedbacks.find((f) => f._id === fb.unitoIn) : null;
+    const chip = (id, num, nome, presente) => `<li class="mg-attesa" data-id="${esc(id)}">`
+      + `<button type="button" class="mg-attesa-num" data-azione="apri" ${presente ? `title="Apri ${esc(num)}"` : 'disabled title="Non è fra quelli letti"'}>${esc(num)}</button>`
+      + (nome ? `<span class="mg-attesa-titolo" title="${esc(nome)}">${esc(nome)}</span>` : '')
+      + '</li>';
+    if (voci.length) {
+      titolo.textContent = voci.length === 1 ? 'Unisce' : `Unisce ${voci.length} segnalazioni`;
+      lista.innerHTML = voci.map((v) => chip(v.id, v.num, v.titolo, v.presente)).join('');
+    } else if (MR.assorbito(fb)) {
+      titolo.textContent = 'Assorbita nel pacchetto';
+      lista.innerHTML = pacchetto
+        ? chip(pacchetto._id, `#${FB.formatNum(pacchetto.seq, pacchetto.subSeq)}`, pacchetto.name || '', true)
+        : chip(fb.unitoIn, 'pacchetto', '', false);
+    }
+    mgAssorbite.hidden = !voci.length && !MR.assorbito(fb);
+  }
+  if (mgAssorbite) {
+    mgAssorbite.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-azione="apri"]');
+      const li = btn && !btn.disabled && btn.closest('.mg-attesa[data-id]');
+      if (li) openFromAttesa(li.dataset.id);
+    });
   }
 
   // La riga dei tasti, quando non entra, scorre di lato (#1034): la rotella normale deve bastare a raggiungerli.
@@ -6351,8 +6384,9 @@
   const stopLive = () => live.stop();
   const aggiornaSeguiti = () => live.aggiornaSeguiti();
 
+  // Un originale assorbito in un pacchetto non sta in nessuna scheda (#2270): si apre dove si è.
   function sezioneDi(fb) {
-    if (!sezioniAttendibili() || !statoLeggibile(fb)) return null;
+    if (!sezioniAttendibili() || !statoLeggibile(fb) || MR.assorbito(fb)) return null;
     return MR.manageTabFor(fb, opzSezioni());
   }
 

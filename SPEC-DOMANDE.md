@@ -186,13 +186,13 @@ se lo sono tutti. Lo stesso schema vale
 ogni volta che un agente sporco deve far nascere qualcosa che può restare
 fidato: passa numeri e ruoli, mai testo.
 
-Dal #1153 il biglietto di unione è un compito senza feedback (§ 6.1) con l'ambito
-`unisci` e i soli numeri dei genitori: lo chiede `coda.unione`, su 2–12 feedback
-in coda non ancora iniziati, e finché è aperto nessun altro lavoro prende i
-genitori. Il figlio lo scrive `unisci.scrivi`; i genitori diventano `archived`
-col rimando `unitoIn`. Immagini, documenti, pagina e decisioni dell'owner dei
-genitori li porta il server nel figlio, insieme al segno di chi ha scritto le
-domande di quelle decisioni: l'unione non perde niente.
+Dal #2270 le unioni hanno una strada sola, il pacchetto del manutentore, che
+segue lo stesso schema senza un biglietto in mezzo: il manutentore passa solo i
+numeri, il server scrive il testo (numeri e titoli) e fa nascere il pacchetto
+coi `genitori`, fidato solo se lo sono tutti; gli originali diventano `archived`
+col rimando `unitoIn` e chi lavora riceve nel fascicolo tutto quello che
+portavano (FEEDBACK-STATES.md § 3a). `coda.unione`, `unisci.genitori` e
+`unisci.scrivi` (il compito d'unione del #1153) rispondono solo col motivo.
 
 ### 1.4 Le parole dell'owner
 

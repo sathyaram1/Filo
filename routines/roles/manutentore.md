@@ -154,12 +154,15 @@ Gestione → Automazioni.
 
 1. **Le priorità 3 partono da sole.** Non entrano in nessun pacchetto e non stanno nell'ordine: il server le accende
    subito.
-2. **Pacchetti.** Stessa area; tutte le segnalazioni in coda (`todo`) e non ancora lavorate; nessuna a priorità 3.
-   Tetto indicativo: 1.000 righe stimate o 15 file. Un feedback scorrelato resta da solo. Un pacchetto passa o non
-   passa intero. Niente figli (#N.M) per spezzare un lavoro: il contenitore è il pacchetto.
+2. **Pacchetti.** La sola strada per unire è `pacchetto <N,M,…>`: nasce un feedback nuovo col testo del server (numeri
+   e titoli), che assorbe gli originali; il server rifiuta col motivo quelli già iniziati (ramo, biglietto vivo), a
+   priorità 3, locali, già assorbiti, oltre 20, e un giro di attese. Tu aggiungi: stessa area; una catena di attese (A e
+   C aspettano B, o A aspetta B che aspetta C) si unisce solo se il lavoro si fa davvero in un colpo; due originali che
+   si contraddicono non si uniscono: apri una domanda. Tetto indicativo: 1.000 righe stimate o 15 file. Un feedback
+   scorrelato resta da solo. Un pacchetto passa o non passa intero. Niente figli (#N.M) per spezzare un lavoro.
 3. **Quello che toglie lavoro.** Una scheda con `risolto_su_main` si accende lo stesso: la sessione lo ricontrolla e lo
-   chiude con la prova. Un doppione va nel pacchetto del suo originale; un pacchetto già aperto non si allarga, ma uno
-   nuovo può unire il vecchio e il doppione.
+   chiude con la prova. Un doppione di un lavoro non iniziato si unisce con lui in un pacchetto; un pacchetto già aperto
+   non si allarga, ma uno nuovo può assorbire il vecchio (se non è iniziato) e il doppione.
 4. **La classe è il primo criterio, non un filtro.** Scegli prima per classe, poi guarda i rami vivi: un lavoro che
    tocca i file probabili di un ramo vivo (`incroci <N>`) aspetta, in attesa di quel ramo o dopo nell'ordine, e intanto
    entra uno di classe più bassa in un'area libera. `rami` e `incroci` leggono anche i rami di filo-security dal suo
@@ -198,7 +201,8 @@ Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indi
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
 deve girare fra i riservati). Se chiude con «ancora fuori», l'indice c'è lo stesso: rilancia quando il server risponde.
 
-Le schede: `aspetta #P` e `pacchetto di …` dicono chi è già in un pacchetto. `aspetta` porta solo le attese che
+Le schede: `pacchetto di …` dice chi è un pacchetto; gli originali assorbiti non hanno più una scheda (il loro lavoro è
+il pacchetto, e alla sua fusione si chiudono come risolti). `aspetta #P` resta sui pacchetti di prima. `aspetta` porta solo le attese che
 bloccano ancora, ognuna col suo stato; `aspettava` quelle già fuse, che non fermano niente; «attese che non fermano
 una priorità 3» le tue su una 3, che parte lo stesso (tornano a fermare se la priorità scende). Una «chiuso senza
 fusione» blocca per sempre: spostala sull'originale (`attesa <B> <vecchio> --togli`, poi `attesa <B> <originale>`). Una scheda «non riletta» non basta per
@@ -326,7 +330,7 @@ npm run manutentore -- parallelo <N>               # quante sessioni insieme, so
 npm run manutentore -- priorita <N> <0|1|2|3>      # una 3 non si abbassa
 npm run manutentore -- attesa <B> <A|C-12> [--togli]   # B aspetta A, o il compito C-12
 npm run manutentore -- compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   # un compito senza feedback, istruzioni da stdin: risponde col suo id
-npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnalazioni in coda
+npm run manutentore -- pacchetto <N,M,…> [--server]   # nasce un feedback nuovo che assorbe gli originali non iniziati
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N|C-n> [nota]      # un lavoro (o un compito) fermo per guasto riparte
 npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato; una 3 solo se l'originale è a 3 e avanza
@@ -360,14 +364,12 @@ dell'orchestratore; un pacchetto lo conta tutto sul suo numero.
 
 Oltre un tetto il server rifiuta col numero: in quel caso si stringe la finestra.
 
-Un pacchetto con la spec è un `feedback` nuovo che dice per ogni segnalazione cosa cambia e come si verifica, seguito
-da `pacchetto <nuovo> <N,M,…>`; `pacchetto` da solo unisce senza spec nuova. La spec sta nel testo: le note del
-feedback non arrivano a nessuna sessione di lavoro. Un feedback che deve fondersi prima va in `attesa`, non solo nel
-testo. Area, tetto e urgenti li controlli tu. Nella sessione locale c'è anche
-`npm run feedback:apri -- "<titolo>" - --non-locale --pacchetto 812,815` (spec lunga in un `--allega`, chi deve fondersi
-prima in `--aspetta`): rifiuta una spec che manda alle note, che non nomina ogni unita o che mette prima un feedback che
-non aspetta, e copia nel pacchetto gli allegati delle unite (al più 5 immagini e 5 documenti in tutto: oltre, dividi il
-pacchetto).
+Il testo del pacchetto lo scrive il server, coi numeri e i titoli degli originali: niente testo tuo. Chi lo lavora
+riceve nel fascicolo testo, conversazione, decisioni dell'owner e allegati di ogni originale. Il pacchetto è fidato
+solo se lo sono tutti gli originali. Le attese passano a lui: chi aspettava un originale aspetta il pacchetto, e il
+pacchetto aspetta quello che aspettavano gli originali, meno loro stessi. Un feedback che deve fondersi prima va in
+`attesa` sul pacchetto. Area, tetto e urgenti li controlli tu. La forma di prima (`pacchetto <P> <N,M>`),
+`feedback:apri --pacchetto` e l'unione del riordino rispondono solo col motivo.
 
 ## Alla fine di ogni accensione
 

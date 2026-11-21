@@ -55,6 +55,11 @@
   }
 
   const apribile = (n) => !!n && (porte.owner || porte.mie.has(n));
+  // I numeri della riga che chi guarda può aprire, le sue segnalazioni per prime (una riga di pacchetto ne ha più d'uno).
+  const apribili = (r) => {
+    const l = (r && Array.isArray(r.segnalazioni) ? r.segnalazioni : []).filter(apribile);
+    return [...l.filter((n) => porte.mie.has(n)), ...l.filter((n) => !porte.mie.has(n))];
+  };
   function apriSegnalazione(n) {
     const url = porte.mie.has(n)
       ? `filo://board/board.html#segnalazione=${n}`
@@ -69,14 +74,14 @@
     li.className = 'nv-riga';
     li.tabIndex = -1;
     li.appendChild(document.createTextNode(r.testo));
-    if (apribile(r.segnalazione)) {
+    for (const n of apribili(r)) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'nv-segn';
-      b.textContent = `#${r.segnalazione}`;
-      b.title = porte.mie.has(r.segnalazione) ? 'Apri la tua segnalazione' : 'Apri la segnalazione';
+      b.textContent = `#${n}`;
+      b.title = porte.mie.has(n) ? 'Apri la tua segnalazione' : 'Apri la segnalazione';
       b.tabIndex = -1;
-      b.addEventListener('click', () => apriSegnalazione(r.segnalazione));
+      b.addEventListener('click', () => apriSegnalazione(n));
       li.appendChild(b);
     }
     datiDi.set(li, { riga: r, versione: v });
@@ -251,7 +256,8 @@
       return;
     } else if (e.key === 'Enter') {
       const d = datiDi.get(li);
-      if (d && apribile(d.riga.segnalazione)) { e.preventDefault(); apriSegnalazione(d.riga.segnalazione); }
+      const n = d ? apribili(d.riga)[0] : 0;
+      if (n) { e.preventDefault(); apriSegnalazione(n); }
       return;
     } else return;
     e.preventDefault();
@@ -282,11 +288,11 @@
         type: 'item', icon: icona('copy', 16), label: 'Copia il testo', azione: 'patch-notes',
         onClick: () => copia(riga.testo, 'Riga copiata'),
       }];
-      const n = riga.segnalazione;
-      if (apribile(n)) {
-        voci.push(porte.mie.has(n)
-          ? { type: 'item', icon: icona('feedback', 16), label: 'Apri la tua segnalazione', azione: 'patch-notes', onClick: () => apriSegnalazione(n) }
-          : { type: 'item', icon: icona('feedback', 16), label: 'Apri la segnalazione', azione: 'patch-notes', onClick: () => apriSegnalazione(n) });
+      const numeri = apribili(riga);
+      // Con più numeri la voce dice quale apre; con uno solo resta com'era.
+      for (const n of numeri) {
+        const label = `${porte.mie.has(n) ? 'Apri la tua segnalazione' : 'Apri la segnalazione'}${numeri.length > 1 ? ` #${n}` : ''}`;
+        voci.push({ type: 'item', icon: icona('feedback', 16), label, azione: 'patch-notes', onClick: () => apriSegnalazione(n) });
       }
       voci.push(copiaVersione(versione));
       return voci;

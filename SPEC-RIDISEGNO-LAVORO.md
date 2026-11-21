@@ -41,18 +41,14 @@ nasce con il feedback (un agente Haiku alla nascita, Opus rilegge solo quelle
 che tolgono lavoro) e si rifà quando il feedback cambia; il manutentore le
 legge tutte, Haiku gli serve anche per le letture di massa che non decidono.
 
-**Pacchetto.** Un feedback che contiene più segnalazioni della stessa area, non
-ancora lavorate, con il testo che è una spec: cosa cambia, per ogni
-segnalazione unita, e come si verifica. La spec sta nel testo o in un allegato,
-mai nelle note, e un feedback che deve fondersi prima sta nelle attese: lo
-strumento rifiuta il resto alla nascita (FEEDBACK-STATES.md § 3a). Porta con sé gli allegati delle
-segnalazioni unite, col nome che dice da dove viene ognuno (tetto: quello di un
-feedback, oltre il pacchetto non nasce); alla sua nascita le unite si archiviano
-con la nota «Unito nel pacchetto #P: il lavoro continua lì» e il rimando
-`unitoIn`, senza frase per chi le ha segnalate, e chi le aspettava aspetta il
-pacchetto (decisione dell'owner del 30/10; regole in FEEDBACK-STATES.md § 3a).
-Alla fusione non resta niente da chiudere: il messaggio cita le unite, e la
-ricerca «già risolto su main» le trova. Un feedback scorrelato
+**Pacchetto** (#2270: una strada sola). Un feedback nuovo che assorbe più
+segnalazioni della stessa area, non ancora lavorate. Lo chiede solo il
+manutentore (`pacchetto <N,M,…>`); il testo lo scrive il server coi numeri e i
+titoli degli originali (scelta dell'owner del 07/11), e chi lavora riceve nel
+fascicolo testo, conversazione, decisioni e allegati di ognuno. Gli originali
+escono da coda, liste e conteggi e chi li aspettava aspetta il pacchetto; alla
+fusione si chiudono come risolti con la frase del pacchetto, e il messaggio li
+cita. Regole in FEEDBACK-STATES.md § 3a. Un feedback scorrelato
 resta da solo. Un problema urgente (sicurezza, difetto che blocca l'uso) non
 entra in nessun pacchetto: si lavora appena arriva.
 
@@ -145,8 +141,8 @@ verifica leggera dopo riallineamento pulito; spesa per account al manutentore.
 
 App e script: ruolo del manutentore (prompt, schede in contesto, file dei rami
 da git); ruolo del primo lavoro con piano nelle note; il ruolo della scheda e lo
-script del censimento in `scripts/`; `feedback:apri … --pacchetto N,M,…` che
-mette le attese; FEEDBACK-STATES.md per pacchetti e motivo del correttore.
+script del censimento in `scripts/`; `manutentore pacchetto N,M,…` (#2270);
+FEEDBACK-STATES.md per pacchetti e motivo del correttore.
 
 Ogni voce è un lavoro per le sessioni cloud di fase 1; l'ordine lo decide il
 manutentore.
@@ -159,10 +155,10 @@ Fatto dalla parte dell'app, con le regole in FEEDBACK-STATES.md § 3a:
   contesto | rami | incroci <N>` (schede in una riga, rami in corso coi file da git);
 - schede: `routines/roles/scheda.md` e `npm run feedback:schede -- elenca |
   scrivi | rileggi | stato` (Haiku scrive, Opus rilegge chi toglie lavoro e il 10%);
-- pacchetti: `feedback:apri --pacchetto` (campo `unisce`, controlli della regola 1,
-  allegati e attese delle unite copiati, unite archiviate alla nascita e attese spostate sul
-  pacchetto, #1903, #1903.1); la transizione `todo → done` della pipeline per chiudere le unite
-  dei pacchetti nati prima;
+- pacchetti: `pacchetto <N,M,…>` del manutentore, che il server fa nascere col suo testo e
+  con gli originali assorbiti (#2270; prima `feedback:apri --pacchetto`, #1903, oggi tolto);
+  le transizioni della pipeline `todo → done` e `archived → done` per chiudere le unite alla
+  fusione;
 - primo lavoro: «già risolto su main» come primo passo (`payload.suMain`, chiusura
   `gia_risolto` con la fusione), piano consegnato con `deliver piano` e rimandato in
   `payload.piano`;

@@ -375,8 +375,7 @@ test('#2217 --server, anche accanto a --non-locale, apre col segno lavoro server
 
 test('#2217 --server non fidato non promette le routine: va nei Ricevuti a chiedere la fiducia; fidato sì', async () => {
   const casi = [
-    [{ biglietto: 'assente' }, false], [{ biglietto: 'sporco' }, false], [{ biglietto: 'tolto', nonFidato: 'allegati' }, false],
-    [{ biglietto: 'pulito', nonFidato: 'allegati' }, false], [{ biglietto: 'pulito' }, true],
+    [{ biglietto: 'assente' }, false], [{ biglietto: 'sporco' }, false], [{ biglietto: 'pulito' }, true],
   ];
   for (const [r, promette] of casi) {
     const riga = SCRIPT.rigaAperto({ server: true, r: { seq: 912, ...r } });

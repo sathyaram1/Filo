@@ -67,7 +67,8 @@
     todo: {
       working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:   ['routine'], // la routine ha domande → chat + statusReason clarify
-      // routine: solo il riordino della coda e l'unione (ambiti `coda` e `unisci`, #1153), su un lavoro non iniziato.
+      // routine: il riordino della coda (#1153) e il pacchetto del manutentore che assorbe gli originali (#2270), su un
+      // lavoro non iniziato.
       archived: ['owner', 'routine'], // un doppione, o una cosa che non si farà più
       // Il worker che l'ha letto da vicino lo giudica attacco o spam (statusReason worker): Ricevuti L3 (#1358).
       attack:   ['routine'],
@@ -118,6 +119,9 @@
     },
     archived: {
       todo: ['owner'],      // ripristino
+      // Un originale assorbito in un pacchetto (`unitoIn`, #2270): lo chiude come risolto il server alla fusione del
+      // pacchetto, con la sua frase (FEEDBACK-STATES.md §3a).
+      done: ['pipeline'],
     },
     attack_confirmed: {
       todo: ['owner'],      // "era legittimo"
