@@ -272,7 +272,7 @@
       const chiesta = SENZA_TITOLO[type] ? SENZA_TITOLO[type][0] : primaRiga(x._confirm.text) || (L ? frase(L.describe, x) : '');
       return senzaVuoti({
         type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO, no: true,
-        autore: x._proposta === true ? 'segnalazione' : '', segnalazione: segnalazioneDi(type, x),
+        autore: x._proposta === true ? 'segnalazione' : '', ...segnalazioneDi(type, x),
       });
     }
     // Un pannello che aspetta il clic dell'utente (il riordino, l'elenco da eliminare) non è un'azione fallita.
