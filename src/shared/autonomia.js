@@ -239,79 +239,18 @@
     return out;
   }
 
-  // ── segreti: controlli deterministici, mai un modello ────────────────────────
-  const CHIAVI_API = [
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-    /\bsk-(?:or-v1-|ant-|proj-)?[A-Za-z0-9_-]{20,}/,
-    /\bAKIA[0-9A-Z]{16}\b/,
-    /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}/,
-    /\bgithub_pat_[A-Za-z0-9_]{30,}/,
-    /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
-    /\bAIza[0-9A-Za-z_-]{30,}/,
-    /\bglpat-[A-Za-z0-9_-]{20,}/,
-    /\btvly-[A-Za-z0-9_-]{16,}/,
-    /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-  ];
-  // Un token nell'intestazione di autorizzazione, di qualunque forma, e la password dentro un indirizzo (utente:password@).
-  const INTESTAZIONE = /\bAuthorization[ \t]*:[ \t]*(?:Bearer|Basic|Token|Digest)[ \t]+([A-Za-z0-9._~+\/=-]{8,})/gi;
-  const NELL_INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s\/:@"'`]+:([^\s\/@"'`]{4,})@/gi;
-  // utente:password dato a un programma di rete (`curl -u`, `--user`): diventa la stessa intestazione di autorizzazione.
-  const OPZIONE_UTENTE = /(?:^|\s)(?:-u|--user|--proxy-user)(?:=|\s+)["']?[^\s:"'\/@]+:([^\s"']{4,})/g;
-  const PAROLA_PASSWORD = /(?:password|passwd|pwd|passphrase|parola\s+d['’]ordine|chiave\s+segreta|secret)\s*(?:[:=]|\bè\b|\bis\b|\bera\b)\s*["'«“]?([^\s"'»”,;&]{4,})/gi;
-  const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s+(?:di\s+)?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s+codes?\b)[\s:=]*(?:(?:è|e'|is|era|was)\s+)?["'«“]?(\d[A-Za-z0-9]{3,}|[A-Za-z0-9]{4,}(?:[-\s][A-Za-z0-9]{4,}){1,9})/gi;
-
-  function sembraPassword(tok) {
-    const s = String(tok || '');
-    return s.length >= 4 && (/[0-9]/.test(s) || /[^A-Za-z0-9À-ÿ]/.test(s) || (/[a-z]/.test(s) && /[A-Z]/.test(s.slice(1))));
-  }
-  function ibanValido(raw) {
-    const s = raw.replace(/\s+/g, '').toUpperCase();
-    if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
-    const r = s.slice(4) + s.slice(0, 4);
-    let resto = 0;
-    for (const ch of r) {
-      const v = /[A-Z]/.test(ch) ? String(ch.charCodeAt(0) - 55) : ch;
-      for (const d of v) resto = (resto * 10 + Number(d)) % 97;
-    }
-    return resto === 1;
-  }
-  function luhn(cifre) {
-    let somma = 0;
-    for (let i = 0; i < cifre.length; i++) {
-      let d = Number(cifre[cifre.length - 1 - i]);
-      if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
-      somma += d;
-    }
-    return somma % 10 === 0;
-  }
-  const CARTA = /^(?:4\d{12}(?:\d{3}){0,2}|5[1-5]\d{14}|2(?:2[2-9]|[3-6]\d|7[01])\d{13}|3[47]\d{13}|6(?:011|5\d{2})\d{12})$/;
+  // ── segreti: le forme stanno in guardianoStatico.js (segretiInUscita), le stesse del registro dei letti ──────
+  const TIPO_DI_REGOLA = Object.freeze({ chiave: 'chiave', password: 'password', codice: 'codice', iban: 'banca', carta: 'banca' });
   function soloAlnum(s) { return String(s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(); }
 
-  // I segreti che `testo` contiene, uno per uno: { tipo, valore }.
+  // I segreti che `testo` contiene, uno per uno: { tipo, valore }. Senza il guardiano non si sa: conta come una chiave.
   function* trovati(testo) {
-    let t = String(testo || '');
+    const t = String(testo || '');
     if (!t.trim()) return;
-    try { t = `${t}\n${decodeURIComponent(t.replace(/\+/g, ' '))}`; } catch (_) {}
-    for (const re of CHIAVI_API) {
-      const m = t.match(re);
-      if (m) yield { tipo: 'chiave', valore: m[0] };
-    }
-    for (const m of t.matchAll(INTESTAZIONE)) yield { tipo: 'chiave', valore: m[1] };
-    for (const m of t.matchAll(PAROLA_PASSWORD)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
-    for (const m of t.matchAll(NELL_INDIRIZZO)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
-    for (const m of t.matchAll(OPZIONE_UTENTE)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
-    for (const m of t.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) yield { tipo: 'codice', valore: m[1] };
-    for (const m of t.matchAll(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}/g)) {
-      const s = soloAlnum(m[0]);
-      for (let n = s.length; n >= 15; n--) {
-        if (ibanValido(s.slice(0, n))) { yield { tipo: 'banca', valore: s.slice(0, n) }; break; }
-      }
-    }
-    // Solo i prefissi dei circuiti: un numero di 13 cifre che comincia per 1 è un orario in millisecondi.
-    for (const m of t.matchAll(/(?<![\d])[2-6](?:[ -]?\d){12,18}(?![\d])/g)) {
-      const cifre = m[0].replace(/\D/g, '');
-      if (CARTA.test(cifre) && luhn(cifre)) yield { tipo: 'banca', valore: cifre };
-    }
+    if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') { try { require('./guardianoStatico.js'); } catch (_) { /* resta senza */ } }
+    const G = global.SN_GUARDIANO_STATICO;
+    if (!G || typeof G.segretiInUscita !== 'function') { yield { tipo: 'chiave', valore: '' }; return; }
+    for (const x of G.segretiInUscita(t)) yield { tipo: TIPO_DI_REGOLA[x.regola] || 'chiave', valore: x.valore };
   }
 
   // Il segreto che `testo` porterebbe fuori: { tipo, scritto }, tipo '' se nessuno. `richiesta` = cosa ha scritto
