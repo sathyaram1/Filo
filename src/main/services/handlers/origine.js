@@ -55,4 +55,4 @@ function soloFilo(handler) {
   };
 }
 
-module.exports = { daFilo, soloFilo, vistaInterna, origineDi, filoNegatoAllaPagina };
+module.exports = { daFilo, soloFilo, vistaInterna, origineDi, filoNegatoAllaPagina, paginaNonDiFilo, daPaginaNonDiFilo };
