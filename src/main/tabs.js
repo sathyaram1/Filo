@@ -4311,6 +4311,20 @@ class TabManager {
     openExternalScheme(url);
   }
 
+  // Una pagina del computer che cerca il web lo trova chiuso (fileDelComputer.js): lo dice una volta per pagina, sulla
+  // scheda davanti; per una dietro, quando passa davanti.
+  _senzaRete(tab, url) {
+    if (!tab || !this.tabs.includes(tab)) return;
+    let pagina = '';
+    try { pagina = String(tab.view.webContents.getURL() || '').split('#')[0]; } catch (_) {}
+    if (tab._senzaReteDetto === pagina) return;
+    if (this.activeId !== tab.id) { tab._senzaReteInAttesa = url; return; }
+    tab._senzaReteDetto = pagina;
+    tab._senzaReteInAttesa = null;
+    const a = avvisoSenzaRete(url);
+    try { this.win.webContents.send('shell:toast', { text: a.testo, opts: { unica: `${a.chiave}:${tab.id}`, tipo: 'indirizzo_fermato' } }); } catch (_) {}
+  }
+
   // Il collegamento file: che Chromium ha rifiutato a una pagina (page-preload.js): vale solo dopo un input vero, che
   // la pagina non può fingere.
   indirizzoRifiutatoDallaPagina(wc, url) {
