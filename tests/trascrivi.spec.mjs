@@ -268,10 +268,28 @@ test('un\'immagine più pesante del limite dello strato si rimpicciolisce e si a
   const strato = await trascriviDalTastoDestro(app, page);
   await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 30_000 });
   await expect(strato.locator('.sn-tr-riga')).toHaveText(['rumore']);
-  // Al lettore arriva col tetto delle immagini date all'Aiuto, non col limite dello strato.
-  const [data] = await app.evaluate(() => globalThis.__immagini);
+});
+
+test('una foto sopra il tetto delle immagini date all\'Aiuto arriva al lettore ridotta come all\'Aiuto', async ({ app, openTab, testServer }) => {
+  // Rumore 1500×1000: più di 4 MB, ma sotto il limite dello strato.
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:20px">
+<img id="foto" style="width:600px;height:400px">
+<script>
+  const c = document.createElement('canvas'); c.width = 1500; c.height = 1000;
+  const g = c.getContext('2d'); const d = g.createImageData(c.width, c.height);
+  for (let i = 0; i < d.data.length; i++) d.data[i] = (i % 4 === 3) ? 255 : (Math.random() * 256) | 0;
+  g.putImageData(d, 0, 0);
+  document.getElementById('foto').src = c.toDataURL('image/png');
+</script></body></html>`);
+  await page.waitForFunction(() => document.getElementById('foto').complete && document.getElementById('foto').naturalWidth > 0, null, { timeout: 30_000 });
   const tetto = await app.evaluate(() => globalThis.SN_CONST.ALLEGATI_CHAT.tettoImmagineByte);
-  expect(Math.floor((data.length - data.indexOf(',') - 1) * 3 / 4)).toBeLessThanOrEqual(tetto);
+  const byte = (u) => Math.floor((u.length - u.indexOf(',') - 1) * 3 / 4);
+  expect(byte(await page.evaluate(() => document.getElementById('foto').src))).toBeGreaterThan(tetto);
+  await lettoreFinto(app, [{ testo: 'rumore', x1: 0, y1: 0, x2: 500, y2: 100 }]);
+  const strato = await trascriviDalTastoDestro(app, page);
+  await expect(strato.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 30_000 });
+  const [data] = await app.evaluate(() => globalThis.__immagini);
+  expect(byte(data)).toBeLessThanOrEqual(tetto);
 });
 
 test('l\'Aiuto aperto su un sito trascrive l\'immagine indicata e fa scegliere una porzione della pagina sotto', async ({ app, openTab, testServer }) => {
