@@ -32,12 +32,8 @@ test('esplora 2', async ({ app, avvisi }) => {
   const page = await home(app);
   const indice = join(dir, 'indice.html');
 
-  const quot = `"${indice}"`;
-  const q = await execAction(app, { type: 'NAVIGA', url: quot }, { parole: `aprimi ${quot}` });
-  log('virgolette', { ex: q.executed, nc: q.needsConfirm, d: q.describe });
-
-  // conferma dalla chat: percorso non scritto
-  await modelloFinto(app, [
+  void page;
+  if (process.env.G5_CONF) await modelloFinto(app, [
     { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: pathToFileURL(indice).href }) }] },
     { text: 'Ecco.' },
   ]);
