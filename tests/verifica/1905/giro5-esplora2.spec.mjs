@@ -55,13 +55,9 @@ test('esplora 2', async ({ app, avvisi }) => {
   await expect.poll(async () => Boolean(p = await paginaDellaScheda(app, id, (x) => x.url().startsWith('file:'))), { timeout: 10_000 }).toBe(true);
   void r;
 
-  await p.locator('#web').click({ noWaitAfter: true });
-  await new Promise((r) => setTimeout(r, 2500));
   const v = await avvisi().catch(() => null);
-  log('clic sito', { url: p.url(), schede: (await schede(app)).length, avvisi: v ? await v.locator('.shell-notif.show').allInnerTexts() : null });
-
   // tasto destro sul collegamento al sito
-  await p.locator('#web').click({ button: 'right' });
+  await p.locator('#web').click({ button: 'right', noWaitAfter: true });
   await expect(menuDi(p).locator('.sn-menu')).toBeVisible({ timeout: 8000 });
   log('menu sito', await menuDi(p).locator('.sn-menu').innerText());
   await p.screenshot({ path: join(SHOTS, 'g5-menu-sito.png') });
