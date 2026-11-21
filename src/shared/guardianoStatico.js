@@ -331,7 +331,8 @@
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
   function annunciato(fra, valore = '', { stretto = false } = {}) {
     if (ALTRA_FRASE.test(fra) || /\/|\bwww\./i.test(fra)) return false;
-    const g = fra.replace(/(?:\s*(?:\d{1,3}[.)]|[•·*"'«»“”(-]))*\s*$/, '');
+    // L'apostrofo dopo una lettera è di «e'», non una virgoletta che apre il valore.
+    const g = fra.replace(/(?:\s*(?:\d{1,3}[.)]|[•·*"«»“”(-]|(?<![A-Za-zÀ-ÿ])'))*\s*$/, '');
     if (stretto && !g.trim()) return false;
     if (!ATTACCO.test(g)) return false;
     if (/=\s*$/.test(g) && !/^\s*=\s*$/.test(g)) return false;
