@@ -123,11 +123,7 @@ function caselleDellUtente(campi, conti, { toccato = () => false, prima = () => 
   let corrente = [];
   let lungo = 0;
   const chiudi = () => {
-    const g = corrente.join('');
-    if (corrente.length > 1) {
-      const prova = new Map(resto);
-      if (fattoDiCaratteri(g, null, prova)) { gruppi.push(g); for (const [k, n] of prova) resto.set(k, n); }
-    }
+    if (corrente.length > 1) gruppi.push(corrente.join(''));
     corrente = [];
     lungo = 0;
   };
@@ -137,9 +133,13 @@ function caselleDellUtente(campi, conti, { toccato = () => false, prima = () => 
     let v;
     try { if (NON_TESTO.test(el.type || '')) continue; v = String(el.value || ''); } catch (_) { continue; }
     if (!v) continue;
-    const suo = v.length <= MAX_SEGRETO && (toccato(el) || prima(el) !== v) && fattoDiCaratteri(v, conti);
+    const prova = new Map(resto);
+    const suo = v.length <= MAX_SEGRETO && (toccato(el) || prima(el) !== v) && fattoDiCaratteri(v, null, prova);
     if (!suo || lungo + v.length > 4 * MAX_SEGRETO) chiudi();
-    if (suo) { corrente.push(v); lungo += v.length; }
+    if (!suo) continue;
+    for (const [k, n] of prova) resto.set(k, n);
+    corrente.push(v);
+    lungo += v.length;
   }
   chiudi();
   return gruppi;
