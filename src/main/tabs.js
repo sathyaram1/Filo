@@ -3431,6 +3431,12 @@ class TabManager {
     wc.on('will-navigate', (event, url) => {
       // Da un file aperto un collegamento a un altro della sua cartella si segue (#1905).
       const fraFile = /^file:/i.test(String(wc.getURL() || '')) && FileDelComputer.concessoDaLink(tab._fileConcesso, url);
+      // Una pagina del computer non porta sul web quello che ha letto, nemmeno nell'indirizzo di un salto (#1905).
+      if (!fraFile && FileDelComputer.inSessioneDiFile(wc) && WEB.test(String(url || ''))) {
+        event.preventDefault();
+        this._senzaRete(tab, url);
+        return;
+      }
       // SICUREZZA: niente schemi non-web in cima. mailto/tel/sms non sono
       // pagine e vanno consegnati al sistema invece di fallire.
       if (!fraFile && (isWebUnsafeNav(url) || this._versoFiloDaFuori(tab, url))) {
