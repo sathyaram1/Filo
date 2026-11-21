@@ -1,6 +1,8 @@
 // #1635 — nella chat della home il tasto della segnalazione proposta e la riga «Segnalazione inviata» mostrano al
 // passaggio del mouse il fumetto di Filo con titolo e testo interi: un testo lungo scorre con la rotella, il fumetto non
-// copre il tasto, sparisce all'uscita e non cambia quello che parte. Modello finto, invio finto, nessuna rete.
+// copre il tasto, sparisce all'uscita e non cambia quello che parte. Riaperta la home, le righe lo dicono ancora (#1704.1),
+// e fumetto, riquadro e invio dicono lo stesso titolo anche quando il modello lo scrive sotto un altro nome o non lo scrive.
+// Modello finto, invio finto, nessuna rete.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
