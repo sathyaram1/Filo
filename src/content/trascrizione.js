@@ -218,7 +218,6 @@
         pezzi.push({ n, w: s.w, stimata: s.stimata });
         return;
       }
-      n.classList.add('sn-tr-parole');
       n.style.width = `${s.w}px`;
       const parti = s.testo.trim().split(/(\s+)/);
       for (let j = 0; j < parti.length; j++) {
