@@ -281,12 +281,13 @@
     global.SN_ACTIONS?.copyToClipboard?.(testo);
   }
 
-  // Il Copia del sistema su questo testo: le righe una per riga, senza gli spazi in coda che la selezione si porta dietro.
+  // Il Copia del sistema su questo testo, con la regola del Copia del tasto destro: le righe una per riga.
   function copiaSelezione(a, e) {
     const radiceOmbra = a.radice.getRootNode && a.radice.getRootNode();
     let sel = null;
     try { sel = (radiceOmbra && radiceOmbra.getSelection && radiceOmbra.getSelection()) || document.getSelection(); } catch (_) { sel = null; }
-    const testo = String((sel && sel.toString()) || '').replace(/[ \t]+\n/g, '\n').trim();
+    const grezzo = String((sel && sel.toString()) || '');
+    const testo = global.SN_ACTIONS?.testoCopiato ? global.SN_ACTIONS.testoCopiato(grezzo) : grezzo.trim();
     if (!testo || !e.clipboardData) return;
     e.preventDefault();
     e.clipboardData.setData('text/plain', testo);
