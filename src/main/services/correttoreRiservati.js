@@ -171,18 +171,21 @@ function portaIlDato(riga, tipo, inTesta) {
 
 // Sotto la richiesta `r` c'è già la risposta: nella frase che nomina la password («la password è gattonero»), in una
 // riga di chi scrive, in una riga corta con un valore dalla forma di password o in una che porta il dato. Un «PS:», un
-// orario, un altro del gruppo o un sollecito di chi ha chiesto non la chiudono (#1723).
+// orario, un altro del gruppo o un sollecito di chi ha chiesto non la chiudono (#1723); un dato di sole lettere solo se
+// sotto c'è già un altro messaggio, perché in una chat senza nomi anche «sono arrivato» lo sembra.
 function chiusa(l, r) {
   if (!r.chiesta && portaIlDato(l.slice(r.nome, r.fine), r.tipo, false)) return true;
   const richiedente = chiParla(l.slice(l.lastIndexOf('\n', r.inizio - 1) + 1, r.fine));
   const righe = l.slice(r.fine).split('\n');
   if (r.fine > 0 && l[r.fine - 1] !== '\n') righe.shift();
-  return righe.some((riga) => {
+  return righe.some((riga, i) => {
     const chi = chiParla(riga);
     if (chi !== null && CHI_SCRIVE.has(chi)) return true;
     if (chi !== null && chi === richiedente) return false;
     const parole = (chi === null ? riga : riga.replace(PARLA, '')).split(/\s+/).filter(Boolean);
-    return (parole.length <= 4 && parole.some((w) => formaDiPassword(pulito(w)))) || portaIlDato(riga, r.tipo, true);
+    if (parole.length <= 4 && parole.some((w) => formaDiPassword(pulito(w)))) return true;
+    const dato = portaIlDato(riga, r.tipo, true);
+    return dato === true || (dato === 'debole' && righe.slice(i + 1).some((s) => s.trim()));
   });
 }
 
