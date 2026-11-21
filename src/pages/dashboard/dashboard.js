@@ -604,6 +604,7 @@
           nota.className = 'dash-bubble-note';
           nota.dataset.replay = '1';
           nota.textContent = `${riga.icona} ${riga.testo}`;
+          if (riga.fumetto) nota.title = riga.fumetto;
           metti(nota);
         }
       } else if (!isUser && types.length && !m.esiti) {
