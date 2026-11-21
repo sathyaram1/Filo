@@ -323,8 +323,11 @@
   // lo precisano, mai dentro un indirizzo né dopo una virgola che apre altro. Dopo quelle parole i due
   // punti annunciano la parola che li precede: lì «1500» o «BENVENUTO10» sono altro. `stretto`: solo l'attacco,
   // e che ci sia: «Password dimenticata?» non annuncia niente.
-  const ATTACCO = /(?:^|[:=]|(?:^|[\s(])(?:è|e'|is|are|was|sono|ecco|here|vale|risulta|seguente|seguenti|following))$/i;
-  const SOLO_ATTACCO = /^\s*(?:[:=]|è|e'|is|are|was|sono|ecco|here|vale|risulta)?\s*$/i;
+  // Le parole che annunciano il dato subito dopo un'etichetta: un elenco solo, che usa anche il correttore
+  // (correttoreRiservati.js). Nessuna chiede di essere protetta in una regex.
+  const ANNUNCI = Object.freeze(['è', "e'", 'e’', 'era', 'sarebbe', 'is', 'are', 'was', 'sono', 'ecco', 'here', 'vale', 'risulta']);
+  const ATTACCO = new RegExp(`(?:^|[:=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following))$`, 'i');
+  const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
   function annunciato(fra, valore = '', { stretto = false } = {}) {
     if (ALTRA_FRASE.test(fra) || /\/|\bwww\./i.test(fra)) return false;
