@@ -131,7 +131,7 @@ function passa(doc, misure = M) {
     // Il server unisce anche i numeri (un numero è un numero): una mappa o una lista dentro, invece, fa fallire l'unione.
     const valori = Object.values(v);
     if (!valori.every((x) => typeof x === 'string' || Number.isInteger(x))) return `${campo}: un valore non si unisce`;
-    // Il tetto lo cresce ogni azione nuova (circa 1.340 caratteri nelle conferme): il rosso dice il numero da portare nelle regole.
+    // Il caso peggiore cresce a ogni azione nuova (circa 1.340 caratteri nelle conferme): il rosso dice quanto, col tetto.
     if (valori.join('#').length > r.tetto) return `${campo}: valori lunghi ${valori.join('#').length}, il tetto delle regole è ${r.tetto}`;
     if (!new RegExp(r.valori).test(valori.join('#'))) return `${campo}: valori fuori forma`;
   }
