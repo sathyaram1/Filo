@@ -581,7 +581,7 @@ function paginaDi(wc) {
 // Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente in un collegamento di Filo chiede l'OK come per
 // NAVIGA. La stessa domanda la fa l'anteprima prima del clic (contattabilePrimaDelClic).
 async function exfilChiedeOk(indirizzo, u, { wc = null, pagina = '' } = {}) {
-  if (!u || !u.exfil || !/^https?:/i.test(pagina) || !/^https?:/i.test(indirizzo)) return false;
+  if (!u || !u.exfil || !paginaNonDiFilo(pagina) || !/^https?:/i.test(indirizzo)) return false;
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
