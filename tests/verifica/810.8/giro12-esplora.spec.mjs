@@ -99,6 +99,27 @@ test('IBAN scritto in un campo senza nome: cosa vede il modello', async ({ app, 
   expect(await dopoUnRiavvio(app)).not.toContain(compatta(IBAN));
 });
 
+test('testo conservato da Filo con la carta dentro', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Posta</title></head><body>
+    <form><input name="oggetto" id="o"><textarea name="messaggio" id="m" style="width:400px;height:100px"></textarea></form></body></html>`);
+  await page.locator('#o').click();
+  await page.keyboard.type('Abbonamento');
+  await page.locator('#m').click();
+  await page.keyboard.type(`Ciao Marco, la carta è ${CARTA}. A presto`);
+  await page.waitForTimeout(1500);
+  const stato = await app.evaluate(async () => {
+    const rq = process.mainModule.require;
+    const T = rq(rq('node:path').join(process.cwd(), 'src/main/services/testoDeiCampi.js'));
+    return JSON.stringify(await T.stato());
+  });
+  console.log('conservati', stato.slice(0, 600));
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  await page.waitForTimeout(1500);
+  console.log('dopo ricarica', await page.locator('#m').inputValue());
+});
+
 test('codice letto, proposto e accettato resta letto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, POSTA);
