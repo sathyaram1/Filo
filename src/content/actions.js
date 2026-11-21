@@ -93,8 +93,9 @@
   // menu la conosce su una riga) e la formattazione.
   function copySelection(text) {
     const grezzo = window.getSelection()?.toString() || '';
-    const unaRiga = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-    const stessa = !!grezzo.trim() && unaRiga(grezzo) === unaRiga(text);
+    // Il confronto senza spazi: il testo del menu perde gli a capo dei <br> (le parole ai due lati restano attaccate).
+    const lettere = (s) => String(s || '').replace(/\s+/g, '');
+    const stessa = !!grezzo.trim() && lettere(grezzo) === lettere(text);
     return copyToClipboard(stessa ? testoCopiato(grezzo) : text, stessa ? htmlDellaSelezione() : '');
   }
 
