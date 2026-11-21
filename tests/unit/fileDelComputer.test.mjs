@@ -149,11 +149,11 @@ test('un collegamento simbolico nella cartella vale per il file vero: se punta f
   assert.equal(F.permesso(c, join(dir, 'foto.png')), false);
   assert.equal(F.permesso(c, join(dir, 'chiave.png')), false);
   assert.equal(F.permesso(c, join(dir, 'album', 'passaporto.png')), false, 'una cartella collegata che porta fuori');
-  // Nella casa contano i file nominati, e anche lì il file vero.
-  writeFileSync(join(casa, 'appunti.html'), '<img src="Scaricati/sito/foto.png"><img src="Scaricati/sito/vera.png">');
+  // Nella casa contano i file nominati, e anche lì il file vero: uno nascosto non passa.
+  writeFileSync(join(casa, 'appunti.html'), '<img src="Scaricati/sito/chiave.png"><img src="Scaricati/sito/vera.png">');
   const h = F.concessioneDi(join(casa, 'appunti.html'));
   assert.equal(F.permesso(h, join(dir, 'vera.png')), true);
-  assert.equal(F.permesso(h, join(dir, 'foto.png')), false);
+  assert.equal(F.permesso(h, join(dir, 'chiave.png')), false);
 }));
 
 test('la CSP dei file non lascia uscite verso la rete né letture di file come dati', () => {
