@@ -29,7 +29,7 @@ test('r1 tasto destro, poi clic su un\'altra scheda prima che Filo sia pronto: t
   const schede = shell.locator('#tabs .tab:not(.active)');
   await schede.last().click();
   // L'utente è davvero altrove: la scheda delle Preferenze non è più quella in primo piano.
-  await expect.poll(() => page.evaluate(() => document.hasFocus()), { timeout: 5_000 }).toBe(false);
+  await expect.poll(() => page.evaluate(() => document.visibilityState), { timeout: 5_000 }).toBe('hidden');
   await expect(menuDi(page).principale).toHaveCount(0);
   await apriImpostazioni(app);
   await pronta(page);
