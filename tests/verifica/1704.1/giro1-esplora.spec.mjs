@@ -80,6 +80,7 @@ test('testo oltre i 16.000 caratteri: riaperta, il fumetto dice il testo intero 
     await passaSopra(di, riga);
     await expect(fumetto(di)).toBeVisible({ timeout: 3000 });
     const t = await fumetto(di).evaluate((el) => el.textContent);
+    console.log('LUNGO', lungo.length, t.length, JSON.stringify(t.slice(-120)));
     expect(t.length, 'il fumetto non è vuoto').toBeGreaterThan(1000);
     expect(t.endsWith('CODA-FINE') || /…|tagliat|non mostr/i.test(t.slice(-200)), 'o il testo è intero o dice che manca la coda').toBe(true);
   });
