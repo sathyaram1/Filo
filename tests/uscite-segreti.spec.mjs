@@ -1777,3 +1777,63 @@ test('la carta che l’utente fa aggiungere al messaggio dalla Modifica non rest
   await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
   expect(await lettiDopoUnRiavvio(app), 'la carta è rimasta fra i segreti letti').not.toContain(CARTA_UTENTE.replace(/ /g, ''));
 });
+
+// Quello che la pagina trattiene e scrive da sé (l'incolla ripulito, diviso in caselle, i tasti messi da lei) resta
+// dell'utente, e così una cifra corretta in una casella che non è l'ultima (#810.21).
+const CARTA_VARIA = '4532 0151 1283 0366';
+const QUATTRO = `<div id="disegno">•••• •••• •••• ••••</div><label>Numero della carta</label>
+  <input id="c1" maxlength="4"><input id="c2" maxlength="4"><input id="c3" maxlength="4"><input id="c4" maxlength="4">
+  <script>var cc=[1,2,3,4].map(function(i){return document.getElementById('c'+i);});
+  function disegna(){document.getElementById('disegno').textContent=cc.map(function(x){return x.value||'••••';}).join(' ');}</script>`;
+for (const [come, campo, scrivi] of [
+  ['incollata in un campo che toglie da sé gli spazi', `<label for="c">Numero della carta</label><input id="c">
+    <script>var c=document.getElementById('c');c.addEventListener('paste',function(e){e.preventDefault();
+    c.value=e.clipboardData.getData('text/plain').replace(/\\s/g,'');});</script>`, async (app, page) => {
+    await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), CARTA_VARIA);
+    await page.locator('#c').click();
+    await page.keyboard.press('Control+V');
+    await expect(page.locator('#c')).toHaveValue(CARTA_VARIA.replace(/ /g, ''));
+  }],
+  ['incollata nella prima di quattro caselle che la pagina divide', `${QUATTRO}<script>cc[0].addEventListener('paste',function(e){
+    e.preventDefault();var d=e.clipboardData.getData('text/plain').replace(/\\D/g,'');
+    cc.forEach(function(x,i){x.value=d.slice(i*4,i*4+4);});disegna();});</script>`, async (app, page) => {
+    await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), CARTA_VARIA);
+    await page.locator('#c1').click();
+    await page.keyboard.press('Control+V');
+    await expect(page.locator('#disegno')).toHaveText(CARTA_VARIA);
+  }],
+  ['in quattro caselle che trattengono i tasti e mettono loro la cifra', `${QUATTRO}<script>cc.forEach(function(x,i){
+    x.addEventListener('keydown',function(e){if(!/^\\d$/.test(e.key))return;e.preventDefault();
+    if(x.value.length<4)x.value+=e.key;disegna();if(x.value.length===4&&cc[i+1])cc[i+1].focus();});});</script>`, async (_app, page) => {
+    await page.locator('#c1').click();
+    await page.keyboard.type(CARTA_VARIA.replace(/ /g, ''), { delay: 20 });
+    await expect(page.locator('#disegno')).toHaveText(CARTA_VARIA);
+  }],
+  ['in quattro caselle, con una cifra corretta nella seconda', `${QUATTRO}<script>cc.forEach(function(x,i){
+    x.addEventListener('input',function(){disegna();if(x.value.length===4&&cc[i+1])cc[i+1].focus();});});</script>`, async (_app, page) => {
+    await page.locator('#c1').click();
+    await page.keyboard.type('4532015912830366', { delay: 20 });
+    await page.locator('#c2').click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('1');
+    await expect(page.locator('#disegno')).toHaveText(CARTA_VARIA);
+  }],
+]) {
+  test(`la carta ${come} non resta fra i segreti letti, né i suoi pezzi`, async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const page = await testServer.openReady(openTab, PAGAMENTO(campo));
+    await oltreLAvviso(app);
+    await preparaModelli(app);
+    await modelloFinto(app);
+    await scrivi(app, page);
+    const aiuto = await apriAiuto(app, shell, page);
+    await scriviAllAiuto(aiuto, 'aiutami a finire il pagamento');
+    await expect(aiuto.locator('.sn-sidebar').getByText('Ecco.')).toBeVisible({ timeout: 20_000 });
+    await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
+    const carta = CARTA_VARIA.replace(/ /g, '');
+    const dopo = (await lettiDopoUnRiavvio(app)).map((v) => v.replace(/[\s-]/g, ''));
+    expect(dopo).toContain('264087');
+    expect(dopo.filter((v) => carta.includes(v)), 'la carta o un suo pezzo è rimasto fra i segreti letti').toEqual([]);
+  });
+}
