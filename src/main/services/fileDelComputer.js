@@ -142,6 +142,7 @@ function nominati(percorso, cartella) {
 function vero(p) {
   try { return fs.realpathSync.native(p); } catch (_) { return p; }
 }
+const cartelleDi = (cartella) => [...new Set([chiave(cartella), chiave(vero(cartella))])];
 
 // Sotto la cartella concessa: niente cartelle e file nascosti (.git, .ssh, .env), e solo tipi da pagina, così un file
 // senza estensione con dentro HTML non si apre come pagina.
