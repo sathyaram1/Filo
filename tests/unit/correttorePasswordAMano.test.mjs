@@ -202,7 +202,8 @@ test('#1723.1: con la risposta già data sopra, in una frase o di sole lettere, 
     // Una password corretta dopo la prima resta un dato.
     nascosto('scusa, ho sbagliato: è Gatto2025', sopra, 'Gatto2025', `correzione sotto «${data}»`);
   }
-  nascosto('alle venti', 'Marco: mi mandi la password del wifi?\nAnna: eccola: gattonero\nMarco: grazie\nIo: Gatto2025', 'Gatto2025', 'ripetuta');
+  const conNomi = 'Marco: mi mandi la password del wifi?\nAnna: eccola: gattonero\nMarco: grazie';
+  assert.equal(alModello('alle venti davanti al cinema', conNomi).nuovo, 'alle venti davanti al cinema');
 });
 
 // Senza nomi un sollecito ha la forma di una risposta di sole lettere: chiude solo se sotto è arrivato altro.
