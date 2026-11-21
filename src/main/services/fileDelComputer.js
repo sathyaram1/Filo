@@ -197,7 +197,8 @@ function preparaSessione(partizione = PARTIZIONE) {
   return s;
 }
 
-// Vero per una pagina della sessione di un file: lei e quello che apre restano senza rete.
+// Vero per una pagina della sessione di un file: lei e quello che apre restano senza rete, WebRTC compreso, che
+// esce per UDP senza passare né dalla CSP né dal proxy (_applySecurity in tabs.js lo manda solo al proxy).
 function inSessioneDiFile(wc) {
   try { return Boolean(wc && [...sessioni.values()].includes(wc.session)); } catch (_) { return false; }
 }
