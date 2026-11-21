@@ -718,7 +718,8 @@ class TabManager {
     try {
       // In una scheda proxata WebRTC non deve MAI aprire UDP diretto: con STUN qualsiasi sito
       // leggerebbe l'IP vero. Non disattivabile, vince sull'impostazione dell'utente.
-      const policy = tab.proxy
+      // Così una pagina del computer, che non ha rete (fileDelComputer.js).
+      const policy = tab.proxy || FileDelComputer.inSessioneDiFile(tab.view.webContents)
         ? 'disable_non_proxied_udp'
         : (this.security.protectIpLeak ? 'default_public_interface_only' : 'default');
       tab.view.webContents.setWebRTCIPHandlingPolicy(policy);
