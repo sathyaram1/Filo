@@ -112,6 +112,39 @@ function fattoAiBordi(valore, conti) {
   return false;
 }
 
+const NON_TESTO = /^(hidden|checkbox|radio|submit|button|reset|file|image|range|color)$/i;
+const MAX_CASELLE = 2000;
+
+// Un valore diviso in più caselle (la carta in quattro, il codice in sei) è dell'utente anche se la pagina le riempie
+// da sé: caselle vicine, cambiate da quando lui scrive nel documento, fatte dei suoi caratteri presi una volta sola.
+function caselleDellUtente(campi, conti, { toccato = () => false, prima = () => undefined } = {}) {
+  const resto = new Map(conti);
+  const gruppi = [];
+  let corrente = [];
+  let lungo = 0;
+  const chiudi = () => {
+    const g = corrente.join('');
+    if (corrente.length > 1) {
+      const prova = new Map(resto);
+      if (fattoDiCaratteri(g, null, prova)) { gruppi.push(g); for (const [k, n] of prova) resto.set(k, n); }
+    }
+    corrente = [];
+    lungo = 0;
+  };
+  let visti = 0;
+  for (const el of campi) {
+    if (++visti > MAX_CASELLE) break;
+    let v;
+    try { if (NON_TESTO.test(el.type || '')) continue; v = String(el.value || ''); } catch (_) { continue; }
+    if (!v) continue;
+    const suo = v.length <= MAX_SEGRETO && (toccato(el) || prima(el) !== v) && fattoDiCaratteri(v, conti);
+    if (!suo || lungo + v.length > 4 * MAX_SEGRETO) chiudi();
+    if (suo) { corrente.push(v); lungo += v.length; }
+  }
+  chiudi();
+  return gruppi;
+}
+
 function ascoltaImmessi(invia) {
   if (typeof window === 'undefined' || typeof invia !== 'function') return;
   const principale = ascoltaIn(window, invia);
