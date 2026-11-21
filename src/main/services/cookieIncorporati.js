@@ -292,6 +292,48 @@ function chiaveCookie(c) {
   return `${String(c.domain || '').toLowerCase()}|${c.path || '/'}|${c.name}`;
 }
 
+async function scriviNostra(ses, c, dati) {
+  const k = chiaveCookie(c);
+  let v = nostre.get(k);
+  if (!v) {
+    v = { inVolo: [], ultimo: null, rimosso: null, at: 0 };
+    nostre.set(k, v);
+    while (nostre.size > MAX_NOMI) nostre.delete(nostre.keys().next().value);
+  }
+  const valore = String(dati.value == null ? '' : dati.value);
+  v.inVolo.push(valore);
+  v.at = Date.now();
+  try {
+    await ses.cookies.set(dati);
+  } catch (e) {
+    const i = v.inVolo.indexOf(valore);
+    if (i >= 0) v.inVolo.splice(i, 1);
+    throw e;
+  }
+}
+
+// L'arrivo di una nostra riscrittura dopo la rimozione per sovrascrittura di un valore che non era né quello scritto né
+// il nostro di prima: il sito l'aveva aggiornato fra lettura e scrittura. Torna com'era, e si giudica come ogni arrivo.
+function osservaNostra(ses, k, c, causa, rimosso) {
+  const v = nostre.get(k);
+  if (!v) return;
+  if (Date.now() - v.at > NOSTRE_MS) { nostre.delete(k); return; }
+  if (rimosso) {
+    if (causa === 'overwrite' && v.inVolo.length) v.rimosso = c;
+    return;
+  }
+  const coperto = v.rimosso;
+  v.rimosso = null;
+  const i = v.inVolo.indexOf(String(c.value));
+  if (i < 0) return;
+  v.inVolo.splice(i, 1);
+  const prima = v.ultimo;
+  v.ultimo = String(c.value);
+  if (!coperto || coperto.value === c.value || coperto.value === prima) return;
+  const dati = { ...posto(coperto), value: coperto.value, ...(coperto.session ? {} : { expirationDate: coperto.expirationDate }) };
+  scriviNostra(ses, coperto, dati).catch(() => {});
+}
+
 async function cookieCambiato(ses, c, removed, giaLi = false) {
   if (removed || !c || !c.name) return;
   const sito = sitoDi(urlDi(c));
