@@ -12,7 +12,7 @@
       version: '0.2.295', date: '2026-11-20',
       features: [
         { testo: 'Nella chat della home Filo ti mostra le immagini dentro la risposta, fra un pezzo di testo e l\'altro: una sola o una fila che scorri di lato, col sito da cui viene ognuna. Clic per ingrandirla. Con un modello che disegna, scelto in Impostazioni alla voce «Immagini create in chat», crea anche le immagini che gli chiedi, segnate come fatte con l\'AI.', segnalazione: 2272 },
-        { testo: 'Incolla in chat il percorso di un file del computer, una pagina HTML, un PDF o un\'immagine, e Filo lo apre in una scheda così com\'è. La pagina non può leggere gli altri file del computer.', segnalazione: 1905 },
+        { testo: 'Incolla in chat il percorso di un file del computer, una pagina HTML, un PDF o un\'immagine, e Filo lo apre in una scheda così com\'è. La pagina non legge i file fuori dalla sua cartella e non si collega a internet.', segnalazione: 1905 },
       ],
       fixes: [
         { testo: 'In modalità terminale, un git config che imposta un programma da far partire dopo, come l\'editor dei commit o il comando di ssh, ti chiede di digitare «conferma», come se lanciassi quel programma. Prima bastava un OK, e il programma partiva al git commit o al git fetch successivo.', segnalazione: 2621 },
