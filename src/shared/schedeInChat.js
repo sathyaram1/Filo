@@ -404,6 +404,6 @@
     };
   }
 
-  global.SN_SCHEDE_IN_CHAT = { normalizza, perIlDisco, etichetta, gettone, pezzi, allinea, campo, nellaBolla, azioni, MASSIMO, RE };
+  global.SN_SCHEDE_IN_CHAT = { normalizza, ripulita, perIlDisco, etichetta, gettone, pezzi, allinea, campo, nellaBolla, azioni, MASSIMO, RE };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_SCHEDE_IN_CHAT;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
