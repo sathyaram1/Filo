@@ -147,7 +147,7 @@ module.exports = function register(on, ctx) {
     let da = '';
     try { da = String(sender.wc.getURL() || ''); } catch (_) {}
     const gesto = require('../permessiPagine').gestoDellUtente(sender && sender.wc);
-    win._filoTabs.openTab(url, { origine: /^https?:/i.test(da) ? { tipo: 'link', da, gesto } : { tipo: 'filo', gesto } });
+    win._filoTabs.openTab(url, { origine: paginaNonDiFilo(da) ? { tipo: 'link', da, gesto } : { tipo: 'filo', gesto } });
     return { ok: true };
   });
 
