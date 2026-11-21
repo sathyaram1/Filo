@@ -147,3 +147,36 @@ test('un file col percorso non scritto dall\'utente chiede il suo OK, e la confe
   assert.match(d, /\/home\/u\/r\.html/);
   assert.match(d, /non l'hai scritto tu/);
 });
+
+test('una pagina del computer chiede come un sito, una pagina di Filo e una chiamata interna no', () => {
+  const { daPaginaNonDiFilo, paginaNonDiFilo } = require('../../src/main/services/handlers/origine.js');
+  const file = 'file:///home/u/report.html';
+  assert.equal(daPaginaNonDiFilo({ tab: { id: 3, url: file }, url: file, interna: false }), true);
+  assert.equal(daPaginaNonDiFilo({ url: file }), true, 'anche un mittente fatto a mano');
+  assert.equal(daPaginaNonDiFilo({ url: 'https://blog.esempio.it/' }), true);
+  assert.equal(daPaginaNonDiFilo({ url: 'about:blank', interna: false }), true);
+  assert.equal(daPaginaNonDiFilo({ url: 'filo://dashboard/', interna: false }), true, 'un filo:// col preload del web');
+  assert.equal(daPaginaNonDiFilo({ url: 'filo://dashboard/', interna: true }), false);
+  assert.equal(daPaginaNonDiFilo({ url: 'filo://shell/shell.html', isShell: true }), false);
+  assert.equal(daPaginaNonDiFilo({ url: '' }), false);
+  assert.equal(daPaginaNonDiFilo(null), false);
+  assert.equal(paginaNonDiFilo(file), true);
+  assert.equal(paginaNonDiFilo('filo://newtab/'), false);
+  assert.equal(paginaNonDiFilo(''), false);
+});
+
+// La porta che distingue un sito da Filo è una sola: un test sullo schema http di chi manda lasciava passare i file://.
+test('nessun cancello del main riconosce chi manda dallo schema http', async () => {
+  const { readdirSync, readFileSync, statSync } = await import('node:fs');
+  const radice = path.resolve('src/main');
+  const fuori = [];
+  const giro = (dir) => {
+    for (const n of readdirSync(dir)) {
+      const p = join(dir, n);
+      if (statSync(p).isDirectory()) giro(p);
+      else if (n.endsWith('.js') && /\/\^https\?:\/i\.test\((?:String\()?sender\b/.test(readFileSync(p, 'utf8'))) fuori.push(path.relative(radice, p));
+    }
+  };
+  giro(radice);
+  assert.deepEqual(fuori, [], 'si chiede a daPaginaNonDiFilo (src/main/services/handlers/origine.js)');
+});
