@@ -57,3 +57,11 @@ test('un indirizzo illeggibile non produce un avviso; uno uguale ha la stessa ch
 test('un percorso nella cartella di casa si mostra con la tilde, come è stato scritto', () => {
   assert.equal(testo('file:///~/Scaricati/x.pdf'), 'File del computer bloccato per sicurezza: ~/Scaricati/x.pdf');
 });
+
+test('una pagina del computer che chiede il web dice che si mostra senza rete, col sito e senza il resto dell\'indirizzo', () => {
+  const { avvisoSenzaRete } = require('../../src/main/services/indirizzoFermato.js');
+  assert.equal(avvisoSenzaRete('https://raccolta.example/p?dati=SEGRETO').testo,
+    'Le pagine aperte dal computer si mostrano senza rete: raccolta.example resta fuori');
+  assert.equal(avvisoSenzaRete('').testo, 'Le pagine aperte dal computer si mostrano senza rete');
+  assert.equal(avvisoSenzaRete('wss://a.example/').chiave, avvisoSenzaRete('https://b.example/').chiave);
+});
