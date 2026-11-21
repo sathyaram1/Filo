@@ -222,6 +222,7 @@ function ascoltaIn(w, invia) {
 
   // Si chiama PRIMA che il testo entri: `base` è quello che c'era, e a campo vuoto si riparte (la chat dopo un invio).
   function voce(el) {
+    if (!fila.quanti) fotoDiPrima();
     let t = testi.get(el);
     if (!t) {
       t = { n: ++numero, testo: '', conti: new Map(), quanti: 0, base: valoreVero(el) || '', inViaggio: 0 };
