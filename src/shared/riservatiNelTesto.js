@@ -100,7 +100,8 @@ function richieste(l, tutte = false) {
     const f = new RegExp(FINE_FRASE.source, 'g').exec(l.slice(m.j, m.j + FRASE_MAX));
     const a = f ? m.j + f.index + f[0].length : Math.min(l.length, m.j + FRASE_MAX);
     const prima = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop();
-    const chiesta = !!((f && f[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(prima(), l.slice(m.j, a)));
+    const riga = l.slice(m.j, m.j + FRASE_MAX).split('\n')[0];
+    const chiesta = !!((f && f[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(prima(), riga));
     if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, fine: a, tipo: m.tipo, chiesta });
   }
   return out;
