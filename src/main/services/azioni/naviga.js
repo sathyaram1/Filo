@@ -60,7 +60,7 @@ async function azioneNaviga(action, { sender, assistente, parole }) {
       const chiesto = !!String(parole || '').trim() || require('../permessiPagine').gestoDellUtente(sender && sender.wc);
       let daPagina = '';
       try { daPagina = assistente && sender && sender.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
-      const origine = /^https?:/i.test(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
+      const origine = paginaNonDiFilo(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
       contaPaginaDallaChat(url, win);
       tabId = tm.openTab(url, { activate: !background, origine, fileDelComputer: !!file });
       // Gli schemi non web sono esclusi qui sopra: una scheda che non
