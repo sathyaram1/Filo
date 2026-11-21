@@ -49,7 +49,7 @@ test('esplora 3', async ({ app, avvisi }) => {
   log('ping main dopo', await corsa(app.evaluate(() => 1), 5000));
   log('ping pagina dopo', await corsa(p.evaluate(() => 1), 5000));
   log('attesa', Date.now());
-  log('wft', await corsa(p.waitForTimeout(3000), 6000));
+  await p.waitForTimeout(3000);
   log('attesa fine', Date.now());
   log('schede dopo sosta', await schede(app));
   log('crash?', await app.evaluate(({ BrowserWindow }, i) => {
