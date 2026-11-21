@@ -7,7 +7,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
-import { clickConfirm, scrollConfirmToEnd, fillConfirmInput, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, scrollConfirmToEnd, fillConfirmInput, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 const TITOLO = 'Timer muto';
 const CODA = 'Questa è la coda della segnalazione.';
