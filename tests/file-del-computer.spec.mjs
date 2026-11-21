@@ -443,7 +443,7 @@ window.addEventListener('load', async () => {
     expect(e.https, 'immagine e fetch verso https li rifiuta la pagina stessa').toBeGreaterThanOrEqual(2);
 
     // Anche con un clic dell'utente e da uno script, nessun salto e nessuna finestra porta i dati sul web.
-    await pagina.locator('#web').click();
+    await pagina.locator('#web').click({ noWaitAfter: true });
     await pagina.evaluate((s) => { window.open(`${s}/finestra?d=x`); location.href = `${s}/salto?d=x`; }, r.origine);
     // E la sessione stessa non esce, nemmeno a chiederglielo dal main.
     const dalMain = await app.evaluate(async ({ BrowserWindow, session }, { i, u }) => {
