@@ -4,9 +4,8 @@
 
 **Regola.** Un file locale si apre in una scheda solo in una sessione `file-del-computer:<n>` tutta sua, dove Filo
 serve da sé ogni richiesta `file:` (`protocol.handle`): passa solo ciò che la scheda ha avuto in concessione, e a ogni
-risposta, di qualunque tipo, va una CSP che carica solo `file:`, `data:` e `blob:` e mette il documento in `sandbox`
-senza `allow-same-origin`. La concessione è della scheda e si toglie quando si chiude. Mai un `file://` in un'altra
-sessione, nemmeno in quella del proxy.
+risposta, di qualunque tipo, va una CSP che carica solo `file:`, `data:` e `blob:`. La concessione è della scheda e si
+toglie quando si chiude. Mai un `file://` in un'altra sessione, nemmeno in quella del proxy.
 
 Cosa si concede: la cartella del file, con le sottocartelle, senza file o cartelle nascoste e solo tipi da pagina
 (immagini, stili, script, caratteri, media). Se quella cartella è la casa, una che la contiene o la radice di un
