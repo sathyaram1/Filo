@@ -690,15 +690,31 @@ export function credenziale({ argv = [], env = {}, bigliettoDelGiro = '', ruoloD
 export const SENZA_CREDENZIALE = `serve una chiave: ${CHIAVI.map((c) => `${c.variabile} (classe ${c.classe}, ${comeCrearla(c.classe)})`).join(' o ')}, `
   + 'o il biglietto della sessione del manutentore (--ticket)';
 
-/** Il corpo per l'endpoint routineManutentore: una credenziale sola. PURA. */
-export function corpoManutentore(cred, op, dati = {}) {
+/**
+ * Il corpo per l'endpoint routineManutentore: una credenziale sola. Con la chiave, il biglietto della sessione del PC
+ * (`bigliettoLocale`) fa segnare al server le letture riservate, che la chiave da sola non lega a nessuno (#2027.3). PURA.
+ */
+export function corpoManutentore(cred, op, dati = {}, { bigliettoLocale = '' } = {}) {
   if (!cred || (!cred.ticket === !cred.passphrase)) throw new Error('serve esattamente una fra chiave e biglietto');
-  return { ...(cred.ticket ? { ticket: cred.ticket } : { passphrase: cred.passphrase }), op: String(op), dati };
+  const locale = cred.passphrase && bigliettoLocale ? { bigliettoLocale: String(bigliettoLocale) } : {};
+  return { ...(cred.ticket ? { ticket: cred.ticket } : { passphrase: cred.passphrase }), op: String(op), dati, ...locale };
 }
 
-async function chiama(cred, op, dati = {}, opts = {}) {
+async function bigliettoDellaSessione() {
+  try {
+    const { trovaBiglietti } = await import('./lib/biglietto-locale.mjs');
+    const b = trovaBiglietti()[0];
+    return b ? b.ticket : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/** Una richiesta a routineManutentore: con una chiave porta anche il biglietto della sessione del PC (#2027.3). */
+export async function chiama(cred, op, dati = {}, opts = {}) {
   const { call } = await import('./routine-channel.mjs');
-  const { status, body } = await call('routineManutentore', corpoManutentore(cred, op, dati), opts);
+  const bigliettoLocale = cred && cred.passphrase ? await bigliettoDellaSessione() : '';
+  const { status, body } = await call('routineManutentore', corpoManutentore(cred, op, dati, { bigliettoLocale }), opts);
   if (status === 200 && body && body.ok !== false) return body;
   return { ok: false, reason: String((body && body.reason) || `http_${status}`), detail: String((body && body.detail) || '') };
 }

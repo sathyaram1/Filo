@@ -33,9 +33,9 @@ test('senza credenziali il rifiuto nomina le variabili che mancano, in tutti e d
   }
 });
 
-test('il corpo per chiaveDomande: la parola d’ordine in passphrase, senza biglietto né sessione', async () => {
+test('il corpo per chiaveDomande: la parola d’ordine in passphrase, senza sessione; il biglietto resta per il segno delle letture', async () => {
   assert.deepEqual(Q.corpoChiave({ op: 'rispondi', id: 'D-3', scelta: 1, sessione: true, biglietto: 'segreto' }, 'k'),
-    { op: 'rispondi', id: 'D-3', scelta: 1, passphrase: 'k' });
+    { op: 'rispondi', id: 'D-3', scelta: 1, biglietto: 'segreto', passphrase: 'k' });
   assert.deepEqual(Q.corpoChiave({ op: 'elenco', passphrase: 'altra' }, 'k'), { op: 'elenco', passphrase: 'k' });
   const viste = [];
   const fetchImpl = async (url, init) => {
@@ -45,7 +45,7 @@ test('il corpo per chiaveDomande: la parola d’ordine in passphrase, senza bigl
   assert.deepEqual(await Q.chiamaConChiave({ op: 'elenco', biglietto: 's' }, 'k', { fetchImpl }), { ok: true, domande: [] });
   assert.match(viste[0].url, /\/chiaveDomande$/);
   assert.equal(viste[0].init.headers.Authorization, undefined, 'niente token admin con la chiave');
-  assert.deepEqual(JSON.parse(viste[0].init.body), { data: { op: 'elenco', passphrase: 'k' } });
+  assert.deepEqual(JSON.parse(viste[0].init.body), { data: { op: 'elenco', biglietto: 's', passphrase: 'k' } });
   const rifiuto = async () => ({ ok: false, status: 403, json: async () => ({ error: { message: 'serve la chiave owner-non-fidato' } }) });
   await assert.rejects(Q.chiamaConChiave({ op: 'elenco' }, 'k', { fetchImpl: rifiuto }), /Non riuscito: serve la chiave owner-non-fidato/);
   const assente = async () => ({ ok: false, status: 404, json: async () => ({}) });
@@ -100,10 +100,11 @@ test('con la chiave owner-non-fidato elenco, mostra, rispondi, archivia e riapri
   }
   assert.equal(f.owner.length, 0, 'il token admin non è stato usato');
   assert.deepEqual(f.chiave.map((c) => c.passphrase), Array(6).fill('parola-owner'));
+  const b = 'segreto-locale';
   assert.deepEqual(f.chiave.map((c) => c.data), [
-    { op: 'elenco' }, { op: 'mostra', id: 'D-3' }, { op: 'mostra', id: 'D-3' }, { op: 'rispondi', id: 'D-3', scelta: 0 },
-    { op: 'archivia', id: 'D-3' }, { op: 'riapri', id: 'D-3' },
-  ], 'niente biglietto locale né «sessione»: con la chiave il server non li legge');
+    { op: 'elenco', biglietto: b }, { op: 'mostra', id: 'D-3', biglietto: b }, { op: 'mostra', id: 'D-3', biglietto: b },
+    { op: 'rispondi', id: 'D-3', scelta: 0, biglietto: b }, { op: 'archivia', id: 'D-3', biglietto: b }, { op: 'riapri', id: 'D-3', biglietto: b },
+  ], 'niente «sessione»: chi scrive è la chiave; il biglietto locale va col server perché segni le letture (#2027.3)');
   const righe = f.out.filter((s) => s.startsWith('Parlo con la chiave owner-non-fidato (FILO_OWNER_NON_FIDATO_KEY)'));
   assert.equal(righe.length, 5, 'ogni comando dice con cosa parla');
   assert.match(righe[0], /nascono non fidate/);
@@ -112,7 +113,7 @@ test('con la chiave owner-non-fidato elenco, mostra, rispondi, archivia e riapri
   assert.ok(f.out.some((s) => s === 'OK: D-3 è aperta.'), 'la riapre');
   const c = finto(NON_FIDATO, { mostra: { domanda: DOMANDA(), riferimenti: {} }, consiglio: { esiti: [{ id: 'D-3', ok: true }] } });
   assert.equal(await Q.esegui(['consiglio', 'D-3'], c.io), 0, c.err.join(' | '));
-  assert.deepEqual(c.chiave.map((x) => x.data), [{ op: 'mostra', id: 'D-3' }, { op: 'consiglio', ids: ['D-3'] }]);
+  assert.deepEqual(c.chiave.map((x) => x.data), [{ op: 'mostra', id: 'D-3', biglietto: b }, { op: 'consiglio', ids: ['D-3'], biglietto: b }]);
   assert.equal(c.owner.length, 0);
 });
 

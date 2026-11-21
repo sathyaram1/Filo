@@ -100,18 +100,20 @@ async function main() {
   }
   if (args.cmd === 'riservato') {
     const r = await B.segnaRiservato(args.motivo);
-    if (r.senzaBiglietto) { console.error('Nessun biglietto trovato da qui: niente da segnare.'); return 1; }
+    if (r.senzaBiglietto) { console.error('Nessun biglietto trovato da qui: niente da segnare, e i compiti e le domande che scrivi da questo repo nascono riservati.'); return 1; }
     if (r.segnati) console.log('Biglietto riservato: compiti, feedback e domande che scrivi da qui portano il segno.');
-    if (r.errori.length) console.error(`Non segnati: ${r.errori.join('; ')}`);
-    return r.segnati ? 0 : 1;
+    if (r.inAttesa) console.log(`Server non raggiunto (${r.errori.join('; ')}): il segno riservato è annotato in locale e parte alla prossima chiamata; intanto i compiti e le domande che scrivi nascono riservati.`);
+    else if (r.errori.length) console.error(`Non segnati: ${r.errori.join('; ')}`);
+    return r.segnati || r.inAttesa ? 0 : 1;
   }
   if (args.cmd === 'stato') {
     const trovati = B.trovaBiglietti();
-    if (!trovati.length) { console.log('Nessun biglietto trovato da qui: ciò che la sessione scrive da questo repo vale non fidato.'); return 0; }
+    if (!trovati.length) { console.log('Nessun biglietto trovato da qui: ciò che la sessione scrive da questo repo vale non fidato, e i compiti e le domande riservati.'); return 0; }
     const b = await B.trovaBiglietto();
     console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}`);
     if (b.errore) console.log(`Stato non letto: ${b.errore}`);
     if (b.inAttesa) console.log(`Letture esterne annotate solo in locale, non ancora ricevute dal server: ${b.inAttesa}.`);
+    if (b.riservatoInAttesa) console.log(`Letture di dati privati annotate solo in locale, non ancora ricevute dal server: ${b.riservatoInAttesa}.`);
     const motivi = (b.stato && Array.isArray(b.stato.sporcatoDa)) ? b.stato.sporcatoDa : [];
     for (const m of motivi) console.log(`  - ${new Date(Number(m.at) || 0).toISOString()} ${String(m.motivo || '').replace(/[\u0000-\u001f\u007f]/g, ' ')}`);
     return 0;

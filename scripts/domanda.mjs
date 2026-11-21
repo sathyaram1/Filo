@@ -265,11 +265,11 @@ export function rigaCredenziale(cred) {
 }
 
 /**
- * Il corpo per chiaveDomande: il contratto di ownerDomande con la parola d'ordine in `passphrase`. Biglietto e sessione
- * il server li ignora con la chiave, e un segreto che non serve non viaggia. PURA.
+ * Il corpo per chiaveDomande: il contratto di ownerDomande con la parola d'ordine in `passphrase`. Chi scrive resta la
+ * chiave; il biglietto della sessione serve al server solo a segnarle le letture (#2027.3). PURA.
  */
 export function corpoChiave(data, passphrase) {
-  const { biglietto, sessione, passphrase: _p, ...resto } = data && typeof data === 'object' ? data : {};
+  const { sessione, passphrase: _p, ...resto } = data && typeof data === 'object' ? data : {};
   return Object.assign(resto, { passphrase: String(passphrase || '') });
 }
 
@@ -572,12 +572,15 @@ export async function chiamaConChiave(data, passphrase, { fetchImpl = fetch } = 
   return body.result || {};
 }
 
-/** Il registro con una chiave di classe: l'operazione `registro` del canale del manutentore, che le accetta tutte e due. */
-async function registroConChiave(passphrase, parole) {
-  const [{ call }, { corpoManutentore }] = await Promise.all([import('./routine-channel.mjs'), import('./manutentore.mjs')]);
-  const { status, body } = await call('routineManutentore', corpoManutentore({ passphrase }, 'registro', { parole }));
-  if (status === 200 && body && body.ok !== false) return body;
-  throw new Error(`Non riuscito: ${visibile((body && (body.detail || body.reason)) || `errore ${status}`)}`);
+/**
+ * Il registro con una chiave di classe: l'operazione `registro` del canale del manutentore, che le accetta tutte e due,
+ * dalla stessa strada del suo strumento, che porta il biglietto della sessione perché il server la segni (#2027.3).
+ */
+export async function registroConChiave(passphrase, parole, opts = {}) {
+  const { chiama } = await import('./manutentore.mjs');
+  const r = await chiama({ passphrase }, 'registro', { parole }, opts);
+  if (r && r.ok !== false) return r;
+  throw new Error(`Non riuscito: ${visibile((r && (r.detail || r.reason)) || 'errore')}`);
 }
 
 async function credenzialeDelloAmbiente() {
@@ -613,11 +616,10 @@ async function consegnaRegistro(biglietto, data) {
   return deliver(biglietto, 'registro', data);
 }
 
-/** Il segreto del biglietto della sessione (il più sporco se più d'uno), '' senza: il server allora la fa non fidata. */
+/** Il segreto del biglietto della sessione, '' senza: il server allora la fa non fidata e riservata. */
 async function segretoLocale() {
-  const { trovaBiglietto } = await import('./lib/biglietto-locale.mjs');
-  const b = await trovaBiglietto().catch(() => null);
-  return b && typeof b.ticket === 'string' ? b.ticket : '';
+  const { segretoPerScrivere } = await import('./lib/biglietto-locale.mjs');
+  return segretoPerScrivere();
 }
 
 async function sporcaSessione(cosa, motivi) {
@@ -688,7 +690,7 @@ export async function esegui(argv, io = {}) {
       }
       if (!(await conCredenziale())) return 1;
       const segreto = await bigliettoLocale();
-      const r = await chiama(Object.assign({ op: 'chiedi', domanda: letta.domanda }, segreto ? { biglietto: segreto } : {}));
+      const r = await chiama(Object.assign({ op: 'chiedi', domanda: letta.domanda, sessione: true }, segreto ? { biglietto: segreto } : {}));
       scrivi(`OK: domanda ${visibile(r.id || '')} aperta (${fiduciaDetta(r.fiducia)})${inSmistamento(r)}.`);
       return 0;
     }
@@ -747,11 +749,10 @@ export async function esegui(argv, io = {}) {
     }
     // Il registro (§3.6): col biglietto delle routine passa dal canale, che lo dà solo a chi lo può leggere.
     // Ogni lettura porta il biglietto della sessione: col token dell'owner è così che il server la riconosce, e le dà
-    // sporco e segno riservato prima che il testo esca (SPEC-DOMANDE §5.1, #2027).
+    // sporco e segno riservato prima che il testo esca (SPEC-DOMANDE §5.1, #2027); anche con la chiave (#2027.3).
     const lettura = async (data) => {
-      if (conChiave()) return parla(data);
       const s = await bigliettoLocale();
-      return chiama(s ? Object.assign(data, { biglietto: s }) : data);
+      return parla(s ? Object.assign(data, { biglietto: s }) : data);
     };
     if (a.cmd === 'registro') {
       const t = await biglietto();
@@ -790,8 +791,8 @@ export async function esegui(argv, io = {}) {
     // Col token del proprietario il server non distingue una sessione dall'owner: la sessione lo dice, col suo biglietto,
     // e le sue parole prendono la fiducia del biglietto invece di valere come dell'owner.
     const daSessione = async () => {
-      if (conChiave()) return {};
       const s = await bigliettoLocale();
+      if (conChiave()) return s ? { biglietto: s } : {};
       return s ? { sessione: true, biglietto: s } : { sessione: true };
     };
     if (a.cmd === 'archivia' || a.cmd === 'riapri') {

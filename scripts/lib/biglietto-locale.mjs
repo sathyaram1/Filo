@@ -92,28 +92,83 @@ export function cartellaSporchi(b) {
   return join(dirname(b.path), 'sporchi', b.fp);
 }
 
-/** Annota in locale una lettura esterna del biglietto `b`. Lancia se non riesce a scrivere. */
-export function annotaSporco(b, motivo, nowMs = Date.now()) {
-  const dir = cartellaSporchi(b);
+// Il segno riservato che il server non ha ancora ricevuto (#2027.3) ha la stessa coda dello sporco, dentro la sua
+// cartella, così chiusura e scadenza lo tolgono con lui. Finché c'è, il biglietto non parte con le scritture (segretoPerScrivere).
+export function cartellaRiservati(b) {
+  return join(cartellaSporchi(b), 'riservati');
+}
+
+// Le due code (sporco e segno riservato) sono una sola meccanica: annotare, rileggere, consegnare e togliere vivono qui.
+const CODE = Object.freeze({
+  sporco: { cartella: cartellaSporchi, op: 'sporca', predefinito: 'lettura esterna' },
+  riservato: { cartella: cartellaRiservati, op: 'riservato', predefinito: 'dati privati' },
+});
+
+function annotaInCoda(coda, b, motivo, nowMs) {
+  const dir = coda.cartella(b);
   mkdirSync(dir, { recursive: true });
   const nome = `${String(Math.round(Number(nowMs) || Date.now())).padStart(14, '0')}-${process.pid}-${randomBytes(4).toString('hex')}.json`;
   writeFileSync(join(dir, nome), `${JSON.stringify({ motivo: String(motivo || ''), at: Number(nowMs) || Date.now() })}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
-/** Le letture annotate e non ancora consegnate, dalla più vecchia. Una voce illeggibile conta lo stesso. */
-export function sporchiInAttesa(b) {
-  const dir = cartellaSporchi(b);
+function vociInCoda(coda, b) {
+  const dir = coda.cartella(b);
   let nomi = [];
   try { nomi = readdirSync(dir).filter((n) => n.endsWith('.json')).sort(); } catch (_) { return []; }
   return nomi.map((n) => {
     const file = join(dir, n);
     try {
       const d = JSON.parse(readFileSync(file, 'utf8'));
-      return { file, motivo: String((d && d.motivo) || '').trim() || 'lettura esterna', at: Number(d && d.at) || 0 };
+      return { file, motivo: String((d && d.motivo) || '').trim() || coda.predefinito, at: Number(d && d.at) || 0 };
     } catch (_) {
-      return { file, motivo: 'lettura esterna (annotazione illeggibile)', at: 0 };
+      return { file, motivo: `${coda.predefinito} (annotazione illeggibile)`, at: 0 };
     }
   });
+}
+
+/** Consegna al server la coda di `b`, più `aggiunta` (una lettura non annotata). Mai un'eccezione. */
+async function consegnaCoda(coda, b, { deps = {}, nowMs = Date.now(), aggiunta = '' } = {}) {
+  const voci = vociInCoda(coda, b);
+  const tutte = aggiunta ? voci.concat([{ motivo: aggiunta, at: nowMs }]) : voci;
+  if (!tutte.length) return { consegnati: 0, restano: 0 };
+  try {
+    await chiama(coda.op, { ticket: b.ticket, motivo: motivoDaConsegnare(tutte, nowMs) }, deps);
+  } catch (e) {
+    return { consegnati: 0, restano: voci.length, errore: String((e && e.message) || e).slice(0, 200) };
+  }
+  for (const v of voci) { try { rmSync(v.file, { force: true }); } catch (_) { /* si riconsegna: un doppione non cambia niente */ } }
+  return { consegnati: tutte.length, restano: vociInCoda(coda, b).length };
+}
+
+/** Annota la lettura su ogni biglietto della sessione e la consegna. → { fatti, inAttesa?, senzaBiglietto?, errori } */
+async function segnaInCoda(coda, consegna, motivo, { env, cwd, deps = {}, nowMs = Date.now() } = {}) {
+  const m = String(motivo || '').trim().slice(0, 300);
+  const out = { fatti: 0, errori: [] };
+  if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
+  const trovati = trovaBiglietti({ env, cwd });
+  if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
+  let inAttesa = 0;
+  for (const b of trovati) {
+    let aggiunta = '';
+    try { annotaInCoda(coda, b, m, nowMs); } catch (_) { aggiunta = m; }
+    const r = await consegna(b, { deps, nowMs, aggiunta });
+    if (!r.errore) out.fatti += 1;
+    else {
+      out.errori.push(r.errore);
+      if (r.restano) inAttesa += 1;
+    }
+  }
+  return inAttesa ? Object.assign(out, { inAttesa }) : out;
+}
+
+/** Annota in locale una lettura esterna del biglietto `b`. Lancia se non riesce a scrivere. */
+export function annotaSporco(b, motivo, nowMs = Date.now()) {
+  annotaInCoda(CODE.sporco, b, motivo, nowMs);
+}
+
+/** Le letture annotate e non ancora consegnate, dalla più vecchia. Una voce illeggibile conta lo stesso. */
+export function sporchiInAttesa(b) {
+  return vociInCoda(CODE.sporco, b);
 }
 
 export function sporcoSulServer(b) {
@@ -135,21 +190,30 @@ export function motivoDaConsegnare(voci, nowMs = Date.now()) {
  * Consegna al server lo sporco annotato di `b`, più `aggiunta` se c'è (una lettura che non si è riuscita ad annotare).
  * Mai un'eccezione. → { consegnati, restano, errore? }: `restano` = voci ancora solo in locale.
  */
-export async function consegnaSporchi(b, { deps = {}, nowMs = Date.now(), aggiunta = '' } = {}) {
-  const voci = sporchiInAttesa(b);
-  const tutte = aggiunta ? voci.concat([{ motivo: aggiunta, at: nowMs }]) : voci;
-  if (!tutte.length) return { consegnati: 0, restano: 0 };
-  try {
-    await chiama('sporca', { ticket: b.ticket, motivo: motivoDaConsegnare(tutte, nowMs) }, deps);
-  } catch (e) {
-    return { consegnati: 0, restano: voci.length, errore: String((e && e.message) || e) };
+export async function consegnaSporchi(b, opts = {}) {
+  const r = await consegnaCoda(CODE.sporco, b, opts);
+  if (r.consegnati && !r.errore) {
+    try {
+      mkdirSync(cartellaSporchi(b), { recursive: true });
+      writeFileSync(join(cartellaSporchi(b), SEGNO_SUL_SERVER), `${opts.nowMs || Date.now()}\n`, 'utf8');
+    } catch (_) { /* il gancio richiamerà il server: costa una chiamata */ }
   }
-  for (const v of voci) { try { rmSync(v.file, { force: true }); } catch (_) { /* si riconsegna: un doppione non sporca di più */ } }
-  try {
-    mkdirSync(cartellaSporchi(b), { recursive: true });
-    writeFileSync(join(cartellaSporchi(b), SEGNO_SUL_SERVER), `${nowMs}\n`, 'utf8');
-  } catch (_) { /* il gancio richiamerà il server: costa una chiamata */ }
-  return { consegnati: tutte.length, restano: sporchiInAttesa(b).length };
+  return r;
+}
+
+/** Annota in locale una lettura di dati privati del biglietto `b`. Lancia se non riesce a scrivere. */
+export function annotaRiservato(b, motivo, nowMs = Date.now()) {
+  annotaInCoda(CODE.riservato, b, motivo, nowMs);
+}
+
+/** Le letture di dati privati annotate e non ancora consegnate. Una voce illeggibile conta lo stesso. */
+export function riservatiInAttesa(b) {
+  return vociInCoda(CODE.riservato, b);
+}
+
+/** Consegna al server il segno riservato annotato di `b`, più `aggiunta`. Mai un'eccezione. → { consegnati, restano, errore? } */
+export async function consegnaRiservati(b, opts = {}) {
+  return consegnaCoda(CODE.riservato, b, opts);
 }
 
 /**
@@ -278,13 +342,14 @@ export async function haCredenzialeOwner() {
   }
 }
 
-/** Lo stato di ogni biglietto trovato, letto dal server dopo avergli consegnato lo sporco annotato. Un biglietto
- * illeggibile, o con sporco rimasto solo in locale (`inAttesa`), vale sporco. */
+/** Lo stato di ogni biglietto trovato, letto dal server dopo avergli consegnato sporco e segno riservato annotati. Un
+ * biglietto illeggibile, o con sporco rimasto solo in locale (`inAttesa`), vale sporco; `riservatoInAttesa` dice il segno. */
 async function statiDi(biglietti, deps) {
   const out = [];
   for (const b of biglietti) {
     const { restano } = await consegnaSporchi(b, { deps });
-    const attesa = restano ? { inAttesa: restano } : {};
+    const riservati = (await consegnaRiservati(b, { deps })).restano;
+    const attesa = Object.assign(restano ? { inAttesa: restano } : {}, riservati ? { riservatoInAttesa: riservati } : {});
     try {
       const s = await chiama('stato', { ticket: b.ticket }, deps);
       out.push(Object.assign({}, b, { fiducia: s.fiducia === 'fidato' && s.chiuso !== true && !restano ? 'fidato' : 'non_fidato', stato: s }, attesa));
@@ -301,6 +366,15 @@ export async function trovaBiglietto({ env, cwd, deps = {} } = {}) {
   if (!trovati.length) return null;
   const stati = await statiDi(trovati, deps);
   return stati.find((b) => b.fiducia !== 'fidato') || stati[0];
+}
+
+/**
+ * Il segreto con cui la sessione scrive compiti e domande: '' senza biglietto, o col segno riservato rimasto solo in
+ * locale, perché il server fa riservato quello che una sessione scrive senza biglietto (#2027.3). Mai un'eccezione.
+ */
+export async function segretoPerScrivere(opts = {}) {
+  const b = await trovaBiglietto(opts).catch(() => null);
+  return b && typeof b.ticket === 'string' && !b.riservatoInAttesa ? b.ticket : '';
 }
 
 /**
@@ -348,52 +422,28 @@ export async function fiduciaLocale(opts = {}) {
  * fermarsi per un guasto del server, e senza biglietto la sessione è già non fidata.
  * @returns {Promise<{ sporcati: number, inAttesa?: number, senzaBiglietto?: true, errori: string[] }>}
  */
-export async function sporca(motivo, { env, cwd, deps = {}, nowMs = Date.now() } = {}) {
-  const m = String(motivo || '').trim().slice(0, 300);
-  const out = { sporcati: 0, errori: [] };
-  if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
-  const trovati = trovaBiglietti({ env, cwd });
-  if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
-  let inAttesa = 0;
-  for (const b of trovati) {
-    let aggiunta = '';
-    try { annotaSporco(b, m, nowMs); } catch (_) { aggiunta = m; }
-    const r = await consegnaSporchi(b, { deps, nowMs, aggiunta });
-    if (!r.errore) out.sporcati += 1;
-    else {
-      out.errori.push(r.errore);
-      if (r.restano) inAttesa += 1;
-    }
-  }
-  return inAttesa ? Object.assign(out, { inAttesa }) : out;
+export async function sporca(motivo, opts = {}) {
+  const { fatti, ...resto } = await segnaInCoda(CODE.sporco, consegnaSporchi, motivo, opts);
+  return Object.assign({ sporcati: fatti }, resto);
 }
 
 /**
  * Il segno riservato (SPEC-DOMANDE §5.1, #2027) per i dati privati che la sessione legge senza passare dal server (il
- * feedback dal database): quello che scrive dopo lo porta. Mai un'eccezione.
- * @returns {Promise<{ segnati: number, senzaBiglietto?: true, errori: string[] }>}
+ * feedback dal database): quello che scrive dopo lo porta. Annotato prima in locale, come lo sporco: col server giù
+ * parte alla prossima chiamata (`inAttesa`). Mai un'eccezione.
+ * @returns {Promise<{ segnati: number, inAttesa?: number, senzaBiglietto?: true, errori: string[] }>}
  */
-export async function segnaRiservato(motivo, { env, cwd, deps = {} } = {}) {
-  const m = String(motivo || '').trim().slice(0, 300);
-  const out = { segnati: 0, errori: [] };
-  if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
-  const trovati = trovaBiglietti({ env, cwd });
-  if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
-  for (const b of trovati) {
-    try {
-      await chiama('riservato', { ticket: b.ticket, motivo: m }, deps);
-      out.segnati += 1;
-    } catch (e) {
-      out.errori.push(String((e && e.message) || e).slice(0, 200));
-    }
-  }
-  return out;
+export async function segnaRiservato(motivo, opts = {}) {
+  const { fatti, ...resto } = await segnaInCoda(CODE.riservato, consegnaRiservati, motivo, opts);
+  return Object.assign({ segnati: fatti }, resto);
 }
 
-/** La riga per chi ha letto dati privati: '' se il segno è preso o non c'è un biglietto da segnare. */
+/** La riga per chi ha letto dati privati, da dire prima che escano: '' se il server ha preso il segno. */
 export async function rigaRiservato(cosa, opts = {}) {
   const r = await segnaRiservato(cosa, opts);
-  if (r.segnati || r.senzaBiglietto) return '';
+  if (r.segnati) return '';
+  if (r.senzaBiglietto) return `Nessun biglietto trovato da qui, quindi niente segno riservato: i compiti e le domande che scrivi da questo repo nascono riservati, ma se la sessione ha un biglietto in un altro repo dichiaralo da lì con node scripts/biglietto.mjs riservato "${cosa}".`;
+  if (r.inAttesa) return `Server non raggiunto (${r.errori.join('; ')}): il segno riservato è annotato in locale e parte alla prossima chiamata; intanto i compiti e le domande che scrivi da qui nascono riservati.`;
   return `Segno riservato NON preso (${r.errori.join('; ')}): prima di scrivere compiti o feedback dichiaralo con node scripts/biglietto.mjs riservato "${cosa}".`;
 }
 
