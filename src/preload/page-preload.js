@@ -360,6 +360,14 @@ let streamCounter = 0;
 
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
+// Una pagina aperta dal computer trova il web chiuso dalla sua CSP (fileDelComputer.js): il main lo dice all'utente.
+if (location.protocol === 'file:') {
+  document.addEventListener('securitypolicyviolation', (e) => {
+    const u = String((e && e.blockedURI) || '');
+    if (/^(?:https?|wss?):/i.test(u)) { try { ipcRenderer.send('filo:senza-rete', u); } catch (_) {} }
+  }, { passive: true });
+}
+
 // Le conferme di Filo su un sito le disegna il main sopra la scheda, fuori dal documento
 // che il sito può ridisegnare (#592.6): SN_CONFIRM_UI manda qui la domanda. Ai tasti che
 // l'utente batte sul popup mentre scriveva risponde il suo campo, in questo frame.
