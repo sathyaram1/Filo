@@ -61,7 +61,8 @@ async function modifica(mossa, { piattaforma = process.platform } = {}) {
 }
 
 // L'azione BARRA_SITI della chat: la stessa mossa dei gesti, dallo stesso `modifica`. Torna l'esito per il dispatch
-// e, se la barra è cambiata, le voci da annunciare.
+// e, se la barra è cambiata, le voci da annunciare. `invariata` lo dice alla riga e al modello: senza, una mossa che
+// lascia la barra com'era si racconta come fatta.
 async function daChat(action) {
   const B = Barra();
   const a = action && typeof action === 'object' ? action : {};
