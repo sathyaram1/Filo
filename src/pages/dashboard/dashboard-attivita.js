@@ -2327,7 +2327,7 @@
         if (btn) { wrap.appendChild(btn); continue; }
       }
       const riga = E.rigaDellaVoce(v);
-      if (riga && (tutte || riga.fallita)) wrap.appendChild(makeActivityRow(riga.icona, riga.testo));
+      if (riga && (tutte || riga.fallita)) wrap.appendChild(makeActivityRow(riga.icona, riga.testo, null, riga.fumetto || ''));
       else if (riga) riuscite.push(riga.testo);
     }
     let nota = null;
