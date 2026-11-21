@@ -146,22 +146,47 @@ const chiParla = (riga) => { const m = riga.match(PARLA); return m ? m[1].trim()
 // Chi scrive il campo si firma così nelle conversazioni copiate; le pagine di chat non mettono nomi, e un altro nome
 // può essere chiunque del gruppo.
 const CHI_SCRIVE = new Set(['io', 'tu', 'me', 'you', 'i']);
-// Sotto la richiesta `r` c'è già la risposta: una riga di chi scrive, o una riga corta con un valore dalla forma di
-// password («gatto2024», «certo, gatto2024»). Un «PS:», un orario o un altro del gruppo non la chiudono (#1723).
+const pulito = (v) => String(v || '').replace(/[.,;:!?)\]»”"']+$/u, '');
+// La riga porta già il dato: in testa («Gatto2024 (con la G maiuscola)», «certo, Gatto2024») o dopo una parola che lo
+// presenta («è gattonero tutto minuscolo», «eccola: gattonero»). Il nome di chi parla non presenta, una domanda non porta.
+function portaIlDato(riga, tipo, inTesta) {
+  const X = globalThis.SN_URL_EXFIL;
+  const chi = chiParla(riga);
+  const testo = chi !== null && !AVVII.has(chi) && !PRESENTA_DATO.has(chi) ? riga.replace(PARLA, '') : riga;
+  if (!X || !X.segretiDetti || /\?\s*$/.test(testo)) return false;
+  let testa = inTesta;
+  let presentato = false;
+  for (const w of testo.split(/\s+/)) {
+    const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    if (w.endsWith(':') || w === '=' || PRESENTA_DATO.has(t)) { presentato = true; continue; }
+    if (!t || (testa && (AVVII.has(t) || SALUTO.test(t)))) continue;
+    if ((testa || presentato) && formaDiPassword(t)) return true;
+    if (presentato && X.segretiDetti(`${tipo} ${t}`).length) return true;
+    testa = false;
+    presentato = false;
+  }
+  return false;
+}
+
+// Sotto la richiesta `r` c'è già la risposta: nella frase che nomina la password («la password è gattonero»), in una
+// riga di chi scrive, in una riga corta con un valore dalla forma di password o in una che porta il dato. Un «PS:», un
+// orario, un altro del gruppo o un sollecito di chi ha chiesto non la chiudono (#1723).
 function chiusa(l, r) {
-  const G = globalThis.SN_GUARDIANO_STATICO;
+  if (!r.chiesta && portaIlDato(l.slice(r.nome, r.fine), r.tipo, false)) return true;
+  const richiedente = chiParla(l.slice(l.lastIndexOf('\n', r.inizio - 1) + 1, r.fine));
   const righe = l.slice(r.fine).split('\n');
   if (r.fine > 0 && l[r.fine - 1] !== '\n') righe.shift();
   return righe.some((riga) => {
     const chi = chiParla(riga);
     if (chi !== null && CHI_SCRIVE.has(chi)) return true;
+    if (chi !== null && chi === richiedente) return false;
     const parole = (chi === null ? riga : riga.replace(PARLA, '')).split(/\s+/).filter(Boolean);
-    return !!(G && G.sembraPassword) && parole.length <= 4
-      && parole.some((w) => G.sembraPassword(w.replace(/[.,;:!?)\]»”"']+$/u, '')));
+    return (parole.length <= 4 && parole.some((w) => formaDiPassword(pulito(w)))) || portaIlDato(riga, r.tipo, true);
   });
 }
 
-// Il messaggio sopra il campo a cui il campo risponde: { tipo, chiesta } o null.
+// Il messaggio sopra il campo a cui il campo risponde: { tipo, chiesta, data } o null. Con la risposta già sopra
+// (`data`) il campo perde solo le parole con la forma di una password: una seconda password sì, le parole normali no.
 function richiestaAperta(sopra) {
   const l = sopra.toLowerCase();
   const tutte = richieste(l, true);
@@ -172,10 +197,11 @@ function richiestaAperta(sopra) {
       || (r.fine === ultima.fine && r.tipo === ultima.tipo && r.chiesta && !ultima.chiesta);
     if (meglio) ultima = r;
   }
-  if (!ultima || l.slice(ultima.fine).trim().length > DOPO_LA_RICHIESTA || chiusa(l, ultima)) return null;
+  if (!ultima || l.slice(ultima.fine).trim().length > DOPO_LA_RICHIESTA) return null;
+  if (chiusa(l, ultima)) return { tipo: ultima.tipo, chiesta: false, data: true };
   // Una richiesta vera prima di un sollecito che rinomina la password vale ancora: conta come chiesta.
   const chiesta = tutte.some((r) => r.chiesta && r.tipo === ultima.tipo && !chiusa(l, r));
-  return { tipo: ultima.tipo, chiesta };
+  return { tipo: ultima.tipo, chiesta, data: false };
 }
 
 // Le password scritte a mano fuori dal posto di un'etichetta (#1649): accanto al nome utente, dopo il nome della rete,
