@@ -127,6 +127,7 @@
   function rigaTrascritta(m) {
     if (!m) return '';
     const testo = String(m.text == null ? '' : m.text).replace(/\s+/g, ' ').trim();
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
     const ES = global.SN_ESITO;
     const esiti = m.role !== 'user' && ES && Array.isArray(m.esiti) ? ES.perTrascrizione(ES.daRaccontare(m.esiti, false)) : '';
     if (!testo && !esiti) return '';
