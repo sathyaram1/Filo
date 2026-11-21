@@ -120,6 +120,51 @@ test('testo conservato da Filo con la carta dentro', async ({ app, openTab, test
   console.log('dopo ricarica', await page.locator('#m').inputValue());
 });
 
+test('testo rimesso da Filo dopo un riavvio', async ({ testServer }) => {
+  test.setTimeout(150_000);
+  const { _electron: electron } = await import('@playwright/test');
+  const { argomentiScala, chiudiApp } = await import('../../fixtures/electron.mjs');
+  const { cartellaTemporanea, togliCartella } = await import('../../helpers/percorsi.mjs');
+  const { primaFinestra } = await import('../../helpers/primaFinestra.mjs');
+  const path = await import('node:path');
+  const url = testServer.html(`<!doctype html><html><head><title>Posta</title></head><body>
+    <p>Il tuo codice di recupero è 264087.</p>
+    <form><textarea name="messaggio" id="m" style="width:400px;height:100px"></textarea></form></body></html>`);
+  const host = new URL(url).hostname;
+  const userData = cartellaTemporanea('filo-810-8-giro12-');
+  const lancia = () => electron.launch({
+    args: [...argomentiScala, '.'], cwd: path.resolve(process.cwd()),
+    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test', FILO_TEST_ACCOLTO: '1' },
+  });
+  const sulPosto = (w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } };
+  let app = null;
+  try {
+    app = await lancia();
+    const shell = await primaFinestra(app);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => Boolean(page = app.windows().find(sulPosto)), { timeout: 15000 }).toBe(true);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+    await page.locator('#m').click();
+    await page.keyboard.type(`Ciao Marco, la carta è ${CARTA}. A presto`);
+    await page.waitForTimeout(1300);
+    await chiudiApp(app);
+    app = await lancia();
+    let tornata = null;
+    await expect.poll(() => Boolean(tornata = app.windows().find(sulPosto)), { timeout: 20000 }).toBe(true);
+    await expect.poll(() => tornata.locator('#m').inputValue().catch(() => ''), { timeout: 15000 }).toContain(CARTA);
+    const shell2 = await primaFinestra(app);
+    await modelli(app);
+    const aiuto = await apriAiuto(app, shell2, tornata);
+    await chiedi(aiuto, 'correggi il messaggio');
+    await expect.poll(() => letti(app), { timeout: 10_000 }).toContain('264087');
+    expect(await dopoUnRiavvio(app), 'la carta rimessa da Filo è fra i segreti letti').not.toContain(compatta(CARTA));
+  } finally {
+    if (app) await chiudiApp(app);
+    togliCartella(userData);
+  }
+});
+
 test('codice letto, proposto e accettato resta letto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, POSTA);
