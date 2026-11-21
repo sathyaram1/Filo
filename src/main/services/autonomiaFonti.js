@@ -10,6 +10,7 @@ const { contaSe, winOf } = require('./handlersComuni');
 const {
   cartellaDelComando, displayCwd, pendingConfirmKey, perimetroLettura, segretiCustoditi,
 } = require('./porteUscita');
+const { daPaginaNonDiFilo } = require('./handlers/origine');
 // Questi vivono in moduli che caricano questo: si chiedono al momento della chiamata, non al caricamento.
 const eseguiAzioneFilo = (...a) => require('./handlers').eseguiAzioneFilo(...a);
 
