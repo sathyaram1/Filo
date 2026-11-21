@@ -173,15 +173,26 @@ function escPrimaAFilo(e, ascolto, UI) {
   } catch (_) {}
 }
 
-// Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
+// Il clic destro si rigioca, in copia, quando l'handler vero è pronto; un gesto dato intanto lo scarta senza menu.
+// L'ascolto dei gesti nasce qui, prima degli script del sito, che in cattura potrebbero fermarli.
+let tastoDestroInAttesa = null;
+if (IS_SUBFRAME) {
+  try { tastoDestroInAttesa = require('./menu-del-sito.js').tastoDestroInAttesa(window); } catch (e) { console.error('[Filo CS] tasto destro in attesa', e); }
+}
 function replayContextMenu(e, clic) {
-  const { copiaDelClic, RIGIOCO_MS } = require('./menu-del-sito.js');
-  const copy = copiaDelClic(e);
-  const deadline = Date.now() + RIGIOCO_MS;
+  const { RIGIOCO_MS } = require('./menu-del-sito.js');
+  const attesa = tastoDestroInAttesa;
+  if (!attesa) { menuDiRiserva(clic); return; }
+  const mio = attesa.tieni(e);
   const tick = () => {
-    if (globalThis.__snFiloSpento === true) { menuDiRiserva(clic); return; }
-    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
-    if (Date.now() > deadline) { menuDiRiserva(clic); return; }
+    if (!attesa.ancora(mio)) return;
+    if (globalThis.__snFiloSpento === true) { attesa.prendi(); menuDiRiserva(clic); return; }
+    if (typeof contextMenuHandler === 'function') {
+      const copia = attesa.prendi();
+      if (copia) apriMenuDiFilo(copia, clic); else menuDiRiserva(clic);
+      return;
+    }
+    if (Date.now() - mio.alle > RIGIOCO_MS) { attesa.prendi(); menuDiRiserva(clic); return; }
     setTimeout(tick, 16);
   };
   setTimeout(tick, 16);

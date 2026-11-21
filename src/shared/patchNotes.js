@@ -12,6 +12,7 @@
       version: '0.2.297', date: '2026-11-21',
       fixes: [
         { testo: 'Il correttore non manda ai modelli la password che scrivi sotto chi te la chiede in due parole, come «sono arrivato, password del wifi», anche quando è fatta di sole lettere.', segnalazione: 2638 },
+        { testo: 'Nelle Preferenze e nelle altre pagine di Filo, se dai il tasto destro mentre la pagina si sta ancora aprendo e poi clicchi altrove o premi Esc, il menu non ti compare più un attimo dopo.', segnalazione: 2444 },
       ],
     },
     {
