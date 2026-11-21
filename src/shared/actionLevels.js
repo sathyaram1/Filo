@@ -114,6 +114,7 @@
     if (DNS.test(testo)) return true;
     const dagliIndirizzi = [...testo.matchAll(HOST_URL)].map((m) => m[1]).filter(Boolean);
     if (dagliIndirizzi.some((h) => !questoComputer(h))) return true;
+    if ([...testo.matchAll(URL_INTERO)].some((m) => !restaSulComputer(m[0]))) return true;
     if (CLIENT_DB.test(testo) && serverNominati(testo).some((h) => !questoComputer(h))) return true;
     if (LOGIN_REGISTRO.test(testo)) {
       const registri = [...[...testo.matchAll(HOST_NUDO)].map((m) => m[1]), ...(testo.match(/\blocalhost\b/gi) || [])];
