@@ -119,7 +119,7 @@ function nominati(percorso, cartella) {
     } finally { fs.closeSync(fd); }
   } catch (_) { return []; }
   const base = indirizzoDi(percorso);
-  const cartelle = [...new Set([chiave(cartella), chiave(vero(cartella))])];
+  const cartelle = cartelleDi(cartella);
   const nellaCartella = (p) => cartelle.some((c) => dentro(c, p) && permessoNellaCartella(c, p));
   const fuori = [];
   for (const m of testo.matchAll(NOMINA)) {
