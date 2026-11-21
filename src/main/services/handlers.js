@@ -120,7 +120,7 @@ async function eseguiAzioneFilo(action, {
         || setter.scrive.includes('blocklist') || setter.scrive.includes('security.safeBrowse.trustedSites')
         || setter.scrive.includes('security.cookies.bannerSites'))) {
         // Dall'Aiuto di un sito «questo sito» è lui, e le altre schede non si nominano (#843).
-        const daSito = /^https?:/i.test(sender?.tab?.url || sender?.url || '');
+        const daSito = daPaginaNonDiFilo(sender);
         const { tm, tab } = daSito ? { tm: null, tab: { url: sender?.tab?.url || sender?.url } } : targetWebTab(sender);
         const schede = tm ? tm.tabs.filter((t) => !t.isInternal).map((t) => ({ url: t.url, title: t.title })) : [];
         const r = globalThis.SN_PAGINE_DELICATE.risolviSchede(
