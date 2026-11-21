@@ -940,7 +940,6 @@ test('#1685.3 una conversazione riletta da un\'altra dice che il comando non era
   test.setTimeout(60_000);
   const page = await home(app);
   await terminaleSpento(app);
-  await livelloAutonomia(app, 'conservativo');
   await modelloFinto(app, [
     { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: '{"comando":"ls","spiegazione":"Elenco i file"}' }] },
     { text: 'Ho elencato i file.' },
@@ -949,6 +948,7 @@ test('#1685.3 una conversazione riletta da un\'altra dice che il comando non era
   await chiedi(page, 'elenca i file della cartella');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ho elencato i file' })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await livelloAutonomia(app, 'conservativo');
   await chiedi(page, 'segnala che il timer non suona');
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   await clickConfirm(page, 'cancel');
