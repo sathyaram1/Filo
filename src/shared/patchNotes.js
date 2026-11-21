@@ -14,6 +14,7 @@
         { testo: 'Il correttore non manda ai modelli la password che scrivi sotto chi te la chiede in due parole, come «sono arrivato, password del wifi», anche quando è fatta di sole lettere.', segnalazione: 2638 },
         { testo: 'Nelle Preferenze e nelle altre pagine di Filo, se dai il tasto destro mentre la pagina si sta ancora aprendo e poi clicchi altrove o premi Esc, il menu non ti compare più un attimo dopo.', segnalazione: 2444 },
         { testo: 'Quando chiedi aiuto su una pagina, Filo non conserva più le password e i numeri di carta che scrivi o incolli tu, in un modulo, in un messaggio o nella chat dell\'assistente, né quelli che accetti dall\'assistente o fai scrivere a Filo.', segnalazione: 810 },
+        'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
       ],
     },
     {
@@ -28,7 +29,6 @@
         { testo: 'Se avevi la protezione delle pagine delicate accesa, dopo l\'aggiornamento Filo resta su «Chiedi sulle delicate»: da posta, banca, sanità, enti pubblici e pagine con una password non parte niente da solo finché non lo cambi tu.', segnalazione: 1589 },
         { testo: '«Annulla» sul segno di un tuo messaggio in chat, e dal tasto destro sulla bolla, rimette anche un livello di privacy più largo: ti chiede di scrivere «conferma», come l\'elenco dei cambi nella home.', segnalazione: 1589 },
         { testo: 'Una password scritta a mano in una chat, come risposta sotto chi te la chiede, non arriva ai modelli né alla ricerca web, neanche quando chiedi a Filo di spiegare la pagina.', segnalazione: 1589 },
-        'Se la tua segnalazione viene risolta insieme ad altre simili, ti arriva lo stesso l\'avviso «risolta», con la frase che dice cosa è cambiato. Nella pagina Novità una riga nata da più segnalazioni mostra il numero di ognuna delle tue.',
       ],
     },
     {
