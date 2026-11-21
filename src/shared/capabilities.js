@@ -96,7 +96,7 @@
     },
     {
       id: 'open-local-file', title: 'Apri un file del computer in una scheda', category: 'navigation',
-      desc: 'Una pagina HTML, un PDF, un’immagine, un testo, un audio o un video che hai sul computer si apre in una scheda di Filo, come la vedresti nel browser, con le immagini e gli stili della sua cartella. La pagina non può leggere gli altri file del computer.',
+      desc: 'Una pagina HTML, un PDF, un’immagine, un testo, un audio o un video che hai sul computer si apre in una scheda di Filo, come la vedresti nel browser, con le immagini e gli stili della sua cartella. La pagina non legge i file fuori dalla sua cartella e non si collega a internet.',
       invoke: 'Incolla in chat il percorso del file e chiedi di aprirlo. Se il percorso non l’hai scritto tu, Filo ti chiede prima l’OK. Chiusa la scheda, la riapri dal riferimento in chat o con Ctrl+Shift+T (Cmd+Shift+T su Mac).',
       doesNot: 'Non apre in una scheda i file di un altro computer della rete, le cartelle, né i documenti che una scheda non mostra (Word, fogli di calcolo, archivi): quelli Filo li legge o te li apre col loro programma. L’Aiuto sopra un sito non apre file del computer: lo fa la chat della home. Dentro la pagina locale i collegamenti ad altri file della stessa cartella si seguono, quelli fuori no. Un file aperto dalla cartella di casa o dalla radice di un disco prende solo i file che nomina, e i file e le cartelle nascosti restano chiusi.',
     },
