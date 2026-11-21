@@ -497,6 +497,7 @@
         out.push({ valore: m[1] ? m[0].slice(0, -m[1].length) : m[0], regola: 'chiave' });
       }
     }
+    credenzialiAlPosto(s, out, forma);
     codiciVicini(s, out);
     for (const m of s.match(IBAN_RE) || []) {
       if (ibanValido(m)) out.push({ valore: m.replace(/\s/g, ''), regola: 'iban' });
