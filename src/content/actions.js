@@ -83,11 +83,19 @@
     } catch (_) { return ''; }
   }
 
-  // Copia del tasto destro sulla selezione: con la formattazione, se la selezione è ancora quella del menu.
+  // Il testo di una selezione come lo mette negli appunti il Copia del sistema: a capo compresi, senza gli spazi che una
+  // riga si porta dietro prima dell'a capo.
+  function testoCopiato(grezzo) {
+    return String(grezzo || '').replace(/[ \t]+\n/g, '\n').trim();
+  }
+
+  // Copia del tasto destro sulla selezione: se la selezione è ancora quella del menu, lo stesso testo di Ctrl+C (il
+  // menu la conosce su una riga) e la formattazione.
   function copySelection(text) {
-    const qui = (window.getSelection()?.toString() || '').replace(/\s+/g, ' ').trim();
-    const html = qui && qui === String(text || '').replace(/\s+/g, ' ').trim() ? htmlDellaSelezione() : '';
-    return copyToClipboard(text, html);
+    const grezzo = window.getSelection()?.toString() || '';
+    const unaRiga = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+    const stessa = !!grezzo.trim() && unaRiga(grezzo) === unaRiga(text);
+    return copyToClipboard(stessa ? testoCopiato(grezzo) : text, stessa ? htmlDellaSelezione() : '');
   }
 
   // Negli appunti deve finire un indirizzo apribile: un javascript:, un data: o un
