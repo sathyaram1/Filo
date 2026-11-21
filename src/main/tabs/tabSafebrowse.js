@@ -167,7 +167,8 @@ const safebrowseMethods = {
       const url = armato = sotto;
       timer = setTimeout(() => {
         timer = null;
-        if (wc.isDestroyed()) return;
+        // Una pagina del computer non ha rete, nemmeno per la finestra nascosta che prova il link (#1905).
+        if (wc.isDestroyed() || require('../services/fileDelComputer').inSessioneDiFile(wc)) return;
         try { this._sbPreverifica(url, wc.getURL(), wc.session); } catch (_) {}
       }, SOSTA_MS);
     };
