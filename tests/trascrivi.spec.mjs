@@ -230,8 +230,8 @@ test('una selezione su più righe si copia con le righe separate, da Ctrl+C, dal
   const menu = menuDi(strato).locator('.sn-menu').first();
   await expect(menu).toBeVisible({ timeout: 5000 });
   await menu.locator('button', { hasText: /^Copia$/ }).first().click();
-  // Il Copia del menu stende gli a capo in spazi, come per ogni selezione: le parole restano separate.
-  await expect.poll(() => appunti(app), { timeout: 5000 }).toMatch(/^4821\sTotale/);
+  // Il Copia del tasto destro dà lo stesso testo di Ctrl+C: chi copia un elenco lo ritrova a righe.
+  await expect.poll(() => appunti(app), { timeout: 5000 }).toBe(conCtrlC);
 
   await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
   await strato.keyboard.press('ControlOrMeta+a');
