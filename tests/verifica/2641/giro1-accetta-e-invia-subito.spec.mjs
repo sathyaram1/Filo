@@ -51,9 +51,11 @@ for (let giro = 1; giro <= 4; giro++) {
     await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
     await aiuto.fill('.sn-sidebar-input textarea', 'scegli tu una password');
     await aiuto.press('.sn-sidebar-input textarea', 'Enter');
-    await aiuto.locator('.sn-highlight-accept').click({ timeout: 20_000 });
-    // Subito: nessuna attesa fra l'Accetta e l'invio, come chi preme Invio di slancio.
+    const accetta = aiuto.locator('.sn-highlight-accept');
+    await accetta.waitFor({ timeout: 20_000 });
+    // Subito: la domanda è già scritta, e Invio arriva appena dopo l'Accetta, come chi preme di slancio.
     await aiuto.fill('.sn-sidebar-input textarea', 'e adesso?');
+    await accetta.click();
     await aiuto.press('.sn-sidebar-input textarea', 'Enter');
     await expect(aiuto.locator('.sn-sidebar').getByText('Premi Entra.')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('#p')).toHaveValue(PROPOSTA);
