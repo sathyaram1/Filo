@@ -14,6 +14,8 @@
         { testo: 'La traduzione della pagina si chiede anche a Filo, nella chat o nell\'Aiuto della pagina: «traducimi questa pagina», «riprendi la traduzione», «torna all\'originale». Se la pagina è già tradotta o già com\'era, te lo dice. Il tasto che traduce la selezione, premuto senza niente di selezionato, traduce la pagina.', segnalazione: 504 },
       ],
       fixes: [
+        { testo: 'Trascrivi mostra e legge anche i loghi con la scritta chiara su fondo trasparente, e una parola trascinata dalla prima all\'ultima lettera si copia intera anche quando l\'immagine usa un carattere diverso da quello di Filo.', segnalazione: 2374 },
+        { testo: '«Copia» del tasto destro su un testo che va a capo, come un indirizzo o un elenco, lo copia con le sue righe, come Ctrl+C.', segnalazione: 2374 },
         { testo: 'Il riquadro Bluetooth della home non dice più «spento» a Bluetooth acceso, ha già l\'elenco dei dispositivi quando lo apri, mostra e collega anche quelli senza nome, e se qualcosa non va dice cosa è successo e cosa fare. Lo stesso vale per il Wi-Fi.', segnalazione: 2394 },
         { testo: 'Se il computer risponde lento una volta, la home torna da sola a leggere subito Bluetooth e Wi-Fi, senza riavviare Filo, e dopo una pausa del computer non ti mostra come attuale lo stato di prima.', segnalazione: 2394 },
       ],
