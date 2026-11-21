@@ -364,7 +364,7 @@
 
   // Le voci di un turno come le legge il modello nei turni dopo. Le righe possono ripetere testi scritti da un sito o da
   // un modello (#592.4): una riga sola ciascuna, ripulite, dentro il recinto dei testi salvati.
-  function perModello(voci) {
+  function righePerModello(voci) {
     const E = global.SN_ESTERNO;
     const campo = (s, max = 200) => {
       const t = E ? E.neutralizza(String(s || ''), { unaRiga: true }) : pulito(s);
