@@ -144,6 +144,7 @@
     img.onload = () => {
       if (aperto !== a) return;
       a.nat = { w: img.naturalWidth, h: img.naturalHeight };
+      a.grigi = grigi(img);
       posa(a);
       try { radice.focus({ preventScroll: true }); } catch (_) {}
     };
