@@ -177,7 +177,7 @@ test('una voce dell\'elenco di Indietro scelta subito dopo il crollo della sched
   const indice = await app.evaluate(({ BrowserWindow }, da) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const tab = w._filoTabs.tabs.find((t) => t.view.webContents.getURL() === da);
-    return w._filoTabs.vociCronologia(tab.id, 'indietro')[0].indice;
+    return w._filoTabs.vociCronologia('indietro', tab.id)[0].indice;
   }, dopo);
   await gestoSubitoDopoIlCrollo(app, dopo, 'vaiAllaVoce', indice);
   await expect.poll(() => schedaMostra(app, prima), { timeout: 10_000 }).toBe(`${prima} prima`);
