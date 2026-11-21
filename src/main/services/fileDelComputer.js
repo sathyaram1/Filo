@@ -194,11 +194,24 @@ function preparaSessione(partizione = PARTIZIONE) {
   const { session } = require('electron');
   const s = session.fromPartition(partizione);
   s.protocol.handle('file', (req) => servi(partizione, req));
-  // Come le altre sessioni delle schede: le pagine d'errore di Filo, e le richieste che la pagina locale fa al web.
+  // Le pagine d'errore di Filo, come nelle altre sessioni delle schede.
   try { require('../protocol').registerFiloProtocolForSession(s); } catch (_) {}
-  try { const Cookies = require('./cookies'); Cookies.ensureRequestHook(s); Cookies.coverAdblock(s); } catch (_) {}
+  // Sotto la CSP, la rete della sessione è chiusa da sé: le richieste web si annullano, e quello che la CSP non vede
+  // (preconnessioni, WebRTC per TCP) trova un proxy che non risponde. Unico ascolto onBeforeRequest: nient'altro qui.
+  s.webRequest.onBeforeRequest({ urls: RETE }, (_d, cb) => cb({ cancel: true }));
+  s.setProxy({ proxyRules: 'http://127.0.0.1:9', proxyBypassRules: '<-loopback>' }).catch(() => {});
   sessioni.set(partizione, s);
   return s;
+}
+
+// Vero per una pagina della sessione di un file: lei e quello che apre restano senza rete.
+function inSessioneDiFile(wc) {
+  try { return Boolean(wc && [...sessioni.values()].includes(wc.session)); } catch (_) { return false; }
+}
+
+// WebRTC esce per UDP senza passare né dalla CSP né dal proxy: qui solo per il proxy, che non risponde.
+function chiudiRete(wc) {
+  if (inSessioneDiFile(wc)) { try { wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch (_) {} }
 }
 
 // Da chiamare prima di caricare il file, da ogni strada che lo apre: dà la partizione della scheda nuova, o null.
