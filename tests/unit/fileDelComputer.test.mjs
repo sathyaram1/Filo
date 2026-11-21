@@ -112,7 +112,7 @@ test('aperto un file nella cartella di casa, la pagina legge solo sé e i file c
     <img srcset="b.png 1x, c.png 2x"><div style="background:url(&quot;d.jpg&quot;)"></div><style>i{background:url(e.webp)}</style>
     <img src=".ssh/id_rsa"><script src="chiave"></script><img src="../fuori.png"><a href="Documenti/conto.pdf">conto</a>`);
   const c = F.concessioneDi(join(casa, 'appunti.html'));
-  assert.equal(c.cartella, null, 'la casa non si concede intera');
+  assert.deepEqual(c.cartelle, [], 'la casa non si concede intera');
   const legge = (...p) => F.permesso(c, join(casa, ...p));
   for (const p of [['appunti.html'], ['stile.css'], ['img', 'a.png'], ['b.png'], ['c.png'], ['e.webp'], ['Documenti', 'conto.pdf']]) {
     assert.equal(legge(...p), true, p.join('/'));
