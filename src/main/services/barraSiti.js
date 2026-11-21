@@ -80,7 +80,7 @@ async function daChat(action) {
   return {
     executed: true,
     kept: true,
-    output: { voci, ...(esito.voce ? { voce: esito.voce.nome } : {}), ...(esito.gia ? { gia: true } : {}) },
+    output: { voci, ...(esito.voce ? { voce: esito.voce.nome } : {}), ...(esito.gia ? { gia: true } : {}), ...(esito.cambiato ? {} : { invariata: true }) },
     ...(esito.cambiato ? { cambiate: esito.voci } : {}),
   };
 }
