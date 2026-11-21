@@ -225,6 +225,10 @@ test('#1723.1: «pass» come etichetta, coi due punti o accanto al nome utente, 
     nascosto(t, '', v, t);
     assert.equal(R.oscura(t), t.replace(v, S), t);
   }
+  // Le forme sono le stesse per il pavimento, che le prende dallo stesso posto.
+  globalThis.self = globalThis;
+  const P = require('../../src/shared/pavimento.js');
+  for (const t of ['User: mario / Pass: Girasole2024', 'Le credenziali sono: mario / Girasole2024']) assert.ok(!P.oscura(t).includes('Girasole2024'), `pavimento: ${t}`);
   for (const t of ['il pass, è bellissimo', 'la pass giornaliera', 'il pass del concerto costa 50', 'pass: costa 10 euro',
     'I need to pass the exam', 'il green pass 2021 è scaduto', 'ho comprato il passaporto AB1234567']) {
     assert.equal(alModello(t).nuovo, t, t);
