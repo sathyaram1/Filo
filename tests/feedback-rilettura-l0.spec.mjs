@@ -318,10 +318,19 @@ test('con un altro riquadro di feedback aperto, quello rimandato indietro aspett
   expect(await invii(app)).toEqual([]);
 });
 
-// #1403.1 — la segnalazione scritta da Filo in chat e confermata passa dalla stessa rilettura.
+// #1403.1 — la segnalazione scritta da Filo in chat e confermata passa dalla stessa rilettura. La password l'ha scritta
+// l'utente: una che non ha scritto lui non esce mai (#810), e la sua la manda solo con la parola «conferma» (#2644).
 const segnalazioneDaChat = async (app, testo) => {
-  const r = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca' });
-  return { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca', _confirm: { level: 2, text: r.describe, parti: r.parti } };
+  const r = await app.evaluate((_e, { a, richiesta }) => globalThis.SN_EXECUTE_FILO_ACTION(a, { richiesta }),
+    { a: { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca' }, richiesta: testo });
+  expect(r.needsConfirm, 'una password scritta dall\'utente esce con la parola «conferma»').toBe(3);
+  return { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca', _confirm: { level: r.needsConfirm, text: r.describe, parti: r.parti } };
+};
+const confermaConLaParola = async (page) => {
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  expect(await confirmText(page)).toContain('porterebbe fuori una password');
+  await fillConfirmInput(page, 'conferma');
+  await clickConfirm(page, 'ok');
 };
 
 test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non mandarla» la tiene, «Manda così» la manda', async ({ app, shell }) => {
