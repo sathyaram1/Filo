@@ -305,7 +305,7 @@ async function rimetti(ses, k, c) {
 function osservaPulizia(ses, k, c, causa, rimosso) {
   const p = pulizie.get(k);
   if (!p) return false;
-  if (Date.now() - p.at > NOSTRE_MS) { pulizie.delete(k); return false; }
+  if (Date.now() - p.at > (p.fatta ? PULIZIA_DECISA_MS : NOSTRE_MS)) { pulizie.delete(k); return false; }
   if (rimosso && causa === 'expired-overwrite') {
     p.prova = c;
     if (p.fatta && p.rimessa == null && daRimettere(p, c)) rimetti(ses, k, c).catch(() => {});
