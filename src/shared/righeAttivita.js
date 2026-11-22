@@ -304,11 +304,10 @@
       const op = global.SN_BARRA_SITI ? global.SN_BARRA_SITI.operazione(a) : '';
       if (op === 'elenca') return { icon: '📌', text: 'Letta la barra dei siti' };
       if (op === 'ripiega' || op === 'riapri') return { icon: '📌', text: op === 'ripiega' ? 'Chat della home ripiegata' : 'Chat della home riaperta' };
-      // Una mossa che ha lasciato la barra com'era non si racconta come fatta: lo dice l'esito.
-      const cosa = o.gia ? 'È già nella barra dei siti'
-        : o.invariata ? ({ rinomina: 'Ha già quel nome nella barra dei siti', sposta: 'È già a quel posto nella barra dei siti' }[op] || 'Barra dei siti già così')
-          : { aggiungi: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
-      return { icon: '📌', text: `${cosa || 'Barra dei siti'}${nome ? ` · ${nome}` : ''}` };
+      // Una mossa che ha lasciato la barra com'era non si racconta come fatta: come «Sei già nella home», non conta.
+      const gia = global.SN_BARRA_SITI ? global.SN_BARRA_SITI.giaCosi(op, o) : '';
+      const cosa = gia || { aggiungi: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
+      return { icon: '📌', text: `${cosa || 'Barra dei siti'}${nome ? ` · ${nome}` : ''}`, ...(gia ? { failed: true } : {}) };
     },
     CANCELLA_PAGINE: (a) => {
       const n = Number(a._output && a._output.cancellate) || 0;
