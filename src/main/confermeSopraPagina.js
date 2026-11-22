@@ -135,7 +135,7 @@ function seguiGestiDiTutti() {
 // rimostra o la sposta mentre c'è una domanda, si riguarda.
 function registraFinestraDelSito(win, padre) {
   if (!win || finestreDelSito.has(win) || win.isDestroyed()) return;
-  seguiFuoco();
+  seguiGestiDiTutti();
   finestreDelSito.set(win, padre || null);
   win.once('closed', () => { finestreDelSito.delete(win); nascoste.delete(win); });
   for (const ev of ['show', 'move', 'resize']) win.on(ev, riallinea);
