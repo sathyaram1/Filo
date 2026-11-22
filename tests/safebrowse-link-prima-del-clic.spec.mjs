@@ -475,7 +475,8 @@ test('un file travestito su un sito noto (Dropbox, il CDN di Discord): al clic l
   await expect.poll(() => verdettoPronto(app, 'https://cdn.discordapp.com/attachments/1/2/foto.jpg.scr')).toBe('sospetto');
   await clicFermato(app, '#dropbox');
   const avviso = await vistaAvviso(app);
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento/)).toBeVisible();
+  await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
+  await expect(avviso.locator('#corpo')).toContainText(': sembra un documento');
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
   expect(await richiesteVerso(app, 'dropbox.com')).toEqual([]);
 });
