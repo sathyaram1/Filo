@@ -192,7 +192,7 @@ async function pulizia(variante, n = -1, sito = null) {
 const VARIANTI = [
   { nome: 'avvisi prima delle risposte', avvisiInRitardo: 0 },
   { nome: 'avvisi dopo le risposte', avvisiInRitardo: 3 },
-  { nome: 'avvisi dopo la fine della pulizia', avvisiInRitardo: Number(process.env.RIT || 30) },
+  { nome: 'avvisi dopo la fine della pulizia', avvisiInRitardo: 30 },
 ];
 
 for (const v of VARIANTI) {
