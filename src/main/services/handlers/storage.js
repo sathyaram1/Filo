@@ -217,7 +217,7 @@ module.exports = function register(on, ctx) {
       const filo = contaFilo(parsed);
       const { mergeImportedData, regolaImport, haSegreti, proxyDaCompletare } = require('../exportData');
       const dati = datiDaFondere(parsed.data);
-      const { merged, stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
+      const { merged, stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione(parsed.proxySenzaCredenziali));
       return {
         ok: true,
         token,
