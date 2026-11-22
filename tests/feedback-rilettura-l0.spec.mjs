@@ -330,7 +330,8 @@ const confermaConLaParola = async (page) => {
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
   expect(await confirmText(page)).toContain('porterebbe fuori una password');
   await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'ok');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
 };
 
 test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non mandarla» la tiene, «Manda così» la manda', async ({ app, shell }) => {
