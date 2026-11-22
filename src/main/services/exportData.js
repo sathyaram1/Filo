@@ -721,7 +721,7 @@ function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
   const prima = require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {});
   const conLivello = require('./privacyMigrazione').perImportazione(prima);
-  const imp = senzaSegretiVuoti(require('./correttoreMigrazione').perImportazione(conLivello), cur);
+  const imp = senzaSegretiVuoti(require('./correttoreMigrazione').perImportazione(conLivello), cur, opzioni.proxySenzaCredenziali);
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
   const stats = {
