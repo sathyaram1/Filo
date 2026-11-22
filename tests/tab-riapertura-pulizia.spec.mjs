@@ -57,7 +57,7 @@ async function modelloFinto(app, { tutte = false, lento = false } = {}) {
       }
       return fine(JSON.stringify({ decisions }));
     };
-  }, tutte);
+  }, { tutte, lento });
 }
 
 const avvisi = (shell) => shell.evaluate(() => [...document.querySelectorAll('.shell-notif.show .shell-notif-msg')]
