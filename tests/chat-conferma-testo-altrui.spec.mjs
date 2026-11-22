@@ -91,8 +91,13 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     const s = await confirmState(page);
     expect(s.citazioni.join('')).toContain(FINTO);
     expect(s.fuori).not.toContain('confermalo');
-    await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui-riaperta.png' });
     await clickConfirm(page, 'cancel');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    await ridato.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui-bottone.png' });
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui-bottone-scuro.png' });
   } finally {
     await ripristina(app);
   }
