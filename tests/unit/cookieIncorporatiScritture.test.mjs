@@ -153,3 +153,69 @@ test('senza scritture in mezzo il declassamento tiene il valore e toglie la scad
   assert.deepEqual(d.cookie('stato').map((c) => `${c.value}:${c.session ? 'sessione' : 'scadenza'}`), ['1:sessione']);
   assert.equal(scritture, 1);
 });
+
+// #2637.1 — la pulizia a fine visita del partizionato di un riquadro toglie anche il normale con lo stesso nome e poi
+// lo rimette: se il sito lo aggiorna mentre Filo pulisce, deve restare il valore del sito.
+const NORMALE = { url: 'https://video.com/', name: 'stato', secure: true, sameSite: 'no_restriction' };
+const fraUnGiorno = () => Math.floor(Date.now() / 1000) + 86400;
+const stati = (d) => d.cookie('stato')
+  .map((c) => `${c.value}:${c.partizionato ? 'partizionato' : 'normale'}:${c.session ? 'sessione' : 'scadenza'}`).sort();
+
+// Un normale del sito da prima della visita, il partizionato del riquadro dall'intestazione, poi la scheda si chiude e
+// la pulizia parte; `sito` scrive mentre Filo aspetta la risposta del passo `n` della pulizia.
+async function pulizia(variante, n = -1, sito = null) {
+  process.env.NODE_ENV = 'test';
+  schede.splice(0, schede.length, scheda);
+  const CI = caricaModulo();
+  const d = deposito(variante);
+  d.scrivi({ ...NORMALE, value: 'mio', expirationDate: fraUnGiorno() });
+  await quiete();
+  CI.aggancia(d.ses);
+  CI.margineTest(1);
+  await d.intestazioni({
+    url: 'https://video.com/riquadro', resourceType: 'subFrame', frame: { top: { url: 'https://articolo.it/' } },
+    responseHeaders: { 'set-cookie': ['stato=p1; Max-Age=3600; Path=/; SameSite=None; Secure; Partitioned'] },
+  });
+  d.scrivi({ ...NORMALE, value: 'p1' }, { partizionato: true });
+  await quiete();
+  schede.length = 0;
+  await CI.giroDiPulizia();
+  await new Promise((r) => setTimeout(r, 5));
+  if (sito) d.alPasso(n, () => sito(d));
+  d.contaPassi();
+  await CI.giroDiPulizia();
+  await quiete();
+  return d;
+}
+
+const VARIANTI = [{ nome: 'avvisi prima delle risposte', avvisiInRitardo: 0 }, { nome: 'avvisi dopo le risposte', avvisiInRitardo: 3 }];
+
+for (const v of VARIANTI) {
+  test(`senza scritture in mezzo la pulizia toglie il partizionato e rimette il normale com'era (${v.nome})`, async () => {
+    const d = await pulizia(v);
+    assert.deepEqual(stati(d), ['mio:normale:scadenza']);
+  });
+
+  test(`il sito che aggiorna il suo cookie normale a qualunque passo della pulizia lo ritrova col valore nuovo (${v.nome})`, async () => {
+    const passi = (await pulizia(v)).passiContati();
+    assert.ok(passi >= 5, `la pulizia fa ${passi} passi`);
+    const sbagliati = [];
+    for (let n = 0; n < passi; n++) {
+      const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'nuovo', expirationDate: fraUnGiorno() }));
+      const resta = stati(d);
+      if (resta.join() !== 'nuovo:normale:scadenza') sbagliati.push(`passo ${n}: ${resta.join(', ')}`);
+    }
+    assert.deepEqual(sbagliati, []);
+  });
+
+  test(`il riquadro che aggiorna il partizionato durante la pulizia non diventa un cookie normale (${v.nome})`, async () => {
+    const passi = (await pulizia(v)).passiContati();
+    const sbagliati = [];
+    for (let n = 0; n < passi; n++) {
+      const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'p2' }, { partizionato: true }));
+      const normali = stati(d).filter((s) => s.includes(':normale:'));
+      if (normali.join() !== 'mio:normale:scadenza') sbagliati.push(`passo ${n}: ${normali.join(', ')}`);
+    }
+    assert.deepEqual(sbagliati, []);
+  });
+}
