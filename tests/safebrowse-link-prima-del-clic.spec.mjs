@@ -397,7 +397,8 @@ test('un link «scarica» a un file travestito: al clic l\'avviso, il file non p
     await contaScaricamenti(app);
     await clicFermato(app, '#file');
     const avviso = await vistaAvviso(app);
-    await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
+    await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
+    await expect(avviso.locator('#corpo')).toContainText(': sembra un documento, ma è un programma');
     await expect.poll(() => copertura(app)).toEqual(COPERTA);
     expect(await scaricamenti(app)).toEqual([]);
     const continua = avviso.getByRole('button', { name: 'Continua' });
