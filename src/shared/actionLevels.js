@@ -1967,5 +1967,5 @@
   const LOTTO_ELIMINA = 200;
   const LOTTO_RINOMINA = 40;
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale, traduzioneFatta, LOTTO_ELIMINA, LOTTO_RINOMINA };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, piatto, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale, traduzioneFatta, LOTTO_ELIMINA, LOTTO_RINOMINA };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
