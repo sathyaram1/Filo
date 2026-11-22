@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.300', date: '2026-11-22',
+      fixes: [
+        { testo: 'Quando in una chat hai già dato la password a chi te l\'ha chiesta, il correttore torna a controllare intere le frasi che scrivi dopo. Una password scritta come «Pass: …», accanto al nome utente o come seconda password nella stessa risposta resta fuori da quello che legge.', segnalazione: 1723 },
+      ],
+    },
+    {
       version: '0.2.299', date: '2026-11-22',
       fixes: [
         { testo: 'Filo apre i link a un server del tuo computer anche quando contengono nome utente e password, come http://admin:password@localhost:8080: restano sul computer, come lo stesso indirizzo in un comando del terminale. Se il link rimanda a un altro sito, la password resta ferma.', segnalazione: 2255 },

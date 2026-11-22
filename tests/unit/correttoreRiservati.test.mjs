@@ -108,7 +108,9 @@ test('senza una richiesta, o con la conversazione andata avanti, la risposta par
   assert.equal(risposta('certo, alle 1830 al bar Gatto2024', 'Anna: ci vediamo martedì?').nuovo, 'certo, alle 1830 al bar Gatto2024');
   const avanti = 'Marco: mi mandi la password del wifi?\nIo: arriva\nMarco: grazie! a che ora ci vediamo domani?';
   assert.equal(risposta('alle venti davanti al cinema 2024', avanti).nuovo, 'alle venti davanti al cinema 2024');
-  const lontana = `Marco: mi mandi la password del wifi?\n${'Io: parliamo di altro adesso\n'.repeat(20)}`;
+  // Lontana oltre il tetto: più vicino, con la risposta già sopra, la parola con la forma di una password si toglie
+  // ancora (correttorePasswordAMano.test.mjs).
+  const lontana = `Marco: mi mandi la password del wifi?\n${'Io: parliamo di altro adesso\n'.repeat(40)}`;
   assert.equal(risposta('certo, Gatto2024', lontana).nuovo, 'certo, Gatto2024');
 });
 
