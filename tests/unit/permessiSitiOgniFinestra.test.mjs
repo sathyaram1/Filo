@@ -33,11 +33,17 @@ const sulDisco = async () => {
   await Storage.flushNow();
   return JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8')).sitePermissions || {};
 };
-const riavvio = async () => {
-  // Una ripartenza di Filo rilegge il disco da capo.
-  for (const s of Permessi.scelteRicordate()) Permessi._usaAnnuncio(() => {}), Permessi.togliScelta(s.origine, s.parte);
-  Permessi._usaAnnuncio(() => annunci.push(Date.now()));
-};
+// Una ripartenza di Filo: storage e permessi rinascono e rileggono il file.
+async function dopoLaRiapertura() {
+  const percorsi = [join(ROOT, 'src', 'main', 'shim', 'storage.js'), join(ROOT, 'src', 'main', 'services', 'permessiPagine.js')];
+  for (const p of percorsi) delete require.cache[require.resolve(p)];
+  const S = require(percorsi[0]);
+  const P = require(percorsi[1]);
+  P._usaDisco(S);
+  P._usaAnnuncio(() => {});
+  await P.carica();
+  return P.scelteRicordate().map((s) => `${s.origine}|${s.parte}`);
+}
 
 test('tolta dalla pagina Sicurezza di una finestra in incognito, la risposta non torna alla riapertura', async () => {
   await Permessi.carica();
@@ -45,10 +51,7 @@ test('tolta dalla pagina Sicurezza di una finestra in incognito, la risposta non
   const ok = await Storage.runIncognito(async () => Permessi.togliScelta('https://riunione.example', 'audio'));
   assert.equal(ok, true);
   assert.deepEqual(Object.keys(await sulDisco()), ['https://posta.example|notifiche'], 'sul disco il microfono non c\'è più');
-  Storage.resetIncognito();
-  await riavvio();
-  await Permessi.carica();
-  assert.deepEqual(Permessi.scelteRicordate().map((s) => `${s.origine}|${s.parte}`), ['https://posta.example|notifiche']);
+  assert.deepEqual(await dopoLaRiapertura(), ['https://posta.example|notifiche']);
 });
 
 test('dalla finestra normale la stessa mossa resta come prima', async () => {
