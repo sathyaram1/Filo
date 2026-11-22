@@ -2361,8 +2361,7 @@ class TabManager {
     cands.forEach((tab, i) => {
       const d = byIndex.get(i);
       if (!d || d.action !== 'archive') return;
-      // Ricontrollata qui: mentre il modello rispondeva l'utente può aver scritto.
-      if (this._intoccabileDalTriage(tab)) return;
+      // Chi la chiama ha già tolto, alla risposta, le schede chiuse o riprese nell'attesa (_delGiro).
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
