@@ -97,16 +97,35 @@ function allineaFinestre() {
 }
 
 const riallinea = () => { if (aSchermo.size) setImmediate(allineaFinestre); };
-let fuocoSeguito = false;
+const GESTI = new Set(['mouseDown', 'rawKeyDown', 'keyDown', 'mouseWheel', 'touchStart', 'gestureTapDown']);
+const seguiti = new WeakSet();
+function finestraDi(wc) {
+  try { const w = BrowserWindow.fromWebContents(wc); if (w) return w; } catch (_) {}
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { if ((w.contentView.children || []).some((v) => v.webContents === wc)) return w; } catch (_) {}
+  }
+  return null;
+}
+function seguiGesti(wc) {
+  if (!wc || seguiti.has(wc)) return;
+  seguiti.add(wc);
+  wc.on('input-event', (_e, input) => {
+    if (!input || !GESTI.has(input.type)) return;
+    const w = finestraDi(wc);
+    if (!w) return;
+    const casa = casaDi(w);
+    const prima = usata.get(casa);
+    usata.set(casa, ++giroUso);
+    if (prima !== giroUso - 1) riallinea();
+  });
+}
+let gestiSeguiti = false;
 function seguiFuoco() {
-  if (fuocoSeguito) return;
-  fuocoSeguito = true;
+  if (gestiSeguiti) return;
+  gestiSeguiti = true;
   try {
-    require('electron').app.on('browser-window-focus', (_e, w) => {
-      if (!w || finestreDelSito.has(w)) return;
-      fuoco.set(w, ++giroFuoco);
-      riallinea();
-    });
+    require('electron').app.on('web-contents-created', (_e, wc) => seguiGesti(wc));
+    for (const wc of WebContents.getAllWebContents()) seguiGesti(wc);
   } catch (_) {}
 }
 
