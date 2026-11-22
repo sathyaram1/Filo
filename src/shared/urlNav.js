@@ -44,6 +44,27 @@
       || /^(?:::ffff:)?127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h) || /^::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}$/.test(h);
   }
 
+  // Un indirizzo del computer stesso non porta fuori niente (#2255), salvo che nel resto ne nomini un altro, anche
+  // codificato: un rimando del server locale (`/r?to=https%3A%2F%2Fsito`) lo porterebbe fuori. Vale per link e comandi.
+  function restaSulComputer(url) {
+    let u;
+    try { u = new URL(String(url || '').trim()); } catch (_) { return false; }
+    if (!questoComputer(u.hostname)) return false;
+    let resto = `${u.pathname}${u.search}${u.hash}`;
+    for (let i = 0; i < 8; i++) {
+      const d = resto.replace(/%([0-9a-f]{2})/gi, (_m, h) => String.fromCharCode(parseInt(h, 16)));
+      if (d === resto) break;
+      resto = d;
+    }
+    // Per i browser `/\sito` vale `//sito`; un host che non si legge vale fuori.
+    for (const m of resto.matchAll(/[/\\]{2,}([^/\\?#\s]*)/g)) {
+      let host = null;
+      try { host = new URL('//' + m[1], u.href).hostname; } catch (_) { host = null; }
+      if (host == null || !questoComputer(host)) return false;
+    }
+    return true;
+  }
+
   // Host che parlano quasi sempre in chiaro (dev, router/IoT su IP privato, rete di casa):
   // per loro lo schema di default è http. Accetta anche la forma IPv6 fra parentesi ([::1]).
   function isLocalHost(host) {
@@ -307,7 +328,7 @@
   }
 
   global.SN_URL_NAV = {
-    isLocalHost, questoComputer, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
+    isLocalHost, questoComputer, restaSulComputer, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
     normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, fileDiQuestoComputer, isShareableAddress, collegamentoScritto, ricercaDi, eRicercaDi,
     indirizzoRicerca, indirizzoRicercaImmagine, invioRicercaImmagine, LENS_CARICA,

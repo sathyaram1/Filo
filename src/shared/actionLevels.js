@@ -100,6 +100,10 @@
   const HOST_NUDO = /(?<![\w@.\/-])((?:[\w-]+\.)+[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?![\w-])/gi;
   // La regola è quella dei link (src/shared/urlNav.js); senza il modulo ogni indirizzo vale fuori.
   const questoComputer = (host) => !!(global.SN_URL_NAV && global.SN_URL_NAV.questoComputer(host));
+  const restaSulComputer = (url) => !!(global.SN_URL_NAV && global.SN_URL_NAV.restaSulComputer(url));
+  const URL_INTERO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s"'`^<>|;]+/gi;
+  // Il testo che un link o una lettura portano fuori: niente se l'indirizzo è del computer stesso, come un comando (#2255).
+  const indirizzoCheEsce = (a) => { const url = indirizzoDi(a); return restaSulComputer(url) ? '' : url; };
   // I client dei database e i login ai registri si collegano al server che nominano (#1312): un database senza
   // server nominato è quello del computer, un login senza registro va al registro pubblico. Una cartella è un socket.
   const CLIENT_DB = /\b(?:mysql|mariadb|mysqldump|psql|pg_dump|pg_dumpall|pg_restore|mongo|mongosh|mongodump|mongorestore|redis-cli|sqlcmd|cqlsh|clickhouse-client)\b/i;
@@ -114,6 +118,7 @@
     if (DNS.test(testo)) return true;
     const dagliIndirizzi = [...testo.matchAll(HOST_URL)].map((m) => m[1]).filter(Boolean);
     if (dagliIndirizzi.some((h) => !questoComputer(h))) return true;
+    if ([...testo.matchAll(URL_INTERO)].some((m) => !restaSulComputer(m[0]))) return true;
     if (CLIENT_DB.test(testo) && serverNominati(testo).some((h) => !questoComputer(h))) return true;
     if (LOGIN_REGISTRO.test(testo)) {
       const registri = [...[...testo.matchAll(HOST_NUDO)].map((m) => m[1]), ...(testo.match(/\blocalhost\b/gi) || [])];
@@ -442,7 +447,7 @@
       // (#530). Il campo può solo alzare il costo, quindi chi lo forgia non ottiene niente.
       costo: (a) => costoIndirizzo(a, a && a.cerca ? 2 : 1),
       campo: 'web',
-      uscita: (a) => indirizzoDi(a),
+      uscita: indirizzoCheEsce,
       describe: (a) => {
         const url = indirizzoDi(a) || 'una pagina';
         const N0 = global.SN_URL_NAV;
@@ -859,7 +864,7 @@
       // La scheda già aperta si legge senza uscire: resta in chat. `_nonCompare` ed `_exfil` li scrive il main, mai l'LLM.
       costo: (a) => costoIndirizzo(a, indirizzoDi(a) ? 1 : 0),
       campo: 'web',
-      uscita: (a) => indirizzoDi(a),
+      uscita: indirizzoCheEsce,
       // Chi scrive la pagina è un autore ignoto, anche quando la pagina è una scheda dell'utente.
       fonte: (a, out) => (out && (out.testo || out.text)
         ? { classe: 5, campo: 'web', chiave: 'web:pagina', motivo: out.fonte === 'scheda' ? 'ho letto una pagina aperta in una tua scheda' : 'ho letto una pagina web' }
