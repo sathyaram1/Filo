@@ -314,7 +314,7 @@ function osservaPulizia(ses, k, c, causa, rimosso) {
   const v = nostre.get(k);
   // Una sovrascrittura di un valore ancora più nuovo la rimette già la sorveglianza delle riscritture.
   if (v && v.rimosso) return;
-  if (p.prova && p.prova.value !== p.rimessa && daRimettere(p.prova, k, [])) rimetti(ses, k, p.prova).catch(() => {});
+  if (p.prova && p.prova.value !== p.rimessa && daRimettere(p, p.prova)) rimetti(ses, k, p.prova).catch(() => {});
 }
 
 // All'uscita da Filo i cookie di sessione se ne vanno da soli; i partizionati ancora in attesa si tolgono qui.
