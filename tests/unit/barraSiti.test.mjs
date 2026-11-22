@@ -370,7 +370,7 @@ test('#1803.2 una mossa che lascia la barra com\'era: il pulsante dopo l\'OK e i
   x = await prova(metti);
   assert.equal(x.fatto, 'È già nella barra dei siti «youtube.com»');
   assert.equal(x.esito, E.FALLITO, 'il riassunto in cima non la conta come fatta');
-  assert.equal(E.motivo({ ...metti, _output: { gia: true, invariata: true } }), 'era già così');
+  assert.equal(E.motivo({ ...metti, _output: { gia: true, invariata: true, voce: 'YouTube' } }), 'È già nella barra dei siti · YouTube', 'riaperta, la riga di prima');
   assert.equal(x.riga.failed, true);
   x = await prova({ type: 'BARRA_SITI', operazione: 'rinomina', elemento: 'YouTube', nome: 'YouTube' });
   assert.equal(x.fatto, 'Ha già quel nome nella barra dei siti «YouTube»');
