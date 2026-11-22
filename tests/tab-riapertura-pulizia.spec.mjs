@@ -33,8 +33,11 @@ function lancia(userData) {
 }
 
 // `tutte`: un modello deciso fino in fondo, come chiede il prompt della riapertura, che archivia tutto quello che riceve.
-async function modelloFinto(app, { tutte = false } = {}) {
-  await app.evaluate((_, tutte) => {
+// `lento`: il giudizio aspetta `globalThis.__rispondiPulizia()`, come un modello vero che ci mette decine di secondi.
+async function modelloFinto(app, { tutte = false, lento = false } = {}) {
+  await app.evaluate((_, { tutte, lento }) => {
+    globalThis.__giudizioChiesto = false;
+    const via = lento ? new Promise((r) => { globalThis.__rispondiPulizia = r; }) : Promise.resolve();
     globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => ({ vectors: texts.map(() => [0.5, 0.2, 0.9, 0.1]) });
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       const sistema = String((messages[0] && messages[0].content) || '');
