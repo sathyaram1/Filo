@@ -829,12 +829,14 @@ test('la pagina Sicurezza già aperta si aggiorna da sé quando si risponde a un
   await expect.poll(() => esiti.includes('concesso:audio'), { timeout: 10_000 }).toBe(true);
   await expect(righe.filter({ hasText: 'Microfono: consentito' })).toHaveCount(1, { timeout: 5_000 });
 
-  const scheda = await app.evaluate(({ BrowserWindow }, u) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+  // Il «dimentica» del menu della scheda, per la strada che usa la cornice.
+  const id = await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const t = w._filoTabs.tabs.find((x) => x.view && x.view.webContents.getURL().startsWith(u));
-    return require('./src/main/services/permessiPagine.js').dimentica(t.view.webContents).tolte;
-  }, origine + '/microfono').catch(() => null);
-  expect(scheda, 'la scheda aveva la risposta da togliere').toBe(1);
+    return t ? t.id : null;
+  }, origine + '/microfono');
+  const tolte = await shell.evaluate((x) => window.filoShell.tabs.dimenticaPermessi(x), id);
+  expect(tolte.tolte, 'la scheda aveva la risposta da togliere').toBe(1);
   await expect(righe).toHaveText(['Nessuna risposta data a un sito'], { timeout: 5_000 });
 });
 
