@@ -405,11 +405,9 @@ test('dall\'Aiuto: la segnalazione confermata con la parola per la password part
   await page.evaluate((t) => window.__filoSidebarTest.scriveUtente(t), TESTO);
   await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, azione);
   await confermaConLaParola(page);
-  // Il modello finto non trova niente: la password la riconosce il controllo senza modello.
-  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
-  expect(await invii(app)).toEqual([]);
-  await clickConfirm(page, 'ok');
+  // Il modello finto non trova niente e la password, che il controllo senza modello riconosce, è quella confermata.
   await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([TESTO]);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
 });
 
