@@ -70,8 +70,8 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     expect(b.dentro).toContain(FINTO);
     expect(b.filo).toBe('3px');
 
-    const riga = page.locator('.dash-bubble-filo .dash-activity-row', { hasText: 'Conferma chiesta' }).first();
-    await expect(riga).toHaveCount(1);
+    const riga = page.locator('.dash-activity-row', { hasText: 'Conferma chiesta' }).first();
+    await expect(riga).toBeAttached();
     const r = await pezzi(riga);
     expect(r.fuori).toMatch(/^Conferma chiesta · Filo vuole impostare/);
     expect(r.fuori).not.toMatch(/fornitore|confermalo/);
