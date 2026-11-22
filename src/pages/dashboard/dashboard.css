@@ -1583,12 +1583,13 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* Dentro una riga: va a capo con lei, e ogni pezzo tiene il suo bordo. */
+/* Dentro una riga o un bottone: un foglietto solo, che va a capo al suo interno. */
 .dash-altrui {
-  padding: 0 5px;
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 6px;
   overflow-wrap: anywhere;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
 }
 /* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
 .dash-delete-note[data-cerco="1"]::before {
