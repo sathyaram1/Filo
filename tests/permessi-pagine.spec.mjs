@@ -36,6 +36,32 @@ const PAGINE = {
 
 // La finestra nascosta si chiude a caricamento finito: un riquadro lento tiene viva la pagina mentre chiede.
 PAGINE['/media-lenta'] = PAGINE['/media'] + '<iframe src="/lento"></iframe>';
+// Un finto avviso di virus (#591.6): allarme sonoro, voce e finestra di dialogo appena si apre.
+const BIP = (() => {
+  const n = 8000; const b = Buffer.alloc(44 + n);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20);
+  b.writeUInt16LE(1, 22); b.writeUInt32LE(8000, 24); b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34);
+  b.write('data', 36); b.writeUInt32LE(n, 40);
+  for (let i = 0; i < n; i++) b[44 + i] = 128 + Math.round(100 * Math.sin(i / 3));
+  return 'data:audio/wav;base64,' + b.toString('base64');
+})();
+PAGINE['/allarme'] = `<!doctype html><meta charset="utf-8"><title>Avviso</title><p>Il tuo computer è infetto</p>
+<iframe src="/lento"></iframe>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  const a = new Audio(${JSON.stringify(BIP)}); a.loop = true;
+  a.play().then(() => m('allarme:suona'), (e) => m('allarme:' + e.name));
+  const ctx = new AudioContext();
+  setTimeout(() => m('contesto:' + ctx.state), 500);
+  try {
+    const u = new SpeechSynthesisUtterance('Il tuo computer è infetto, chiama il numero');
+    u.onstart = () => m('voce:parla'); u.onerror = (e) => m('voce:' + e.error);
+    speechSynthesis.speak(u);
+  } catch (e) { m('voce:' + e.name); }
+  setTimeout(() => { alert('Il tuo computer è infetto, chiama il numero'); m('dopo:avviso'); }, 200);
+  setTimeout(() => { m('conferma:' + confirm('Chiami adesso?')); m('domanda:' + prompt('Numero', '1')); }, 400);
+  setTimeout(() => { window.print(); m('dopo:stampa'); }, 600);
+</script>`;
 PAGINE['/microfono'] = PAGINE['/media'].replace('{ audio: true, video: true }', '{ audio: true }');
 PAGINE['/fotocamera'] = `<!doctype html><meta charset="utf-8"><title>Modulo</title><textarea autofocus></textarea><script>
   window.__prova = () => navigator.mediaDevices.getUserMedia({ video: true }).then(
