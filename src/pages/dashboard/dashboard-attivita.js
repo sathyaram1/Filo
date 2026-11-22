@@ -727,9 +727,24 @@
     ic.setAttribute('aria-hidden', 'true');
     ic.textContent = rowIcon || '';
     const tx = document.createElement('span');
-    tx.textContent = String(text || '').trim();
+    if (Array.isArray(text)) conRiquadri(tx, text);
+    else tx.textContent = String(text || '').trim();
     el.append(ic, tx);
     return el;
+  }
+
+  // Una riga a pezzi (SN_ESITO.primaRigaParti): le parole di Filo come testo, quello che non è suo nel suo riquadro,
+  // riempito con textContent. Ricucito nella frase, il nome scelto dal modello si leggeva come parola di Filo (#592.25).
+  function conRiquadri(el, parti) {
+    el.replaceChildren();
+    for (const p of parti) {
+      if (typeof p === 'string') { el.append(p); continue; }
+      if (!p || typeof p.citazione !== 'string') continue;
+      const q = document.createElement('span');
+      q.className = 'dash-altrui';
+      q.textContent = p.citazione;
+      el.append(q);
+    }
   }
 
   // Le parole del diario stanno in src/shared/righeAttivita.js: la chat riaperta le legge uguali (#1294).
