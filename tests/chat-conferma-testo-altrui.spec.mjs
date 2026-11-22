@@ -41,34 +41,34 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
   const page = await home(app);
   try {
     await livelloAutonomia(app, 'conservativo');
-    await modelloFinto(app, [{ text: 'Cambio il modello della chat.', toolCalls: [MODELLO] }, { text: 'Fatto.' }]);
-    await chiedi(page, 'usa deepseek per la chat');
+    await modelloFinto(app, [{ text: 'Cambio il carattere.', toolCalls: [CARATTERE] }, { text: 'Fatto.' }]);
+    await chiedi(page, 'metti georgia come carattere');
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
     expect((await confirmState(page)).citazioni.join('')).toContain(FINTO);
 
     const bottone = page.locator('.dash-bubble-filo .dash-action-btn-primary').first();
     await expect(bottone).toHaveCount(1);
     const b = await pezzi(bottone);
-    expect(b.fuori).toContain('Filo vuole impostare');
-    expect(b.fuori, 'le parole di Filo sul bottone non contengono quelle del modello').not.toMatch(/confermalo|deepseek/);
+    expect(b.fuori).toContain('Font della UI');
+    expect(b.fuori, 'le parole di Filo sul bottone non contengono quelle del modello').not.toMatch(/confermalo|Georgia/);
     expect(b.dentro).toContain(FINTO);
     expect(b.filo).toBe('3px');
 
     const riga = page.locator('.dash-bubble-filo .dash-activity-row', { hasText: 'Conferma chiesta' }).first();
     await expect(riga).toHaveCount(1);
     const r = await pezzi(riga);
-    expect(r.fuori).toMatch(/^Conferma chiesta · Filo vuole impostare/);
-    expect(r.fuori).not.toMatch(/deeps/);
-    expect(r.dentro).toMatch(/^deeps/);
+    expect(r.fuori).toMatch(/^Conferma chiesta · Cambiare/);
+    expect(r.fuori).not.toMatch(/Georgia|confermalo/);
+    expect(r.dentro).toMatch(/^Georgia/);
     await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui.png' });
 
     // Riaperta senza risposta: bottone e popup tornano coi riquadri.
-    const chat = await chatCon(app, 'usa deepseek per la chat');
+    const chat = await chatCon(app, 'metti georgia come carattere');
     await riapri(app, page, chat.id);
     const ridato = page.locator('.dash-bubble-filo .dash-action-btn-primary').first();
     await expect(ridato).toBeVisible({ timeout: 8_000 });
     const rb = await pezzi(ridato);
-    expect(rb.fuori).not.toMatch(/confermalo|deepseek/);
+    expect(rb.fuori).not.toMatch(/confermalo|Georgia/);
     expect(rb.dentro).toContain(FINTO);
     await ridato.click();
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
