@@ -104,9 +104,16 @@ export function corriFile(dir, voce, { lancia = spawnSync, prepara = preparaLanc
     return { esiti: esitiDaTap(r.stdout), partito: true };
   }
   const rapporto = join(dirname(dir), `rapporto-${Math.random().toString(36).slice(2)}.json`);
-  const l = prepara('npx', ['playwright', 'test', rel, '--retries=0', '--reporter=json']);
+  // Le dipendenze della copia sono un collegamento: la CLI che lo risolve e lo spec che non lo risolve (la junction su
+  // Windows) caricano due Playwright, e lo spec non trova i casi. Coi collegamenti tenuti la copia è una sola ovunque.
+  const cli = join(cwd, 'node_modules', '@playwright', 'test', 'cli.js');
+  const diretto = existsSync(cli);
+  const argomenti = ['test', rel, '--retries=0', '--reporter=json'];
+  const l = diretto
+    ? prepara(process.execPath, ['--preserve-symlinks', '--preserve-symlinks-main', cli, ...argomenti])
+    : prepara('npx', ['playwright', ...argomenti]);
   if (!l.ok) return { esiti: new Map(), partito: false, errore: l.motivo };
-  const r = lancia(l.cmd, l.args, { cwd, env: { ...(l.env || pulito), PLAYWRIGHT_JSON_OUTPUT_FILE: rapporto }, encoding: 'utf8', timeout: TETTO_FILE_MS, maxBuffer: 1 << 26, shell: process.platform === 'win32' });
+  const r = lancia(l.cmd, l.args, { cwd, env: { ...(l.env || pulito), PLAYWRIGHT_JSON_OUTPUT_FILE: rapporto }, encoding: 'utf8', timeout: TETTO_FILE_MS, maxBuffer: 1 << 26, shell: !diretto && process.platform === 'win32' });
   if (r.error && r.error.code === 'ETIMEDOUT') return { esiti: new Map(), partito: false, errore: 'oltre il tetto di tempo' };
   let json = null;
   try { json = JSON.parse(readFileSync(rapporto, 'utf8')); } catch (_) { /* senza rapporto lo spec non è partito */ }
