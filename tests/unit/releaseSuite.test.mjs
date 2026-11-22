@@ -526,7 +526,7 @@ describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di p
       'senza la riprova un flaky su Windows butta un verde, o un giro di pubblicazione');
     assert.match(unit.corpo, /continue-on-error:\s*true/, 'il passo dopo deve poter aprire il feedback');
     const node = (testo, nome) => nodeDeiWorkflow(testo).filter((x) => x.lavoro === nome).map((x) => x.fonte);
-    assert.deepEqual(node(SUITE_YML, LAVORO_UNIT_WINDOWS), node(YML, 'release'));
+    assert.deepEqual(node(IMP_YML, LAVORO_UNIT_WINDOWS), node(YML, 'release'));
     assert.deepEqual(node(YML, 'release'), [{ file: '.node-version' }]);
     assert.match(lavoro, /node scripts\/npm-ci-ritenta\.mjs/);
   });
