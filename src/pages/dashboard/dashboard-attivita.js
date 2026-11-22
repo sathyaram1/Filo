@@ -1545,7 +1545,8 @@
         if (!cosa) { btn.textContent = `${simbolo} ${short}`; return; }
         const riga = document.createElement('span');
         riga.className = 'dash-cmd-btn-cosa';
-        riga.textContent = `${simbolo} ${cosa}`;
+        // La spiegazione l'ha scritta il modello: nel suo riquadro, come nel popup.
+        conRiquadri(riga, [`${simbolo} `, { citazione: cosa }]);
         const codice = document.createElement('code');
         codice.className = 'dash-cmd-btn-codice';
         codice.textContent = short;
