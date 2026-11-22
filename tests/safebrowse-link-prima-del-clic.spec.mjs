@@ -462,7 +462,7 @@ test('un file travestito che la pagina costruisce da sé (blob, data): l\'avviso
   await app.evaluate(() => { globalThis.__scaricamenti = []; });
   await clicFermato(app, '#data');
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»/)).toBeVisible();
+  await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
   expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
 });
 
