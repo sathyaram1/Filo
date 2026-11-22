@@ -153,7 +153,8 @@ Gestione → Automazioni.
 ## Le regole dell'ordine
 
 1. **Le priorità 3 partono da sole.** Non entrano in nessun pacchetto e non stanno nell'ordine: il server le accende
-   subito.
+   subito. L'eccezione è il derivato dei rilievi interni nato senza attesa: `attesa <N.k> <N>` col genitore aperto e non
+   fuso passa anche a 3, ed è l'attesa che il server scrive alla nascita, quindi la ferma davvero.
 2. **Pacchetti.** La sola strada per unire è `pacchetto <N,M,…>`: nasce un feedback nuovo col testo del server (numeri
    e titoli), che assorbe gli originali; il server rifiuta col motivo quelli già iniziati (ramo, biglietto vivo), a
    priorità 3, locali, già assorbiti, oltre 20, e un giro di attese. Tu aggiungi: stessa area; una catena di attese (A e
