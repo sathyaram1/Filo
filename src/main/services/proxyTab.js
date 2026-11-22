@@ -53,25 +53,16 @@ function providerHost(settings, env = process.env) {
   try { return new URL(ep.proxyRules).hostname || ''; } catch (_) { return ''; }
 }
 
-// Sostituisce {country}/{COUNTRY} nel template e separa le credenziali
-// dall'endpoint: Chromium non accetta user:pass dentro proxyRules — per i
-// proxy HTTP le credenziali passano dall'evento `login` (vedi sotto); per
-// SOCKS5 Chromium non supporta l'autenticazione (i provider usano l'IP
-// whitelisting o il geo-targeting via username su HTTP).
+// Sostituisce {country}/{COUNTRY} nel template e separa le credenziali dall'endpoint: Chromium non le accetta dentro
+// proxyRules, per i proxy HTTP passano dall'evento `login` (sotto). La lettura è SN_CONST.leggiProxy, la stessa dei
+// segreti custoditi (#2134.2).
 function endpointFor(template, country) {
   const filled = String(template)
     .replace(/\{country\}/g, country)
     .replace(/\{COUNTRY\}/g, country.toUpperCase());
-  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(filled) ? filled : `socks5://${filled}`;
-  let u;
-  try { u = new URL(withScheme); } catch (_) { return null; }
-  if (!u.hostname) return null;
-  const scheme = u.protocol.replace(/:$/, '');
-  const hostPort = u.port ? `${u.hostname}:${u.port}` : u.hostname;
-  const auth = u.username
-    ? { username: decodeURIComponent(u.username), password: decodeURIComponent(u.password || '') }
-    : null;
-  return { proxyRules: `${scheme}://${hostPort}`, auth };
+  if (!globalThis.SN_CONST) require('../../shared/constants.js');
+  const p = globalThis.SN_CONST.leggiProxy(filled);
+  return (p && p.uso) || null;
 }
 
 // Niente fallback fra tier: la scelta è del chiamante. null se il tier non è configurato.
