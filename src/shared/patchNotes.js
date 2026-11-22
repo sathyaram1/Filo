@@ -12,6 +12,7 @@
       version: '0.2.300', date: '2026-11-22',
       fixes: [
         { testo: 'Quando in una chat hai già dato la password a chi te l\'ha chiesta, il correttore torna a controllare intere le frasi che scrivi dopo. Una password scritta come «Pass: …», accanto al nome utente o come seconda password nella stessa risposta resta fuori da quello che legge.', segnalazione: 1723 },
+        { testo: 'Filo si collega anche ai proxy scritti come «indirizzo:porta:utente:password», la forma degli elenchi di molti fornitori, e a quelli con utente e password ma senza http:// davanti; la loro password è protetta come una chiave API. Un backup con un proxy senza utente e password ora prende il posto di quello di questo computer.', segnalazione: [905, 2134] },
       ],
     },
     {
