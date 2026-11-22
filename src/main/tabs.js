@@ -2147,15 +2147,20 @@ class TabManager {
   // scheda, impostazioni). Prima erano esclusi TUTTI i filo:// interni, quindi
   // il riordino poteva chiudere un sito (es. YouTube) ma mai le impostazioni
   // aperte o le home duplicate. (Incognito è escluso a monte.)
-  _triageCandidates(trigger) {
+  _triageCandidates(trigger, dal) {
+    return this.tabs.filter((t) => this._delGiro(t, trigger, dal));
+  }
+
+  // Vale alla partenza e di nuovo alla risposta del modello (#349.2): una scheda chiusa, o ripresa in mano da `dal`
+  // (alla riapertura: da quando Filo si è riaperto), è del lavoro di adesso, e la pulizia non la tocca né la conta.
+  _delGiro(t, trigger, dal) {
+    if (!this.tabs.includes(t) || this._intoccabileDalTriage(t)) return false;
+    if (t.lastInteractionAt >= dal) return false;
+    // La pulizia decisa della riapertura è per la sessione di prima: una scheda nata dopo non è sua (#349).
+    if (trigger === 'reopen' && !t._dallaSessione) return false;
     const T = globalThis.SN_TAB_TRIAGE;
-    return this.tabs.filter((t) => {
-      if (this._intoccabileDalTriage(t)) return false;
-      // La pulizia decisa della riapertura è per la sessione di prima: una scheda nata o usata dopo è del lavoro di adesso (#349).
-      if (trigger === 'reopen' && !(t._dallaSessione && !(t.lastInteractionAt >= this._riapertaAlle))) return false;
-      if (T) return T.isTriageableUrl(t.url);
-      return !t.isInternal && /^https?:\/\//i.test(t.url || '');
-    });
+    if (T) return T.isTriageableUrl(t.url);
+    return !t.isInternal && /^https?:\/\//i.test(t.url || '');
   }
 
   // «Tieni sempre aperto X» (#823): la regola la applica Filo, qualunque cosa risponda il modello.
