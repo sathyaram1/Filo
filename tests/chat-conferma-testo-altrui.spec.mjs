@@ -77,6 +77,8 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     expect(r.fuori).toMatch(/Conferma chiesta · Filo vuole impostare/);
     expect(r.fuori).not.toMatch(/fornitore|confermalo/);
     await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui.png' });
+    await clickConfirm(page, 'cancel');
+    await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui-bottone.png' });
 
     // Riaperta senza risposta (e col tema scuro): bottone e popup tornano coi riquadri.
     const chat = await chatCon(app, 'cambia il modello della chat');
