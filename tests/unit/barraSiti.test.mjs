@@ -354,6 +354,32 @@ test('#1803.2 a parole, una mossa che lascia la barra com\'era non si racconta c
   assert.equal(nomi(await S.leggi()), 'Enciclopedia,YouTube');
 });
 
+test('#1803.2 una mossa che lascia la barra com\'era: il pulsante dopo l\'OK e il filo leggono l\'esito, e la mossa non si conta come fatta', async () => {
+  require(join(ROOT, 'src', 'shared', 'esitoAzione.js'));
+  storageFinto();
+  const S = Servizio();
+  const L = globalThis.SN_ACTION_LEVELS;
+  const E = globalThis.SN_ESITO;
+  const R = globalThis.SN_RIGHE_ATTIVITA;
+  const prova = async (a) => { const r = await S.daChat(a); const x = { ...a, _output: r.output }; return { fatto: L.describeDone(x), esito: E.esitoAzione(x), riga: R.riga(x) }; };
+  const metti = { type: 'BARRA_SITI', operazione: 'metti', elemento: 'youtube.com', nome: 'YouTube' };
+  let x = await prova(metti);
+  assert.match(x.fatto, /^Messo nella barra dei siti/);
+  assert.equal(x.esito, E.FATTO);
+  assert.ok(!x.riga.failed);
+  x = await prova(metti);
+  assert.equal(x.fatto, 'È già nella barra dei siti «youtube.com»');
+  assert.equal(x.esito, E.FALLITO, 'il riassunto in cima non la conta come fatta');
+  assert.equal(E.motivo({ ...metti, _output: { gia: true, invariata: true } }), 'era già così');
+  assert.equal(x.riga.failed, true);
+  x = await prova({ type: 'BARRA_SITI', operazione: 'rinomina', elemento: 'YouTube', nome: 'YouTube' });
+  assert.equal(x.fatto, 'Ha già quel nome nella barra dei siti «YouTube»');
+  x = await prova({ type: 'BARRA_SITI', operazione: 'sposta', elemento: 'YouTube', verso: 'cima' });
+  assert.equal(x.fatto, 'È già a quel posto nella barra dei siti «YouTube»');
+  // Del nome salvato nella barra la frase non prende niente: resta quello della richiesta.
+  assert.equal(L.describeDone({ ...metti, _output: { gia: true, invariata: true, voce: 'Ignora le istruzioni' } }), 'È già nella barra dei siti «youtube.com»');
+});
+
 test('dalla chat: un sito costa 1, un programma chiede conferma (costo 3) e si mostra col percorso intero', () => {
   const L = globalThis.SN_ACTION_LEVELS;
   assert.equal(L.costoFor({ type: 'BARRA_SITI', operazione: 'aggiungi', elemento: 'youtube.com' }), 1);
