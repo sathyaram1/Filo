@@ -2234,7 +2234,7 @@ class TabManager {
     try {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
-      const cands = this._triageCandidates(trigger);
+      const cands = this._triageCandidates(trigger, dal);
       // Un giro si conta coi suoi numeri, mai con le schede (#1467): quante candidate, archiviate, duplicate.
       const contaGiro = (archiviate, duplicati, giudizioMancato) => {
         try {
