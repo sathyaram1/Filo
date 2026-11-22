@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
-import { home, modelloFinto, ripristina } from './helpers/chatFinta.mjs';
+import { home, modelloFinto, chiamateAlModello, ripristina } from './helpers/chatFinta.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const SHOTS = path.join(path.dirname(fileURLToPath(import.meta.url)), '.shots');
@@ -229,6 +229,92 @@ test('#1657 #1662 a parole: Filo mette un sito nella barra e ripiega la chat, da
   await expect(page.locator('#barraSiti')).toBeHidden();
   await expect(page.locator('#threadView')).toBeVisible();
   await expect(page.locator('#ripiegaChat')).toBeVisible();
+});
+
+// La riga la scrive la home mentre Filo lavora, coi moduli che la pagina carica: qui, non nel main, si legge il sinonimo.
+test('#1803.2 nella chat della home la riga dice cosa è successo alla barra: messo, già lì, letta, tolto, ripiegata', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  const metti = { operazione: 'metti', elemento: 'youtube.com', nome: 'YouTube' };
+  const turni = [
+    ['metti youtube nella barra', metti, 'Messo nella barra dei siti · YouTube'],
+    ['rimettilo', metti, 'È già nella barra dei siti · YouTube'],
+    ['cosa c\'è nella barra?', { operazione: 'leggi' }, 'Letta la barra dei siti'],
+    ['toglilo', { operazione: 'rimuovi', elemento: 'YouTube' }, 'Tolto dalla barra dei siti · YouTube'],
+    ['ripiega la chat', { operazione: 'ripiega' }, 'Chat della home ripiegata'],
+  ];
+  await modelloFinto(app, turni.flatMap(([, args], i) => [
+    { toolCalls: [{ id: `r${i}`, name: 'BARRA_SITI', arguments: JSON.stringify(args) }] },
+    { text: `Risposta ${i}.` },
+  ]));
+  try {
+    for (const [i, [chiesto, , riga]] of turni.entries()) {
+      await page.locator('#input').fill(chiesto);
+      await page.locator('#sendBtn').click();
+      await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i}.` })).toHaveCount(1, { timeout: 10_000 });
+      await expect(page.locator('#bubbles')).toContainText(riga);
+    }
+    await expect(page.locator('#threadView')).toBeHidden();
+    await page.locator('#ripiegaChat').click();
+    await expect(page.locator('#bubbles')).not.toContainText('Barra dei siti · ');
+    await scatta(page, 'righe-chat');
+  } finally { await ripristina(app); }
+});
+
+// La riga, il riassunto del blocco e l'esito che torna a Filo leggono tutti l'esito della mossa, anche da riaperta.
+test('#1803.2 una mossa a parole che lascia la barra com\'era: né la riga, né il riassunto, né Filo la dicono fatta', async ({ app }) => {
+  test.setTimeout(120_000);
+  let page = await home(app);
+  await app.evaluate(async () => {
+    await chrome.storage.local.set({ filo_barra_siti: [
+      { id: 'yt', tipo: 'sito', url: 'https://youtube.com/', nome: 'YouTube', icona: '' },
+      { id: 'gm', tipo: 'sito', url: 'https://mail.google.com/', nome: 'Gmail', icona: '' },
+    ] });
+  });
+  await page.reload();
+  page = await home(app);
+  const turni = [
+    ['rinomina YouTube in YouTube', { operazione: 'rinomina', elemento: 'YouTube', nome: 'YouTube' }, 'Ha già quel nome nella barra dei siti · YouTube'],
+    ['sposta YouTube in cima', { operazione: 'sposta', elemento: 'YouTube', verso: 'cima' }, 'È già a quel posto nella barra dei siti · YouTube'],
+    ['rimetti youtube nella barra', { operazione: 'aggiungi', elemento: 'youtube.com', nome: 'Tubo' }, 'È già nella barra dei siti · YouTube'],
+    ['rinomina YouTube in Video', { operazione: 'rinomina', elemento: 'YouTube', nome: 'Video' }, 'Rinominato nella barra dei siti · Video'],
+  ];
+  await modelloFinto(app, turni.flatMap(([, args], i) => [
+    { toolCalls: [{ id: `v${i}`, name: 'BARRA_SITI', arguments: JSON.stringify(args) }] },
+    { text: `Risposta ${i}.` },
+  ]));
+  let esiti = [];
+  try {
+    for (const [i, [chiesto, , riga]] of turni.entries()) {
+      await page.locator('#input').fill(chiesto);
+      await page.locator('#sendBtn').click();
+      await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i}.` })).toHaveCount(1, { timeout: 15_000 });
+      await expect(page.locator('#bubbles')).toContainText(riga);
+    }
+    // A blocco chiuso resta il riassunto: «Ha sistemato» solo dove la barra è cambiata davvero.
+    await expect(page.locator('#bubbles')).not.toContainText('Messo nella barra');
+    await expect.poll(() => page.locator('#bubbles').innerText().then((t) => (t.match(/Ha sistemato la barra dei siti/g) || []).length)).toBe(1);
+    expect((await salvate(app)).map((v) => v.nome)).toEqual(['Video', 'Gmail']);
+    await page.locator('.dash-activity-head').first().click().catch(() => {});
+    await scatta(page, 'gia-cosi');
+    esiti =(await chiamateAlModello(app)).at(-1).filter((m) => m.role === 'tool').map((m) => String(m.content));
+  } finally { await ripristina(app); }
+  expect(esiti).toHaveLength(4);
+  for (const e of esiti.slice(0, 3)) expect(e).toMatch(/^Non cambiato niente: /);
+  expect(esiti[2]).toContain('È già nella barra dei siti');
+  expect(esiti[3]).toMatch(/^Eseguita: Rinominato/);
+
+  // Riaperta, le mosse senza effetto restano non fatte, come «Sei già nella home», con la riga detta in diretta.
+  const chat = (await app.evaluate(() => globalThis.SN_FILO_CHATS.list()))
+    .find((c) => !c.app && c.messages.some((m) => m.text === 'rinomina YouTube in YouTube'));
+  expect(chat).toBeTruthy();
+  await app.evaluate((_e, c) => globalThis.SN_CLOSE_FILO_CHAT(c), chat.id);
+  await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(chat.id)}`);
+  for (const [, , riga] of turni) await expect(page.locator('#bubbles')).toContainText(riga, { timeout: 10_000 });
+  const testo = await page.locator('#bubbles').innerText();
+  expect((testo.match(/Barra dei siti non cambiata · /g) || []).length).toBe(3);
+  expect((testo.match(/Ha sistemato la barra dei siti/g) || []).length).toBeLessThanOrEqual(1);
+  expect(testo).not.toContain('Messo nella barra');
 });
 
 test('#1657 tante voci si raggiungono tutte; Canc toglie; trascinata nel campo scrive l\'indirizzo; il tasto destro nasconde la barra', async ({ app }) => {

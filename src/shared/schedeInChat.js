@@ -23,14 +23,19 @@
   // scaricati dal main (data:), così mostrare un gettone non contatta il sito. I formati sono quelli che il main riconosce
   // nell'icona di una scheda (src/main/services/iconaScheda.js): un svg sta in un <img>, dove i suoi script non girano.
   const ICONA = /^data:image\/(png|x-icon|vnd\.microsoft\.icon|gif|jpeg|webp|bmp|avif|svg\+xml);base64,/i;
-  function normalizza(s) {
-    if (!s || typeof s !== 'object') return null;
-    const url = typeof s.url === 'string' && /^https?:\/\//i.test(s.url) && s.url.length <= 4096 ? s.url : '';
-    const titolo = testo(s.titolo, 300) || sitoDi(url);
-    if (!url || !titolo) return null;
+  // La pulizia di ogni scheda portata da una parte all'altra, anche di una che non è un sito (la barra dei siti prende
+  // le pagine di Filo, #1803.2): l'indirizzo resta com'è, chi la riceve decide se entra. Una sola, per tutte le strade.
+  function ripulita(s) {
+    if (!s || typeof s !== 'object' || typeof s.url !== 'string') return null;
+    const url = s.url.trim();
+    if (!url || url.length > 4096) return null;
     const icona = typeof s.icona === 'string' && s.icona.length <= 200000 && ICONA.test(s.icona) ? s.icona : '';
     const id = typeof s.id === 'string' && /^[\w-]{1,80}$/.test(s.id) ? s.id : '';
-    return { id, titolo, url, icona };
+    return { id, titolo: testo(s.titolo, 300) || sitoDi(url), url, icona };
+  }
+  function normalizza(s) {
+    const r = ripulita(s);
+    return r && /^https?:\/\//i.test(r.url) && r.titolo ? r : null;
   }
 
   // Le schede di un messaggio come si salvano col filo (home e righe delle app): ripulite, al più MASSIMO, senza le
@@ -399,6 +404,6 @@
     };
   }
 
-  global.SN_SCHEDE_IN_CHAT = { normalizza, perIlDisco, etichetta, gettone, pezzi, allinea, campo, nellaBolla, azioni, MASSIMO, RE };
+  global.SN_SCHEDE_IN_CHAT = { normalizza, ripulita, perIlDisco, etichetta, gettone, pezzi, allinea, campo, nellaBolla, azioni, MASSIMO, RE };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_SCHEDE_IN_CHAT;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

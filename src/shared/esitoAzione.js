@@ -26,7 +26,7 @@
     if (a._executed === false) return FALLITO;
     // Un comando della finestra che non ha mosso niente (la home chiesta dalla
     // home): il sistema lo segna eseguito, ma raccontarlo come fatto mente.
-    if (o && o.already) return FALLITO;
+    if (o && (o.already || o.invariata)) return FALLITO;
     return FATTO;
   }
 
@@ -115,6 +115,8 @@
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
     if (o.already) return 'era già così';
+    // Una mossa senza effetto (la barra dei siti già così): riaperta, la chat ripete la riga detta in diretta.
+    if (o.invariata) { const d = rigaDelDiario(a); return d && d.text ? pulito(d.text) : 'era già così'; }
     if (o.ok === false && o.errore && o.frase) return String(o.frase);
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.ok === false && o.dettaglio) return String(o.dettaglio);

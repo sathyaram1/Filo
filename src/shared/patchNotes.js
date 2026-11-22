@@ -17,6 +17,7 @@
         { testo: 'Filo riconosce più segreti letti in una pagina o nell\'uscita di un comando (un token di accesso, la password dentro un indirizzo, le chiavi di GitLab e Tavily) e non li lascia uscire da un link o da una ricerca fatti dopo.', segnalazione: 1840 },
         { testo: 'In una chat riaperta, «Aggiungi al calendario» mette l\'evento con la sua fine: le ferie dal 10 al 15 restano di sei giorni e la riunione di due ore resta di due ore.', segnalazione: 1685 },
         { testo: 'Quando Filo rilegge una conversazione di giorni fa, o la ritrova da solo, sa anche com\'era andata ogni cosa che aveva fatto lì: un comando che non era partito non te lo racconta come fatto.', segnalazione: 1685 },
+        { testo: 'Se chiedi a Filo di mettere nella barra dei siti un sito che c\'è già, o di rinominarlo col nome che ha, la conversazione te lo dice invece di raccontarlo come fatto.', segnalazione: 1803 },
       ],
     },
     {

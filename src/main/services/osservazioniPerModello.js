@@ -1615,6 +1615,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (soloBottone(type) && res.kept && !res.needsConfirm) {
     return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}.${doveStaIlTesto(giro)}`;
   }
+  // Una mossa che ha lasciato la barra dei siti com'era: la frase viene dall'esito (solo i suoi segni), non dalla richiesta.
+  if (type === 'BARRA_SITI' && res.executed && res.output && res.output.invariata) {
+    let gia = '';
+    try { gia = descriviPerModello({ ...action, _output: { gia: !!res.output.gia, invariata: true } }, { fatto: true }); } catch (_) {}
+    return `Non cambiato niente: ${String(gia || 'la barra dei siti era già così').replace(/\.+\s*$/, '')}. Dillo all'utente in una riga, senza dire di averlo fatto.`;
+  }
   if (res.executed) {
     // La descrizione «a cosa fatta», non quella del popup: un «vuole» dopo «Eseguita» faceva
     // credere al modello che fosse ancora da fare.

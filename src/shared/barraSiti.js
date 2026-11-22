@@ -204,5 +204,14 @@
     return normalizza(voci).map((v) => (v.tipo === 'app' ? { nome: v.nome, programma: v.percorso } : { nome: v.nome, indirizzo: v.url }));
   }
 
-  global.SN_BARRA_SITI = { MAX_VOCI, MAX_NOME, ESTENSIONI_APP, estensione, nomeDelProgramma, normalizzaIndirizzo, normalizza, trova, applica, operazione, mossaDaChat, descrivi };
+  // La frase di una mossa che ha lasciato la barra com'era, '' se l'ha cambiata. La dicono la riga, il pulsante dopo
+  // l'OK e l'esito che torna a Filo: tutti dall'esito della mossa, mai dalla richiesta.
+  function giaCosi(op, esito) {
+    const o = esito && typeof esito === 'object' ? esito : {};
+    if (o.gia) return 'È già nella barra dei siti';
+    if (!o.invariata) return '';
+    return { rinomina: 'Ha già quel nome nella barra dei siti', sposta: 'È già a quel posto nella barra dei siti' }[op] || 'Barra dei siti già così';
+  }
+
+  global.SN_BARRA_SITI = { MAX_VOCI, MAX_NOME, ESTENSIONI_APP, estensione, nomeDelProgramma, normalizzaIndirizzo, normalizza, trova, applica, operazione, mossaDaChat, descrivi, giaCosi };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
