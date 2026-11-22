@@ -2287,18 +2287,16 @@ class TabManager {
       let dupIdx = new Set();
       if (T) {
         const activeUrl = (this.tabs.find((t) => t.id === this.activeId) || {}).url || '';
-        const restanti = this.tabs.filter((t) => !cands.includes(t) || !ancora[cands.indexOf(t)]);
         const vive = cands.map((t, i) => ({ t, i })).filter(({ i }) => ancora[i]);
-        // Una scheda fuori dal giro con lo stesso indirizzo è l'esemplare tenuto: le sue copie nel giro sono doppioni.
         const dup = T.findDuplicateIndices(
-          [...vive.map(({ t }) => t), ...restanti].map((t, j) => ({
+          vive.map(({ t }) => ({
             url: t.url,
             formDirty: !!t.formDirty,
-            lastInteractionAt: j < vive.length ? t.lastInteractionAt || 0 : Infinity,
+            lastInteractionAt: t.lastInteractionAt || 0,
           })),
           activeUrl,
         );
-        for (const j of dup) if (j < vive.length) dupIdx.add(vive[j].i);
+        for (const j of dup) dupIdx.add(vive[j].i);
       }
 
       // I duplicati vincono sempre su un "tieni" dell'LLM.
