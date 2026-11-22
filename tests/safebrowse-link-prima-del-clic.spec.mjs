@@ -3,7 +3,7 @@
 // Prima del clic non esce niente: né verso i link né verso Google, i registri, il modello o la finestra isolata.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
+import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA, nomeNellAvviso } from './helpers/avvisoSito.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { serviSiti, richiesteVerso } from './helpers/reteChiusa.mjs';
 import { fileURLToPath } from 'node:url';
