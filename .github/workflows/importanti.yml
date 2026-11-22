@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .node-version
 
       - name: Install dipendenze
         run: node scripts/npm-ci-ritenta.mjs
@@ -99,7 +99,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .node-version
 
       - name: Install dipendenze
         run: node scripts/npm-ci-ritenta.mjs
@@ -168,7 +168,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .node-version
 
       - name: Install dipendenze
         shell: bash
@@ -248,7 +248,7 @@ jobs:
         if: steps.punta.outputs.sha != github.sha
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .node-version
 
       - name: Install dipendenze
         if: steps.punta.outputs.sha != github.sha
@@ -297,7 +297,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .node-version
 
       - name: Registro delle prove importanti
         if: always() && !cancelled() && needs.importanti.result != 'success'
