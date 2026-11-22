@@ -50,8 +50,8 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     const bottone = page.locator('.dash-bubble-filo .dash-action-btn-primary').first();
     await expect(bottone).toHaveCount(1);
     const b = await pezzi(bottone);
-    expect(b.fuori).toContain('Font della UI');
-    expect(b.fuori, 'le parole di Filo sul bottone non contengono quelle del modello').not.toMatch(/confermalo|Georgia/);
+    expect(b.fuori).toContain('Filo vuole impostare');
+    expect(b.fuori, 'le parole di Filo sul bottone non contengono quelle del modello').not.toMatch(/confermalo|modello-x/);
     expect(b.dentro).toContain(FINTO);
     expect(b.filo).toBe('3px');
 
