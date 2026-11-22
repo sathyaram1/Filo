@@ -560,7 +560,7 @@ const finestrelle = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.g
   .filter((w) => !w._filoTabs && /^https?:/.test(w.webContents.getURL()))
   .map((w) => w.isVisible()));
 
-// Il clic che permette di aprirla dà il fuoco alla sua finestra: `poi` lo rimette dove deve stare.
+// Il clic che permette di aprirla (#737.1) è un gesto dell'utente in quella finestra: `poi` lo riporta dove serve.
 async function finestrellaSopra(pagina, area, u, poi = async () => {}) {
   await pagina.mouse.click(5, 5);
   await poi();
