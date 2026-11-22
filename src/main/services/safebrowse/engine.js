@@ -53,30 +53,53 @@ function nomeFile(n) {
   return v.length > 60 ? `${v.slice(0, 36)}…${v.slice(-20)}` : v;
 }
 
+// Il corpo dell'avviso è a pezzi: stringhe di Filo e { citazione } per il nome scelto da chi serve il file, che
+// l'avviso disegna nel suo riquadro. Fra virgolette il nome le chiudeva da sé e continuava come parola di Filo (#592.25).
+function frase(...pezzi) {
+  const out = [];
+  for (const p of pezzi.flat(Infinity)) {
+    if (p == null || p === '') continue;
+    if (typeof p === 'string' && typeof out[out.length - 1] === 'string') out[out.length - 1] += p;
+    else out.push(p);
+  }
+  return out;
+}
+const nome = (n) => ({ citazione: nomeFile(n) });
+// Il testo piatto, per chi legge l'avviso come testo (il confronto fra due verdetti, la segnalazione di un falso allarme).
+const piatto = (parti) => parti.map((p) => (typeof p === 'string' ? p : `«${p.citazione}»`)).join('');
+function conMaiuscola(parti) {
+  const [primo, ...resto] = parti;
+  return typeof primo === 'string' ? [primo.replace(/^./, (c) => c.toUpperCase()), ...resto] : parti;
+}
+function messaggio(title, parti) {
+  const p = frase(parti);
+  return { title, body: piatto(p), ...(p.some((x) => typeof x !== 'string') ? { parti: p } : {}) };
+}
+
 // I segnali che non dipendono da chi è il sito: `sola` apre l'avviso, `coda` si mette in fila ai fatti di un'impersonazione.
 function fattiPagina({ dom, autoDl, doubleExt, insecureForm }) {
   const out = [];
-  const travestito = (n) => `«${nomeFile(n)}», che sembra un documento ma è un programma`;
+  const travestito = (n) => [nome(n), ', che sembra un documento ma è un programma'];
   const stesso = !!(autoDl && doubleExt && doubleExt.where === 'download' && doubleExt.name === autoDl.name);
   if (autoDl) {
-    const cosa = stesso ? travestito(autoDl.name) : `un programma${autoDl.name ? ` («${nomeFile(autoDl.name)}»)` : ''}`;
+    const cosa = stesso ? travestito(autoDl.name) : ['un programma', autoDl.name ? [' ', nome(autoDl.name)] : []];
     out.push({
       titolo: 'Scaricamento partito da solo',
-      sola: `Questa pagina di ${dom} ha avviato da sola lo scaricamento di ${cosa}.`,
-      coda: `la pagina ha avviato da sola lo scaricamento di ${cosa}`,
+      sola: frase(`Questa pagina di ${dom} ha avviato da sola lo scaricamento di `, cosa, '.'),
+      coda: frase('la pagina ha avviato da sola lo scaricamento di ', cosa),
     });
   }
   if (doubleExt && !stesso) {
     const t = travestito(doubleExt.name);
     out.push(doubleExt.where === 'url'
-      ? { titolo: 'File travestito', sola: `Il link porta a «${nomeFile(doubleExt.name)}»: sembra un documento, ma è un programma che si avvia sul computer.`, coda: `il link porta a ${t}` }
-      : { titolo: 'Programma travestito da documento', sola: `Questa pagina di ${dom} ti fa scaricare ${t}.`, coda: `la pagina ti fa scaricare ${t}` });
+      ? { titolo: 'File travestito', sola: frase('Il link porta a ', nome(doubleExt.name), ': sembra un documento, ma è un programma che si avvia sul computer.'), coda: frase('il link porta a ', t) }
+      : { titolo: 'Programma travestito da documento', sola: frase(`Questa pagina di ${dom} ti fa scaricare `, t, '.'), coda: frase('la pagina ti fa scaricare ', t) });
   }
   if (insecureForm) {
     out.push({
       titolo: 'Dati in chiaro',
-      sola: `I dati che scrivi qui viaggiano in chiaro: il modulo di ${dom} li manda a un indirizzo non cifrato.`,
-      coda: 'i dati che scrivi qui viaggiano in chiaro',
+      sola: [`I dati che scrivi qui viaggiano in chiaro: il modulo di ${dom} li manda a un indirizzo non cifrato.`],
+      coda: ['i dati che scrivi qui viaggiano in chiaro'],
     });
   }
   return out;
