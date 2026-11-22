@@ -2799,6 +2799,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   const P = () => global.SN_AIUTO_PAGINA;
   global.__filoSidebarTest = {
     runFiloAction, filoActionLabel,
+    // Le parole dell'utente che una conferma rimanda al main, come __filoDashActions.scriveUtente (#810).
+    scriveUtente: (testo) => { history.push({ role: 'user', content: String(testo || ''), kind: 'real' }); },
     runPageAction, parseAssistantOutput,
     resolveImageEl: (p) => P().resolveImageEl(p),
     resolveLinkEl: (p) => P().resolveLinkEl(p),

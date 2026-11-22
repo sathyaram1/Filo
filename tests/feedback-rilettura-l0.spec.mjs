@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { nelMondoDiFilo, statoDi, clicca, paginaDelloStrato } from './helpers/riquadri.mjs';
-import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = 'tests/.shots';
@@ -318,10 +318,20 @@ test('con un altro riquadro di feedback aperto, quello rimandato indietro aspett
   expect(await invii(app)).toEqual([]);
 });
 
-// #1403.1 — la segnalazione scritta da Filo in chat e confermata passa dalla stessa rilettura.
+// #1403.1 — la segnalazione scritta da Filo in chat e confermata passa dalla stessa rilettura. La password l'ha scritta
+// l'utente: una che non ha scritto lui non esce mai (#810), e la sua la manda solo con la parola «conferma» (#2644).
 const segnalazioneDaChat = async (app, testo) => {
-  const r = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca' });
-  return { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca', _confirm: { level: 2, text: r.describe, parti: r.parti } };
+  const r = await app.evaluate((_e, { a, richiesta }) => globalThis.SN_EXECUTE_FILO_ACTION(a, { richiesta }),
+    { a: { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca' }, richiesta: testo });
+  expect(r.needsConfirm, 'una password scritta dall\'utente esce con la parola «conferma»').toBe(3);
+  return { type: 'INVIA_FEEDBACK', testo, titolo: 'Accesso alla banca', _confirm: { level: r.needsConfirm, text: r.describe, parti: r.parti } };
+};
+const confermaConLaParola = async (page) => {
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  expect(await confirmText(page)).toContain('porterebbe fuori una password');
+  await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
 };
 
 test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non mandarla» la tiene, «Manda così» la manda', async ({ app, shell }) => {
@@ -330,15 +340,21 @@ test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non ma
   await finti(app);
   await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }] }) });
   const action = await segnalazioneDaChat(app, TESTO);
-  const proponi = (id) => page.evaluate(({ a, id }) => {
-    const host = document.createElement('div');
-    host.id = id;
-    document.body.appendChild(host);
-    window.__filoDashActions.renderActions(host, [a], { autoConfirm: true });
-  }, { a: action, id });
+  // Il riquadro che vuole la parola non si apre da solo: si apre col clic sul bottone della proposta.
+  const proponi = async (id) => {
+    await page.evaluate(({ a, id }) => {
+      const host = document.createElement('div');
+      host.id = id;
+      document.body.appendChild(host);
+      window.__filoDashActions.renderActions(host, [a], { autoConfirm: true });
+    }, { a: action, id });
+    await page.locator(`#${id} .dash-action-btn`).click();
+  };
+
+  await page.evaluate((t) => window.__filoDashActions.scriveUtente(t), TESTO);
 
   await proponi('prova-chat-1');
-  await clickConfirm(page, 'ok');
+  await confermaConLaParola(page);
   await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
   expect(await confirmText(page)).toContain('password');
   await page.screenshot({ path: `${SHOTS}/1403.1-chat-rilettura.png` });
@@ -347,7 +363,7 @@ test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non ma
   expect(await invii(app), '«Non mandarla»: non parte').toEqual([]);
 
   await proponi('prova-chat-2');
-  await clickConfirm(page, 'ok');
+  await confermaConLaParola(page);
   await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
   const chiamate = await chiamateTesto(app);
   await clickConfirm(page, 'ok');
@@ -361,8 +377,15 @@ test('dall\'Aiuto: la segnalazione confermata con una password si ferma, e «Man
   const page = await newtab(app);
   await finti(app);
   await page.evaluate(() => window.SN_SIDEBAR.open());
-  await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, { type: 'INVIA_FEEDBACK', testo: TESTO, titolo: 'Accesso alla banca' });
-  await clickConfirm(page, 'ok');
+  const azione = { type: 'INVIA_FEEDBACK', testo: TESTO, titolo: 'Accesso alla banca' };
+  // Una password che l'utente non ha scritto non esce: niente riquadro, la riga dice che si è fermata.
+  expect(await page.evaluate((a) => window.__filoSidebarTest.runFiloAction(a), azione)).toBe(false);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  expect(await invii(app)).toEqual([]);
+
+  await page.evaluate((t) => window.__filoSidebarTest.scriveUtente(t), TESTO);
+  await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, azione);
+  await confermaConLaParola(page);
   // Il modello finto non trova niente: la password la riconosce il controllo senza modello.
   await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
   expect(await invii(app)).toEqual([]);
