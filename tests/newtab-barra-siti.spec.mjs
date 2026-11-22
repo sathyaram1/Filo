@@ -261,6 +261,57 @@ test('#1803.2 nella chat della home la riga dice cosa è successo alla barra: me
   } finally { await ripristina(app); }
 });
 
+// La riga, il riassunto del blocco e l'esito che torna a Filo leggono tutti l'esito della mossa, anche da riaperta.
+test('#1803.2 una mossa a parole che lascia la barra com\'era: né la riga, né il riassunto, né Filo la dicono fatta', async ({ app }) => {
+  test.setTimeout(120_000);
+  let page = await home(app);
+  await app.evaluate(async () => {
+    await chrome.storage.local.set({ filo_barra_siti: [
+      { id: 'yt', tipo: 'sito', url: 'https://youtube.com/', nome: 'YouTube', icona: '' },
+      { id: 'gm', tipo: 'sito', url: 'https://mail.google.com/', nome: 'Gmail', icona: '' },
+    ] });
+  });
+  await page.reload();
+  page = await home(app);
+  const turni = [
+    ['rinomina YouTube in YouTube', { operazione: 'rinomina', elemento: 'YouTube', nome: 'YouTube' }, 'Ha già quel nome nella barra dei siti · YouTube'],
+    ['sposta YouTube in cima', { operazione: 'sposta', elemento: 'YouTube', verso: 'cima' }, 'È già a quel posto nella barra dei siti · YouTube'],
+    ['rimetti youtube nella barra', { operazione: 'aggiungi', elemento: 'youtube.com', nome: 'Tubo' }, 'È già nella barra dei siti · YouTube'],
+    ['rinomina YouTube in Video', { operazione: 'rinomina', elemento: 'YouTube', nome: 'Video' }, 'Rinominato nella barra dei siti · Video'],
+  ];
+  await modelloFinto(app, turni.flatMap(([, args], i) => [
+    { toolCalls: [{ id: `v${i}`, name: 'BARRA_SITI', arguments: JSON.stringify(args) }] },
+    { text: `Risposta ${i}.` },
+  ]));
+  let esiti = [];
+  try {
+    for (const [i, [chiesto, , riga]] of turni.entries()) {
+      await page.locator('#input').fill(chiesto);
+      await page.locator('#sendBtn').click();
+      await expect(page.locator('.dash-bubble-filo', { hasText: `Risposta ${i}.` })).toHaveCount(1, { timeout: 15_000 });
+      await expect(page.locator('#bubbles')).toContainText(riga);
+    }
+    // A blocco chiuso resta il riassunto: «Ha sistemato» solo dove la barra è cambiata davvero.
+    await expect(page.locator('#bubbles')).not.toContainText('Messo nella barra');
+    await expect.poll(() => page.locator('#bubbles').innerText().then((t) => (t.match(/Ha sistemato la barra dei siti/g) || []).length)).toBe(1);
+    expect((await salvate(app)).map((v) => v.nome)).toEqual(['Video', 'Gmail']);
+    esiti = (await chiamateAlModello(app)).at(-1).filter((m) => m.role === 'tool').map((m) => String(m.content));
+  } finally { await ripristina(app); }
+  expect(esiti).toHaveLength(4);
+  for (const e of esiti.slice(0, 3)) expect(e).toMatch(/^Non cambiato niente: /);
+  expect(esiti[2]).toContain('È già nella barra dei siti');
+  expect(esiti[3]).toMatch(/^Eseguita: Rinominato/);
+
+  // Riaperta, la conversazione racconta le stesse righe.
+  const chat = (await app.evaluate(() => globalThis.SN_FILO_CHATS.list()))
+    .find((c) => !c.app && c.messages.some((m) => m.text === 'rinomina YouTube in YouTube'));
+  expect(chat).toBeTruthy();
+  await app.evaluate((_e, c) => globalThis.SN_CLOSE_FILO_CHAT(c), chat.id);
+  await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(chat.id)}`);
+  for (const [, , riga] of turni) await expect(page.locator('#bubbles')).toContainText(riga, { timeout: 10_000 });
+  await expect(page.locator('#bubbles')).not.toContainText('Messo nella barra');
+});
+
 test('#1657 tante voci si raggiungono tutte; Canc toglie; trascinata nel campo scrive l\'indirizzo; il tasto destro nasconde la barra', async ({ app }) => {
   test.setTimeout(60_000);
   let page = await home(app);
