@@ -313,6 +313,13 @@
     if (op === 'elenca') return fatto ? 'Letta la barra dei siti' : 'Leggere la barra dei siti';
     if (op === 'ripiega') return fatto ? 'Chat della home ripiegata' : 'Ripiegare la chat della home';
     if (op === 'riapri') return fatto ? 'Chat della home riaperta' : 'Riaprire la chat della home';
+    // Dell'esito si leggono solo i segni: il nome resta quello detto nella richiesta.
+    const B = fatto ? barraSiti() : null;
+    const gia = B && B.giaCosi && a && a._output ? B.giaCosi(op, { gia: !!a._output.gia, invariata: !!a._output.invariata }) : '';
+    if (gia) {
+      const cosa = op !== 'aggiungi' ? [cit(voce || '')] : percorso ? [cit(percorso, true)] : sito ? [cit(sito)] : [];
+      return frase([`${gia}${cosa.length ? ' ' : ''}`, ...(voce || percorso || sito || op !== 'aggiungi' ? cosa : [])]);
+    }
     if (op === 'aggiungi' && percorso) return frase([fatto ? 'Messo nella barra dei siti il programma ' : 'Mettere nella barra dei siti il programma ', cit(percorso, true)]);
     if (op === 'aggiungi') return frase([fatto ? 'Messo nella barra dei siti ' : 'Mettere nella barra dei siti ', ...(sito ? [cit(sito)] : ['un sito'])]);
     const chi = voce ? [cit(voce)] : ['una voce'];
