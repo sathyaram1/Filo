@@ -1,5 +1,5 @@
-// #2637 — il declassamento di un cookie di riquadro legge e poi riscrive: se il riquadro lo aggiorna fra le due,
-// la riscrittura non deve rimettere il valore vecchio. Electron è finto, il deposito dei cookie avvisa come Chromium.
+// #2637 — il declassamento di un cookie di riquadro e la pulizia dei partizionati leggono e poi riscrivono: se il sito
+// aggiorna il cookie fra le due, non deve tornare il valore vecchio. Electron è finto, il deposito avvisa come Chromium.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
