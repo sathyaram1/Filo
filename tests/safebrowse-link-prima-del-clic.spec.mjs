@@ -224,7 +224,8 @@ test('un link a un file travestito: l\'avviso nomina il file prima che parta', a
   await clicFermato(app, '#file');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('File travestito')).toBeVisible();
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
+  await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
+  await expect(avviso.locator('#corpo')).toContainText(': sembra un documento, ma è un programma');
   await foto(avviso, '965-file-travestito.png');
   expect(await richiesteVerso(app, 'archivio-documenti.example.com')).toEqual([]);
 });
