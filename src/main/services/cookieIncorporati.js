@@ -271,7 +271,7 @@ async function togliPartizionati(ses, sito, nomi) {
     for (const k of posti.keys()) {
       const p = pulizie.get(k);
       const c = (p && p.prova) || normali.get(k) || null;
-      if (p) p.fatta = true;
+      if (p) { p.fatta = true; p.attesa = !p.prova && !!c; }
       if (c && daRimettere(p, c)) await rimetti(ses, k, c);
     }
   }
