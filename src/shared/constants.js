@@ -1160,12 +1160,10 @@
   // I campi del proxy nelle impostazioni, uno per tier (proxyTab.TIERS): li leggono i segreti e l'importazione.
   const CAMPI_PROXY = Object.freeze(['datacenter', 'residential']);
 
-  // L'unica lettura di un proxy (#2134.2): la usa chi si collega (proxyTab.endpointFor) e chi ne custodisce i segreti,
-  // così una password usata è sempre custodita. Schema facoltativo; due forme: «[utente[:password]@]host[:porta]», con
-  // le credenziali fino all'ultima @ (#905.1), e quella degli elenchi dei fornitori «host:porta:utente:password»
-  // (#905.4). Senza schema socks5, che fa risolvere i nomi al proxy, ma http con le credenziali: coi socks Chromium
-  // non le manda. `uso`: { proxyRules, auth } per collegarsi, null se non si legge; `scritte`: le credenziali come
-  // sono nel testo e l'indirizzo `senza`, null se non ce ne sono. PURA.
+  // L'unica lettura di un proxy (#2134.2), di chi si collega e di chi ne custodisce i segreti: una password usata è
+  // sempre custodita. Forme: «[utente[:password]@]host[:porta]» e quella degli elenchi «host:porta:utente:password»
+  // (#905.4). Senza schema socks5 (i nomi li risolve il proxy), http con le credenziali, che Chromium coi socks non
+  // manda. `uso`: { proxyRules, auth }; `scritte`: le credenziali come sono nel testo e l'indirizzo `senza`. PURA.
   const SCHEMA_PROXY = /^([a-z][a-z0-9+.-]*):\/\//i;
   const FORMA_ELENCO = /^([^\s:/?#@[\]]+):(\d{1,5}):([^:@/?#]+):(.+)$/;
   const CREDENZIALI_URL = /^([^/?#]+)@/;
