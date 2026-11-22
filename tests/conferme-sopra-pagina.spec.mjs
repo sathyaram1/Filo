@@ -540,19 +540,8 @@ async function dueFinestre(app, shell, openTab, testServer) {
     const ws = BrowserWindow.getAllWindows().filter((x) => x._filoTabs);
     ws.forEach((w, i) => { w.setOpacity(1); w.show(); w.setBounds({ x: i * 820, y: 0, width: 800, height: 700 }); });
   });
-  await fuocoA(app, davanti);
   const pagina = app.windows().find((w) => { try { return new URL(w.url()).hostname === altrove; } catch (_) { return false; } });
   return { page, altrove, incognito: pagina };
-}
-
-// Il fuoco di una finestra appena aperta arriva quando vuole lui: si ridà finché quella voluta non lo tiene.
-async function fuocoA(app, quale) {
-  await expect.poll(() => app.evaluate(({ BrowserWindow }, incognito) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !!x._filoIncognito === incognito);
-    if (BrowserWindow.getFocusedWindow() !== w) w.focus();
-    return BrowserWindow.getFocusedWindow() === w;
-  }, quale === 'incognito'), { timeout: 10_000 }).toBe(true);
-  await new Promise((r) => setTimeout(r, 300));
 }
 
 // L'area della domanda a schermo, in px dello schermo.
