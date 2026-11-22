@@ -178,11 +178,20 @@ function sceltePer(ses) {
   return ses._filoScelte;
 }
 
+// Le risposte su disco sono di tutte le finestre: anche tolte dalla pagina Sicurezza di un incognito vanno sul disco, non
+// nella sua memoria (#591.6). Ogni cambio lo sanno le pagine di Filo aperte, da qualunque strada arrivi.
 function salva() {
   try {
-    Promise.resolve(disco().set({ [CHIAVE_DISCO]: Object.fromEntries(sceltePersistenti) })).catch(() => {});
+    const d = disco();
+    const scrivi = () => d.set({ [CHIAVE_DISCO]: Object.fromEntries(sceltePersistenti) });
+    Promise.resolve(typeof d.runNormale === 'function' ? d.runNormale(scrivi) : scrivi()).catch(() => {});
   } catch (_) {}
+  try { annuncia(); } catch (_) {}
 }
+let annuncia = () => {
+  const { MSG } = globalThis.SN_MSG || {};
+  if (MSG && MSG.PERMESSI_SITI_CAMBIATI) require('./broadcast').broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
+};
 
 // Va letta prima che si apra una scheda: il controllo è sincrono e una pagina ripristinata chiede subito.
 async function carica() {
