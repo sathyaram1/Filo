@@ -272,7 +272,6 @@ async function azioneTogliPermessoSito(action) {
     const ci = r.restano.length ? `ci sono: ${r.restano.join('; ')}` : 'non ce n\'è nessuna';
     return { executed: false, kept: false, output: { error: `nessuna risposta ricordata per ${r.host}${action.permesso ? ` (${action.permesso})` : ''}: ${ci}`, invariato: true } };
   }
-  broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
   return { executed: true, kept: false, output: { tolte: r.tolte } };
 }
 
