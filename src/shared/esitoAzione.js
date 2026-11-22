@@ -26,7 +26,7 @@
     if (a._executed === false) return FALLITO;
     // Un comando della finestra che non ha mosso niente (la home chiesta dalla
     // home): il sistema lo segna eseguito, ma raccontarlo come fatto mente.
-    if (o && o.already) return FALLITO;
+    if (o && (o.already || o.invariata)) return FALLITO;
     return FATTO;
   }
 
