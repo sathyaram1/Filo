@@ -59,7 +59,7 @@ PAGINE['/allarme'] = `<!doctype html><meta charset="utf-8"><title>Avviso</title>
     speechSynthesis.speak(u);
   } catch (e) { m('voce:' + e.name); }
   setTimeout(() => { alert('Il tuo computer è infetto, chiama il numero'); m('dopo:avviso'); }, 200);
-  setTimeout(() => { m('conferma:' + confirm('Chiami adesso?')); m('domanda:' + prompt('Numero', '1')); }, 400);
+  setTimeout(() => { m('conferma:' + confirm('Chiami adesso?')); }, 400);
   setTimeout(() => { window.print(); m('dopo:stampa'); }, 600);
 </script>`;
 PAGINE['/microfono'] = PAGINE['/media'].replace('{ audio: true, video: true }', '{ audio: true }');
