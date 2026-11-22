@@ -340,12 +340,16 @@ test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non ma
   await finti(app);
   await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }] }) });
   const action = await segnalazioneDaChat(app, TESTO);
-  const proponi = (id) => page.evaluate(({ a, id }) => {
-    const host = document.createElement('div');
-    host.id = id;
-    document.body.appendChild(host);
-    window.__filoDashActions.renderActions(host, [a], { autoConfirm: true });
-  }, { a: action, id });
+  // Il riquadro che vuole la parola non si apre da solo: si apre col clic sul bottone della proposta.
+  const proponi = async (id) => {
+    await page.evaluate(({ a, id }) => {
+      const host = document.createElement('div');
+      host.id = id;
+      document.body.appendChild(host);
+      window.__filoDashActions.renderActions(host, [a], { autoConfirm: true });
+    }, { a: action, id });
+    await page.locator(`#${id} .dash-action-btn`).click();
+  };
 
   await page.evaluate((t) => window.__filoDashActions.scriveUtente(t), TESTO);
 
