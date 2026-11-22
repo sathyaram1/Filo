@@ -1,4 +1,4 @@
-// I controlli che fermano un avviso (#536) o un'uscita (#810) SENZA chiedere a nessun modello.
+// I controlli che fermano un avviso (#536) o un'uscita (#810) SENZA chiedere a nessun modello: l'unico posto delle forme dei segreti.
 // Devono funzionare a rete staccata e sbagliare di rado: solo forme che non hanno nessuna ragione
 // di comparire in un testo onesto. Prove: tests/unit/guardianoStatico.test.mjs, usciteSegreti.test.mjs.
 
@@ -81,6 +81,10 @@
     ['\\bxox[baprs]-', '[A-Za-z0-9-]', 10],
     ['\\bAIza', '[A-Za-z0-9_-]', 20],
     ['\\bAKIA', '[A-Z0-9]', 12],
+    ['\\bglpat-', '[A-Za-z0-9_-]', 20],
+    ['\\btvly-', '[A-Za-z0-9_-]', 16],
+    // JWT: intestazione e dichiarazioni possono superare MAX_TOKEN (i token aziendali con molti gruppi), la firma no.
+    ['\\beyJ[A-Za-z0-9_-]{10,8192}\\.eyJ[A-Za-z0-9_-]{10,8192}\\.', '[A-Za-z0-9_-]', 10],
   ].map(([testa, corpo, min]) => new RegExp(`${testa}${corpo}{${min},${MAX_TOKEN}}(${corpo})?`))
     .concat([
       /-----BEGIN [A-Z ]{0,64}PRIVATE KEY-----/,
@@ -92,7 +96,7 @@
   // dichiarazioni (l'emittente e la chiave di firma sono quelli di tutti): il segreto è la firma.
   const PREFISSO_FISSO = new RegExp(`^(?:-----BEGIN [A-Z ]*PRIVATE KEY-----\\s*)?(?:${[
     'sk-(?:or-v1-|ant-api\\d\\d-|proj-)?', '(?:sk|pk|rk)_(?:live|test)_', 'gh[pousr]_', 'github_pat_', 'xox[baprs]-', 'AIza', 'AKIA',
-    ...INIZI_PKCS8, 'eyJ[\\w-]*\\.eyJ[\\w-]*\\.',
+    'glpat-', 'tvly-(?:dev-)?', ...INIZI_PKCS8, 'eyJ[\\w-]*\\.eyJ[\\w-]*\\.',
   ].join('|')})?`);
   const CODA_FISSA = /\s*-----END [A-Z ]*PRIVATE KEY-----\s*$/;
 
@@ -437,13 +441,52 @@
     }
   }
 
+  // Le credenziali riconosciute dal posto, di qualunque forma: il token dell'intestazione di autorizzazione, la password
+  // dentro un indirizzo (utente:password@) e quella data con l'utente a un programma di rete (`curl -u`, `--user`).
+  const INTESTAZIONE = new RegExp('\\bAuthorization[ \\t]{0,8}:[ \\t]{0,8}(?:Bearer|Basic|Token|Digest)[ \\t]{1,8}'
+    + `([A-Za-z0-9._~+/=-]{8,${MAX_TOKEN}})`, 'gi');
+  const NELL_INDIRIZZO = /\b[a-z][a-z0-9+.-]{0,30}:\/\/[^\s/:@"'`]{1,256}:([^\s/@"'`]{4,256})@/gi;
+  const OPZIONE_UTENTE = /(?:^|\s)(?:-u|--user|--proxy-user)(?:=|\s{1,8})["']?[^\s:"'/@]{1,256}:([^\s"']{4,256})/g;
+  // Chi registra quello che ha letto scarta i segnaposto della documentazione («Bearer YOUR_TOKEN», «user:${PASSWORD}@»),
+  // che resterebbero un mese a fermare ogni uscita con quella parola; chi controlla un'uscita prende ogni valore al suo posto.
+  const tokenCasuale = (v) => /[A-Za-z]/.test(v) && (/\d/.test(v) || (/[a-z]/.test(v) && /[A-Z]/.test(v)));
+  const FORMA_LETTA = { token: tokenCasuale, password: sembraPassword };
+  function passwordInUscita(v) {
+    const s = String(v || '');
+    return s.length >= 4 && (/[0-9]/.test(s) || /[^A-Za-z0-9À-ÿ]/.test(s) || (/[a-z]/.test(s) && /[A-Z]/.test(s.slice(1))));
+  }
+  const FORMA_USCENTE = { token: () => true, password: passwordInUscita };
+  function credenzialiAlPosto(s, out, forma) {
+    for (const m of s.matchAll(INTESTAZIONE)) if (forma.token(m[1])) out.push({ valore: m[1], regola: 'chiave' });
+    for (const re of [NELL_INDIRIZZO, OPZIONE_UTENTE]) {
+      for (const m of s.matchAll(re)) if (forma.password(m[1])) out.push({ valore: m[1], regola: 'password' });
+    }
+  }
+
   // `[{ valore, regola }]` con regola 'codice' | 'password' | 'chiave' | 'iban' | 'carta'. `saturo` sull'elenco: il
   // testo ne aveva più del tetto, o una chiave più lunga di MAX_TOKEN, e chi controlla un'uscita lì guarda la presenza
   // dei suoi pezzi (urlExfil.js).
   function segretiNelTesto(testoLetto) {
-    const s = testo(testoLetto);
+    return raccogli(testo(testoLetto), raccolta(), FORMA_LETTA);
+  }
+
+  // Quello che un'azione porterebbe fuori (autonomia.js): le stesse forme di segretiNelTesto, anche percent-codificate, più
+  // le parole che lo annunciano lette larghe («il pin è 4821», «password=Ciao2024»). Qui un falso allarme chiede
+  // «conferma» o lascia fare a mano; nel registro dei letti fermerebbe per un mese ogni uscita con quel valore.
+  const PAROLA_PASSWORD = /(?:password|passwd|pwd|passphrase|parola\s{1,8}d['’]ordine|chiave\s{1,8}segreta|secret)\s{0,8}(?:[:=]|\bè\b|\bis\b|\bera\b)\s{0,8}["'«“]?([^\s"'»”,;&]{4,256})/gi;
+  const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s{1,8}(?:di\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s{1,8}codes?\b)[\s:=]{0,8}(?:(?:è|e'|is|era|was)\s{1,8})?["'«“]?(\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\s][A-Za-z0-9]{4,64}){1,9})/gi;
+  function segretiInUscita(testoUscente) {
+    let s = testo(testoUscente);
+    try { s = `${s}\n${decodeURIComponent(s.replace(/\+/g, ' '))}`; } catch (_) { /* un % che non codifica niente */ }
     const out = raccolta();
-    const fine = () => Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
+    raccogli(s, out, FORMA_USCENTE);
+    for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
+    for (const m of s.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) out.push({ valore: m[1], regola: 'codice' });
+    return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
+  }
+
+  function raccogli(s, out, forma) {
+    const fine = () => Object.defineProperty(out.valori, 'saturo', { value: out.saturo, configurable: true });
     if (!s.trim()) return fine();
     let oltre = false;
     for (const re of FORME_CHIAVE) {
@@ -454,6 +497,7 @@
         out.push({ valore: m[1] ? m[0].slice(0, -m[1].length) : m[0], regola: 'chiave' });
       }
     }
+    credenzialiAlPosto(s, out, forma);
     codiciVicini(s, out);
     for (const m of s.match(IBAN_RE) || []) {
       if (ibanValido(m)) out.push({ valore: m.replace(/\s/g, ''), regola: 'iban' });
@@ -671,7 +715,7 @@
 
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
-    segretiNelTesto, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
+    segretiNelTesto, segretiInUscita, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
     sembraPassword,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

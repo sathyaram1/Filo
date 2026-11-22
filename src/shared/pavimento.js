@@ -173,8 +173,7 @@
       }
     }
   }
-  // Un token col suo formato: JWT e «Bearer …».
-  const JWT = /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g;
+  // Un token dopo «Bearer», anche fuori dall'intestazione. Il JWT e le chiavi col loro prefisso li riconosce il guardiano.
   const BEARER = /\bBearer\s+([A-Za-z0-9._~+/-]{16,}=*)/g;
   // I parametri di un indirizzo che portano una credenziale: il nome lo dice, il valore si toglie.
   const NOME_SEGRETO = /^(?:access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|api[_-]?key|apikey|key|secret|client[_-]?secret|password|passwd|pwd|pass|otp|sig|signature|x-amz-signature|x-amz-credential|x-amz-security-token|session[_-]?id|sessionid|sid|auth|ticket|code)$/i;
@@ -531,7 +530,6 @@
     for (const m of s.matchAll(PIN)) out.push({ valore: m[1], regola: 'codice' });
     codiciVicini(s, out);
     codiciDiRecupero(s, out);
-    for (const m of s.matchAll(JWT)) out.push({ valore: m[0], regola: 'token' });
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
