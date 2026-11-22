@@ -824,7 +824,7 @@ test('la pagina Sicurezza già aperta si aggiorna da sé quando si risponde a un
   await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
   const sicurezza = await paginaSicurezza();
   const righe = sicurezza.locator('#sec-perm-list li');
-  await expect(righe).toHaveText(['Nessuna risposta data a un sito'], { timeout: 10_000 });
+  await expect(righe).toHaveText(NESSUNA, { timeout: 10_000 });
   await apri('/microfono');
   const si = barra().getByRole('button', { name: 'Consenti', exact: true });
   await expect(si).toBeEnabled({ timeout: 10_000 });
