@@ -270,7 +270,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     }
     // LLM rinforza il testo se ha una motivazione fissa.
     if (llmSus && llm.reason && !impSus && !young && !certBad) {
-      message.body = `${message.body} ${llm.reason}`.trim();
+      message = message.parti ? messaggio(message.title, [message.parti, ` ${llm.reason}`]) : { ...message, body: `${message.body} ${llm.reason}`.trim() };
     }
     return {
       level: 'sospetto',
