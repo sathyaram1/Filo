@@ -84,7 +84,9 @@
       const errText = await r.text().catch(() => '');
       throw new Error(`tavily ${r.status}: ${errText.slice(0, 200)}`);
     }
-    return r.json();
+    const data = await r.json();
+    await segnaNelConto(data, 'basic', s);
+    return data;
   }
 
   async function searchTavily({ query, apiKey, maxResults }) {
