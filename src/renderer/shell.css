@@ -747,9 +747,8 @@ html[data-feedback-dim="1"] .shell {
 /* Il nome lo sceglie il sito e può non avere spazi: va a capo dove serve, o
    la sua coda (l'estensione) finirebbe oltre il bordo. */
 .dl-row-ask { font: 12px/1.4 system-ui, sans-serif; color: var(--fg); overflow-wrap: anywhere; }
-/* Il nome scelto da altri (un file del sito, un file o una cartella che chiede una pagina) sta su un foglietto suo,
-   come il testo altrui nei popup di conferma (#592.7): il filo a sinistra è per metà colore del testo, così un accento
-   spento non lo spegne. Una regola per tutta la cornice; la sentinella la tiene uguale al popup (#592.25). */
+/* Un nome scelto da altri su un foglietto suo, come nei popup di conferma (#592.7): il filo a sinistra è per metà
+   colore del testo, così un accento spento non lo spegne. Uguale al popup: tests/unit/segnoTestoAltrui.test.mjs. */
 .dl-row-ask-nome,
 .permesso-oggetto {
   background: var(--bg);
