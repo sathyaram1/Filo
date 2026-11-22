@@ -27,13 +27,20 @@ const RICHIESTA = new RegExp([
   // «ti ricordi la password», «come è la password», «che password ha il wifi», «e la password del wifi».
   '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?<=^|:\\s*)e\\s+(?:la|il))',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
+// Un elenco solo per il saluto in testa alla risposta e per quello prima della richiesta corta (#2638.1).
+const SALUTI = 'ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera';
+const SALUTO = new RegExp(`^(?:${SALUTI})$`, 'u');
 // La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
-// dopo l'ultima virgola o i due punti al più un articolo o un saluto, dopo il nome solo di cosa è e poi la fine della
-// riga; «Il pw del documento. Il documento è pronto» continua, e non chiede (#2638).
-const ELLITTICA_PRIMA = /^\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|ciao+|ehi|hey|hi|wi-?fi|router|home)\s+))*$/u;
-const DI_COSA = String.raw`(?:(?:del(?:la|lo)?|dell['’]|di|de|per|for|of)\s*(?:(?:la|il|lo|l['’]|the|my|mio|mia|tuo|tua)\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
+// sulla riga, prima, chi parla o un'altra frase, poi al più un articolo o un saluto; dopo il nome solo di cosa è e la
+// fine della riga. «Password del wifi» da sola è l'etichetta di una pagina, «password dimenticata» non chiede (#2638.1).
+const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|${SALUTI}|wi-?fi|router|home)\\s+))*$`, 'u');
+const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|per|for|of)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
 const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:grazie|thanks|thx))?[^\\p{L}\\p{N}]*$`, 'u');
-const ellittica = (prima, dopo) => ELLITTICA_PRIMA.test(prima.split(/[,;:]|\s[-–—]\s/).pop()) && ELLITTICA_DOPO.test(dopo);
+const ellittica = (testa, dopo) => {
+  const pezzi = testa.split(/[,;:]|[.!?]+\s|\s[-–—]\s/);
+  return pezzi.length > 1 && /[\p{L}\p{N}]/u.test(pezzi.slice(0, -1).join(''))
+    && ELLITTICA_PRIMA.test(pezzi[pezzi.length - 1]) && ELLITTICA_DOPO.test(dopo);
+};
 // In chat la password si chiama anche così: «pass» solo con l'articolo o col wifi, da solo è anche l'inglese «to pass».
 const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|pass\\s+(?:del(?:la)?\\s+)?wi-?fi'
   + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
