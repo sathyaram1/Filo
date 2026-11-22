@@ -45,6 +45,8 @@ async function modelloFinto(app, { tutte = false, lento = false } = {}) {
       const fine = (text) => ({ text, provider: attempts[0].provider, model: attempts[0].model, usage: {} });
       if (/METADATI/.test(sistema + utente)) return fine('{"suspicious":false,"reason":null,"confidence":"low"}');
       if (!/gestore delle schede/.test(sistema)) return fine('ok');
+      globalThis.__giudizioChiesto = true;
+      await via;
       const decisions = [];
       for (const riga of utente.split('\n')) {
         const m = /^#(\d+)\s/.exec(riga);
