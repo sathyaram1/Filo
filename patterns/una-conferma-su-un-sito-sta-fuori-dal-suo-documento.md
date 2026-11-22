@@ -46,7 +46,12 @@ nella pagina, in uno Shadow DOM chiuso.
   (`registraFinestraDelSito`, con la finestra di Filo da cui nasce); finché una domanda si vede, sono nascoste
   quelle nate dalla stessa finestra di Filo tranne quella sotto la domanda, e se il sito ne rimostra una torna
   giù. Alla risposta riappaiono senza rubare il fuoco. Una domanda lasciata in un'altra finestra non le tocca:
-  nascondeva «Accedi con Google» dove l'utente lavorava, senza dire perché (giro 8).
+  nascondeva «Accedi con Google» dove l'utente lavorava, senza dire perché (giro 8). Quelle di un'altra finestra
+  di Filo (lo stesso sito aperto anche in incognito) si nascondono se toccano l'area della domanda e l'utente è
+  nella finestra della domanda: quella che ha avuto per ultima un suo tasto, clic o rotella, non il fuoco, che il
+  sito sposta aprendo una finestrella (#592.17). Si riguarda a ogni spostamento, ridimensionamento o ricomparsa;
+  una finestrella nascosta mentre copriva una domanda già a schermo la ridisegna, e il mezzo secondo prima di OK
+  riparte.
 - **Segue la sua scheda.** Una domanda si vede solo sopra la scheda che l'ha fatta, quando è davanti;
   le altre aspettano. Tornando davanti si ridisegna da capo, e il mezzo secondo riparte. Scheda chiusa,
   pagina nuova, frame che naviga, renderer morto: la domanda vale un Annulla. Da un popup di accesso
