@@ -1557,7 +1557,8 @@
         if (short !== cmdText) btn.title = cmdText;
         segnaComando('▶');
       } else {
-        btn.textContent = shortLabel;
+        if (domanda.parti) conRiquadri(btn, domanda.parti);
+        else btn.textContent = shortLabel;
         const segnalazione = RA.testoSegnalazione(a);
         if (segnalazione) btn.title = segnalazione;
       }
