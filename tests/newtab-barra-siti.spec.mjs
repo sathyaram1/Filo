@@ -304,7 +304,7 @@ test('#1803.2 una mossa a parole che lascia la barra com\'era: né la riga, né 
   expect(esiti[2]).toContain('È già nella barra dei siti');
   expect(esiti[3]).toMatch(/^Eseguita: Rinominato/);
 
-  // Riaperta, le mosse senza effetto restano non fatte, come «Sei già nella home».
+  // Riaperta, le mosse senza effetto restano non fatte, come «Sei già nella home», con la riga detta in diretta.
   const chat = (await app.evaluate(() => globalThis.SN_FILO_CHATS.list()))
     .find((c) => !c.app && c.messages.some((m) => m.text === 'rinomina YouTube in YouTube'));
   expect(chat).toBeTruthy();
