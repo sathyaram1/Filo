@@ -367,9 +367,9 @@
     const L = global.SN_ACTION_LEVELS;
     // Un no alla conferma è un esito: chi rilegge sa che l'utente ha rifiutato, e il modello non la ripropone (#1373).
     if (x._confirm && x._rifiutata) {
-      const chiesta = SENZA_TITOLO[type] ? SENZA_TITOLO[type][0] : primaRiga(x._confirm.text) || (L ? frase(L.describe, x) : '');
+      const d = SENZA_TITOLO[type] ? { riga: SENZA_TITOLO[type][0], parti: null } : domandaDi(x, L);
       return senzaVuoti({
-        type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO, no: true,
+        type, esito: FALLITO, riga: breve(d.riga, MAX_RIGA), parti: d.parti, motivo: MOTIVO_NO, no: true,
         autore: x._proposta === true ? 'segnalazione' : '', ...segnalazioneDi(type, x),
       });
     }
