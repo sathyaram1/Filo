@@ -104,8 +104,8 @@ export function corriFile(dir, voce, { lancia = spawnSync, prepara = preparaLanc
     return { esiti: esitiDaTap(r.stdout), partito: true };
   }
   const rapporto = join(dirname(dir), `rapporto-${Math.random().toString(36).slice(2)}.json`);
-  // Le dipendenze della copia sono un collegamento: la CLI che lo risolve e lo spec che non lo risolve (la junction su
-  // Windows) caricano due Playwright, e lo spec non trova i casi. Coi collegamenti tenuti la copia è una sola ovunque.
+  // Le dipendenze della copia sono un collegamento: se CLI e spec lo risolvono in due percorsi (la junction su Windows)
+  // caricano due Playwright, e i casi non si trovano. Coi collegamenti tenuti il percorso è uno solo ovunque.
   const cli = join(cwd, 'node_modules', '@playwright', 'test', 'cli.js');
   const diretto = existsSync(cli);
   const argomenti = ['test', rel, '--retries=0', '--reporter=json'];
