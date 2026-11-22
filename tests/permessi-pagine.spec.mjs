@@ -868,7 +868,7 @@ for (const incognito of [true, false]) {
     const righe = sicurezza.locator('#sec-perm-list li');
     await expect(righe.filter({ hasText: 'Microfono: consentito' })).toHaveCount(1, { timeout: 10_000 });
     await righe.filter({ hasText: 'Microfono' }).getByRole('button', { name: 'Togli' }).click();
-    await expect(righe).toHaveText(['Nessuna risposta data a un sito']);
+    await expect(righe).toHaveText(NESSUNA);
     await chiudiApp(app);
 
     esiti.length = 0;
