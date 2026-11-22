@@ -111,7 +111,7 @@ test('un programma partito da solo da una scheda aperta dalla pagina o da un riq
   await openTab('https://riquadro-nascosto.it/');
   const riquadro = await avvisoDi(app, 'riquadro-nascosto.it');
   expect(riquadro.level).toBe('sospetto');
-  expect(riquadro.body).toContain('ha avviato da sola lo scaricamento di un programma («lettore.exe»)');
+  expect(riquadro.body).toContain('ha avviato da sola lo scaricamento di un programma «lettore.exe»');
 });
 
 test('un programma partito da solo su un dominio registrato da pochi giorni: pericoloso', async ({ app, openTab }) => {
