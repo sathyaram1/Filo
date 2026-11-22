@@ -797,10 +797,13 @@ test('segreti: controlli deterministici, che non gridano al lupo', () => {
   assert.equal(A.segreto('ftp://anonymous:guest@x.it/'), '', 'un utente anonimo non è una password');
   assert.equal(A.segreto('Authorization: Bearer'), '');
   // Chi l'ha scritto: `scritto` solo se ogni segreto sta nelle parole dell'utente.
-  assert.deepEqual(A.segretoDettaglio('?password=Gatto2024!', { richiesta: 'la mia password è Gatto2024!' }), { tipo: 'password', scritto: true });
+  assert.deepEqual(A.segretoDettaglio('?password=Gatto2024!', { richiesta: 'la mia password è Gatto2024!' }),
+    { tipo: 'password', scritto: true, valori: ['Gatto2024!'] });
   assert.deepEqual(A.segretoDettaglio('?password=Gatto2024!&k=sk-or-v1-0123456789abcdef0123456789abcdef', { richiesta: 'password Gatto2024!' }),
-    { tipo: 'chiave', scritto: false });
-  assert.deepEqual(A.segretoDettaglio('niente qui'), { tipo: '', scritto: false });
+    { tipo: 'chiave', scritto: false, valori: [] });
+  assert.deepEqual(A.segretoDettaglio('niente qui'), { tipo: '', scritto: false, valori: [] });
+  // #2645 — la forma con «è» di #1840.5: il valore è quello che la parola «conferma» lascia uscire.
+  assert.deepEqual(A.segretoDettaglio('La mia password è Gatto!2024 e non entra.', { richiesta: 'la mia password è Gatto!2024' }).valori, ['Gatto!2024']);
 });
 
 // ── nessuna superficie decide da sé ──────────────────────────────────────────
