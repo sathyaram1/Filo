@@ -41,18 +41,53 @@ function partiPulite(parti) {
 
 // Le finestre che apre un sito (i popup di accesso) stanno sopra quella di Filo: con una domanda a schermo il sito ci
 // posava sopra il testo finto, lasciando scoperto l'OK vero (#592.6, giro 7). Finché una domanda si vede, si nascondono
-// quelle nate dalla stessa finestra di Filo: una domanda lasciata in un'altra finestra non spegne gli accessi qui (giro 8).
+// quelle nate dalla stessa finestra di Filo, e quelle di un'altra che coprono la domanda (#592.17); una domanda lasciata
+// in una finestra da cui l'utente è passato a un'altra non spegne gli accessi di là (giro 8). Regole: il pattern in testa.
 const finestreDelSito = new Map();
 const nascoste = new Set();
 const aSchermo = new Set();
+// L'ordine in cui le finestre di Filo hanno preso il fuoco: quelle del sito non contano, perché aprendosi lo prendono.
+const fuoco = new WeakMap();
+let giroFuoco = 0;
+
+const casaDi = (w) => finestreDelSito.get(w) || w;
+
+// L'area della domanda sullo schermo: tutta la scheda che copre, col suo velo.
+function areaSulloSchermo(c) {
+  try {
+    if (!c.vista || !c.win || c.win.isDestroyed()) return null;
+    const v = c.vista.getBounds();
+    const f = c.win.getContentBounds();
+    return v.width > 0 && v.height > 0 ? { x: f.x + v.x, y: f.y + v.y, width: v.width, height: v.height } : null;
+  } catch (_) { return null; }
+}
+
+const siToccano = (a, b) => !!a && !!b && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+// Le domande a schermo che la finestra `w` (nata da `padre`) copre, fra quelle dove l'utente è adesso.
+function domandeCoperte(w, padre) {
+  let b = null;
+  try { b = w.getBounds(); } catch (_) { return []; }
+  return [...aSchermo].filter((c) => {
+    const casa = casaDi(c.win);
+    if (casa === padre || c.win === w) return false;
+    if ((fuoco.get(casa) || 0) < (fuoco.get(padre) || 0)) return false;
+    return siToccano(b, areaSulloSchermo(c));
+  });
+}
 
 function allineaFinestre() {
   const esenti = new Set([...aSchermo].map((c) => c.win));
-  const conDomanda = new Set([...aSchermo].map((c) => finestreDelSito.get(c.win) || c.win));
+  const conDomanda = new Set([...aSchermo].map((c) => casaDi(c.win)));
   for (const [w, padre] of [...finestreDelSito]) {
     if (!w || w.isDestroyed()) { finestreDelSito.delete(w); nascoste.delete(w); continue; }
-    if (conDomanda.has(padre) && !esenti.has(w)) {
-      if (w.isVisible()) { nascoste.add(w); try { w.hide(); } catch (_) {} }
+    const coperte = esenti.has(w) ? [] : domandeCoperte(w, padre);
+    if ((conDomanda.has(padre) && !esenti.has(w)) || coperte.length) {
+      if (!w.isVisible()) continue;
+      nascoste.add(w);
+      try { w.hide(); } catch (_) {}
+      // Il testo finto è stato a schermo sopra la domanda: un clic partito leggendo quello non vale un sì.
+      for (const c of coperte) c.ridisegna();
     } else if (nascoste.has(w)) {
       nascoste.delete(w);
       try { w.showInactive(); } catch (_) {}
@@ -60,13 +95,28 @@ function allineaFinestre() {
   }
 }
 
+const riallinea = () => { if (aSchermo.size) setImmediate(allineaFinestre); };
+let fuocoSeguito = false;
+function seguiFuoco() {
+  if (fuocoSeguito) return;
+  fuocoSeguito = true;
+  try {
+    require('electron').app.on('browser-window-focus', (_e, w) => {
+      if (!w || finestreDelSito.has(w)) return;
+      fuoco.set(w, ++giroFuoco);
+      riallinea();
+    });
+  } catch (_) {}
+}
+
 // Ogni finestra nata da una pagina web passa di qui, con la finestra di Filo da cui viene (`padre`); se il sito la
-// rimostra mentre c'è una domanda, torna nascosta.
+// rimostra o la sposta mentre c'è una domanda, si riguarda.
 function registraFinestraDelSito(win, padre) {
   if (!win || finestreDelSito.has(win) || win.isDestroyed()) return;
+  seguiFuoco();
   finestreDelSito.set(win, padre || null);
   win.once('closed', () => { finestreDelSito.delete(win); nascoste.delete(win); });
-  win.on('show', () => { if (aSchermo.size) setImmediate(allineaFinestre); });
+  for (const ev of ['show', 'move', 'resize']) win.on(ev, riallinea);
   allineaFinestre();
 }
 
