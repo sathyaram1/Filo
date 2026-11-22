@@ -169,8 +169,10 @@ module.exports = function register(on, ctx) {
     if (mie && mie.length) current[Mie.CHIAVE_BACKUP] = mie;
     return current;
   }
-  function opzioniFusione() {
+  // `proxySenzaCredenziali`: i campi del proxy a cui l'esportazione ha tolto utente e password (readExportZip).
+  function opzioniFusione(proxySenzaCredenziali = []) {
     return {
+      proxySenzaCredenziali,
       tettoPagine: SN_CONST.SAVED_PAGES_LIMIT,
       tettoAppunti: SN_CONST.CLIPBOARD_HISTORY_MAX,
       tettoDownload: require('../downloads').HISTORY_LIMIT,
