@@ -60,7 +60,6 @@ const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'ecc
 // la parola dopo, né fanno di una riga la risposta.
 const NON_IN_RISPOSTA = new Set(['sono', 'are', 'vale', 'risulta', 'here']);
 const PRESENTA_RISPOSTA = new Set([...PRESENTA_DATO].filter((w) => !NON_IN_RISPOSTA.has(w)));
-const SALUTO = /^(?:ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera)$/;
 // «check-in», «self-service»: parole col trattino, non password.
 const formaDiPassword = (v) => !!guardiano().sembraPassword(v) && !/^\p{L}+(?:-\p{L}+)+$/u.test(v);
 // Una parola di sole lettere conta come password solo nelle prime parole della risposta o dopo PRESENTA_DATO: più in là
