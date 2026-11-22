@@ -1869,12 +1869,14 @@
     let costo = costoFor(action, ctx);
     if (!entry || costo == null) return null;
     let segreto = '';
+    let segreti = [];
     let chiesta = true;
     const A = global.SN_AUTONOMIA;
     if (typeof entry.uscita === 'function' && A) {
       let s = { tipo: '', scritto: false };
       try { s = A.segretoDettaglio(entry.uscita(action), { richiesta: ctx.richiesta || '' }); } catch (_) { s = { tipo: 'chiave', scritto: false }; }
       if (s.tipo) { segreto = s.tipo; chiesta = s.scritto; costo = A.COSTO_MAX; }
+      if (s.scritto && Array.isArray(s.valori)) segreti = s.valori;
     }
     let difesa = false;
     try { difesa = !!valore(entry.difesa, action, ctx); } catch (_) { difesa = true; }
