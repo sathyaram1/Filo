@@ -20,9 +20,10 @@ const scheda = {
     },
   },
 };
+const schede = [scheda];
 const electron = {
   session: { defaultSession: null },
-  BrowserWindow: { getAllWindows: () => [{ _filoTabs: { tabs: [scheda] } }] },
+  BrowserWindow: { getAllWindows: () => [{ _filoTabs: { tabs: schede } }] },
   webContents: { fromId: () => null },
 };
 const origLoad = Module._load;
