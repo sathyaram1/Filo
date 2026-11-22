@@ -48,6 +48,9 @@ const partizionati = new Map();
 // una partita da una lettura vecchia può coprire un valore più nuovo del sito; lo dice l'avviso che la segue (#2637).
 const nostre = new Map();
 const NOSTRE_MS = 30 * 1000;
+// Le pulizie dei partizionati in corso (dominio|percorso|nome). Un set già scaduto toglie solo il normale, e il suo
+// avviso ne porta il valore di quel momento: se il sito l'ha cambiato dopo la nostra lettura, si rimette quello.
+const pulizie = new Map();
 
 let modo = 'default';
 let fidati = new Sito.ElencoSiti();
