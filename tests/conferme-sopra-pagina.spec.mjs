@@ -567,8 +567,10 @@ const finestrelle = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.g
   .filter((w) => !w._filoTabs && /^https?:/.test(w.webContents.getURL()))
   .map((w) => w.isVisible()));
 
-async function finestrellaSopra(pagina, area, u) {
+// Il clic che permette di aprirla dà il fuoco alla sua finestra: `poi` lo rimette dove deve stare.
+async function finestrellaSopra(pagina, area, u, poi = async () => {}) {
   await pagina.mouse.click(5, 5);
+  await poi();
   const x = Math.round(area.x + area.width / 2 - 220);
   const y = Math.round(area.y + area.height / 2 - 50);
   await pagina.evaluate(({ u, x, y }) => {
