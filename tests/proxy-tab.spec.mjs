@@ -567,3 +567,25 @@ test('una scheda americana portata in Germania carica dalla Germania (#1272)', a
     await proxy.close();
   }
 });
+
+// #905.4: gli elenchi dei fornitori danno «host:porta:utente:password», e molti l'indirizzo con utente e password senza
+// schema davanti. Tutti e due si collegano con la password.
+for (const [forma, endpoint] of [
+  ['host:porta:utente:password', (port) => `127.0.0.1:${port}:utente-{country}:${PASSWORD_PROXY}`],
+  ['utente:password@host:porta senza schema', (port) => `utente-{country}:${PASSWORD_PROXY}@127.0.0.1:${port}`],
+]) {
+  test(`un proxy scritto come «${forma}» apre la scheda dal paese scelto (#905.4)`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    const sito = await sitoConLinkAccorciati();
+    const proxy = await proxyColPaeseNelNome();
+    try {
+      const id = await conProxyColPaeseNelNome(app, openTab, testServer, proxy, endpoint(proxy.port));
+      const pagina = await inPaese(app, id, 'US', `http://pagina.filo.invalid:${sito.port}/pagina-us`);
+      await expect(pagina.locator('#pronta')).toHaveText('pagina us');
+      expect(proxy.utentiPer('/pagina-us'), 'la pagina passa dal proxy, con utente e password').toEqual(['utente-us']);
+    } finally {
+      await sito.close();
+      await proxy.close();
+    }
+  });
+}
