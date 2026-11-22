@@ -106,7 +106,7 @@ test('un programma partito da solo da una scheda aperta dalla pagina o da un riq
   await openTab('https://apre-schede.it/');
   const scheda = await avvisoDi(app, 'apre-schede.it');
   expect(scheda.level).toBe('sospetto');
-  expect(scheda.body).toContain('ha avviato da sola lo scaricamento di un programma («regalo.exe»)');
+  expect(scheda.body).toContain('ha avviato da sola lo scaricamento di un programma «regalo.exe»');
 
   await openTab('https://riquadro-nascosto.it/');
   const riquadro = await avvisoDi(app, 'riquadro-nascosto.it');
