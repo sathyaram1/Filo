@@ -316,7 +316,20 @@
     const testo = String((c && (c.text ?? c.testo)) || '');
     if (!(livello === 2 || livello === 3) || !testo.trim() || testo.length > MAX_AZIONE) return null;
     const d = String(domanda ?? (c && c.domanda) ?? '');
-    return /^[a-z]{1,12}$/.test(d) ? { livello, testo, domanda: d } : { livello, testo };
+    const parti = partiDellaConferma(c && c.parti, testo);
+    return { livello, testo, ...(parti ? { parti } : {}), ...(/^[a-z]{1,12}$/.test(d) ? { domanda: d } : {}) };
+  }
+  // Riaperta, la domanda torna coi suoi riquadri: solo le forme del popup, e solo se dicono il testo salvato accanto.
+  function partiDellaConferma(parti, testo) {
+    if (!Array.isArray(parti) || parti.length > 200) return null;
+    const p = parti.map((x) => {
+      if (typeof x === 'string') return x;
+      if (x && typeof x === 'object' && Array.isArray(x.elenco) && x.elenco.every((v) => typeof v === 'string')) return { elenco: x.elenco.slice() };
+      if (x && typeof x === 'object' && typeof x.citazione === 'string') return { citazione: x.citazione, ...(x.nuda === true ? { nuda: true } : {}) };
+      return null;
+    });
+    if (p.some((x) => x == null) || !p.some(riquadro) || rigaDiParti(p) !== testo) return null;
+    return JSON.stringify(p).length <= MAX_AZIONE ? p : null;
   }
   // Il pannello dell'eliminazione dall'archivio cerca appena è disegnato: riaperta la chat resta la riga, non si paga
   // un giudizio a ogni riapertura.
