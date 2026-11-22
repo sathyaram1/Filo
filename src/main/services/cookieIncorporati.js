@@ -272,21 +272,21 @@ async function togliPartizionati(ses, sito, nomi) {
       const p = pulizie.get(k);
       const c = (p && p.prova) || normali.get(k) || null;
       if (p) p.fatta = true;
-      if (c && daRimettere(c, k, tutti)) await rimetti(ses, k, c);
+      if (c && daRimettere(p, c)) await rimetti(ses, k, c);
     }
   }
 }
 
-function apriPulizia(k) {
+function apriPulizia(k, tutti) {
+  const diSessione = new Set(tutti.filter((x) => x.session && chiaveCookie(x) === k).map((x) => String(x.value)));
   pulizie.delete(k);
-  pulizie.set(k, { at: Date.now(), prova: null, fatta: false, rimessa: null });
+  pulizie.set(k, { at: Date.now(), prova: null, fatta: false, rimessa: null, diSessione });
   while (pulizie.size > MAX_NOMI) pulizie.delete(pulizie.keys().next().value);
 }
 
 // Un normale di sessione che c'era già alla lettura l'aveva declassato Filo, e muore con la visita.
-function daRimettere(c, k, tutti) {
-  if (!c.session) return true;
-  return !tutti.some((x) => x.session && chiaveCookie(x) === k && x.value === c.value);
+function daRimettere(p, c) {
+  return !c.session || !p || !p.diSessione.has(String(c.value));
 }
 
 async function rimetti(ses, k, c) {
