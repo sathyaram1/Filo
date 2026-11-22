@@ -1231,7 +1231,7 @@
     const out = [];
     if (!oggetto(s)) return out;
     if (oggetto(s.apiKeys)) for (const k of Object.keys(s.apiKeys)) out.push(['apiKeys', k]);
-    if (oggetto(s.proxy)) for (const k of ['datacenter', 'residential']) if (credenzialiProxy(s.proxy[k])) out.push(['proxy', k]);
+    if (oggetto(s.proxy)) for (const k of CAMPI_PROXY) if (credenzialiProxy(s.proxy[k])) out.push(['proxy', k]);
     const sb = oggetto(s.security) ? s.security.safeBrowse : null;
     if (oggetto(sb) && 'safeBrowsingKey' in sb) out.push(['security', 'safeBrowse', 'safeBrowsingKey']);
     return out;
