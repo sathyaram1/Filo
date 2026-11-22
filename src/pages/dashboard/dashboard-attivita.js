@@ -1973,7 +1973,7 @@
 
   // Cosa chiedeva la conferma, prima che il sì la tolga: riaperta, la chat dice cosa non è riuscito.
   function primaRigaConferma(a) {
-    return global.SN_ESITO.primaRigaConferma(a && a._confirm && a._confirm.text);
+    return global.SN_ESITO.rigaDellaDomanda(a && a._confirm).riga;
   }
 
   // Com'è andata un'azione decisa dopo il turno entra nell'archivio, nella conversazione dove è nato il bottone (#1294):
