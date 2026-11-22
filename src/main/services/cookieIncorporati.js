@@ -299,22 +299,24 @@ async function rimetti(ses, k, c) {
 
 // Gli avvisi possono arrivare dopo le risposte: la prova di un normale riscritto dal sito che arriva a pulizia decisa
 // corregge quello che si è rimesso (o si rimette da sola, se non si era rimesso niente). Il primo arrivo nostro chiude.
+// Torna vero per un avviso di prima della nostra scadenza, che la sorveglianza delle riscritture prenderebbe per nostro.
 function osservaPulizia(ses, k, c, causa, rimosso) {
   const p = pulizie.get(k);
-  if (!p) return;
-  if (Date.now() - p.at > NOSTRE_MS) { pulizie.delete(k); return; }
-  if (rimosso) {
-    if (causa !== 'expired-overwrite') return;
+  if (!p) return false;
+  if (Date.now() - p.at > NOSTRE_MS) { pulizie.delete(k); return false; }
+  if (rimosso && causa === 'expired-overwrite') {
     p.prova = c;
     if (p.fatta && p.rimessa == null && daRimettere(p, c)) rimetti(ses, k, c).catch(() => {});
-    return;
+    return false;
   }
-  if (!p.fatta || p.rimessa == null || String(c.value) !== p.rimessa) return;
+  if (p.attesa && !p.prova) return true;
+  if (rimosso || !p.fatta || p.rimessa == null || String(c.value) !== p.rimessa) return false;
   pulizie.delete(k);
   const v = nostre.get(k);
   // Una sovrascrittura di un valore ancora più nuovo la rimette già la sorveglianza delle riscritture.
-  if (v && v.rimosso) return;
+  if (v && v.rimosso) return false;
   if (p.prova && p.prova.value !== p.rimessa && daRimettere(p, p.prova)) rimetti(ses, k, p.prova).catch(() => {});
+  return false;
 }
 
 // All'uscita da Filo i cookie di sessione se ne vanno da soli; i partizionati ancora in attesa si tolgono qui.
