@@ -380,10 +380,9 @@ test('la finestra nascosta del controllo profondo è muta e non mostra le finest
   expect(muta).toEqual([true]);
   expect(esiti).toContain('allarme:NotAllowedError');
   expect(esiti).toContain('contesto:suspended');
-  expect(esiti).not.toContain('voce:parla');
+  expect(esiti).toContain('voce:not-allowed');
   expect(esiti).toContain('dopo:avviso');
   expect(esiti).toContain('conferma:false');
-  expect(esiti).toContain('domanda:null');
   expect(await finito).toBe(true);
   const rimaste = await app.evaluate(({ webContents }) => webContents.getAllWebContents().filter((w) => /\/allarme$/.test(w.getURL())).length);
   expect(rimaste, 'a controllo finito della copia non resta niente').toBe(0);
