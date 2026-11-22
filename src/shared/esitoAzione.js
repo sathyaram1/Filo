@@ -403,6 +403,13 @@
       ...(SENZA_TITOLO[type] || !x._confirm ? {} : bottoneDi(esito, type, x, x._confirm, x._domanda)),
     });
   }
+  // La domanda di un'azione in una riga, piatta e a pezzi: quella del popup, o la sua spiegazione se non c'è.
+  function domandaDi(x, L) {
+    const c = x && x._confirm;
+    const d = c ? rigaDellaDomanda(c) : { riga: '', parti: null };
+    if (d.riga || !L) return d;
+    try { return rigaDellaDomanda({ text: L.describe(x), parti: L.describeParts(x) }); } catch (_) { return { riga: '', parti: null }; }
+  }
   function rigaDelDiario(x) {
     const R = global.SN_RIGHE_ATTIVITA;
     try { return R ? R.rigaArchivio(x) : null; } catch (_) { return null; }
