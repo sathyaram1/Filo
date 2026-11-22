@@ -423,11 +423,11 @@
       fineDiretta() { inDiretta = false; },
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»), dentro il nodo della sua azione.
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la conta.
-      addRow(type, rowIcon, text, failed = false, cambi = null, a = null, title = '') {
+      addRow(type, rowIcon, text, failed = false, cambi = null, a = null, title = '', parti = null) {
         closeTurnReasoning();
         const gia = contaAzione(type, a, failed);
         const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
-        const riga = makeActivityRow(rowIcon, text, cambi, title);
+        const riga = makeActivityRow(rowIcon, parti || text, cambi, title);
         segnaSistema(riga, a);
         // La proposta finita col bottone diventa il suo esito nella stessa riga: due frasi che si contraddicono no.
         if (gia && gia.prima === global.SN_ESITO.PROPOSTO && gia.voce.riga && gia.voce.riga.isConnected) gia.voce.riga.replaceWith(riga);
