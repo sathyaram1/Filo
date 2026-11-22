@@ -64,12 +64,12 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui.png' });
 
     // Riaperta senza risposta: bottone e popup tornano coi riquadri.
-    const chat = await chatCon(app, 'metti georgia come carattere');
+    const chat = await chatCon(app, 'cambia il modello della chat');
     await riapri(app, page, chat.id);
     const ridato = page.locator('.dash-bubble-filo .dash-action-btn-primary').first();
     await expect(ridato).toBeVisible({ timeout: 8_000 });
     const rb = await pezzi(ridato);
-    expect(rb.fuori).not.toMatch(/confermalo|Georgia/);
+    expect(rb.fuori).not.toMatch(/confermalo|modello-x/);
     expect(rb.dentro).toContain(FINTO);
     await ridato.click();
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
