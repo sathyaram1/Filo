@@ -368,6 +368,25 @@ test('la finestra nascosta del controllo profondo nega microfono e fotocamera al
   await expect(barra()).toBeHidden();
 });
 
+// La copia nascosta di un finto avviso di virus non suona, non parla e non mostra finestre di dialogo (#591.6).
+test('la finestra nascosta del controllo profondo è muta e non mostra le finestre di dialogo della pagina', async () => {
+  test.setTimeout(60_000);
+  const finito = app.evaluate(async (_e, u) => { await globalThis.SN_SAFEBROWSE.sandbox.detonate(u); return true; }, origine + '/allarme');
+  await expect.poll(() => esiti.includes('dopo:stampa'), { timeout: 10_000, message: JSON.stringify(esiti) }).toBe(true);
+  const muta = await app.evaluate(({ webContents }) => webContents.getAllWebContents()
+    .filter((w) => /\/allarme$/.test(w.getURL())).map((w) => w.isAudioMuted()));
+  expect(muta).toEqual([true]);
+  expect(esiti).toContain('allarme:NotAllowedError');
+  expect(esiti).toContain('contesto:suspended');
+  expect(esiti).not.toContain('voce:parla');
+  expect(esiti).toContain('dopo:avviso');
+  expect(esiti).toContain('conferma:false');
+  expect(esiti).toContain('domanda:null');
+  expect(await finito).toBe(true);
+  const rimaste = await app.evaluate(({ webContents }) => webContents.getAllWebContents().filter((w) => /\/allarme$/.test(w.getURL())).length);
+  expect(rimaste, 'a controllo finito della copia non resta niente').toBe(0);
+});
+
 const paginaDi = (base) => app.windows().find((w) => w.url().startsWith(base));
 
 test('un clic che arriva appena la domanda compare non concede: Consenti si arma dopo un attimo', async () => {
