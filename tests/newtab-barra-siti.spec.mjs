@@ -302,14 +302,17 @@ test('#1803.2 una mossa a parole che lascia la barra com\'era: né la riga, né 
   expect(esiti[2]).toContain('È già nella barra dei siti');
   expect(esiti[3]).toMatch(/^Eseguita: Rinominato/);
 
-  // Riaperta, la conversazione racconta le stesse righe.
+  // Riaperta, le mosse senza effetto restano non fatte, come «Sei già nella home».
   const chat = (await app.evaluate(() => globalThis.SN_FILO_CHATS.list()))
     .find((c) => !c.app && c.messages.some((m) => m.text === 'rinomina YouTube in YouTube'));
   expect(chat).toBeTruthy();
   await app.evaluate((_e, c) => globalThis.SN_CLOSE_FILO_CHAT(c), chat.id);
   await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(chat.id)}`);
-  for (const [, , riga] of turni) await expect(page.locator('#bubbles')).toContainText(riga, { timeout: 10_000 });
-  await expect(page.locator('#bubbles')).not.toContainText('Messo nella barra');
+  await expect(page.locator('#bubbles')).toContainText('Rinominato nella barra dei siti · Video', { timeout: 10_000 });
+  const testo = await page.locator('#bubbles').innerText();
+  expect((testo.match(/Barra dei siti non cambiata · era già così/g) || []).length).toBe(3);
+  expect((testo.match(/Ha sistemato la barra dei siti/g) || []).length).toBeLessThanOrEqual(1);
+  expect(testo).not.toContain('Messo nella barra');
 });
 
 test('#1657 tante voci si raggiungono tutte; Canc toglie; trascinata nel campo scrive l\'indirizzo; il tasto destro nasconde la barra', async ({ app }) => {
