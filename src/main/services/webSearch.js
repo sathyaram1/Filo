@@ -171,7 +171,8 @@
         return await searchTavily({ query: q, apiKey: tavilyKey, maxResults });
       } catch (e) {
         console.warn('[SN] tavily failed, fallback ddg:', e.message || e);
-        ripiego = true;
+        // Col mese esaurito Tavily non è guasto: la ricerca va al motore gratuito.
+        ripiego = !(e && e.code === 'LIMIT_REACHED');
       }
     }
     try {
