@@ -72,7 +72,7 @@ function domandeCoperte(w, padre) {
   return [...aSchermo].filter((c) => {
     const casa = casaDi(c.win);
     if (casa === padre || c.win === w) return false;
-    if ((fuoco.get(casa) || 0) < (fuoco.get(padre) || 0)) return false;
+    if ((usata.get(casa) || 0) < (usata.get(padre) || 0)) return false;
     return siToccano(b, areaSulloSchermo(c));
   });
 }
