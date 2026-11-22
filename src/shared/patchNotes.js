@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.299', date: '2026-11-22',
+      fixes: [
+        { testo: 'Quando riapri Filo e la pulizia delle schede ci mette un po\' a decidere, una scheda che nel frattempo hai ripreso resta aperta, e una che hai chiuso tu non finisce nel conto dell\'avviso né torna con «Riapri».', segnalazione: 349 },
+      ],
+    },
+    {
       version: '0.2.298', date: '2026-11-21',
       fixes: [
         { testo: 'Trascrivi mostra e legge anche i loghi con la scritta chiara su fondo trasparente, e una parola trascinata dalla prima all\'ultima lettera si copia intera anche quando l\'immagine usa un carattere diverso da quello di Filo.', segnalazione: 2374 },
