@@ -816,6 +816,7 @@ const paginaSicurezza = async () => {
   await expect.poll(() => { p = app.windows().find((w) => w.url().startsWith('filo://security')); return Boolean(p); }, { timeout: 10_000 }).toBe(true);
   return p;
 };
+const NESSUNA = ['Nessuna risposta data a un sito.'];
 
 // La pagina Sicurezza già aperta mostra le risposte date dopo, e quelle tolte dal menu della scheda (#591.6).
 test('la pagina Sicurezza già aperta si aggiorna da sé quando si risponde a un sito o si toglie la risposta dalla scheda', async () => {
