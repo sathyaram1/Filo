@@ -188,7 +188,12 @@ async function pulizia(variante, n = -1, sito = null) {
   return d;
 }
 
-const VARIANTI = [{ nome: 'avvisi prima delle risposte', avvisiInRitardo: 0 }, { nome: 'avvisi dopo le risposte', avvisiInRitardo: 3 }];
+// Con gli avvisi molto in ritardo la pulizia decide prima di sapere cosa ha tolto, e si corregge quando lo sa.
+const VARIANTI = [
+  { nome: 'avvisi prima delle risposte', avvisiInRitardo: 0 },
+  { nome: 'avvisi dopo le risposte', avvisiInRitardo: 3 },
+  { nome: 'avvisi dopo la fine della pulizia', avvisiInRitardo: 30 },
+];
 
 for (const v of VARIANTI) {
   test(`senza scritture in mezzo la pulizia toglie il partizionato e rimette il normale com'era (${v.nome})`, async () => {
