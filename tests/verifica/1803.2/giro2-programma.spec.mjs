@@ -42,7 +42,9 @@ for (const gia of [false, true]) {
       await expect(btn).toContainText(atteso);
       await expect(btn).not.toContainText(vietato);
       try { fs.mkdirSync(path.join(process.cwd(), 'tests', '.shots'), { recursive: true }); await page.screenshot({ path: path.join(process.cwd(), 'tests', '.shots', `verifica-1803-2-programma-${gia ? 'gia' : 'nuovo'}.png`) }); } catch (_) {}
-      // Dopo l'OK Filo riprende da solo e risponde sull'esito.
+      // Il turno dopo: Filo legge nella memoria del filo com'è andata.
+      await page.locator('#input').fill('allora?');
+      await page.locator('#sendBtn').click();
       await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta finale.' })).toHaveCount(1, { timeout: 15_000 });
       if (gia) await expect(page.locator('#bubbles')).not.toContainText('Ha sistemato la barra dei siti');
       chiamate = await chiamateAlModello(app);
