@@ -139,6 +139,16 @@ class ConfermeSopraPagina {
     this.seq = 0;
     this.seguite = new WeakSet();
     if (win && typeof win.once === 'function') win.once('closed', () => { this._togli(() => true); this._butta(); });
+    seguiFuoco();
+    try { if (win && win.isFocused()) fuoco.set(win, ++giroFuoco); } catch (_) {}
+    if (win && typeof win.on === 'function') for (const ev of ['move', 'resize']) win.on(ev, riallinea);
+  }
+
+  // La domanda a schermo si ridisegna da capo, e col popup riparte il mezzo secondo prima che OK valga.
+  ridisegna() {
+    if (!this.mostrata) return;
+    this.mostrata = null;
+    setImmediate(() => this.posa());
   }
 
   chiedi(wc, frame, richiesta) {
