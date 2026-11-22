@@ -280,6 +280,6 @@
     TIPI_TESTO, TIPI_IMMAGINE, MAX_TESTO, FRASI_TESTO, FRASI_IMMAGINE, FRASI_ALLEGATO, FRASE_RED_TEAM, TITOLO,
     ISTRUZIONI_TESTO, ISTRUZIONI_IMMAGINI,
     richiestaTesto, richiestaImmagini, troppoLungo, trovaPezzo, leggiTesto, leggiImmagini, daValori, daTratti, daAllegato,
-    avviso, esito,
+    senzaConfermati, avviso, esito,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
