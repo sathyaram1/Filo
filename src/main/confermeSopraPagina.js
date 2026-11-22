@@ -145,8 +145,11 @@ class ConfermeSopraPagina {
   }
 
   // La domanda a schermo si ridisegna da capo, e col popup riparte il mezzo secondo prima che OK valga.
+  // Con un numero nuovo: la vista chiude il popup vecchio, e la sua risposta (un Annulla) non vale per quello nuovo.
   ridisegna() {
-    if (!this.mostrata) return;
+    const voce = this.mostrata ? this.coda.find((v) => v.id === this.mostrata) : null;
+    if (!voce) return;
+    voce.id = ++this.seq;
     this.mostrata = null;
     setImmediate(() => this.posa());
   }
