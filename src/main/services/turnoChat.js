@@ -1318,7 +1318,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       if (!res || !res.needsConfirm) continue;
       const rendered = { ...a };
       delete rendered._argsError;
-      rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
+      rendered._confirm = { level: res.needsConfirm, text: res.describe || '', parti: res.parti, ...(res.avviso ? { avviso: res.avviso } : {}) };
       if (res.domanda) rendered._domanda = res.domanda;
       rendered._executed = false;
       renderedActions.push(rendered);
