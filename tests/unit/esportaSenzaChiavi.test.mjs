@@ -92,8 +92,7 @@ test('con «Includi le chiavi» l\'archivio le porta tutte, e le dichiara', () =
 
 test('importare un archivio senza chiavi lascia quelle che ci sono già', () => {
   const qui = { settings: { theme: 'light', apiKeys: { openrouter: 'sk-or-v1-di-questo-computer' }, proxy: { datacenter: PROXY } } };
-  const { data } = readExportZip(buildExportZip(sorgente()));
-  const { merged } = mergeImportedData(qui, data);
+  const { merged } = importa(qui, readExportZip(buildExportZip(sorgente())));
   assert.deepEqual(merged.settings.apiKeys, { openrouter: 'sk-or-v1-di-questo-computer' });
   assert.equal(merged.settings.proxy.datacenter, PROXY);
   assert.equal(merged.settings.theme, 'dark', 'il resto del backup entra');
