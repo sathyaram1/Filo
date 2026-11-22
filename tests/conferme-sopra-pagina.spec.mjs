@@ -522,8 +522,8 @@ test('una domanda lasciata aperta in un’altra finestra di Filo non nasconde il
 });
 
 // #592.17: lo stesso sito aperto anche in una finestra in incognito apriva da lì la finestrella sul testo della domanda.
-// Le due finestre di Filo stanno a schermo una accanto all'altra; `davanti` è quella dove l'utente è passato per ultimo.
-async function dueFinestre(app, shell, openTab, testServer, davanti) {
+// Le due finestre di Filo stanno a schermo una accanto all'altra.
+async function dueFinestre(app, shell, openTab, testServer) {
   const page = await testServer.openReady(openTab, '<h1>Negozio</h1>');
   await shell.evaluate(() => window.filoShell.openIncognito());
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
