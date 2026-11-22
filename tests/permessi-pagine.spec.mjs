@@ -809,6 +809,71 @@ test('le risposte date restano dopo aver riaperto Filo, e dalla pagina Sicurezza
   await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
 });
 
+const paginaSicurezza = async () => {
+  let p = null;
+  await expect.poll(() => { p = app.windows().find((w) => w.url().startsWith('filo://security')); return Boolean(p); }, { timeout: 10_000 }).toBe(true);
+  return p;
+};
+
+// La pagina Sicurezza già aperta mostra le risposte date dopo, e quelle tolte dal menu della scheda (#591.6).
+test('la pagina Sicurezza già aperta si aggiorna da sé quando si risponde a un sito o si toglie la risposta dalla scheda', async () => {
+  test.setTimeout(90_000);
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  const sicurezza = await paginaSicurezza();
+  const righe = sicurezza.locator('#sec-perm-list li');
+  await expect(righe).toHaveText(['Nessuna risposta data a un sito'], { timeout: 10_000 });
+  await apri('/microfono');
+  const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+  await expect(si).toBeEnabled({ timeout: 10_000 });
+  await si.click();
+  await expect.poll(() => esiti.includes('concesso:audio'), { timeout: 10_000 }).toBe(true);
+  await expect(righe.filter({ hasText: 'Microfono: consentito' })).toHaveCount(1, { timeout: 5_000 });
+
+  const scheda = await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => x.view && x.view.webContents.getURL().startsWith(u));
+    return require('./src/main/services/permessiPagine.js').dimentica(t.view.webContents).tolte;
+  }, origine + '/microfono').catch(() => null);
+  expect(scheda, 'la scheda aveva la risposta da togliere').toBe(1);
+  await expect(righe).toHaveText(['Nessuna risposta data a un sito'], { timeout: 5_000 });
+});
+
+// Quello che si toglie dalla pagina Sicurezza aperta in incognito resta tolto, come dalla finestra normale (#591.6).
+for (const incognito of [true, false]) {
+  test(`tolta dalla pagina Sicurezza ${incognito ? 'in incognito' : 'della finestra normale'}, la risposta non torna alla riapertura`, async () => {
+    test.setTimeout(120_000);
+    await apri('/microfono');
+    const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+    await expect(si).toBeEnabled({ timeout: 10_000 });
+    await si.click();
+    await expect.poll(() => esiti.includes('concesso:audio'), { timeout: 10_000 }).toBe(true);
+
+    if (incognito) {
+      await shell.evaluate(() => window.filoShell.openIncognito());
+      await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+        const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+        if (!w || !w._filoTabs || !w._filoTabs.tabs.length) return false;
+        w._filoTabs.openTab('filo://security/security.html');
+        return true;
+      }), { timeout: 15_000 }).toBe(true);
+    } else {
+      await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+    }
+    const sicurezza = await paginaSicurezza();
+    const righe = sicurezza.locator('#sec-perm-list li');
+    await expect(righe.filter({ hasText: 'Microfono: consentito' })).toHaveCount(1, { timeout: 10_000 });
+    await righe.filter({ hasText: 'Microfono' }).getByRole('button', { name: 'Togli' }).click();
+    await expect(righe).toHaveText(['Nessuna risposta data a un sito']);
+    await chiudiApp(app);
+
+    esiti.length = 0;
+    await avvia();
+    await apri('/microfono');
+    await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
+    expect(esiti, 'il sito non riprende il microfono da solo').toEqual([]);
+  });
+}
+
 // Quello che Chrome chiede si chiede, quello che concede passa: prima di #591 passava tutto, dopo il giro 19 niente.
 for (const [via, dopo, domanda] of [
   ['/schermi', 'schermi:letti', 'vuole usare tutti i tuoi schermi'],
