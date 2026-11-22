@@ -177,11 +177,16 @@
     const buone = out.filter((p) => p !== '');
     return buone.some(riquadro) ? buone : null;
   }
-  // Il testo piatto di una riga a pezzi, con la regola di sempre (i riquadri fra virgolette, i nudi senza).
-  function rigaDiParti(parti) {
-    const L = global.SN_ACTION_LEVELS;
-    return Array.isArray(parti) && L && typeof L.piatto === 'function' ? L.piatto(parti) : '';
+  // Le parti di una spiegazione in una riga di testo (il bottone, il diario, il modello): i riquadri fra virgolette, i
+  // nudi senza, gli elenchi a punti. La usa anche SN_ACTION_LEVELS.describe: una regola sola.
+  function piatto(parti) {
+    return (Array.isArray(parti) ? parti : []).map((p) => {
+      if (typeof p === 'string') return p;
+      if (Array.isArray(p.elenco)) return p.elenco.map((v) => `• ${v}`).join('\n');
+      return p.nuda ? p.citazione : `«${p.citazione}»`;
+    }).join('');
   }
+  const rigaDiParti = (parti) => (Array.isArray(parti) ? piatto(parti) : '');
   // Al più `max` caratteri del testo piatto: si taglia dove si arriva, e il taglio si vede.
   function accorciaParti(parti, max) {
     if (!Array.isArray(parti) || rigaDiParti(parti).length <= max) return parti;
