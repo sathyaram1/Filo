@@ -49,6 +49,11 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
         ? new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
         : vero(input, init));
     });
+    await app.evaluate(async () => {
+      const T = globalThis.SN_TEST_MODELS;
+      await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, modelRegistry: T.registry, models: { ...T.models, filo_chat: 'deepseek-flash' }, apiKeys: { openrouter: 'k-test' } });
+      globalThis.SN_WALLET_MAIN.keySource = async () => 'factory';
+    });
     // Una lettura nel giro tiene aperto il turno sulla conferma (#1130).
     const leggi = { id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' };
     await modelloFinto(app, [{ text: 'Cambio il modello della chat.', toolCalls: [leggi, MODELLO] }, { text: 'Ti chiedo conferma.' }, { text: 'Fatto.' }]);
