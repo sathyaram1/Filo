@@ -15,6 +15,7 @@
         { testo: 'Il bottone che riapre una richiesta di conferma, la sua riga nella chat, anche riaperta, e l\'avviso dei siti pericolosi mostrano il nome scelto da un modello o da un sito nel suo riquadro, come la richiesta stessa: non si legge più come una frase di Filo.', segnalazione: 592 },
         { testo: 'Mentre Filo ti chiede conferma su un sito, una finestrella aperta dallo stesso sito in un\'altra finestra di Filo non può più coprire il testo della richiesta.', segnalazione: 592 },
         { testo: 'Quando riapri Filo e la pulizia delle schede ci mette un po\' a decidere, una scheda che nel frattempo hai ripreso resta aperta, e una che hai chiuso tu non finisce nel conto dell\'avviso né torna con «Riapri».', segnalazione: 349 },
+        { testo: 'Se in chat o nell\'Aiuto mandi una segnalazione con dentro una password tua, dopo che hai scritto «conferma» parte: Filo non ti ferma una seconda volta per la stessa password.', segnalazione: 2645 },
       ],
     },
     {
