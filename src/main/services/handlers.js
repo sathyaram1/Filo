@@ -636,6 +636,8 @@ async function eseguiAzioneFilo(action, {
       confirmed, sender, contesto, fontiLette, assistente, parole, avanzamento, chatId, segnale, nascostiDellaChat,
       domanda, capRilettura, schedeViste, intervista, type, righeDaDimenticare, rigaDaCorreggere, impostazioni,
       decisione, daChiedere, sospesa, senzaRilettura: senzaRilettura === true,
+      // I segreti per cui l'utente ha appena scritto «conferma»: il riquadro lo diceva, e non si richiede (#2645).
+      segretiConfermati: confirmed && daChiedere && decisione.digita && ing.segreto && Array.isArray(ing.segreti) ? ing.segreti : [],
 });
   } catch (e) {
     console.warn('[Filo] action exec failed', type, e);
