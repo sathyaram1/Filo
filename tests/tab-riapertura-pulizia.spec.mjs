@@ -145,6 +145,7 @@ test('mentre il modello decide, una scheda ripresa resta e una chiusa a mano non
     const app = await lancia(userData);
     const shell = await primaFinestra(app);
     await modelloFinto(app, { tutte: true, lento: true });
+    await app.evaluate(() => { globalThis.__dbg = []; const w = console.warn; console.warn = (...a) => { globalThis.__dbg.push(a.map(String).join(' ')); w(...a); }; });
     await expect.poll(() => app.evaluate(() => globalThis.__giudizioChiesto), { timeout: 60_000 }).toBe(true);
     // Nell'attesa l'utente passa al verde, lo guarda, torna al documento; e chiude lui il rosso.
     const id = async (re) => (await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs))
