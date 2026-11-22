@@ -205,7 +205,7 @@
       else out.push('…');
       break;
     }
-    return ripulite(out) || null;
+    return out;
   }
   // Le parti salvate di una riga valgono solo se dicono la riga piatta salvata accanto: una sola frase, due forme.
   function partiDellaRiga(parti, riga) {
