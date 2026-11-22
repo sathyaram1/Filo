@@ -62,15 +62,15 @@ test('il proxy senza utente e password torna dove non c\'era, e non cancella que
   const parsed = readExportZip(buildExportZip(sorgente()));
   assert.deepEqual(parsed.proxySenzaCredenziali, ['datacenter']);
 
-  const altrove = mergeImportedData({ settings: {} }, parsed.data).merged;
+  const altrove = importa({ settings: {} }, parsed).merged;
   assert.equal(altrove.settings.proxy.datacenter, 'socks5://gate.example.com:7000');
   assert.deepEqual(proxyDaCompletare(altrove, parsed.proxySenzaCredenziali), ['datacenter'], 'la conferma deve dirlo');
 
-  const qui = mergeImportedData({ settings: { proxy: { datacenter: PROXY } } }, parsed.data).merged;
+  const qui = importa({ settings: { proxy: { datacenter: PROXY } } }, parsed).merged;
   assert.equal(qui.settings.proxy.datacenter, PROXY, 'lo stesso proxy, qui con la password, resta com\'è');
   assert.deepEqual(proxyDaCompletare(qui, parsed.proxySenzaCredenziali), []);
 
-  const diverso = mergeImportedData({ settings: { proxy: { datacenter: 'http://u:p@altro.example.com:1' } } }, parsed.data).merged;
+  const diverso = importa({ settings: { proxy: { datacenter: 'http://u:p@altro.example.com:1' } } }, parsed).merged;
   assert.equal(diverso.settings.proxy.datacenter, 'http://u:p@altro.example.com:1', 'senza la password il backup non cancella quella di qui');
 
   const senza = readExportZip(buildExportZip({ settings: { proxy: { residential: 'http://gate2.example.com:8000' } } }));
