@@ -254,7 +254,7 @@ async function togliPartizionati(ses, sito, nomi) {
     try { partizionati = (await ses.cookies.get({ domain: sito })).filter((c) => c.name === nome); } catch (_) {}
     for (const c of partizionati) {
       const k = chiaveCookie(c);
-      if (!posti.has(k)) { posti.set(k, c); apriPulizia(k); }
+      if (!posti.has(k)) { posti.set(k, c); apriPulizia(k, tutti); }
     }
     // Un normale scritto dal sito dopo la prima passata lo toglie (e lo dice) la seconda: la rimozione per indirizzo
     // parte insieme, senza un'attesa in mezzo in cui il sito lo riscriverebbe e lei lo porterebbe via muto.
