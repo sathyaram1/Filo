@@ -84,6 +84,31 @@ test('uno spec Playwright nuovo: lanciato davvero nelle due copie, rosso senza i
   } finally { togliCartella(root); }
 });
 
+// Su Windows la junction delle dipendenze si risolve in modo diverso da Linux: qui lo stesso si ottiene con lo spec che
+// non risolve i collegamenti, e senza un percorso unico per CLI e spec i casi non si trovano.
+test('uno spec Playwright nuovo si trova anche dove lo spec non risolve il collegamento delle dipendenze', () => {
+  const { root, base } = ramoDiProva();
+  const g = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' }).trim();
+  const prima = process.env.NODE_OPTIONS;
+  try {
+    symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'junction');
+    writeFileSync(join(root, '.gitignore'), 'node_modules\n');
+    writeFileSync(join(root, 'tests', 'somma.spec.mjs'), [
+      "import { test, expect } from '@playwright/test';",
+      "import { somma } from '../src/somma.mjs';",
+      "test('la somma nello spec', () => { expect(somma(2, 3)).toBe(5); });",
+      '',
+    ].join('\n'));
+    g('add', '-A'); g('commit', '-qm', 'spec');
+    process.env.NODE_OPTIONS = `${prima || ''} --preserve-symlinks`.trim();
+    const p = provaTestNuovi({ root, base, head: g('rev-parse', 'HEAD') });
+    assert.deepEqual(p.casi.find((c) => c.file === 'tests/somma.spec.mjs'), { file: 'tests/somma.spec.mjs', caso: 'la somma nello spec', senza: 'rosso', con: 'verde' });
+  } finally {
+    if (prima === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = prima;
+    togliCartella(root);
+  }
+});
+
 test('la copia nasce nella forma lunga del percorso: con la temporanea corta di Windows Playwright non trova i casi', () => {
   const { root, base } = ramoDiProva();
   const copia = apriCopia(root, base);
