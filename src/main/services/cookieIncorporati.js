@@ -306,7 +306,7 @@ function osservaPulizia(ses, k, c, causa, rimosso) {
   if (rimosso) {
     if (causa !== 'expired-overwrite') return;
     p.prova = c;
-    if (p.fatta && p.rimessa == null && daRimettere(c, k, [])) rimetti(ses, k, c).catch(() => {});
+    if (p.fatta && p.rimessa == null && daRimettere(p, c)) rimetti(ses, k, c).catch(() => {});
     return;
   }
   if (!p.fatta || p.rimessa == null || String(c.value) !== p.rimessa) return;
