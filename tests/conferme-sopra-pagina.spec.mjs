@@ -540,9 +540,13 @@ async function dueFinestre(app, shell, openTab, testServer, davanti) {
     const ws = BrowserWindow.getAllWindows().filter((x) => x._filoTabs);
     ws.forEach((w, i) => { w.setOpacity(1); w.show(); w.setBounds({ x: i * 820, y: 0, width: 800, height: 700 }); });
   });
-  await app.evaluate(({ BrowserWindow }, incognito) => {
-    BrowserWindow.getAllWindows().find((x) => x._filoTabs && !!x._filoIncognito === incognito).focus();
-  }, davanti === 'incognito');
+  // Il fuoco della finestra appena aperta arriva quando vuole lui: si ridà finché quella voluta non lo tiene.
+  await expect.poll(() => app.evaluate(({ BrowserWindow }, incognito) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !!x._filoIncognito === incognito);
+    if (BrowserWindow.getFocusedWindow() !== w) w.focus();
+    return BrowserWindow.getFocusedWindow() === w;
+  }, davanti === 'incognito'), { timeout: 10_000 }).toBe(true);
+  await new Promise((r) => setTimeout(r, 300));
   const pagina = app.windows().find((w) => { try { return new URL(w.url()).hostname === altrove; } catch (_) { return false; } });
   return { page, altrove, incognito: pagina };
 }
