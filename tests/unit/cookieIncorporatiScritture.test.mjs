@@ -216,6 +216,17 @@ for (const v of VARIANTI) {
     });
   }
 
+  test(`il normale che il sito crea mentre Filo pulisce, senza averne uno prima, resta (${v.nome})`, async () => {
+    const passi = (await pulizia(v, -1, null, { normale: false })).passiContati();
+    const sbagliati = [];
+    for (let n = 0; n < passi; n++) {
+      const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'nuovo', expirationDate: fraUnGiorno() }), { normale: false });
+      const resta = stati(d);
+      if (resta.join() !== 'nuovo:normale:scadenza') sbagliati.push(`passo ${n}: ${resta.join(', ')}`);
+    }
+    assert.deepEqual(sbagliati, []);
+  });
+
   test(`il riquadro che aggiorna il partizionato durante la pulizia non diventa un cookie normale (${v.nome})`, async () => {
     const passi = (await pulizia(v)).passiContati();
     const sbagliati = [];
