@@ -586,6 +586,11 @@ test('una finestrella aperta da un’altra finestra di Filo sopra il testo della
   expect(area).toBeTruthy();
   await finestrellaSopra(incognito, area, finto);
   await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
+  await new Promise((r) => setTimeout(r, 500));
+  console.log('DEBUG', JSON.stringify(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => ({
+    filo: !!w._filoTabs, inc: !!w._filoIncognito, url: w.webContents.getURL().slice(0, 40), b: w.getBounds(), vis: w.isVisible(), foc: w.isFocused(),
+    vista: w._filoTabs && w._filoTabs.conferme.vista ? w._filoTabs.conferme.vista.getBounds() : null,
+  })))), JSON.stringify(area));
   await expect.poll(() => finestrelle(app)).toEqual([false]);
   // Il sito la sposta o la ingrandisce: resta nascosta finché c'è la domanda.
   await incognito.evaluate(() => { try { window.open('', 'g').focus(); } catch (_) {} });
