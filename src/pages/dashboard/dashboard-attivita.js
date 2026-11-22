@@ -783,7 +783,7 @@
     }
     const row = activityRowFor(a);
     if (row) {
-      activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
+      activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '', row.parti || null);
       if (rifiutataDallaRegola(a) && activity.mostra) activity.mostra(a);
       return true;
     }
