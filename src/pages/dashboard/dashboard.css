@@ -1566,9 +1566,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   background: color-mix(in srgb, #c0392b 6%, transparent);
 }
 .dash-delete-note { font-size: 13px; margin-bottom: 6px; overflow-wrap: anywhere; }
-/* Il testo non di Filo (la richiesta del modello, il valore nella riga di una domanda) su un foglietto suo, come nei
-   popup di conferma (#592.7, #592.25): il filo a sinistra è per metà colore del testo, così un accento spento non lo
-   spegne. Una regola per tutta la home; la sentinella la tiene uguale al popup. */
+/* Il testo non di Filo su un foglietto suo, come nei popup di conferma (#592.7): il filo a sinistra è per metà colore
+   del testo, così un accento spento non lo spegne. Uguale al popup: tests/unit/segnoTestoAltrui.test.mjs. */
 .dash-delete-query,
 .dash-altrui {
   background: color-mix(in srgb, currentColor 5%, transparent);
