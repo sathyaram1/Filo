@@ -37,6 +37,8 @@ test('mosse senza effetto: rinomina allo stesso nome, sposta in cima la prima, r
     }
     await expect(page.locator('#bubbles')).not.toContainText('Messo nella barra');
     await expect(page.locator('#bubbles')).not.toContainText('Spostato nella barra');
+    try { await page.screenshot({ path: 'tests/.shots/verifica-1803-giro1-righe.png' }); } catch (_) {}
+    console.log('TESTO-BOLLE', await page.locator('#bubbles').innerText());
     // Il modello legge lo stesso esito della riga: per le tre mosse senza effetto, che la barra non è cambiata.
     const chiamate = await chiamateAlModello(app);
     const esiti = chiamate.at(-1).filter((m) => m.role === 'tool').map((m) => String(m.content));
