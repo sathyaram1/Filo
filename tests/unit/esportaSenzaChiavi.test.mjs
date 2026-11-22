@@ -212,3 +212,39 @@ test('ogni proxy di cui Filo usa la password è un segreto: spazi, tabulazioni, 
     }
   }
 });
+
+// #905.5: il backup vince su tutte le impostazioni; resta protetto solo il proxy a cui l'esportazione ha tolto le credenziali.
+test('un backup col proxy che autorizza per indirizzo prende il posto di quello di qui con la password', () => {
+  const parsed = readExportZip(buildExportZip({ settings: { proxy: { datacenter: 'nuovo.esempio.com:3128' } } }));
+  assert.deepEqual(parsed.proxySenzaCredenziali, []);
+  const qui = { settings: { proxy: { datacenter: 'http://mario:password-vecchia@vecchio.esempio.com:8080' } } };
+  const { merged } = importa(qui, parsed);
+  assert.equal(merged.settings.proxy.datacenter, 'nuovo.esempio.com:3128');
+  assert.deepEqual(proxyDaCompletare(merged, parsed.proxySenzaCredenziali), [], 'non c\'è niente da completare');
+  // Lo stesso archivio, con un proxy a cui l'esportazione ha tolto la password: quello di qui resta.
+  const tolto = readExportZip(buildExportZip({ settings: { proxy: { datacenter: 'http://anna:pw-del-backup@vecchio.esempio.com:8080' } } }));
+  assert.equal(importa(qui, tolto).merged.settings.proxy.datacenter, qui.settings.proxy.datacenter);
+});
+
+// #905.4: molti fornitori danno gli elenchi come «host:porta:utente:password».
+test('un proxy «host:porta:utente:password» è un segreto: la casella compare, l\'archivio porta il solo indirizzo', () => {
+  const ELENCO = 'gate.esempio.com:8080:mario:passwordsegreta';
+  const dati = { settings: { proxy: { datacenter: ELENCO } }, filo_notes: [{ id: 'n', text: `il proxy è ${ELENCO}` }] };
+  assert.equal(C.haSegreti(dati.settings), true, 'la casella «Includi le chiavi» deve comparire');
+  const zip = buildExportZip(dati);
+  assert.equal(zip.includes(Buffer.from('passwordsegreta')), false);
+  const parsed = readExportZip(zip);
+  assert.equal(parsed.data.settings.proxy.datacenter, 'gate.esempio.com:8080');
+  assert.deepEqual(parsed.proxySenzaCredenziali, ['datacenter']);
+  assert.equal(importa({ settings: { proxy: { datacenter: ELENCO } } }, parsed).merged.settings.proxy.datacenter, ELENCO);
+  assert.deepEqual(proxyDaCompletare(importa({ settings: {} }, parsed).merged, parsed.proxySenzaCredenziali), ['datacenter']);
+  assert.equal(readExportZip(buildExportZip(dati, { chiavi: true })).data.settings.proxy.datacenter, ELENCO);
+});
+
+// #2134.2: i campi del proxy stanno in un elenco solo, quello di SN_CONST.
+test('l\'esportazione non tiene un suo elenco dei campi del proxy né una sua lettura delle credenziali', () => {
+  const testo = readFileSync(join(ROOT, 'src', 'main', 'services', 'exportData.js'), 'utf8');
+  assert.equal(/['"](datacenter|residential)['"]/.test(testo), false, 'i campi del proxy si chiedono a SN_CONST.CAMPI_PROXY');
+  assert.equal(/decodeURIComponent/.test(testo), false, 'le forme della password si chiedono a SN_CONST.segretiDelProxy');
+  assert.deepEqual([...C.CAMPI_PROXY], ['datacenter', 'residential']);
+});
