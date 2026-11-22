@@ -81,7 +81,7 @@ async function azioneOnboarding(action, { intervista }) {
 }
 
 async function azioneInviaFeedback(action, {
-  confirmed, sender, contesto, fontiLette, assistente, chatId, impostazioni, senzaRilettura = false,
+  confirmed, sender, contesto, fontiLette, assistente, chatId, impostazioni, senzaRilettura = false, segretiConfermati = [],
 }) {
   // Filo invia un feedback a nome dell'utente (#146.5). Livello 2: a
   // questo punto la conferma è già passata (il gate sopra ha lasciato
