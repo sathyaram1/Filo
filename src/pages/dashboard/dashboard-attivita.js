@@ -1996,7 +1996,7 @@
     a._executed = false;
     if (r && r.output) a._output = r.output;
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, true, row.cambi, a);
+    if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, true, row.cambi, a, '', row.parti || null);
     archiviaEsito(a, { chat, chiesta });
   }
 
