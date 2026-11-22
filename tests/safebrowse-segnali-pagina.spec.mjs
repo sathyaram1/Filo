@@ -85,10 +85,11 @@ test('una pagina che al caricamento fa partire un programma, senza clic: sospett
   await openTab('https://scarica-subito.it/');
   const a = await avvisoDi(app, 'scarica-subito.it');
   expect(a.level).toBe('sospetto');
-  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma («setup.exe»)');
+  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma «setup.exe»');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('Scaricamento partito da solo')).toBeVisible({ timeout: 6000 });
-  await expect(avviso.getByText(/ha avviato da sola lo scaricamento/)).toBeVisible();
+  await expect(avviso.locator('#corpo')).toContainText('ha avviato da sola lo scaricamento');
+  await expect(avviso.locator('#corpo .altrui')).toHaveText('setup.exe');
   await avviso.screenshot({ path: 'tests/.shots/814-scaricamento-partito-da-solo.png' }).catch(() => {});
   // La domanda di #588 non cambia: il programma aspetta la risposta fuori dalla cartella Download.
   await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 10000 }).toBe('pending');
