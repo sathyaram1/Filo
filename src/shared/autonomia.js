@@ -255,18 +255,21 @@
 
   // Il segreto che `testo` porterebbe fuori: { tipo, scritto }, tipo '' se nessuno. `richiesta` = cosa ha scritto
   // l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui e non contano; `scritto` dice
-  // se ogni altro segreto l'ha scritto lui: solo allora può uscire, con la parola (costo 4).
+  // se ogni altro segreto l'ha scritto lui: solo allora può uscire, con la parola (costo 4). `valori`: quelli che la
+  // parola lascia uscire, gli stessi che la rilettura del feedback non ripropone (#2645).
   function segretoDettaglio(testo, { richiesta = '' } = {}) {
     const chiesto = soloAlnum(richiesta);
     let tipo = '';
+    const valori = [];
     for (const s of trovati(testo)) {
       const v = soloAlnum(s.valore);
       const suo = v.length >= 4 && chiesto.includes(v);
       if (s.tipo === 'banca' && suo) continue;
-      if (!suo) return { tipo: s.tipo, scritto: false };
+      if (!suo) return { tipo: s.tipo, scritto: false, valori: [] };
       if (!tipo) tipo = s.tipo;
+      if (s.valore && !valori.includes(s.valore)) valori.push(s.valore);
     }
-    return { tipo, scritto: !!tipo };
+    return { tipo, scritto: !!tipo, valori };
   }
   function segreto(testo, opzioni) { return segretoDettaglio(testo, opzioni).tipo; }
 
