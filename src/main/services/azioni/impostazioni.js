@@ -119,7 +119,9 @@ async function azioneInviaFeedback(action, {
     // secondo sì («Manda così») arriva con `senzaRilettura`. Al modello e al diario vanno solo le frasi, mai i pezzi.
     const L0 = senzaRilettura ? null : require('../feedbackL0').corrente();
     if (L0) {
-      const letto = await L0.controlla({ testo, immagini: (payload.images || []).map((i) => i && i.dataUrl), allegati: payload.files });
+      const letto = await L0.controlla({
+        testo, immagini: (payload.images || []).map((i) => i && i.dataUrl), allegati: payload.files, confermati: segretiConfermati,
+      });
       if (letto.stato === 'trovato' && letto.esito) {
         const { titolo: t, frasi } = letto.esito;
         return {
