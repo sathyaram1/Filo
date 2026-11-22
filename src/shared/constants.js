@@ -1157,31 +1157,70 @@
   const oggetto = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   const pieno = (v) => typeof v === 'string' && v.trim() !== '';
 
-  // Utente e password di un proxy come li legge chi lo usa (proxyTab.endpointFor): lo schema davanti è facoltativo,
-  // perché molti fornitori danno «utente:password@host:porta» (#905.1), e come per un URL valgono fino all'ultima @
-  // prima dell'host; spazi compresi, che chi lo usa accetta nella password. `senza`: l'indirizzo senza credenziali. null
-  // se non ce ne sono. PURA.
-  const CREDENZIALI_PROXY = /^([a-z][a-z0-9+.-]*:\/\/)?([^/?#]+)@/i;
-  function credenzialiProxy(v) {
+  // I campi del proxy nelle impostazioni, uno per tier (proxyTab.TIERS): li leggono i segreti e l'importazione.
+  const CAMPI_PROXY = Object.freeze(['datacenter', 'residential']);
+
+  // L'unica lettura di un proxy (#2134.2): la usa chi si collega (proxyTab.endpointFor) e chi ne custodisce i segreti,
+  // così una password usata è sempre custodita. Schema facoltativo; due forme: «[utente[:password]@]host[:porta]», con
+  // le credenziali fino all'ultima @ (#905.1), e quella degli elenchi dei fornitori «host:porta:utente:password»
+  // (#905.4). Senza schema socks5, che fa risolvere i nomi al proxy, ma http con le credenziali: coi socks Chromium
+  // non le manda. `uso`: { proxyRules, auth } per collegarsi, null se non si legge; `scritte`: le credenziali come
+  // sono nel testo e l'indirizzo `senza`, null se non ce ne sono. PURA.
+  const SCHEMA_PROXY = /^([a-z][a-z0-9+.-]*):\/\//i;
+  const FORMA_ELENCO = /^([^\s:/?#@[\]]+):(\d{1,5}):([^:@/?#]+):(.+)$/;
+  const CREDENZIALI_URL = /^([^/?#]+)@/;
+  const decodifica = (x) => { try { return decodeURIComponent(x); } catch (_) { return x; } };
+  function leggiProxy(v) {
     if (!pieno(v)) return null;
     const t = v.trim();
-    const m = CREDENZIALI_PROXY.exec(t);
-    if (!m) return null;
-    const i = m[2].indexOf(':');
-    return { credenziali: m[2], password: i >= 0 ? m[2].slice(i + 1) : '', senza: (m[1] || '') + t.slice(m[0].length) };
+    const sm = SCHEMA_PROXY.exec(t);
+    const resto = sm ? t.slice(sm[0].length) : t;
+    const davanti = sm ? sm[0] : '';
+    const el = FORMA_ELENCO.exec(resto);
+    let scritte = null;
+    if (el) scritte = { credenziali: `${el[3]}:${el[4]}`, password: el[4], senza: `${davanti}${el[1]}:${el[2]}` };
+    else {
+      const m = CREDENZIALI_URL.exec(resto);
+      const i = m ? m[1].indexOf(':') : -1;
+      if (m) scritte = { credenziali: m[1], password: i >= 0 ? m[1].slice(i + 1) : '', senza: davanti + resto.slice(m[0].length) };
+    }
+    const schema = sm ? sm[1] : (scritte ? 'http' : 'socks5');
+    let uso = null;
+    try {
+      const u = new URL(el ? `${schema}://${el[1]}:${el[2]}` : `${schema}://${resto}`);
+      if (u.hostname) {
+        const auth = el ? { username: el[3], password: el[4] }
+          : u.username ? { username: decodifica(u.username), password: decodifica(u.password || '') } : null;
+        uso = { proxyRules: `${u.protocol.replace(/:$/, '')}://${u.port ? `${u.hostname}:${u.port}` : u.hostname}`, auth };
+      }
+    } catch (_) {}
+    if (!scritte && uso && uso.auth) {
+      scritte = { credenziali: `${uso.auth.username}:${uso.auth.password}`, password: uso.auth.password, senza: uso.proxyRules };
+    }
+    return { uso, scritte };
   }
 
-  // I valori segreti di un proxy, gli stessi per uscite, modelli ed esportazione (#2134): la coppia utente:password e
-  // la password com'è scritta e decodificata. `password: true` le dà la soglia di lunghezza delle password. PURA.
+  // Utente e password di un proxy come sono scritti: { credenziali, password, senza }, null se non ce ne sono. PURA.
+  function credenzialiProxy(v) {
+    const p = leggiProxy(v);
+    return p && p.scritte;
+  }
+
+  // I valori segreti di un proxy, gli stessi per uscite, modelli ed esportazione (#2134): la coppia utente:password, la
+  // password com'è scritta, decodificata e come la manda chi si collega. `password: true` le dà la soglia delle
+  // password. PURA.
   function segretiDelProxy(v) {
-    const c = credenzialiProxy(v);
+    const p = leggiProxy(v);
+    const c = p && p.scritte;
     if (!c) return [];
     const out = [{ valore: c.credenziali }];
-    if (!c.password) return out;
-    out.push({ valore: c.password, password: true });
-    let chiara = c.password;
-    try { chiara = decodeURIComponent(c.password); } catch (_) {}
-    if (chiara !== c.password) out.push({ valore: chiara, password: true });
+    const visti = new Set([c.credenziali]);
+    const usata = p.uso && p.uso.auth ? p.uso.auth.password : '';
+    for (const x of [c.password, decodifica(c.password), usata]) {
+      if (!x || visti.has(x)) continue;
+      visti.add(x);
+      out.push({ valore: x, password: true });
+    }
     return out;
   }
 
