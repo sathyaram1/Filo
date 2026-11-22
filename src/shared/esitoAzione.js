@@ -216,11 +216,14 @@
     return rigaDiParti(p) === riga ? p : null;
   }
   // Riga piatta e riga a pezzi di una domanda, accorciate insieme: `parti` null se la riga è tutta di Filo.
+  // Tagliata prima del riquadro, restano le sole parole di Filo: mai il testo piatto, che lo ricucirebbe.
   function rigaDellaDomanda(c, max = MAX_RIGA) {
-    const testo = primaRiga(c && c.text);
-    const p = accorciaParti(primaRigaParti(c && c.parti), max);
-    const riga = p ? rigaDiParti(p) : '';
-    return p && riga ? { riga, parti: p } : { riga: testo, parti: null };
+    const intera = primaRigaParti(c && c.parti);
+    if (!intera) return { riga: primaRiga(c && c.text), parti: null };
+    const p = accorciaParti(intera, max);
+    if (p) return { riga: rigaDiParti(p), parti: p };
+    const sole = taglia(intera, max).filter((x) => typeof x === 'string').join('').replace(/\s+/g, ' ').trim();
+    return { riga: sole, parti: null };
   }
   function frase(fn, a) {
     try { return primaRiga(fn(a)); } catch (_) { return ''; }
