@@ -58,6 +58,8 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     const leggi = { id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' };
     await modelloFinto(app, [{ text: 'Cambio il modello della chat.', toolCalls: [leggi, MODELLO] }, { text: 'Ti chiedo conferma.' }, { text: 'Fatto.' }]);
     await chiedi(page, 'cambia il modello della chat');
+    await page.waitForTimeout(3000);
+    console.log('DEBUG', JSON.stringify((await app.evaluate(() => globalThis.__chatFinta_calls || [])).slice(-1)[0]?.slice(-3)).slice(0, 3000));
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
     expect((await confirmState(page)).citazioni.join('')).toContain(FINTO);
 
