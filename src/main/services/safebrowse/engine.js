@@ -170,9 +170,12 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
   return { title: 'Sito potenzialmente sospetto', body: `Fai attenzione su ${dom}.` };
 }
 
+// Elenco «a, b e c» di frasi o di pezzi: torna pezzi.
 function joinIt(arr) {
-  if (arr.length <= 1) return arr.join('');
-  return arr.slice(0, -1).join(', ') + ' e ' + arr[arr.length - 1];
+  if (arr.length <= 1) return frase(arr);
+  const out = [];
+  arr.forEach((x, i) => { out.push(i === 0 ? '' : i === arr.length - 1 ? ' e ' : ', ', x); });
+  return frase(out);
 }
 
 // Valutazione completa. `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays, sandbox, llm }. `ctx` opzionale: gli
