@@ -98,3 +98,41 @@ test('providerHost: host del fornitore effettivo, senza credenziali', () => {
   assert.equal(P.providerHost({}, {}), '');
   assert.equal(P.providerHost({ proxy: { residential: 'socks5://r.x:1' } }, {}), '');
 });
+
+// #905.4: gli elenchi dei fornitori danno «host:porta:utente:password». Coi socks Chromium non manda le credenziali:
+// senza schema un proxy con utente e password si usa in http.
+test('endpointFor: la forma degli elenchi «host:porta:utente:password» si collega, in http', () => {
+  const ep = P.endpointFor('gate.esempio.com:8080:mario-{country}:password:con:duepunti', 'de');
+  assert.equal(ep.proxyRules, 'http://gate.esempio.com:8080');
+  assert.deepEqual(ep.auth, { username: 'mario-de', password: 'password:con:duepunti' });
+  assert.equal(P.resolve('us', { settings: { proxy: { datacenter: 'gate.esempio.com:8080:mario:passwordsegreta' } }, env: {} }).proxyRules,
+    'http://gate.esempio.com:8080');
+  assert.equal(P.endpointFor('socks5://gate.esempio.com:1080:mario:pw', 'it').proxyRules, 'socks5://gate.esempio.com:1080', 'lo schema scritto vince');
+  assert.equal(P.endpointFor('mario:pw@gate.esempio.com:8080', 'it').proxyRules, 'http://gate.esempio.com:8080');
+  assert.equal(P.endpointFor('gate.esempio.com:1080', 'it').proxyRules, 'socks5://gate.esempio.com:1080', 'senza credenziali resta socks5');
+  assert.equal(P.providerHost({ proxy: { datacenter: 'gate.esempio.com:8080:mario:pw' } }, {}), 'gate.esempio.com');
+  assert.equal(P.endpointFor('gate.esempio.com:99999:mario:pw', 'it'), null, 'una porta che non esiste non si legge');
+  assert.doesNotThrow(() => P.endpointFor('http://mario:pa%zz@gate.esempio.com:8080', 'it'), 'una % sbagliata nella password');
+});
+
+// #2134.2: chi si collega e chi custodisce i segreti leggono il proxy con la stessa funzione: una password usata per
+// collegarsi è sempre custodita, in ogni forma in cui la si può scrivere.
+test('ogni password con cui il proxy si collega è fra i suoi segreti', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
+  const C = globalThis.SN_CONST;
+  const forme = [
+    'http://mario:S3gr%40ta@gate.esempio.com:8080', 'socks5://mario:pw-socks@gate.esempio.com:1080',
+    'mario:pass word@gate.esempio.com:8080', 'mario:pass\tword-tab@gate.esempio.com:8080', 'mario:pa@ss@gate.esempio.com:8080',
+    'gate.esempio.com:8080:mario:passwordsegreta', 'http://gate.esempio.com:8080:mario:pass word', 'mario:pa%zz@gate.esempio.com:8080',
+    'HTTP://Mario:Pw-Maiuscole@Gate.Esempio.com:8080',
+  ];
+  for (const forma of forme) {
+    const ep = P.endpointFor(forma, 'it');
+    assert.ok(ep && ep.auth && ep.auth.password, `${JSON.stringify(forma)}: il proxy deve collegarsi con la password`);
+    const segreti = C.segretiDelProxy(forma).map((x) => x.valore);
+    assert.ok(segreti.includes(ep.auth.password), `${JSON.stringify(forma)}: «${ep.auth.password}» non è custodita (${JSON.stringify(segreti)})`);
+    assert.ok(C.credenzialiProxy(forma), `${JSON.stringify(forma)}: l'esportazione non la toglierebbe`);
+  }
+  const testo = require('node:fs').readFileSync(join(__dirname, '..', '..', 'src', 'main', 'services', 'proxyTab.js'), 'utf8');
+  assert.equal(/decodeURIComponent\(u\.(username|password)/.test(testo), false, 'la scheda non tiene una sua lettura delle credenziali');
+});
