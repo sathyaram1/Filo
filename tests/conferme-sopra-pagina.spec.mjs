@@ -573,17 +573,15 @@ async function finestrellaSopra(pagina, area, u, poi = async () => {}) {
 
 test('una finestrella aperta da un’altra finestra di Filo sopra il testo della domanda si nasconde, e torna alla risposta', async ({ app, shell, openTab, testServer }) => {
   const finto = testServer.html('<title>Filo</title><p>Filo chiede conferma. Filo vuole impostare: Tema → Scuro.</p>', { pubblico: true });
-  const { page, incognito } = await dueFinestre(app, shell, openTab, testServer, 'normale');
+  const { page, incognito } = await dueFinestre(app, shell, openTab, testServer);
   const host = new URL(page.url()).hostname;
   await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
   const vista = await confermaSopraPagina(app);
   const area = await areaDomanda(app);
   expect(area).toBeTruthy();
-  await app.evaluate(({ app: a }) => { globalThis.__fz = []; a.on('browser-window-focus', (_e, w) => globalThis.__fz.push(`${w._filoTabs ? (w._filoIncognito ? 'inc' : 'main') : w.webContents.getURL().slice(0, 30)}`)); });
-  await finestrellaSopra(incognito, area, finto, () => fuocoA(app, 'normale'));
+  // L'utente sta leggendo la domanda (un tasto lì); la finestrella parte dall'altra finestra senza un suo gesto nuovo.
+  await finestrellaSopra(incognito, area, finto, () => vista.keyboard.press('Shift'));
   await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
-  await new Promise((r) => setTimeout(r, 500));
-  console.log('DEBUG', JSON.stringify(await app.evaluate(() => globalThis.__fz)));
   await expect.poll(() => finestrelle(app)).toEqual([false]);
   // Il sito la sposta o la ingrandisce: resta nascosta finché c'è la domanda.
   await incognito.evaluate(() => { try { window.open('', 'g').focus(); } catch (_) {} });
