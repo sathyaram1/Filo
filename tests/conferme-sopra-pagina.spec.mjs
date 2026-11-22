@@ -595,16 +595,17 @@ test('una finestrella aperta da un’altra finestra di Filo sopra il testo della
 
 test('la domanda lasciata nella finestra da cui l’utente è passato a un’altra non nasconde l’accesso aperto di là, nemmeno sopra di lei', async ({ app, shell, openTab, testServer }) => {
   const accesso = testServer.html('<title>Accedi</title><p>Accedi con il tuo account</p>', { pubblico: true });
-  const { page, incognito } = await dueFinestre(app, shell, openTab, testServer, 'incognito');
+  const { page, incognito } = await dueFinestre(app, shell, openTab, testServer);
   const host = new URL(page.url()).hostname;
   await nelMondoDiFilo(app, host, `(() => { SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }); return 1; })()`);
-  await confermaSopraPagina(app);
+  const vista = await confermaSopraPagina(app);
+  // L'utente passa all'altra finestra e lì apre l'accesso col suo clic.
   await finestrellaSopra(incognito, await areaDomanda(app), accesso);
   await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
   await new Promise((r) => setTimeout(r, 1500));
   expect(await finestrelle(app)).toEqual([true]);
   // Tornato alla finestra della domanda, la finestrella che la copre si nasconde.
-  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).focus(); });
+  await vista.keyboard.press('Shift');
   await expect.poll(() => finestrelle(app)).toEqual([false]);
 });
 
