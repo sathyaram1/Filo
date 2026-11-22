@@ -2792,11 +2792,8 @@
       const testo = document.createElement('div');
       testo.className = 'dl-chiusura-testo';
       if (chiusura.n === 1) {
-        testo.append('Chiudo la finestra, ma ');
-        const nome = document.createElement('span');
-        nome.className = 'dl-chiusura-nome';
-        nome.textContent = `«${chiusura.nome}»`;
-        testo.append(nome, ' non ha finito di scaricarsi: lo lascio finire?');
+        // Il nome lo sceglie il sito: nel suo riquadro, come nelle altre domande della riga (#592.25).
+        riempiDomanda(testo, ['Chiudo la finestra, ma questo scaricamento non è finito: lo lascio finire?', { citazione: chiusura.nome }]);
       } else {
         testo.textContent = `Chiudo la finestra, ma ${chiusura.n} scaricamenti non sono finiti: li lascio finire?`;
       }
