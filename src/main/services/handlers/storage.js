@@ -213,7 +213,7 @@ module.exports = function register(on, ctx) {
       const parsed = readExportZip(buf); // lancia se non è un export di Filo
 
       const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, at: Date.now() };
+      PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, proxySenzaCredenziali: parsed.proxySenzaCredenziali, at: Date.now() };
       const filo = contaFilo(parsed);
       const { mergeImportedData, regolaImport, haSegreti, proxyDaCompletare } = require('../exportData');
       const dati = datiDaFondere(parsed.data);
