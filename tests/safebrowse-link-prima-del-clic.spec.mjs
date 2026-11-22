@@ -443,7 +443,8 @@ test('un file travestito che la pagina costruisce da sé (blob, data): l\'avviso
   await contaScaricamenti(app);
   await clicFermato(app, '#blob');
   const avviso = await vistaAvviso(app);
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
+  await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
+  await expect(avviso.locator('#corpo')).toContainText(': sembra un documento, ma è un programma');
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
   expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
   await expect(avviso.getByRole('button', { name: 'Continua' })).toBeEnabled({ timeout: 5_000 });
