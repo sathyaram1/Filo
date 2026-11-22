@@ -152,7 +152,11 @@ for (const [nome, css] of Object.entries(FOGLI)) {
     const pulito = await riquadro(app, page);
     await page.addStyleTag({ content: css });
     const s = await riquadro(app, page);
-    expect(s.citazioni).toEqual([TESTO]);
+    // Senza titolo scritto il riquadro mostra quello di ripiego, che parte col testo (#1704.1).
+    const ripiego = await app.evaluate((_e, t) => globalThis.SN_FEEDBACK.fallbackName(t), TESTO);
+    expect(ripiego).toBeTruthy();
+    expect(s.citazioni).toEqual([ripiego, TESTO]);
+    expect(s.citazioni).toEqual(pulito.citazioni);
     expect(s.riquadro, 'il foglio della pagina ha cambiato il popup').toEqual(pulito.riquadro);
     expect(staccoDelFilo(s), `filo ${s.riquadro.bordo} su ${s.riquadro.bgBox}`).toBeGreaterThanOrEqual(60);
   });
