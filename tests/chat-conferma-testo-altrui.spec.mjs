@@ -78,8 +78,9 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     expect(r.fuori).not.toMatch(/fornitore|confermalo/);
     await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui.png' });
 
-    // Riaperta senza risposta: bottone e popup tornano coi riquadri.
+    // Riaperta senza risposta (e col tema scuro): bottone e popup tornano coi riquadri.
     const chat = await chatCon(app, 'cambia il modello della chat');
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
     await riapri(app, page, chat.id);
     const ridato = page.locator('.dash-bubble-filo .dash-action-btn-primary').first();
     await expect(ridato).toBeVisible({ timeout: 8_000 });
