@@ -36,19 +36,33 @@ const dopo = () => new Promise((r) => setImmediate(r));
 async function quiete() { for (let i = 0; i < 300; i++) await dopo(); }
 
 // Un deposito come quello di Chromium: una sovrascrittura che cambia valore avvisa prima della rimozione del vecchio e
-// poi dell'arrivo del nuovo; a valore uguale avvisa solo l'arrivo. Gli avvisi e le risposte arrivano dopo, in ordine.
-function deposito({ rispostaDopoGliAvvisi }) {
+// poi dell'arrivo del nuovo; a valore uguale avvisa solo l'arrivo. Gli avvisi e le risposte arrivano dopo, in ordine;
+// con `avvisiInRitardo` gli avvisi arrivano dopo le risposte. I partizionati hanno una chiave loro, che né gli avvisi
+// né le letture mostrano: le scritture di Filo toccano solo i normali, la rimozione per indirizzo tutti e due.
+function deposito({ rispostaDopoGliAvvisi, avvisiInRitardo = 0 }) {
   const cookie = new Map();
   const ascolti = [];
   let dopoLettura = null;
-  const chiave = (c) => `${c.domain}|${c.path}|${c.name}`;
-  const avvisa = (c, causa, tolto) => setImmediate(() => { for (const f of ascolti) f({}, { ...c }, causa, tolto); });
-  function scrivi(d) {
+  let passi = -1;
+  let alPasso = null;
+  const chiave = (c) => `${c.partizionato ? 'P' : ''}|${c.domain}|${c.path}|${c.name}`;
+  const pubblico = ({ partizionato, ...c }) => c;
+  const piuTardi = (n, f) => (n ? setImmediate(() => piuTardi(n - 1, f)) : f());
+  const avvisa = (c, causa, tolto) => piuTardi(1 + avvisiInRitardo, () => { for (const f of ascolti) f({}, pubblico(c), causa, tolto); });
+  // Il sito scrive mentre Filo aspetta la risposta del passo n.
+  const risposta = (r, valore) => {
+    const f = passi >= 0 && passi++ === alPasso ? alPasso && null : null;
+    void f;
+    setImmediate(() => r(valore));
+  };
+  void risposta;
+  function scrivi(d, { partizionato = false } = {}) {
     const ospite = new URL(d.url).hostname;
     const c = {
       name: d.name, value: String(d.value), domain: d.domain || ospite, hostOnly: !d.domain, path: d.path || '/',
       secure: !!d.secure, httpOnly: !!d.httpOnly, sameSite: d.sameSite || 'no_restriction',
       session: d.expirationDate == null, ...(d.expirationDate != null ? { expirationDate: d.expirationDate } : {}),
+      ...(partizionato ? { partizionato: true } : {}),
     };
     const k = chiave(c);
     const vecchio = cookie.get(k);
