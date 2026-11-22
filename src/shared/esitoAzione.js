@@ -190,6 +190,9 @@
   // Al più `max` caratteri del testo piatto: si taglia dove si arriva, e il taglio si vede.
   function accorciaParti(parti, max) {
     if (!Array.isArray(parti) || rigaDiParti(parti).length <= max) return parti;
+    return ripulite(taglia(parti, max));
+  }
+  function taglia(parti, max) {
     const out = [];
     let resta = max - 1;
     for (const p of parti) {
