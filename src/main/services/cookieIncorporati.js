@@ -294,7 +294,7 @@ async function rimetti(ses, k, c) {
   if (p) p.rimessa = String(c.value);
   preesistenti.set(k, Date.now());
   const dati = { ...posto(c), value: c.value, ...(c.session ? {} : { expirationDate: c.expirationDate }) };
-  try { await scriviNostra(ses, c, dati); } catch (_) {}
+  try { await ses.cookies.set(dati); } catch (_) {}
 }
 
 // Gli avvisi possono arrivare dopo le risposte: la prova di un normale riscritto dal sito che arriva a pulizia decisa
