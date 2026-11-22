@@ -504,12 +504,12 @@ async function sitoConLinkAccorciati() {
   return { port: server.address().port, async close() { try { server.closeAllConnections(); } catch (_) {} await new Promise((r) => server.close(r)); } };
 }
 
-async function conProxyColPaeseNelNome(app, openTab, testServer, proxy) {
+async function conProxyColPaeseNelNome(app, openTab, testServer, proxy, endpoint = `http://utente-{country}:${PASSWORD_PROXY}@127.0.0.1:${proxy.port}`) {
   const avvio = await openTab(testServer.html('<title>avvio</title><p id="avvio">x</p>'));
   await avvio.waitForSelector('#avvio');
   await app.evaluate(async (_e, endpoint) => {
     await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: endpoint, bypass: '<-loopback>' } });
-  }, `http://utente-{country}:${PASSWORD_PROXY}@127.0.0.1:${proxy.port}`);
+  }, endpoint);
   return (await webTabInfo(app)).id;
 }
 
