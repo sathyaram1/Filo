@@ -127,29 +127,22 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
   if (hasPassword) facts.push('ti sta chiedendo la password');
   else if (hasPayment) facts.push('ti chiede i dati di pagamento');
   if (sandboxBad) facts.push('analizzato in isolamento, mostra comportamento ingannevole');
-  const tail = facts.length ? (', ' + joinIt(facts) + '.') : '.';
+  const tail = facts.length ? frase(', ', joinIt(facts), '.') : ['.'];
 
   // 2) Impersonazione stretta (e typo su brand corto quando un altro segnale conferma).
   const somiglianzaSola = imp && imp.kind === 'weak_typo' && level !== 'pericoloso';
   if (imp && imp.kind !== 'broad_impersonation' && !somiglianzaSola) {
-    return {
-      title: `Attenzione: questo non è ${imp.brand.display}`,
-      body: `Questo non è ${imp.brand.display}. Il dominio è ${dom}${tail}`,
-    };
+    return messaggio(`Attenzione: questo non è ${imp.brand.display}`, [`Questo non è ${imp.brand.display}. Il dominio è ${dom}`, tail]);
   }
   // 2bis) Solo somiglianza: accusare un sito vero di essere un falso sarebbe peggio del rischio (#728).
   if (somiglianzaSola) {
-    return {
-      title: `${imp.brand.display}? Controlla l'indirizzo`,
-      body: `${dom} assomiglia all'indirizzo di ${imp.brand.display}, ma non è un suo indirizzo ufficiale${tail}`,
-    };
+    return messaggio(`${imp.brand.display}? Controlla l'indirizzo`,
+      [`${dom} assomiglia all'indirizzo di ${imp.brand.display}, ma non è un suo indirizzo ufficiale`, tail]);
   }
   // 3) Impersonazione larga.
   if (imp && imp.kind === 'broad_impersonation') {
-    return {
-      title: `${imp.brand.display}? Controlla l'indirizzo`,
-      body: `${dom} usa il nome "${imp.brand.display}" ma non è un indirizzo ufficiale di ${imp.brand.display}${tail}`,
-    };
+    return messaggio(`${imp.brand.display}? Controlla l'indirizzo`,
+      [`${dom} usa il nome "${imp.brand.display}" ma non è un indirizzo ufficiale di ${imp.brand.display}`, tail]);
   }
   // 4) Un file o un modulo della pagina: dice cosa sta succedendo, gli altri fatti seguono.
   if (pagina.length) {
