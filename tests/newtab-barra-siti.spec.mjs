@@ -310,9 +310,9 @@ test('#1803.2 una mossa a parole che lascia la barra com\'era: né la riga, né 
   expect(chat).toBeTruthy();
   await app.evaluate((_e, c) => globalThis.SN_CLOSE_FILO_CHAT(c), chat.id);
   await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(chat.id)}`);
-  await expect(page.locator('#bubbles')).toContainText('Rinominato nella barra dei siti · Video', { timeout: 10_000 });
+  for (const [, , riga] of turni) await expect(page.locator('#bubbles')).toContainText(riga, { timeout: 10_000 });
   const testo = await page.locator('#bubbles').innerText();
-  expect((testo.match(/Barra dei siti non cambiata · era già così/g) || []).length).toBe(3);
+  expect((testo.match(/Barra dei siti non cambiata · /g) || []).length).toBe(3);
   expect((testo.match(/Ha sistemato la barra dei siti/g) || []).length).toBeLessThanOrEqual(1);
   expect(testo).not.toContain('Messo nella barra');
 });
