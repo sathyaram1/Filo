@@ -317,7 +317,7 @@ module.exports = function register(on, ctx) {
       const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
       const Mie = globalThis.SN_SEGNALAZIONI_MIE;
       const MIE_KEY = Mie ? Mie.CHIAVE_BACKUP : null;
-      const { merged, stats } = mergeImportedData(current, dati, opzioniFusione());
+      const { merged, stats } = mergeImportedData(current, dati, opzioniFusione(pending.proxySenzaCredenziali));
 
       // Le impostazioni passano da applySettingsUpdate, così il backup è attivo subito senza
       // riavviare. Si riscrivono solo le chiavi che cambiano: gli altri listener non si svegliano.
