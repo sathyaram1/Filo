@@ -371,6 +371,8 @@ test('la finestra nascosta del controllo profondo nega microfono e fotocamera al
 // La copia nascosta di un finto avviso di virus non suona, non parla e non mostra finestre di dialogo (#591.6).
 test('la finestra nascosta del controllo profondo è muta e non mostra le finestre di dialogo della pagina', async () => {
   test.setTimeout(60_000);
+  // Playwright chiude da sé le finestre di dialogo che vede: chi le ascolta le lascia aperte, come davanti all'utente.
+  app.on('window', (p) => p.on('dialog', () => {}));
   const finito = app.evaluate(async (_e, u) => { await globalThis.SN_SAFEBROWSE.sandbox.detonate(u); return true; }, origine + '/allarme');
   await expect.poll(() => esiti.includes('dopo:stampa'), { timeout: 10_000, message: JSON.stringify(esiti) }).toBe(true);
   const muta = await app.evaluate(({ webContents }) => webContents.getAllWebContents()
