@@ -385,7 +385,10 @@
     const chiesta = (d) => { riga = d.riga; parti = d.parti; };
     if (esito === CHIESTO) chiesta(domandaDi(x, L));
     // Non riuscita dopo un OK: la domanda a cui l'utente ha risposto, come la diceva il bottone.
-    else if (esito === FALLITO) chiesta(x._confirm ? domandaDi(x, L) : { riga: primaRiga(x._rigaChiesta) || (L ? frase(L.describe, x) : ''), parti: null });
+    else if (esito === FALLITO) {
+      chiesta(x._confirm ? domandaDi(x, L)
+        : x._rigaChiesta ? { riga: primaRiga(x._rigaChiesta), parti: x._rigaChiestaParti || null } : domandaDi(x, L));
+    }
     else riga = (diretta && primaRiga(diretta.text)) || (L ? frase(L.describeDone, x) : '');
     if (!riga && x._domanda && L) chiesta(domandaDi({ ...x, _confirm: null }, L));
     if (SENZA_TITOLO[type]) { riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1]; parti = null; }
