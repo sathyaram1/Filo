@@ -121,7 +121,7 @@ test('un programma partito da solo su un dominio registrato da pochi giorni: per
   await openTab('https://scarica-giovane.it/');
   const a = await avvisoDi(app, 'scarica-giovane.it', { livello: 'pericoloso' });
   expect(a.level).toBe('pericoloso');
-  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma («aggiorna.exe»)');
+  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma «aggiorna.exe»');
   expect(a.body).toContain('registrato 3 giorni fa');
 });
 
