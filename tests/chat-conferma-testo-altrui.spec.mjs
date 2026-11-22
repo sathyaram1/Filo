@@ -99,5 +99,6 @@ test('il bottone di un comando mette la spiegazione scritta dal modello nel suo 
     expect(b.dentro).toBe(FINTO);
   } finally {
     await ripristina(app);
+    togliCartella(dir);
   }
 });
