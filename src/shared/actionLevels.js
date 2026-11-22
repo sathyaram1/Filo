@@ -1890,7 +1890,7 @@
     // La frase del popup quando chiede perché l'azione sta fuori dal perimetro: la dice chi conosce l'azione.
     let perchePerimetro = '';
     try { perchePerimetro = dentroPerimetro ? '' : String(valore(entry.perchePerimetro, action, ctx) || ''); } catch (_) { perchePerimetro = ''; }
-    return { costo, campo: campoFor(action), segreto, chiesta, difesa, parola, dove, dentroPerimetro, perchePerimetro };
+    return { costo, campo: campoFor(action), segreto, segreti, chiesta, difesa, parola, dove, dentroPerimetro, perchePerimetro };
   }
 
   const riquadro = (p) => !!p && typeof p === 'object' && (Array.isArray(p.elenco) || p.citazione != null);
