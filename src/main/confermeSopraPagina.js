@@ -161,8 +161,7 @@ class ConfermeSopraPagina {
     this.seq = 0;
     this.seguite = new WeakSet();
     if (win && typeof win.once === 'function') win.once('closed', () => { this._togli(() => true); this._butta(); });
-    seguiFuoco();
-    try { if (win && win.isFocused()) fuoco.set(win, ++giroFuoco); } catch (_) {}
+    seguiGestiDiTutti();
     if (win && typeof win.on === 'function') for (const ev of ['move', 'resize']) win.on(ev, riallinea);
   }
 
