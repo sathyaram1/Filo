@@ -140,6 +140,80 @@
   // La prima riga di una domanda di conferma, senza i due punti che annunciano il testo sotto: la usano il bottone, il
   // diario e la voce d'archivio, che devono dire la stessa cosa.
   const primaRiga = (s) => String(s || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
+
+  // La stessa prima riga a pezzi, quando ci sta un testo non di Filo (#592.25): stringhe di Filo e { citazione }. Chi
+  // la mostra disegna il riquadro; ricomposta in una frase, il testo altrui si legge come parola di Filo. null se la
+  // prima riga è tutta di Filo. Il suo testo piatto (`rigaDiParti`) è quello che leggono il modello e l'archivio.
+  const riquadro = (p) => !!p && typeof p === 'object' && (Array.isArray(p.elenco) || typeof p.citazione === 'string');
+  const spazi = (s) => String(s).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ');
+  function primaRigaParti(parti) {
+    if (!Array.isArray(parti) || !parti.some(riquadro)) return null;
+    const out = [];
+    for (const p of parti) {
+      const t = typeof p === 'string' ? p : riquadro(p) && typeof p.citazione === 'string' ? p.citazione : null;
+      if (t == null) break;
+      const a = t.indexOf('\n');
+      const pezzo = a < 0 ? t : t.slice(0, a);
+      if (typeof p === 'string') out.push(pezzo);
+      else out.push({ citazione: a < 0 ? pezzo : `${pezzo}…`, ...(p.nuda === true ? { nuda: true } : {}) });
+      if (a >= 0) break;
+    }
+    return ripulite(out);
+  }
+  // Spazi e caratteri di controllo come nella riga piatta (`pulito`), stringhe vicine unite, i due punti finali via.
+  function ripulite(parti) {
+    const out = [];
+    for (const p of parti) {
+      if (typeof p === 'string') {
+        if (typeof out[out.length - 1] === 'string') out[out.length - 1] += spazi(p);
+        else out.push(spazi(p));
+      } else if (p && typeof p.citazione === 'string' && p.citazione.trim()) {
+        out.push({ citazione: spazi(p.citazione).trim(), ...(p.nuda === true ? { nuda: true } : {}) });
+      }
+    }
+    if (typeof out[0] === 'string') out[0] = out[0].replace(/^\s+/, '');
+    const u = out.length - 1;
+    if (typeof out[u] === 'string') out[u] = out[u].replace(/\s*:?\s*$/, '');
+    const buone = out.filter((p) => p !== '');
+    return buone.some(riquadro) ? buone : null;
+  }
+  // Il testo piatto di una riga a pezzi, con la regola di sempre (i riquadri fra virgolette, i nudi senza).
+  function rigaDiParti(parti) {
+    const L = global.SN_ACTION_LEVELS;
+    return Array.isArray(parti) && L && typeof L.piatto === 'function' ? L.piatto(parti) : '';
+  }
+  // Al più `max` caratteri del testo piatto: si taglia dove si arriva, e il taglio si vede.
+  function accorciaParti(parti, max) {
+    if (!Array.isArray(parti) || rigaDiParti(parti).length <= max) return parti;
+    const out = [];
+    let resta = max - 1;
+    for (const p of parti) {
+      const giro = typeof p === 'string' ? 0 : p.nuda ? 0 : 2;
+      const t = typeof p === 'string' ? p : p.citazione;
+      if (t.length + giro <= resta) { out.push(p); resta -= t.length + giro; continue; }
+      const pezzo = t.slice(0, Math.max(0, resta - giro));
+      if (typeof p === 'string') out.push(`${pezzo}…`);
+      else if (pezzo) out.push({ ...p, citazione: `${pezzo}…` });
+      else out.push('…');
+      break;
+    }
+    return ripulite(out) || null;
+  }
+  // Le parti salvate di una riga valgono solo se dicono la riga piatta salvata accanto: una sola frase, due forme.
+  function partiDellaRiga(parti, riga) {
+    if (!Array.isArray(parti) || parti.length > 60 || !riga) return null;
+    const p = parti.map((x) => (typeof x === 'string' ? x
+      : x && typeof x === 'object' && typeof x.citazione === 'string' ? { citazione: x.citazione, ...(x.nuda === true ? { nuda: true } : {}) } : null));
+    if (p.some((x) => x == null) || !p.some(riquadro)) return null;
+    return rigaDiParti(p) === riga ? p : null;
+  }
+  // Riga piatta e riga a pezzi di una domanda, accorciate insieme: `parti` null se la riga è tutta di Filo.
+  function rigaDellaDomanda(c, max = MAX_RIGA) {
+    const testo = primaRiga(c && c.text);
+    const p = accorciaParti(primaRigaParti(c && c.parti), max);
+    const riga = p ? rigaDiParti(p) : '';
+    return p && riga ? { riga, parti: p } : { riga: testo, parti: null };
+  }
   function frase(fn, a) {
     try { return primaRiga(fn(a)); } catch (_) { return ''; }
   }
