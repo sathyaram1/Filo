@@ -154,8 +154,8 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
     if (hasPassword) altri.push('la pagina ti chiede la password');
     else if (hasPayment) altri.push('la pagina ti chiede i dati di pagamento');
     if (sandboxBad) altri.push('aperta in isolamento, mostra un comportamento ingannevole');
-    const seguito = altri.length ? ` ${joinIt(altri).replace(/^./, (c) => c.toUpperCase())}.` : '';
-    return { title: prima.titolo, body: prima.sola + seguito };
+    const seguito = altri.length ? [' ', conMaiuscola(joinIt(altri)), '.'] : [];
+    return messaggio(prima.titolo, [prima.sola, seguito]);
   }
   // 5) Solo segnali non legati all'identità.
   if (certBad) {
