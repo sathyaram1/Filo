@@ -183,7 +183,7 @@ test('il proxy scritto senza schema esce col solo indirizzo, e la password solo 
   const parsed = readExportZip(zip);
   assert.equal(parsed.data.settings.proxy.datacenter, 'gate.esempio.com:8080');
   assert.deepEqual(parsed.proxySenzaCredenziali, ['datacenter']);
-  assert.equal(mergeImportedData({ settings: { proxy: { datacenter: SENZA_SCHEMA } } }, parsed.data).merged.settings.proxy.datacenter,
+  assert.equal(importa({ settings: { proxy: { datacenter: SENZA_SCHEMA } } }, parsed).merged.settings.proxy.datacenter,
     SENZA_SCHEMA, 'importato qui non cancella la password di qui');
   assert.equal(readExportZip(buildExportZip(dati, { chiavi: true })).data.settings.proxy.datacenter, SENZA_SCHEMA);
 });
