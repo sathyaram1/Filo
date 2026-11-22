@@ -42,7 +42,16 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
   const page = await home(app);
   try {
     await livelloAutonomia(app, 'conservativo');
-    await modelloFinto(app, [{ text: 'Cambio il modello della chat.', toolCalls: [MODELLO] }, { text: 'Fatto.' }]);
+    // Il listino di OpenRouter senza quel modello: niente rete, e l'id resta sconosciuto.
+    await app.evaluate(() => {
+      const vero = globalThis.fetch;
+      globalThis.fetch = async (input, init) => (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(String((input && input.url) || input))
+        ? new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+        : vero(input, init));
+    });
+    // Una lettura nel giro tiene aperto il turno sulla conferma (#1130).
+    const leggi = { id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' };
+    await modelloFinto(app, [{ text: 'Cambio il modello della chat.', toolCalls: [leggi, MODELLO] }, { text: 'Ti chiedo conferma.' }, { text: 'Fatto.' }]);
     await chiedi(page, 'cambia il modello della chat');
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
     expect((await confirmState(page)).citazioni.join('')).toContain(FINTO);
