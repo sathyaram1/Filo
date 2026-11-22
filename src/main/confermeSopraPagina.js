@@ -114,13 +114,15 @@ function seguiGesti(wc) {
     const w = finestraDi(wc);
     if (!w) return;
     const casa = casaDi(w);
-    const prima = usata.get(casa);
+    const cambia = casa !== ultimaUsata;
+    ultimaUsata = casa;
     usata.set(casa, ++giroUso);
-    if (prima !== giroUso - 1) riallinea();
+    if (cambia) riallinea();
   });
 }
+let ultimaUsata = null;
 let gestiSeguiti = false;
-function seguiFuoco() {
+function seguiGestiDiTutti() {
   if (gestiSeguiti) return;
   gestiSeguiti = true;
   try {
