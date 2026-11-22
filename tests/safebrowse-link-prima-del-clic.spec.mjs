@@ -427,7 +427,7 @@ test('un file travestito che il sito nomina solo rispondendo: l\'avviso lo ferma
     await contaScaricamenti(app);
     await clicFermato(app, '#allegato');
     const avviso = await vistaAvviso(app);
-    await expect(avviso.getByText(/«fattura\.pdf\.exe»/)).toBeVisible();
+    await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
     await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
     expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
   } finally { await s.chiudi(); }
