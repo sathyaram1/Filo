@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
-import { home, modelloFinto, ripristina } from './helpers/chatFinta.mjs';
+import { home, modelloFinto, chiamateAlModello, ripristina } from './helpers/chatFinta.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const SHOTS = path.join(path.dirname(fileURLToPath(import.meta.url)), '.shots');
