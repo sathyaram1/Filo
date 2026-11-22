@@ -156,6 +156,11 @@ test('mentre il modello decide, una scheda ripresa resta e una chiusa a mano non
     await shell.evaluate((x) => window.filoShell.tabs.close(x), await id(/rosso\.test/));
     await expect.poll(() => titoliTest(shell), { timeout: 10_000 }).not.toContain('Rosso');
     await app.evaluate(() => globalThis.__rispondiPulizia());
+    await new Promise((r) => setTimeout(r, 5000));
+    console.log('DBG', JSON.stringify(await app.evaluate(({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      return { dbg: globalThis.__dbg, running: tm._triageRunning, tabs: tm.tabs.map((t) => [t.url, t.lastInteractionAt, t._dallaSessione]), alle: tm._riapertaAlle };
+    })), JSON.stringify(await avvisi(shell)));
     await expect.poll(() => avvisi(shell), { timeout: 30_000 }).toContain('Schede riordinate, 1 chiusa. La ritrovi nel filo della home');
     expect(await titoliTest(shell), 'la scheda appena ripresa in mano è stata chiusa dalla pulizia').toContain('Verde');
     expect(await titoliTest(shell)).not.toContain('Vecchia');
