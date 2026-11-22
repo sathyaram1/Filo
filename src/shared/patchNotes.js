@@ -14,7 +14,7 @@
         { testo: 'Filo apre i link a un server del tuo computer anche quando contengono nome utente e password, come http://admin:password@localhost:8080: restano sul computer, come lo stesso indirizzo in un comando del terminale. Se il link rimanda a un altro sito, la password resta ferma.', segnalazione: 2255 },
         { testo: 'Quando Filo controlla di nascosto un link sospetto, la pagina non suona, non parla e non lascia sullo schermo i suoi avvisi, come quelli dei finti virus.', segnalazione: 591 },
         { testo: 'La pagina Sicurezza mostra subito le risposte date ai siti, anche se era già aperta, e quello che togli lì resta tolto anche se l\'hai aperta in una finestra in incognito.', segnalazione: 591 },
-        { testo: 'Le ricerche sul web che Filo fa per te entrano nella spesa del mese e si fermano al tuo limite di spesa, come le risposte dei modelli.', segnalazione: 591 },
+        { testo: 'Le ricerche sul web che Filo fa per te entrano nella spesa del mese come le risposte dei modelli, e col limite di spesa raggiunto passano a un motore di ricerca gratuito.', segnalazione: 591 },
       ],
     },
     {
