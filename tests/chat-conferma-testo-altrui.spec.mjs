@@ -42,8 +42,8 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
   const page = await home(app);
   try {
     await livelloAutonomia(app, 'conservativo');
-    await modelloFinto(app, [{ text: 'Cambio il carattere.', toolCalls: [CARATTERE] }, { text: 'Fatto.' }]);
-    await chiedi(page, 'metti georgia come carattere');
+    await modelloFinto(app, [{ text: 'Cambio il modello della chat.', toolCalls: [MODELLO] }, { text: 'Fatto.' }]);
+    await chiedi(page, 'cambia il modello della chat');
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
     expect((await confirmState(page)).citazioni.join('')).toContain(FINTO);
 
