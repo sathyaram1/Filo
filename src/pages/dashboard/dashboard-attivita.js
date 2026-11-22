@@ -1666,7 +1666,7 @@
           a._executed = false;
           delete a._confirm;
           const row = activityRowFor(a);
-          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
+          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '', row.parti || null);
           btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
           archiviaEsito(a, { chat: c });
           return;
