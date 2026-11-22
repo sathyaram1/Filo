@@ -163,12 +163,12 @@ const stati = (d) => d.cookie('stato')
 
 // Un normale del sito da prima della visita, il partizionato del riquadro dall'intestazione, poi la scheda si chiude e
 // la pulizia parte; `sito` scrive mentre Filo aspetta la risposta del passo `n` della pulizia.
-async function pulizia(variante, n = -1, sito = null) {
+async function pulizia(variante, n = -1, sito = null, { normale = true } = {}) {
   process.env.NODE_ENV = 'test';
   schede.splice(0, schede.length, scheda);
   const CI = caricaModulo();
   const d = deposito(variante);
-  d.scrivi({ ...NORMALE, value: 'mio', expirationDate: fraUnGiorno() });
+  if (normale) d.scrivi({ ...NORMALE, value: 'mio', expirationDate: fraUnGiorno() });
   await quiete();
   CI.aggancia(d.ses);
   CI.margineTest(1);
