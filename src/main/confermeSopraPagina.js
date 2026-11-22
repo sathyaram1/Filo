@@ -46,9 +46,10 @@ function partiPulite(parti) {
 const finestreDelSito = new Map();
 const nascoste = new Set();
 const aSchermo = new Set();
-// L'ordine in cui le finestre di Filo hanno preso il fuoco: quelle del sito non contano, perché aprendosi lo prendono.
-const fuoco = new WeakMap();
-let giroFuoco = 0;
+// Dove l'utente è adesso: la finestra di Filo che ha avuto per ultima un suo tasto, clic o rotella (quelli di una
+// finestrella contano per la sua). Non il fuoco: lo sposta anche il sito, aprendo una finestrella o chiamando focus().
+const usata = new WeakMap();
+let giroUso = 0;
 
 const casaDi = (w) => finestreDelSito.get(w) || w;
 
