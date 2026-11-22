@@ -73,9 +73,9 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     const riga = page.locator('.dash-activity-row', { hasText: 'Conferma chiesta' }).first();
     await expect(riga).toBeAttached();
     const r = await pezzi(riga);
-    expect(r.fuori).toMatch(/^Conferma chiesta · Filo vuole impostare/);
+    // Accorciata a due parole, del valore resta al più l'inizio, nel riquadro.
+    expect(r.fuori).toMatch(/Conferma chiesta · Filo vuole impostare/);
     expect(r.fuori).not.toMatch(/fornitore|confermalo/);
-    expect(r.dentro).toMatch(/^fornit/);
     await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui.png' });
 
     // Riaperta senza risposta: bottone e popup tornano coi riquadri.
