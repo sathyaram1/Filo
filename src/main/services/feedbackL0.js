@@ -124,7 +124,7 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
       const [st, tx, im] = await Promise.all(parti);
       clearTimeout(timer);
       if (tx === 'scaduto' || im === 'scaduto') log.warn('[Filo L0] nessuna risposta entro', entroMs, 'ms: vale quello che è arrivato');
-      const trovati = [...st, ...(Array.isArray(tx) ? tx : []), ...(Array.isArray(im) ? im : [])];
+      const trovati = L().senzaConfermati([...st, ...(Array.isArray(tx) ? tx : []), ...(Array.isArray(im) ? im : [])], t, confermati);
       if (trovati.length) {
         let rt = false;
         try { rt = !!redTeam(); } catch (_) {}
