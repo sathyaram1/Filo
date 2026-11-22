@@ -201,17 +201,19 @@ for (const v of VARIANTI) {
     assert.deepEqual(stati(d), ['mio:normale:scadenza']);
   });
 
-  test(`il sito che aggiorna il suo cookie normale a qualunque passo della pulizia lo ritrova col valore nuovo (${v.nome})`, async () => {
-    const passi = (await pulizia(v)).passiContati();
-    assert.ok(passi >= 5, `la pulizia fa ${passi} passi`);
-    const sbagliati = [];
-    for (let n = 0; n < passi; n++) {
-      const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'nuovo', expirationDate: fraUnGiorno() }));
-      const resta = stati(d);
-      if (resta.join() !== 'nuovo:normale:scadenza') sbagliati.push(`passo ${n}: ${resta.join(', ')}`);
-    }
-    assert.deepEqual(sbagliati, []);
-  });
+  for (const durata of ['scadenza', 'sessione']) {
+    test(`il sito che aggiorna il suo cookie normale (${durata}) a qualunque passo della pulizia lo ritrova col valore nuovo (${v.nome})`, async () => {
+      const passi = (await pulizia(v)).passiContati();
+      assert.ok(passi >= 5, `la pulizia fa ${passi} passi`);
+      const sbagliati = [];
+      for (let n = 0; n < passi; n++) {
+        const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'nuovo', ...(durata === 'scadenza' ? { expirationDate: fraUnGiorno() } : {}) }));
+        const resta = stati(d);
+        if (resta.join() !== `nuovo:normale:${durata}`) sbagliati.push(`passo ${n}: ${resta.join(', ')}`);
+      }
+      assert.deepEqual(sbagliati, []);
+    });
+  }
 
   test(`il riquadro che aggiorna il partizionato durante la pulizia non diventa un cookie normale (${v.nome})`, async () => {
     const passi = (await pulizia(v)).passiContati();
