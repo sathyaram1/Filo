@@ -416,7 +416,7 @@ function readExportZip(zipBuffer) {
       dichiarate = Number.isInteger(m.imageCount) && m.imageCount > 0 ? m.imageCount : 0;
       if (typeof m.filo === 'boolean') filoDichiarato = m.filo;
       contoNoto = Number.isInteger(m.imageCount);
-      if (Array.isArray(m.proxySenzaCredenziali)) proxyTolti = CAMPI_PROXY.filter((k) => m.proxySenzaCredenziali.includes(k));
+      if (Array.isArray(m.proxySenzaCredenziali)) proxyTolti = campiProxy().filter((k) => m.proxySenzaCredenziali.includes(k));
     } catch (_) {}
   }
 
