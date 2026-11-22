@@ -35,6 +35,11 @@ test('programma già nella barra rimesso a parole con l\'OK: nessuno lo dice mes
     await expect(btn).toBeVisible({ timeout: 15_000 });
     await btn.click();
     await clickConfirm(page, 'ok');
+    await expect(btn).toHaveText(/^[✓✗]/, { timeout: 15_000 }).catch(() => {});
+    await page.waitForTimeout(4000);
+    console.log('BOTTONE', await btn.innerText().catch(() => '?'));
+    console.log('BOLLE', await page.locator('#bubbles').innerText());
+    console.log('CHIAMATE', (await chiamateAlModello(app)).length);
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta finale.' })).toHaveCount(1, { timeout: 15_000 });
     await expect(btn).not.toContainText('Messo nella barra');
     await expect(btn).toContainText('già nella barra');
