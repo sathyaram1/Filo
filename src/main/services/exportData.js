@@ -134,7 +134,7 @@ const VOCE_FILO = 'filo/eventi.jsonl';
 // I segreti dell'utente (SN_CONST.campiSegreti) entrano nell'archivio solo se chi esporta lo chiede (#905).
 // Una chiave incollata in chat o copiata negli appunti è nell'archivio quanto quella delle Opzioni: si toglie ovunque.
 const SEGRETO_TOLTO = '[chiave tolta dall’esportazione]';
-const CAMPI_PROXY = ['datacenter', 'residential'];
+const campiProxy = () => costanti().CAMPI_PROXY;
 const pieno = (v) => typeof v === 'string' && v.trim() !== '';
 
 function costanti() {
