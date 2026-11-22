@@ -950,7 +950,7 @@
     const chip = document.querySelector(`[data-call-id="${CSS.escape(String(callId))}"]`);
     if (chip && apribileComunque(a)) {
       const row = activityRowFor(a);
-      if (row) chip.before(makeActivityRow(row.icon, row.text, row.cambi, row.title || ''));
+      if (row) chip.before(makeActivityRow(row.icon, row.parti || row.text,row.cambi, row.title || ''));
       chip.replaceWith(bottoneApriComunque(a));
     }
     return true;
@@ -1004,7 +1004,7 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          const riga = makeActivityRow(row.icon, row.text, row.cambi, row.title || '');
+          const riga = makeActivityRow(row.icon, row.parti || row.text,row.cambi, row.title || '');
           segnaSistema(riga, a);
           wrap.appendChild(riga);
           if (!anche) continue;
