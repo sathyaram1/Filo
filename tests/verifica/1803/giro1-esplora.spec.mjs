@@ -20,7 +20,7 @@ test('mosse senza effetto: rinomina allo stesso nome, sposta in cima la prima, r
   const turni = [
     ['rinomina YouTube in YouTube', { operazione: 'rinomina', elemento: 'YouTube', nome: 'YouTube' }, 'Ha già quel nome nella barra dei siti · YouTube'],
     ['sposta YouTube in cima', { operazione: 'sposta', elemento: 'YouTube', verso: 'cima' }, 'È già a quel posto nella barra dei siti · YouTube'],
-    ['metti www.youtube.com nella barra', { operazione: 'aggiungi', elemento: 'https://www.youtube.com/watch?v=abc', nome: 'Tubo' }, 'È già nella barra dei siti · YouTube'],
+    ['metti www.youtube.com nella barra', { operazione: 'aggiungi', elemento: 'youtube.com', nome: 'Tubo' }, 'È già nella barra dei siti · YouTube'],
     ['sposta Gmail in fondo', { operazione: 'sposta', elemento: 'gmail', verso: 'fondo' }, 'È già a quel posto nella barra dei siti · Gmail'],
     ['rinomina YouTube in Video', { operazione: 'rinomina', elemento: 'YouTube', nome: 'Video' }, 'Rinominato nella barra dei siti · Video'],
   ];
