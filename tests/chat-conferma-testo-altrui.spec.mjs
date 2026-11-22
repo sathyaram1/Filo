@@ -85,11 +85,13 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
 test('il bottone di un comando mette la spiegazione scritta dal modello nel suo riquadro', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
+  const dir = cartellaTemporanea('conferma-altrui-');
   try {
     await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
     await livelloAutonomia(app, 'conservativo');
-    await modelloFinto(app, [{ text: 'Provo.', toolCalls: [COMANDO] }, { text: 'Fatto.' }]);
-    await chiedi(page, 'scrivi ciao nel terminale');
+    const comando = { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir "${join(dir, 'tre')}"`, spiegazione: FINTO }) };
+    await modelloFinto(app, [{ text: 'Provo.', toolCalls: [comando] }, { text: 'Fatto.' }]);
+    await chiedi(page, 'crea la cartella tre');
     const bottone = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'confermalo' }).first();
     await expect(bottone).toBeVisible({ timeout: 10_000 });
     const b = await pezzi(bottone.locator('.dash-cmd-btn-cosa'));
