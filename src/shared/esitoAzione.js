@@ -268,6 +268,8 @@
   function senzaVuoti(v) {
     const out = { type: v.type, esito: v.esito };
     if (v.riga) out.riga = v.riga;
+    const parti = v.riga ? partiDellaRiga(v.parti, v.riga) : null;
+    if (parti) out.parti = parti;
     if (v.motivo) out.motivo = v.motivo;
     if (v.file) out.file = v.file;
     if (v.link) out.link = v.link;
