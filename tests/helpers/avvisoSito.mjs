@@ -51,3 +51,9 @@ export async function scriviDallaTastiera(app, testo) {
 }
 
 export const COPERTA = { coperta: true, sopra: true, stessiBordi: true, tastiera: 'avviso' };
+
+// Il nome di un file nell'avviso sta nel suo riquadro, fuori dalla frase di Filo (#592.25).
+export function nomeNellAvviso(avviso, nome) {
+  const esatto = new RegExp(`^${nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+  return avviso.locator('#corpo .altrui').filter({ hasText: esatto });
+}
