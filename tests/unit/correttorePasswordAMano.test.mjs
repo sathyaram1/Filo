@@ -215,6 +215,73 @@ test('#1649: le grafie vicine a quelle degli esempi non lasciano passare la chia
   ]) nascosto(t, '', v, t);
 });
 
+test('#1723.1: con la risposta già data sopra, in una frase o di sole lettere, il messaggio dopo parte intero', () => {
+  for (const data of [
+    'è Gatto2024 con la G maiuscola', 'certo, la password è Gatto2024 ma non dirla in giro', 'Gatto2024 (con la G maiuscola)',
+    'la password è gattonero', 'eccola: gattonero', 'è gattonero tutto minuscolo', 'la pass del wifi risulta gattonero',
+  ]) {
+    const sopra = `mi mandi la password del wifi?\n${data}\ngrazie! a che ora ci vediamo?`;
+    assert.equal(alModello('alle venti davanti al cinema', sopra).nuovo, 'alle venti davanti al cinema', data);
+    assert.equal(alModello('alle 20:30, il 2024 è stato un anno lungo', sopra).nuovo, 'alle 20:30, il 2024 è stato un anno lungo', data);
+    // Una password corretta dopo la prima resta un dato.
+    nascosto('scusa, ho sbagliato: è Gatto2025', sopra, 'Gatto2025', `correzione sotto «${data}»`);
+  }
+  const conNomi = 'Marco: mi mandi la password del wifi?\nAnna: eccola: gattonero\nMarco: grazie';
+  assert.equal(alModello('alle venti davanti al cinema', conNomi).nuovo, 'alle venti davanti al cinema');
+});
+
+// Senza nomi un sollecito ha la forma di una risposta di sole lettere: chiude solo se sotto è arrivato altro.
+test('#1723.1: un sollecito di chi ha chiesto non chiude il legame, nemmeno se somiglia a una risposta', () => {
+  for (const sopra of [
+    'mi mandi la password del wifi?\nsono arrivato', 'mi mandi la password del wifi?\nè urgente',
+    'Marco: mi mandi la password del wifi?\nMarco: sono arrivato\nMarco: è urgente', 'Marco: mi mandi la password del wifi?\nMarco: eccomi: sono sotto',
+    'mi mandi la password?\ngattonero\nla password è sbagliata', 'Marco: mi mandi la password del wifi?\nMarco: è Gatto2024?',
+  ]) nascosto('gattobianco', sopra, 'gattobianco', sopra);
+});
+
+test('#1723.1: «pass» come etichetta, coi due punti o accanto al nome utente, e «le credenziali sono» tolgono la password', () => {
+  for (const [t, v] of [
+    ['Pass: Girasole2024', 'Girasole2024'], ['User: mario / Pass: Girasole2024', 'Girasole2024'],
+    ['User: mario\nPass: Girasole2024', 'Girasole2024'], ['utente: mario pass: Girasole2024', 'Girasole2024'],
+    ['user mario pass Girasole2024', 'Girasole2024'], ['Wi-Fi CasaRossi pass Faro7Blu55', 'Faro7Blu55'],
+    ['Le credenziali sono: mario / Girasole2024', 'Girasole2024'], ['Le mie credenziali sono mario@gmail.com / Girasole2024', 'Girasole2024'],
+  ]) {
+    nascosto(t, '', v, t);
+    assert.equal(R.oscura(t), t.replace(v, S), t);
+  }
+  // Le forme sono le stesse per il pavimento, che le prende dallo stesso posto.
+  globalThis.self = globalThis;
+  const P = require('../../src/shared/pavimento.js');
+  for (const t of ['User: mario / Pass: Girasole2024', 'Le credenziali sono: mario / Girasole2024']) assert.ok(!P.oscura(t).includes('Girasole2024'), `pavimento: ${t}`);
+  for (const t of ['il pass, è bellissimo', 'la pass giornaliera', 'il pass del concerto costa 50', 'pass: costa 10 euro',
+    'I need to pass the exam', 'il green pass 2021 è scaduto', 'ho comprato il passaporto AB1234567']) {
+    assert.equal(alModello(t).nuovo, t, t);
+  }
+});
+
+test('#1723.1: dopo la frase della password la risposta perde una seconda password, non un orario o un numero', () => {
+  const S0 = 'Marco: mi mandi la password del wifi?';
+  for (const [t, atteso] of [
+    ["Gatto2024. Anzi no, l'ho cambiata: Gatto2025", `${S}. Anzi no, l'ho cambiata: ${S}`],
+    ['Gatto2024. Se non va prova Pesca7Mela', `${S}. Se non va prova ${S}`],
+    ['Gatto2024\nse non va prova Pesca7Mela', `${S}\nse non va prova ${S}`],
+    ['Gatto2024. Ci vediamo alle 20:30 al bar, il treno è il 9542', `${S}. Ci vediamo alle 20:30 al bar, il treno è il 9542`],
+    ['Gatto2024. Domani faccio il check-in online', `${S}. Domani faccio il check-in online`],
+  ]) assert.equal(alModello(t, S0).nuovo, atteso, t);
+});
+
+// Le parole che annunciano il dato dopo un'etichetta sono un elenco solo: il correttore e il filtro delle pagine le
+// riconoscono tutte e due, e uno nuovo vale per entrambi.
+test('#1723.1: correttore e filtro delle pagine riconoscono le stesse parole che annunciano la password', () => {
+  const G = globalThis.SN_GUARDIANO_STATICO;
+  assert.ok(G.ANNUNCI.length >= 10);
+  for (const a of G.ANNUNCI) {
+    nascosto(`la pass del wifi ${a} gattonero`, '', 'gattonero', a);
+    nascosto(`pw ${a} gattonero`, '', 'gattonero', a);
+    assert.ok(G.segretiNelTesto(`La password ${a} Tr7#kq29Lm`).some((s) => s.valore === 'Tr7#kq29Lm'), `pagine: ${a}`);
+  }
+});
+
 // Dopo «pw», «la pass» o «, è» una parola qualunque resta parola: il modello la vede e la corregge.
 test('#1649: dopo le etichette corte e la virgola le parole normali restano', () => {
   for (const [t, parola] of [
@@ -233,4 +300,49 @@ test('#1649: dopo le etichette corte e la virgola le parole normali restano', ()
   for (const [t, v] of [['la pass è gattonero', 'gattonero'], ['la pass del wifi: gattonero', 'gattonero'], ['utente mario.rossi, pw pontegrigio', 'pontegrigio']]) {
     nascosto(t, '', v, t);
   }
+});
+
+const Q = 'Marco: mi mandi la password del wifi?';
+
+test('#1723.1: la risposta con la password e una domanda o una seconda frase chiude il legame', () => {
+  for (const risposta of ['Gatto2024. Tu a che ora arrivi?', 'la password è gattonero, tu quando arrivi?',
+    'eccola: gattonero. funziona?', 'sì: Gatto2024 ma te la cambio stasera, ok?']) {
+    const sopra = `${Q}\n${risposta}\nMarco: grazie! a che ora ci vediamo?`;
+    assert.equal(alModello('alle venti davanti al cinema', sopra).nuovo, 'alle venti davanti al cinema', risposta);
+  }
+  // Una domanda che contiene il valore non è la risposta.
+  nascosto('no, è gattobianco', `${Q}\nla password è gattonero?\nsì`, 'gattobianco', 'conferma chiesta');
+});
+
+test('#1723.1: un «non va» dopo la risposta riapre il legame, e un sollecito in due righe non lo chiude', () => {
+  for (const [sopra, campo] of [
+    [`${Q}\nè gattonero\nMarco: non va`, 'scusa, è gattobianco'],
+    [`${Q}\nla password è gattonero\nMarco: non funziona, sicuro?`, 'scusa, era gattobianco'],
+    ['mi mandi la password del wifi?\nsono arrivato\nè urgente', 'gattobianco'],
+    ['mi mandi la password del wifi?\nè urgente\ndai', 'gattobianco'],
+    ['mi mandi la password del wifi?\nsono sotto casa\nsbrigati', 'gattobianco'],
+  ]) nascosto(campo, sopra, 'gattobianco', sopra);
+  // Dopo la correzione e un grazie il legame si richiude.
+  const sopra = 'mi mandi la password del wifi?\nè gattonero\nnon va\nscusa, è gattobianco\ngrazie, ora funziona';
+  assert.equal(alModello('alle venti davanti al cinema', sopra).nuovo, 'alle venti davanti al cinema');
+});
+
+test('#1723.1: dopo «pw» e «la pass» un avverbio o un verbo di cambio presentano la password come dopo «password»', () => {
+  for (const t of ['pw ora è gattonero', 'la pass ora è gattonero', 'la pass del wifi adesso è gattonero', 'pw diventa gattonero',
+    'pw resta gattonero', 'la password ora è gattonero']) {
+    const p = nascosto(t, '', 'gattonero', t);
+    assert.equal(p.nuovo, t.replace('gattonero', S), t);
+  }
+});
+
+test('#1723.1: le credenziali senza la barra e i trattini valgono come nella risposta in chat', () => {
+  for (const t of ['Credenziali: mario Girasole2024', 'le credenziali sono mario Girasole2024']) nascosto(t, '', 'Girasole2024', t);
+  for (const t of ['Le credenziali sono scadute ieri', 'Pass: check-in', 'pass self-service']) assert.equal(alModello(t).nuovo, t, t);
+});
+
+test('#1723.1: oltre le prime parole della risposta «sono», «vale», «risulta» non presentano una password', () => {
+  for (const [t, parola] of [
+    ['certo, te la mando subito appena arrivo a casa stasera perché adesso non la ricordo, comunque sono stanco morto', 'stanco'],
+    ['certo, te la mando subito appena arrivo a casa stasera perché adesso non la ricordo. Il prezzo vale poco, risulta strano', 'strano'],
+  ]) assert.ok(alModello(t, 'mi mandi la password?').nuovo.includes(parola), t);
 });

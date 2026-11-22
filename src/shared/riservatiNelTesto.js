@@ -44,14 +44,21 @@ const FRASE_MAX = 300;
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
   'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks', 'ecco']);
-// Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero»): un elenco solo per la risposta
-// in chat e per le forme libere.
-const ANNUNCI = ['è', "e'", 'e’', 'era', 'sarebbe', 'is', 'was'];
-const ANNUNCIO = `(?:${ANNUNCI.map(esc).join('|')})`;
+// Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero»): l'elenco del filtro delle
+// pagine, che il correttore chiama nello stesso giro.
+const ANNUNCI = guardiano().ANNUNCI;
+const ANNUNCIO = `(?:${ANNUNCI.map(esc).join('|')})(?!\\p{L})`;
 const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo']);
+// Dentro una risposta queste aprono quasi sempre altro («sono stanco», «vale poco», «sono arrivato»): non presentano
+// la parola dopo, né fanno di una riga la risposta.
+const NON_IN_RISPOSTA = new Set(['sono', 'are', 'vale', 'risulta', 'here']);
+const PRESENTA_RISPOSTA = new Set([...PRESENTA_DATO].filter((w) => !NON_IN_RISPOSTA.has(w)));
 const SALUTO = /^(?:ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera)$/;
+// «check-in», «self-service»: parole col trattino, non password.
+const formaDiPassword = (v) => !!guardiano().sembraPassword(v) && !/^\p{L}+(?:-\p{L}+)+$/u.test(v);
 // Una parola di sole lettere conta come password solo nelle prime parole della risposta o dopo PRESENTA_DATO: più in là
-// è il resto del messaggio. Quelle con cifre o simboli contano fino a RISPOSTA_MAX.
+// è il resto del messaggio. Quelle con cifre o simboli contano nella frase del dato; dopo, fino a RISPOSTA_MAX, solo
+// quelle con la forma di una password (una seconda password sì, un orario no).
 const PAROLE_RISPOSTA = 12;
 const RISPOSTA_MAX = 2000;
 // Il campo risponde all'ultimo messaggio che nomina la password finché sopra non c'è già una risposta (chiusa) e non
@@ -102,25 +109,30 @@ function richieste(l, tutte = false) {
     const a = f ? m.j + f.index + f[0].length : Math.min(l.length, m.j + FRASE_MAX);
     const prima = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop();
     const riga = l.slice(m.j, m.j + FRASE_MAX).split('\n')[0];
-    const chiesta = !!((f && f[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(prima(), riga));
-    if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, fine: a, tipo: m.tipo, chiesta });
+    // Il punto di domanda conta nell'inciso che nomina la password: «la password è gattonero, tu quando arrivi?» la dà.
+    const inciso = /[,;]\s|[.!?]+(?=\s|$)|\n/.exec(l.slice(m.j, a));
+    const chiesta = !!((inciso && inciso[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(prima(), riga));
+    if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, nome: m.j, fine: a, tipo: m.tipo, chiesta });
   }
   return out;
 }
 
 // Le parole della risposta (già minuscola) contano come quelle dopo la parola che presenta il dato (segretiDetti):
 // quelle con cifre o simboli fino alla frase che porta il dato; quelle di sole lettere, per una password chiesta, nelle
-// prime PAROLE_RISPOSTA o dopo PRESENTA_DATO.
-function valoriRisposta(risposta, tipo, chiesta = true) {
+// prime PAROLE_RISPOSTA o dopo PRESENTA_DATO. `data`: la risposta sta già sopra, e qui contano solo le parole con la
+// forma di una password.
+function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
   const X = exfil();
   if (!X || !X.segretiDetti) return [];
   const presentata = presenta().map(([re]) => new RegExp(`^(?:${re.source})$`, 'u'));
   const out = [];
-  let lettere = tipo === 'password' && chiesta;
+  let lettere = tipo === 'password' && chiesta && !data;
   let saluto = false;
   let trovato = false;
-  // Un dato con cifre o simboli è la risposta: dopo la sua frase il messaggio parla d'altro.
+  // Un dato con cifre o simboli è la risposta: dopo la sua frase il messaggio parla d'altro, e può portarne solo un altro
+  // con la stessa forma («Gatto2024. Anzi no, l'ho cambiata: Gatto2025»).
   let forte = false;
+  let soloForma = data;
   let dopoPresenta = false;
   let n = 0;
   for (const [, w, spazio] of risposta.matchAll(/(\S+)(\s*)/g)) {
@@ -132,15 +144,17 @@ function valoriRisposta(risposta, tipo, chiesta = true) {
     const candidata = t && !w.endsWith(':') && !AVVII.has(t) && !PRESENTA_DATO.has(t) && !presentata.some((re) => re.test(t));
     const segni = /[^\p{L}'’]/u.test(t);
     const qualunque = tipo === 'password' && !saluto && !forte && ((lettere && n <= PAROLE_RISPOSTA) || dopoPresenta);
-    if (candidata && (segni || qualunque)) {
+    if (soloForma) {
+      if (candidata && formaDiPassword(t)) out.push({ valore: t });
+    } else if (candidata && (segni || qualunque)) {
       const v = X.segretiDetti(`${tipo} ${t}`);
       if (v.length) { trovato = true; if (segni) forte = true; }
       out.push(...v);
     }
-    dopoPresenta = w.endsWith(':') || PRESENTA_DATO.has(t);
+    dopoPresenta = w.endsWith(':') || PRESENTA_RISPOSTA.has(t);
     if (/[.!?]$/.test(w) || spazio.includes('\n')) {
       if (saluto) saluto = false;
-      else if (forte) break;
+      else if (forte) soloForma = true;
       else if (trovato) lettere = false;
     }
   }
@@ -151,22 +165,92 @@ const chiParla = (riga) => { const m = riga.match(PARLA); return m ? m[1].trim()
 // Chi scrive il campo si firma così nelle conversazioni copiate; le pagine di chat non mettono nomi, e un altro nome
 // può essere chiunque del gruppo.
 const CHI_SCRIVE = new Set(['io', 'tu', 'me', 'you', 'i']);
-// Sotto la richiesta `r` c'è già la risposta: una riga di chi scrive, o una riga corta con un valore dalla forma di
-// password («gatto2024», «certo, gatto2024»). Un «PS:», un orario o un altro del gruppo non la chiudono (#1723).
-function chiusa(l, r) {
-  const G = guardiano();
-  const righe = l.slice(r.fine).split('\n');
-  if (r.fine > 0 && l[r.fine - 1] !== '\n') righe.shift();
-  return righe.some((riga) => {
-    const chi = chiParla(riga);
-    if (chi !== null && CHI_SCRIVE.has(chi)) return true;
-    const parole = (chi === null ? riga : riga.replace(PARLA, '')).split(/\s+/).filter(Boolean);
-    return !!(G && G.sembraPassword) && parole.length <= 4
-      && parole.some((w) => G.sembraPassword(w.replace(/[.,;:!?)\]»”"']+$/u, '')));
-  });
+const pulito = (v) => String(v || '').replace(/[.,;:!?)\]»”"']+$/u, '');
+// La riga porta già il dato: in testa («Gatto2024 (con la G maiuscola)», «certo, Gatto2024») o dopo una parola che lo
+// presenta («è gattonero tutto minuscolo», «eccola: gattonero»). Il nome di chi parla non presenta. Una domanda non porta,
+// ma solo nel suo inciso: «è gattonero?» no, «Gatto2024. Tu a che ora arrivi?» e «sì: Gatto2024 ma…, ok?» sì.
+// 'debole' quando il dato è di sole lettere: «è urgente» ha la stessa forma.
+// `dopoIlNome`: la riga segue il nome della password, e lì vale tutto l'elenco degli annunci («la pass risulta …»).
+function portaIlDato(riga, tipo, inTesta, dopoIlNome = false) {
+  const annuncia = dopoIlNome ? PRESENTA_DATO : PRESENTA_RISPOSTA;
+  const X = exfil();
+  const chi = chiParla(riga);
+  const testo = chi !== null && !AVVII.has(chi) && !PRESENTA_DATO.has(chi) ? riga.replace(PARLA, '') : riga;
+  if (!X || !X.segretiDetti) return false;
+  const parole = testo.split(/\s+/);
+  const inDomanda = [];
+  let q = false;
+  for (let k = parole.length - 1; k >= 0; k--) {
+    const p = parole[k].replace(/[)\]»”"'’]+$/u, '');
+    if (/[.!?,;]$/.test(p)) q = p.endsWith('?');
+    inDomanda[k] = q;
+  }
+  let testa = inTesta;
+  let presentato = false;
+  for (const [k, w] of parole.entries()) {
+    const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    if (w.endsWith(':') || w === '=' || annuncia.has(t)) { presentato = true; continue; }
+    if (!t || (testa && (AVVII.has(t) || SALUTO.test(t)))) continue;
+    if (!inDomanda[k]) {
+      if ((testa || presentato) && formaDiPassword(t)) return true;
+      if (presentato && X.segretiDetti(`${tipo} ${t}`).length) return /\d/.test(t) ? true : 'debole';
+    }
+    testa = false;
+    presentato = false;
+  }
+  return false;
 }
 
-// Il messaggio sopra il campo a cui il campo risponde: { tipo, chiesta } o null.
+// Sotto un dato di sole lettere ci vuole la reazione di chi l'ha ricevuto: un grazie, un ok, un messaggio vero. Un
+// sollecito corto («dai», «sbrigati», «non va») no.
+const CONFERMA = /(?<![\p{L}\p{N}])(?:grazie|thanks|thx|ok|okay|perfetto|perfect|fatto|ricevut[ao]|entrat[oa]|connesso|connessa)(?![\p{L}\p{N}])|👍|🙏/u;
+const conferma = (riga) => {
+  const s = riga.replace(PARLA, '');
+  return !NON_VA.test(s) && (CONFERMA.test(s) || s.split(/\s+/).filter(Boolean).length >= 4);
+};
+// Chi ha chiesto dice che la password non va: la correzione che segue è ancora la risposta.
+const NON_VA = /(?<![\p{L}\p{N}])(?:non\s+(?:va|funziona|entra|prende|si\s+collega|mi\s+fa\s+entrare|(?:è|e['’])\s+(?:giusta|quella))|sbagliat[ao]|errat[ao]|(?:does|is)n['’]?t\s+work|wrong)(?![\p{L}\p{N}])/u;
+
+// Sotto la richiesta `r` c'è già la risposta: nella frase che nomina la password («la password è gattonero»), in una
+// riga di chi scrive, in una riga corta con un valore dalla forma di password o in una che porta il dato. Un «PS:», un
+// orario, un altro del gruppo o un sollecito di chi ha chiesto non la chiudono (#1723); un dato di sole lettere solo se
+// sotto c'è già la reazione di chi l'ha ricevuto (conferma), perché in una chat senza nomi anche «è urgente» lo sembra.
+// Chiusa, dà il testo sotto la riga che la chiude (anche vuoto); aperta, null.
+function chiusa(l, r) {
+  const richiedente = chiParla(l.slice(l.lastIndexOf('\n', r.inizio - 1) + 1, r.fine));
+  const righe = l.slice(r.fine).split('\n');
+  if (r.fine > 0 && l[r.fine - 1] !== '\n') righe.shift();
+  const confermata = (i) => righe.slice(i).some((s) => s.trim() && conferma(s));
+  const dopo = (i) => righe.slice(i).join('\n');
+  const datoNellaFrase = r.chiesta ? false : portaIlDato(l.slice(r.nome, r.fine), r.tipo, false, true);
+  if (datoNellaFrase === true || (datoNellaFrase === 'debole' && confermata(0))) return dopo(0);
+  for (const [i, riga] of righe.entries()) {
+    const chi = chiParla(riga);
+    if (chi !== null && CHI_SCRIVE.has(chi)) return dopo(i + 1);
+    if (chi !== null && chi === richiedente) continue;
+    const parole = (chi === null ? riga : riga.replace(PARLA, '')).split(/\s+/).filter(Boolean);
+    if (parole.length <= 4 && parole.some((w) => formaDiPassword(pulito(w)))) return dopo(i + 1);
+    const dato = portaIlDato(riga, r.tipo, true);
+    if (dato === true || (dato === 'debole' && confermata(i + 1))) return dopo(i + 1);
+  }
+  return null;
+}
+
+// Dopo la risposta, un «non va» di chi ha chiesto riapre il legame finché sotto non c'è una risposta nuova.
+function chiusaDavvero(l, r) {
+  let dopo = chiusa(l, r);
+  for (let giri = 0; dopo !== null && giri < 20; giri += 1) {
+    const m = NON_VA.exec(dopo);
+    if (!m) return true;
+    const p = l.length - dopo.length + m.index;
+    const fine = l.indexOf('\n', p) < 0 ? l.length : l.indexOf('\n', p);
+    dopo = chiusa(l, { inizio: p, nome: p, fine, tipo: r.tipo, chiesta: true });
+  }
+  return false;
+}
+
+// Il messaggio sopra il campo a cui il campo risponde: { tipo, chiesta, data } o null. Con la risposta già sopra
+// (`data`) il campo perde solo le parole con la forma di una password: una seconda password sì, le parole normali no.
 function richiestaAperta(sopra) {
   const l = sopra.toLowerCase();
   const tutte = richieste(l, true);
@@ -177,10 +261,13 @@ function richiestaAperta(sopra) {
       || (r.fine === ultima.fine && r.tipo === ultima.tipo && r.chiesta && !ultima.chiesta);
     if (meglio) ultima = r;
   }
-  if (!ultima || l.slice(ultima.fine).trim().length > DOPO_LA_RICHIESTA || chiusa(l, ultima)) return null;
-  // Una richiesta vera prima di un sollecito che rinomina la password vale ancora: conta come chiesta.
-  const chiesta = tutte.some((r) => r.chiesta && r.tipo === ultima.tipo && !chiusa(l, r));
-  return { tipo: ultima.tipo, chiesta };
+  if (!ultima || l.slice(ultima.fine).trim().length > DOPO_LA_RICHIESTA) return null;
+  if (chiusaDavvero(l, ultima)) return { tipo: ultima.tipo, chiesta: false, data: true };
+  // Una richiesta vera prima di un sollecito che rinomina la password vale ancora: conta come chiesta. Riaperta da un
+  // «non va», anche.
+  const riaperta = chiusa(l, ultima) !== null;
+  const chiesta = riaperta || tutte.some((r) => r.chiesta && r.tipo === ultima.tipo && !chiusaDavvero(l, r));
+  return { tipo: ultima.tipo, chiesta, data: false };
 }
 
 // Le password scritte a mano fuori dal posto di un'etichetta (#1649): accanto al nome utente, dopo il nome della rete,
@@ -195,7 +282,12 @@ const FRA = '(?:\\s*[/|]\\s*|\\s+[-–—]\\s+)';
 const LIBERE = {
   // «Username / Password: mario / Girasole2024»: il valore sta al posto dell'etichetta della password.
   coppia: new RegExp(`(?<![\\p{L}\\p{N}])(${UTENTE}|${PW})${FRA}(${UTENTE}|${PW})\\s*[:=]\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
-  credenziali: new RegExp(`(?<![\\p{L}\\p{N}])(?:credenziali|credentials|dati\\s+(?:di\\s+)?(?:accesso|login))\\s*[:=]?\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
+  credenziali: new RegExp(`(?<![\\p{L}\\p{N}])(?:credenziali|credentials|dati\\s+(?:di\\s+)?(?:accesso|login))(?:\\s+${ANNUNCIO})?\\s*[:=]?\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
+  // «Credenziali: mario Girasole2024»: senza la barra il secondo valore deve avere la forma di una password.
+  credenzialiSpazio: new RegExp(`(?<![\\p{L}\\p{N}])(?:credenziali|credentials|dati\\s+(?:di\\s+)?(?:accesso|login))(?:\\s+${ANNUNCIO})?\\s*[:=]?\\s*\\S{1,128}?\\s+(\\S+)`, 'gu'),
+  // «Pass: Girasole2024», «user mario pass Girasole2024»: senza articolo «pass» è anche il pass del concerto, e il
+  // valore deve avere la forma di una password.
+  pass: new RegExp(`(?<![\\p{L}\\p{N}])pass(?![\\p{L}\\p{N}])\\s*(?:[:=]|${ANNUNCIO})?\\s*(\\S+)`, 'gu'),
   // «Login: mario / Girasole2024»: etichette più generiche, il valore deve avere la forma di una password.
   accesso: new RegExp(`(?<![\\p{L}\\p{N}])(?:login|account|accesso|utenza|access)\\s*[:=]\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
   accedi: /(?<![\p{L}\p{N}])(?:accedi|entra|login|log\s*in|sign\s*in)\s+(?:con|with)\s*:?\s*(\S{1,128}?)\s*\/\s*(\S+)/gu,
@@ -212,7 +304,11 @@ const SOLO_CORTE = new RegExp(`^${ETICHETTE_CORTE}$`, 'u');
 const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
 // Dopo un'etichetta corta una parola qualunque è il resto della frase («la pass giornaliera», «il pw del documento»):
 // conta se ha la forma di una password, o se la presenta un annuncio o i due punti; dopo «pw» anche se viene subito.
-const PRESENTATA = new RegExp(`^\\s*(?:(?:del(?:la)?|dell['’]|di)\\s+[\\p{L}\\p{N}-]+\\s*)?(?:[:=]|${ANNUNCIO})\\s*$`, 'u');
+// Come dopo «password»: anche con un avverbio («la pass ora è …») o un verbo di cambio («pw diventa …») in mezzo.
+const AVVERBI = '(?:ora|adesso|invece|ancora|attualmente|now|still)';
+const CAMBIA = '(?:diventa|diventerà|resta|rimane|sarà|will\\s+be)(?!\\p{L})';
+const PRESENTATA = new RegExp(`^\\s*(?:(?:del(?:la)?|dell['’]|di)\\s+[\\p{L}\\p{N}-]+\\s*)?(?:${AVVERBI}\\s+)?(?:[:=]|${ANNUNCIO}|${CAMBIA})\\s*$`, 'u');
+const PONTE = new RegExp(`^(?:${AVVERBI}|${CAMBIA}|${ANNUNCIO})$`, 'u');
 const ACCANTO = /^\s*$/u;
 
 function formeLibere(testo) {
@@ -220,9 +316,8 @@ function formeLibere(testo) {
   const G = guardiano();
   if (!X || !X.segretiDetti) return [];
   const l = String(testo || '').toLowerCase();
-  const pulito = (v) => String(v || '').replace(/[.,;:!?)\]»”"']+$/u, '');
   const valore = (v) => X.segretiDetti(`password ${pulito(v)}`);
-  const forma = (v) => (G && G.sembraPassword && G.sembraPassword(pulito(v)) ? [{ valore: pulito(v) }] : []);
+  const forma = (v) => (G && G.sembraPassword && formaDiPassword(pulito(v)) ? [{ valore: pulito(v) }] : []);
   const out = [];
   const utente = new RegExp(`^${UTENTE}$`, 'u');
   // Il nome della password si cerca largo: una parola scartata («per la password, è …») non deve coprire quella dopo.
@@ -236,8 +331,10 @@ function formeLibere(testo) {
   conNome(LIBERE.coppia, (m) => nomePw(m[1]) !== nomePw(m[2]) && utente.test(nomePw(m[1]) ? m[2] : m[1]),
     (m) => out.push(...valore(nomePw(m[2]) ? m[4] : m[3])));
   for (const m of l.matchAll(LIBERE.credenziali)) out.push(...valore(m[2]));
+  for (const m of l.matchAll(LIBERE.credenzialiSpazio)) out.push(...forma(m[1]));
   for (const m of l.matchAll(LIBERE.accesso)) out.push(...forma(m[2]));
   for (const m of l.matchAll(LIBERE.accedi)) out.push(...forma(m[2]));
+  for (const m of l.matchAll(LIBERE.pass)) out.push(...forma(m[1]));
   for (const m of l.matchAll(LIBERE.rete)) out.push(...forma(m[1]));
   for (const m of l.matchAll(LIBERE.chiaveRete)) out.push(...valore(m[1]));
   for (const m of l.matchAll(LIBERE.corte)) {
@@ -246,7 +343,7 @@ function formeLibere(testo) {
     for (const v of X.segretiDetti(`password ${coda}`)) {
       const s = valoreDi(v);
       const fra = coda.slice(0, Math.max(0, coda.indexOf(s)));
-      if (forma(s).length || PRESENTATA.test(fra) || (pw && ACCANTO.test(fra))) out.push(v);
+      if (forma(s).length || PRESENTATA.test(fra) || (pw && ACCANTO.test(fra) && !PONTE.test(s))) out.push(v);
     }
   }
   conNome(LIBERE.virgola, (m) => nomePw(m[1]) || SOLO_CORTE.test(m[1]), (m) => out.push(...forma(m[2])));
