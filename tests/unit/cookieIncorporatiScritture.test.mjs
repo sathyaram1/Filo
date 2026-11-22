@@ -206,7 +206,8 @@ for (const v of VARIANTI) {
       const passi = (await pulizia(v)).passiContati();
       assert.ok(passi >= 5, `la pulizia fa ${passi} passi`);
       const sbagliati = [];
-      for (let n = 0; n < passi; n++) {
+      // Il passo 0 è la lettura del giro, prima della pulizia: un cookie di sessione che c'è già lì muore con la visita.
+      for (let n = durata === 'sessione' ? 1 : 0; n < passi; n++) {
         const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'nuovo', ...(durata === 'scadenza' ? { expirationDate: fraUnGiorno() } : {}) }));
         const resta = stati(d);
         if (resta.join() !== `nuovo:normale:${durata}`) sbagliati.push(`passo ${n}: ${resta.join(', ')}`);
