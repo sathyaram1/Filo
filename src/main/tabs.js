@@ -2247,22 +2247,7 @@ class TabManager {
         // Niente da giudicare non vuol dire niente da fare: alla riapertura la barra si riordina comunque (#349).
         return this._esitoTriage(this.applyTriageDecisions([], [], opzioni()), { trigger, valutate: 0 });
       }
-      // 1) Duplicati esatti: decisione deterministica e affidabile.
-      const T = globalThis.SN_TAB_TRIAGE;
-      let dupIdx = new Set();
-      if (T) {
-        const activeUrl = (this.tabs.find((t) => t.id === this.activeId) || {}).url || '';
-        dupIdx = T.findDuplicateIndices(
-          cands.map((t) => ({
-            url: t.url,
-            formDirty: !!t.formDirty,
-            lastInteractionAt: t.lastInteractionAt || 0,
-          })),
-          activeUrl,
-        );
-      }
-
-      // 2) LLM per il resto (giudizio). No-op sui duplicati (già decisi sopra).
+      // 1) LLM per il giudizio. I duplicati li decide la regola, alla risposta.
       // Il giudizio può non arrivare (crediti finiti, chiave sbagliata, rete
       // giù): chi ha chiesto il riordino deve saperlo, o legge lo stesso esito
       // di un riordino riuscito in cui non c'era niente da chiudere.
