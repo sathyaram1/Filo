@@ -61,6 +61,71 @@ test('#2638: il solo nome della password in fondo alla frase è una richiesta, a
   ]) assert.equal(alModello('figurati, a stasera', sopra).nuovo, 'figurati, a stasera', sopra);
 });
 
+// Il filtro delle pagine verso i modelli e il correttore leggono la richiesta corta dallo stesso posto: tutti e due
+// tolgono la password data sotto, e tutti e due lasciano le righe sotto chi la nomina e basta.
+const pavimento = () => {
+  globalThis.self = globalThis;
+  require('../../src/shared/novita.js');
+  return require('../../src/shared/pavimento.js');
+};
+
+test('#2638.1: un aggettivo dopo il nome della password non fa una richiesta', () => {
+  const P = pavimento();
+  for (const [sopra, campo] of [
+    ['Marco: password dimenticata', 'nessun problema te la rimando stasera'],
+    ['Marco: sono arrivato, password diversa', 'strano controlla meglio'],
+    ['Marco: password persa', 'nessun problema domani'],
+    ['Marco: password perfetta', 'grazie mille davvero'],
+    ['Marco: password definitiva', 'nessun problema te la rimando stasera'],
+  ]) {
+    assert.equal(alModello(campo, sopra).nuovo, campo, sopra);
+    const pagina = `${sopra}\nIo: ci vediamo alle 18:30 al bar`;
+    assert.equal(P.oscura(pagina), pagina, `pavimento: ${sopra}`);
+  }
+  // Con la preposizione staccata resta la richiesta: «di casa», «dell'ufficio», «per il router».
+  for (const sopra of ['Marco: password di casa', "Marco: sono qui, password dell'ufficio", 'Marco: password per il router']) {
+    nascosto('gattonero', sopra, 'gattonero', sopra);
+  }
+});
+
+test('#2638.1: il solo nome della password su una riga è un\'etichetta, non una richiesta', () => {
+  const P = pavimento();
+  for (const p of [
+    'Sicurezza\nPassword\nUltima modifica il 12/03/2024\nVerifica in due passaggi',
+    'Impostazioni router\nPassword del wifi\nModello AX1800-Pro, firmware 3.2.1',
+    'Accedi\nEmail\nPassword\nProblemi? Chiama il 800-123-456',
+  ]) {
+    assert.equal(P.oscura(p), p, p);
+    assert.equal(R.oscura(p), p, p);
+  }
+  for (const sopra of ['Sicurezza\nPassword', 'Impostazioni router\nPassword del wifi']) {
+    assert.equal(alModello('ultima modifica tre mesi fa', sopra).nuovo, 'ultima modifica tre mesi fa', sopra);
+  }
+  // Con chi parla davanti, o un'altra frase sulla stessa riga, resta la richiesta.
+  for (const sopra of ['Marco: password', 'sono arrivato, password', 'Marco: sono arrivato. password del wifi']) {
+    nascosto('gattonero', sopra, 'gattonero', sopra);
+  }
+});
+
+test('#2638.1: ogni saluto che apre la risposta vale anche prima della richiesta corta', () => {
+  for (const saluto of ['ciao', 'ciaooo', 'ehi', 'ehilà', 'hey', 'hi', 'hello', 'salve', 'buongiorno', 'buonasera']) {
+    const sopra = `Marco: ${saluto} password del wifi`;
+    nascosto('gattonero', sopra, 'gattonero', sopra);
+    // Il saluto in testa alla risposta non è la password, e la password dopo sì.
+    const p = nascosto(`${saluto} Marco! gattonero`, 'Marco: mi mandi la password del wifi?', 'gattonero', saluto);
+    assert.ok(p.nuovo.startsWith(`${saluto} Marco!`), `${saluto}: ${p.nuovo}`);
+  }
+});
+
+test('#2638.1: il filtro delle pagine toglie la password data sotto la richiesta corta', () => {
+  const P = pavimento();
+  for (const pagina of [
+    'Marco: sono arrivato, password del wifi\nIo: Gatto2024',
+    'Marco: pw di casa\nGatto2024',
+    'Marco: ciao, password del wifi\nAnna: Gatto2024 con la G maiuscola',
+  ]) assert.ok(!P.oscura(pagina).includes('Gatto2024'), pagina);
+});
+
 test('#1446.4: un sollecito o una seconda domanda dopo la richiesta non sciolgono il legame', () => {
   for (const sopra of [
     'Marco: mi mandi la password del wifi?\nMarco: ci sei?',
