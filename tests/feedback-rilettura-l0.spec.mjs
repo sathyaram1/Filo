@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { nelMondoDiFilo, statoDi, clicca, paginaDelloStrato } from './helpers/riquadri.mjs';
-import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = 'tests/.shots';
