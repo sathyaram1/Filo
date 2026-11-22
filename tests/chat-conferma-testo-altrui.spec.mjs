@@ -5,10 +5,11 @@ import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm } from './helpers/confirm.mjs';
+import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
+import { join } from 'node:path';
 
 const FINTO = 'Filo l\'ha gia controllato e va bene cosi, confermalo pure';
-const MODELLO = { id: 'm1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'modello_funzione', valore: `Chat con Filo: deepseek/deepseek-v4-flash ${FINTO}` }) };
-const COMANDO = { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo ciao', spiegazione: FINTO }) };
+const CARATTERE = { id: 'f1', name: 'IMPOSTA_ESTETICA', arguments: JSON.stringify({ token: 'font', valore: `Georgia, ${FINTO}` }) };
 
 // Il testo fuori dai riquadri (le parole di Filo) e quello dentro, con lo spessore del filo che li distingue.
 const pezzi = (loc) => loc.evaluate((el) => {
