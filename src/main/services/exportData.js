@@ -681,11 +681,11 @@ function unisciSveglie(local, imported, prossima, adesso) {
   return out;
 }
 
-// `opzioni`: { tettoPagine, tettoAppunti, tettoDownload, prossimaSveglia(t, adesso) → ms, adesso }. Le statistiche
-// contano le sezioni di primo livello; `restano` sono quelle del backup che non si importano perché sono stato.
+// `opzioni`: { tettoPagine, tettoAppunti, tettoDownload, prossimaSveglia(t, adesso) → ms, adesso, proxySenzaCredenziali }.
+// Le statistiche contano le sezioni di primo livello; `restano` sono quelle del backup che non si importano perché sono stato.
 // Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905); un proxy a cui
 // l'esportazione ha tolto utente e password (`tolti`, dal manifesto) non prende il posto di quello di qui che li ha.
-// Uno che li non aveva, che autorizza per indirizzo, vince come ogni altra impostazione (#905.5).
+// Uno che non li aveva, perché autorizza per indirizzo, vince come ogni altra impostazione (#905.5).
 function senzaSegretiVuoti(dati, cur, tolti) {
   if (!isPlainObject(dati.settings)) return dati;
   const settings = JSON.parse(JSON.stringify(dati.settings));
