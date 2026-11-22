@@ -249,7 +249,7 @@ async function togliPartizionati(ses, sito, nomi) {
     const tutti = lista.filter((c) => c.name === nome);
     const posti = new Map();
     for (const c of tutti) posti.set(chiaveCookie(c), c);
-    for (const [k, c] of posti) { apriPulizia(k); await scadi(c); }
+    for (const [k, c] of posti) { apriPulizia(k, tutti); await scadi(c); }
     let partizionati = [];
     try { partizionati = (await ses.cookies.get({ domain: sito })).filter((c) => c.name === nome); } catch (_) {}
     for (const c of partizionati) {
