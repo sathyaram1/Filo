@@ -1984,7 +1984,11 @@
     const esito = E.esitoAzione(a);
     // La stessa voce che archivia il turno (le parole del diario coi numeri, il perché di un no): una regola sola.
     const voce = E.voceArchivio(a) || { type, esito };
-    if (voce.esito === E.FALLITO && chiesta && voce.type !== 'FERMATA') voce.riga = chiesta;
+    if (voce.esito === E.FALLITO && chiesta && voce.type !== 'FERMATA') {
+      voce.riga = chiesta;
+      if (a && a._rigaChiesta === chiesta && a._rigaChiestaParti) voce.parti = a._rigaChiestaParti;
+      else delete voce.parti;
+    }
     if (!voce.riga && fatto) voce.riga = fatto;
     // Quale domanda chiude, fra quelle aperte della risposta che l'aveva proposta.
     if (a) a._voce = { ...voce };
