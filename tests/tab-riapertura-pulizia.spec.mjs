@@ -156,12 +156,8 @@ test('mentre il modello decide, una scheda ripresa resta e una chiusa a mano non
     await shell.evaluate((x) => window.filoShell.tabs.close(x), await id(/rosso\.test/));
     await expect.poll(() => titoliTest(shell), { timeout: 10_000 }).not.toContain('Rosso');
     await app.evaluate(() => globalThis.__rispondiPulizia());
-    await new Promise((r) => setTimeout(r, 5000));
-    console.log('DBG', JSON.stringify(await app.evaluate(({ BrowserWindow }) => {
-      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-      return { pul: tm._ultimaPulizia && tm._ultimaPulizia.schede.map((s) => s.riserva.url), dbg: globalThis.__dbg, running: tm._triageRunning, tabs: tm.tabs.map((t) => [t.url, t.lastInteractionAt, t._dallaSessione]), alle: tm._riapertaAlle };
-    })), JSON.stringify(await avvisi(shell)));
-    await expect.poll(() => avvisi(shell), { timeout: 30_000 }).toContain('Schede riordinate, 1 chiusa. La ritrovi nel filo della home');
+    // Chiuse dalla pulizia: la vecchia e la home della prima sessione, non il verde ripreso né il rosso chiuso a mano.
+    await expect.poll(() => avvisi(shell), { timeout: 30_000 }).toContain('Schede riordinate, 2 chiuse. Le ritrovi nel filo della home');
     expect(await titoliTest(shell), 'la scheda appena ripresa in mano è stata chiusa dalla pulizia').toContain('Verde');
     expect(await titoliTest(shell)).not.toContain('Vecchia');
     const vista = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'la vista degli avvisi non è nata');
