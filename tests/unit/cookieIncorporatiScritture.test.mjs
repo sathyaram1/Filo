@@ -43,19 +43,21 @@ function deposito({ rispostaDopoGliAvvisi, avvisiInRitardo = 0 }) {
   const cookie = new Map();
   const ascolti = [];
   let dopoLettura = null;
-  let passi = -1;
+  // Passi di Filo contati da `contaPassi`: al passo `alPasso.n` il sito scrive mentre Filo aspetta la risposta.
+  let passi = null;
   let alPasso = null;
+  let intestazioni = null;
   const chiave = (c) => `${c.partizionato ? 'P' : ''}|${c.domain}|${c.path}|${c.name}`;
   const pubblico = ({ partizionato, ...c }) => c;
   const piuTardi = (n, f) => (n ? setImmediate(() => piuTardi(n - 1, f)) : f());
   const avvisa = (c, causa, tolto) => piuTardi(1 + avvisiInRitardo, () => { for (const f of ascolti) f({}, pubblico(c), causa, tolto); });
-  // Il sito scrive mentre Filo aspetta la risposta del passo n.
-  const risposta = (r, valore) => {
-    const f = passi >= 0 && passi++ === alPasso ? alPasso && null : null;
-    void f;
-    setImmediate(() => r(valore));
-  };
-  void risposta;
+  function rispondi(valore) {
+    const n = passi == null ? -1 : passi++;
+    return new Promise((r) => setImmediate(() => {
+      if (alPasso && alPasso.n === n) alPasso.f();
+      r(valore);
+    }));
+  }
   function scrivi(d, { partizionato = false } = {}) {
     const ospite = new URL(d.url).hostname;
     const c = {
