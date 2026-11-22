@@ -136,6 +136,42 @@ test('una scheda aperta dopo la riapertura non finisce nella pulizia della sessi
   }
 });
 
+test('mentre il modello decide, una scheda ripresa resta e una chiusa a mano non è della pulizia (#349.2)', async () => {
+  test.setTimeout(150_000);
+  const { server, port } = await servitore();
+  const userData = cartellaTemporanea('filo-test-349-');
+  try {
+    await primaSessione(userData, port);
+    const app = await lancia(userData);
+    const shell = await primaFinestra(app);
+    await modelloFinto(app, { tutte: true, lento: true });
+    await expect.poll(() => app.evaluate(() => globalThis.__giudizioChiesto), { timeout: 60_000 }).toBe(true);
+    // Nell'attesa l'utente passa al verde, lo guarda, torna al documento; e chiude lui il rosso.
+    const id = async (re) => (await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs))
+      .find((t) => re.test(t.url || '')).id;
+    await shell.evaluate((x) => window.filoShell.tabs.activate(x), await id(/verde\.test/));
+    await new Promise((r) => setTimeout(r, 500));
+    await shell.evaluate((x) => window.filoShell.tabs.activate(x), await id(/blu\.test/));
+    await shell.evaluate((x) => window.filoShell.tabs.close(x), await id(/rosso\.test/));
+    await expect.poll(() => titoliTest(shell), { timeout: 10_000 }).not.toContain('Rosso');
+    await app.evaluate(() => globalThis.__rispondiPulizia());
+    await expect.poll(() => avvisi(shell), { timeout: 30_000 }).toContain('Schede riordinate, 1 chiusa. La ritrovi nel filo della home');
+    expect(await titoliTest(shell), 'la scheda appena ripresa in mano è stata chiusa dalla pulizia').toContain('Verde');
+    expect(await titoliTest(shell)).not.toContain('Vecchia');
+    const vista = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'la vista degli avvisi non è nata');
+    const riapri = vista.locator('.shell-notif.show', { hasText: 'Schede riordinate' }).locator('.shell-notif-action', { hasText: 'Riapri' });
+    await expect(riapri).toBeEnabled({ timeout: 10_000 });
+    await riapri.click();
+    await expect.poll(() => titoliTest(shell), { timeout: 15_000 }).toContain('Vecchia');
+    await new Promise((r) => setTimeout(r, 2000));
+    expect(await titoliTest(shell), '«Riapri» ha riportato anche la scheda chiusa a mano').not.toContain('Rosso');
+    await chiudiApp(app);
+  } finally {
+    server.close();
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
 test('l’avviso della riapertura che ha chiuso delle schede le riapre con un clic', async () => {
   test.setTimeout(150_000);
   const { server, port } = await servitore();
