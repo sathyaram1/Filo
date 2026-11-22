@@ -1524,7 +1524,8 @@
     // dell'utente l'azione parte davvero via MSG.FILO_CONFIRM_ACTION.
     if (a._confirm && a._confirm.level >= 2) {
       if (gruppo) gruppo.pendenti.add(a);
-      if (!a._rigaChiesta) a._rigaChiesta = primaRigaConferma(a);
+      const domanda = global.SN_ESITO.rigaDellaDomanda(a._confirm);
+      if (!a._rigaChiesta) { a._rigaChiesta = domanda.riga; a._rigaChiestaParti = domanda.parti; }
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.type = 'button';
