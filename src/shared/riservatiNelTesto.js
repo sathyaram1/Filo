@@ -118,7 +118,7 @@ function richieste(l, tutte = false) {
     const testa = l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split('\n').pop();
     // Il punto di domanda conta nell'inciso che nomina la password: «la password è gattonero, tu quando arrivi?» la dà.
     const inciso = /[,;]\s|[.!?]+(?=\s|$)|\n/.exec(l.slice(m.j, a));
-    const chiesta = !!((inciso && inciso[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(prima(), riga));
+    const chiesta = !!((inciso && inciso[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(testa, riga));
     if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, nome: m.j, fine: a, tipo: m.tipo, chiesta });
   }
   return out;
