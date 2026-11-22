@@ -42,6 +42,7 @@ test('mosse senza effetto: rinomina allo stesso nome, sposta in cima la prima, r
     // Il modello legge lo stesso esito della riga: per le tre mosse senza effetto, che la barra non è cambiata.
     const chiamate = await chiamateAlModello(app);
     const esiti = chiamate.at(-1).filter((m) => m.role === 'tool').map((m) => String(m.content));
+    console.log('ESITI', JSON.stringify(esiti, null, 1));
     expect(esiti.length).toBeGreaterThanOrEqual(5);
     for (const e of esiti.slice(0, 4)) expect(e).toMatch(/invariata/);
     expect(esiti[2]).toMatch(/gia/);
