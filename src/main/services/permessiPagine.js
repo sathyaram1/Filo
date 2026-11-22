@@ -1047,5 +1047,6 @@ module.exports = {
   gestoDiFilo, gestoSulloStrato, gestoNelloStrato, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
+  _usaAnnuncio: (fn) => { annuncia = fn; },
   _usaFontiSchermo: (f) => { fontiDelloSchermo = f; },
 };
