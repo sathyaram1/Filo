@@ -372,8 +372,15 @@ test('dall\'Aiuto: la segnalazione confermata con una password si ferma, e «Man
   const page = await newtab(app);
   await finti(app);
   await page.evaluate(() => window.SN_SIDEBAR.open());
-  await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, { type: 'INVIA_FEEDBACK', testo: TESTO, titolo: 'Accesso alla banca' });
-  await clickConfirm(page, 'ok');
+  const azione = { type: 'INVIA_FEEDBACK', testo: TESTO, titolo: 'Accesso alla banca' };
+  // Una password che l'utente non ha scritto non esce: niente riquadro, la riga dice che si è fermata.
+  expect(await page.evaluate((a) => window.__filoSidebarTest.runFiloAction(a), azione)).toBe(false);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  expect(await invii(app)).toEqual([]);
+
+  await page.evaluate((t) => window.__filoSidebarTest.scriveUtente(t), TESTO);
+  await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, azione);
+  await confermaConLaParola(page);
   // Il modello finto non trova niente: la password la riconosce il controllo senza modello.
   await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
   expect(await invii(app)).toEqual([]);
