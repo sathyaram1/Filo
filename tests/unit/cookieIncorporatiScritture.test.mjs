@@ -85,18 +85,36 @@ function deposito({ rispostaDopoGliAvvisi, avvisiInRitardo = 0 }) {
         const host = f.url ? new URL(f.url).hostname : String(f.domain || '');
         const foto = [...cookie.values()]
           .filter((c) => c.domain.replace(/^\./, '') === host && (!f.name || c.name === f.name))
-          .map((c) => ({ ...c }));
+          .map(pubblico);
         const passo = dopoLettura;
         dopoLettura = null;
         if (rispostaDopoGliAvvisi && passo) passo();
-        return new Promise((r) => setImmediate(() => { if (!rispostaDopoGliAvvisi && passo) passo(); r(foto); }));
+        if (passo && !rispostaDopoGliAvvisi) return new Promise((r) => setImmediate(() => { passo(); r(foto); }));
+        return rispondi(foto);
       },
-      set: (d) => new Promise((r) => { scrivi(d); setImmediate(r); }),
-      remove: async () => {},
+      set: (d) => { scrivi(d); return rispondi(); },
+      remove: (url, nome) => {
+        const host = new URL(url).hostname;
+        for (const [k, c] of [...cookie]) {
+          if (c.name !== nome || c.domain.replace(/^\./, '') !== host) continue;
+          cookie.delete(k);
+          avvisa(c, 'explicit', true);
+        }
+        return rispondi();
+      },
     },
-    webRequest: { onHeadersReceived() {} },
+    webRequest: { onHeadersReceived(f) { intestazioni = f; } },
   };
-  return { ses, scrivi, cookie: (nome) => [...cookie.values()].filter((c) => c.name === nome), poiLettura: (f) => { dopoLettura = f; } };
+  return {
+    ses,
+    scrivi,
+    cookie: (nome) => [...cookie.values()].filter((c) => c.name === nome),
+    poiLettura: (f) => { dopoLettura = f; },
+    contaPassi: () => { passi = 0; },
+    passiContati: () => passi,
+    alPasso: (n, f) => { alPasso = { n, f }; },
+    intestazioni: (d) => new Promise((r) => intestazioni(d, r)),
+  };
 }
 
 function caricaModulo() {
