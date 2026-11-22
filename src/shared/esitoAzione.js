@@ -379,12 +379,14 @@
     const diretta = esito === CHIESTO || esito === FALLITO ? null : rigaDelDiario(x);
     if (diretta && diretta.failed) esito = FALLITO;
     let riga = '';
-    if (esito === CHIESTO) riga = primaRiga(x._confirm && x._confirm.text) || (L ? frase(L.describe, x) : '');
+    let parti = null;
+    const chiesta = (d) => { riga = d.riga; parti = d.parti; };
+    if (esito === CHIESTO) chiesta(domandaDi(x, L));
     // Non riuscita dopo un OK: la domanda a cui l'utente ha risposto, come la diceva il bottone.
-    else if (esito === FALLITO) riga = primaRiga(x._rigaChiesta) || (L ? frase(L.describe, x) : '');
+    else if (esito === FALLITO) chiesta(x._confirm ? domandaDi(x, L) : { riga: primaRiga(x._rigaChiesta) || (L ? frase(L.describe, x) : ''), parti: null });
     else riga = (diretta && primaRiga(diretta.text)) || (L ? frase(L.describeDone, x) : '');
-    if (!riga && x._domanda && L) riga = frase(L.describe, x);
-    if (SENZA_TITOLO[type]) riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1];
+    if (!riga && x._domanda && L) chiesta(domandaDi({ ...x, _confirm: null }, L));
+    if (SENZA_TITOLO[type]) { riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1]; parti = null; }
     const fatta = esito !== FALLITO && esito !== CHIESTO;
     const file = type === 'APRI_FILE' && fatta ? fileDi(x) : null;
     const link = type === 'NAVIGA' && fatta ? linkDi(x) : null;
