@@ -96,7 +96,9 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     await ridato.scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui-bottone.png' });
     await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
-    await page.waitForTimeout(500);
+    await page.reload();
+    await expect(ridato).toBeVisible({ timeout: 8_000 });
+    await page.waitForTimeout(300);
     await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui-bottone-scuro.png' });
   } finally {
     await ripristina(app);
