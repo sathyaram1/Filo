@@ -3488,6 +3488,8 @@
     DEFAULT_PROVIDER,
     PROVIDER_ORDER,
     modelProvidersWithKey,
+    CAMPI_PROXY,
+    leggiProxy,
     credenzialiProxy,
     segretiDelProxy,
     percorsiSegreti,
