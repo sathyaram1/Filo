@@ -346,8 +346,10 @@ test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non ma
     window.__filoDashActions.renderActions(host, [a], { autoConfirm: true });
   }, { a: action, id });
 
+  await page.evaluate((t) => window.__filoDashActions.scriveUtente(t), TESTO);
+
   await proponi('prova-chat-1');
-  await clickConfirm(page, 'ok');
+  await confermaConLaParola(page);
   await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
   expect(await confirmText(page)).toContain('password');
   await page.screenshot({ path: `${SHOTS}/1403.1-chat-rilettura.png` });
@@ -356,7 +358,7 @@ test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non ma
   expect(await invii(app), '«Non mandarla»: non parte').toEqual([]);
 
   await proponi('prova-chat-2');
-  await clickConfirm(page, 'ok');
+  await confermaConLaParola(page);
   await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
   const chiamate = await chiamateTesto(app);
   await clickConfirm(page, 'ok');
