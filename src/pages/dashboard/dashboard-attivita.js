@@ -1557,8 +1557,11 @@
         if (short !== cmdText) btn.title = cmdText;
         segnaComando('▶');
       } else {
-        if (domanda.parti) conRiquadri(btn, domanda.parti);
-        else btn.textContent = shortLabel;
+        if (domanda.parti) {
+          const s = document.createElement('span');
+          conRiquadri(s, domanda.parti);
+          btn.replaceChildren(s);
+        } else btn.textContent = shortLabel;
         const segnalazione = RA.testoSegnalazione(a);
         if (segnalazione) btn.title = segnalazione;
       }
