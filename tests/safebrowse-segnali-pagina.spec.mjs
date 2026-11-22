@@ -492,5 +492,5 @@ test('il clic che Filo dà da sé sul «Salta» di una pubblicità non rende vol
   }, { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) });
   const a = await avvisoDi(app, 'salta-pubblicita.it');
   expect(a.level).toBe('sospetto');
-  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma («setup.exe»)');
+  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma «setup.exe»');
 });
