@@ -73,6 +73,24 @@ test('col portachiavi nessun segreto resta leggibile nel file, e alla riapertura
   }
 });
 
+// #905.4: la forma degli elenchi dei fornitori porta la password quanto le altre.
+test('col portachiavi un proxy «host:porta:utente:password» non resta in chiaro nel file', async () => {
+  const userData = cartellaTemporanea('filo-segreti-elenco-');
+  try {
+    cifraturaAccesa = true;
+    const S = avvia(userData);
+    const settings = { theme: 'dark', proxy: { datacenter: `gate.esempio.com:8080:mario:${PASSWORD}` } };
+    await S.set({ settings });
+    await S.whenSettled();
+    const testo = readFileSync(join(userData, 'storage.json'), 'utf8');
+    assert.equal(testo.includes(PASSWORD), false, 'la password del proxy è sul disco in chiaro');
+    assert.match(JSON.parse(testo).settings.segretiEnc, /^safeStorage:v1:/);
+    assert.deepEqual((await avvia(userData).get('settings')).settings, settings, 'alla riapertura il proxy torna intero');
+  } finally {
+    togliCartella(userData);
+  }
+});
+
 test('un file con la chiave di Safe Browsing e il proxy in chiaro si riscrive cifrato appena Filo lo legge', async () => {
   const userData = cartellaTemporanea('filo-segreti-migra-');
   try {
