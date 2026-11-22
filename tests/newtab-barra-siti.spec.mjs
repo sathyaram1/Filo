@@ -295,7 +295,9 @@ test('#1803.2 una mossa a parole che lascia la barra com\'era: né la riga, né 
     await expect(page.locator('#bubbles')).not.toContainText('Messo nella barra');
     await expect.poll(() => page.locator('#bubbles').innerText().then((t) => (t.match(/Ha sistemato la barra dei siti/g) || []).length)).toBe(1);
     expect((await salvate(app)).map((v) => v.nome)).toEqual(['Video', 'Gmail']);
-    esiti = (await chiamateAlModello(app)).at(-1).filter((m) => m.role === 'tool').map((m) => String(m.content));
+    await page.locator('.dash-activity').first().click().catch(() => {});
+    await scatta(page, 'gia-cosi');
+    esiti =(await chiamateAlModello(app)).at(-1).filter((m) => m.role === 'tool').map((m) => String(m.content));
   } finally { await ripristina(app); }
   expect(esiti).toHaveLength(4);
   for (const e of esiti.slice(0, 3)) expect(e).toMatch(/^Non cambiato niente: /);
