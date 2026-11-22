@@ -122,11 +122,19 @@
   // La trascrizione per CERCA_CHAT con l'id: intera fino a `cap`, oltre testa e coda, e la parte omessa si legge
   // davvero, a pezzi, richiamando con `da` (#868: il contesto della chat promette di rileggere intero un messaggio tagliato).
   const PEZZO_RILETTURA = 30000;
+  // Un messaggio come lo legge il modello in una conversazione riletta o ripescata, con com'è andata ogni azione di
+  // Filo (#1685.3): anche una risposta fatta della sola proposta in attesa del sì (#1130.2). '' se non c'è niente.
+  function rigaTrascritta(m) {
+    if (!m) return '';
+    const testo = String(m.text == null ? '' : m.text).replace(/\s+/g, ' ').trim();
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
+    const ES = global.SN_ESITO;
+    const esiti = m.role !== 'user' && ES && Array.isArray(m.esiti) ? ES.perTrascrizione(ES.daRaccontare(m.esiti, false)) : '';
+    if (!testo && !esiti) return '';
+    return `${m.role === 'user' ? 'Utente' : 'Filo'}:${testo ? ` ${testo}` : ''}${esiti ? `\n${esiti}` : ''}`;
+  }
   function transcriptForReading(messages, { da = null, cap = 8000, pezzo = PEZZO_RILETTURA } = {}) {
-    const full = (Array.isArray(messages) ? messages : [])
-      .filter((m) => m && String(m.text || '').trim())
-      .map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${String(m.text).replace(/\s+/g, ' ').trim()}`)
-      .join('\n');
+    const full = (Array.isArray(messages) ? messages : []).map(rigaTrascritta).filter(Boolean).join('\n');
     const n = full.length;
     const inizio = Number(da);
     if (da == null || da === '' || !Number.isFinite(inizio)) {
@@ -656,6 +664,7 @@
     parseTriage,
     transcriptForTriage,
     transcriptForReading,
+    rigaTrascritta,
     PEZZO_RILETTURA,
     toIndexEntry,
     excerptOf,
