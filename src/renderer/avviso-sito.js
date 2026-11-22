@@ -71,6 +71,7 @@
       level: s.level === 'pericoloso' ? 'pericoloso' : 'sospetto',
       title: String(s.title || ''),
       body: String(s.body || ''),
+      parti: Array.isArray(s.parti) && s.parti.every((p) => typeof p === 'string' || (p && typeof p.citazione === 'string')) ? s.parti : null,
       prima: Number(s.prima) > 0,
     });
   });
