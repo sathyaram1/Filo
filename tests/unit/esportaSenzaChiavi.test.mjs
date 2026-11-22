@@ -34,6 +34,8 @@ function sorgente() {
 const FILO = Buffer.from(`{"tipo":"messaggio","testo":"imposta la chiave openrouter ${CHIAVE}"}\n{"tipo":"messaggio","testo":"grazie"}\n`, 'utf8');
 
 const voce = (zip, nome) => unzip(zip).voci.get(nome).toString('utf8');
+// Come l'importazione dell'app: il manifesto dice quali proxy l'esportazione ha lasciato senza credenziali.
+const importa = (qui, parsed) => mergeImportedData(qui, parsed.data, { proxySenzaCredenziali: parsed.proxySenzaCredenziali });
 
 test('di serie l\'archivio non contiene nessuna chiave, da nessuna parte', () => {
   const zip = buildExportZip(sorgente(), { filo: FILO });
