@@ -840,7 +840,7 @@ test('la pagina Sicurezza già aperta si aggiorna da sé quando si risponde a un
   }, origine + '/microfono');
   const tolte = await shell.evaluate((x) => window.filoShell.tabs.dimenticaPermessi(x), id);
   expect(tolte.tolte, 'la scheda aveva la risposta da togliere').toBe(1);
-  await expect(righe).toHaveText(['Nessuna risposta data a un sito'], { timeout: 5_000 });
+  await expect(righe).toHaveText(NESSUNA, { timeout: 5_000 });
 });
 
 // Quello che si toglie dalla pagina Sicurezza aperta in incognito resta tolto, come dalla finestra normale (#591.6).
