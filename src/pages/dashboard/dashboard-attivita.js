@@ -2343,7 +2343,8 @@
       // La conferma rimasta senza risposta ritrova il suo bottone: il popup richiede il sì come allora (#1685).
       if (v.esito === E.CHIESTO && v.azione && v.conferma) {
         const btn = renderActionButton({
-          ...v.azione, type: v.type, _confirm: { level: v.conferma.livello, text: v.conferma.testo }, _executed: false,
+          ...v.azione, type: v.type, _executed: false,
+          _confirm: { level: v.conferma.livello, text: v.conferma.testo, ...(v.conferma.parti ? { parti: v.conferma.parti } : {}) },
           ...(v.conferma.domanda ? { _domanda: v.conferma.domanda } : {}),
         }, { chat, gruppo });
         if (btn) { wrap.appendChild(btn); continue; }
