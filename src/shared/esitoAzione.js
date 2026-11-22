@@ -465,14 +465,21 @@
     if (!v || !v.type) return null;
     const riga = pulito(v.riga);
     if (v.type === 'FERMATA') return { icona: '🔒', testo: riga || 'Fermata: avrebbe portato fuori un segreto', fallita: true };
-    if (v.esito === CHIESTO) return { icona: '❔', testo: `Conferma chiesta${riga ? ` · ${riga}` : ''}`, fallita: true };
+    // La riga a pezzi, se il testo altrui c'è: chi disegna lo mette nel suo riquadro (#592.25).
+    const parti = partiDellaRiga(v.parti, riga);
+    if (v.esito === CHIESTO) {
+      const testo = `Conferma chiesta${riga ? ` · ${riga}` : ''}`;
+      return { icona: '❔', testo, fallita: true, ...(parti ? { parti: ['Conferma chiesta · ', ...parti] } : {}) };
+    }
     if (v.esito === FALLITO) {
       const perche = pulito(v.motivo);
       // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
       const R = global.SN_RIGHE_ATTIVITA;
       const no = v.no === true || v.motivo === MOTIVO_NO;
       const etichetta = R ? R.etichettaNonFatta(v.type, { no, partita: v.partita === true }) : '';
-      return { icona: '⚠', testo: [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · '), fallita: true };
+      const testo = [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · ');
+      const aPezzi = !etichetta && parti ? ['Non riuscita · ', ...parti, ...(perche ? [` · ${perche}`] : [])] : null;
+      return { icona: '⚠', testo, fallita: true, ...(aPezzi ? { parti: aPezzi } : {}) };
     }
     if (!riga) return null;
     return { icona: '✓', testo: riga, fallita: false };
