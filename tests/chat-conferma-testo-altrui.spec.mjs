@@ -58,9 +58,9 @@ test('il bottone, il diario e la chat riaperta tengono il valore del modello nel
     const riga = page.locator('.dash-bubble-filo .dash-activity-row', { hasText: 'Conferma chiesta' }).first();
     await expect(riga).toHaveCount(1);
     const r = await pezzi(riga);
-    expect(r.fuori).toMatch(/^Conferma chiesta · Cambiare/);
-    expect(r.fuori).not.toMatch(/Georgia|confermalo/);
-    expect(r.dentro).toMatch(/^Georgia/);
+    expect(r.fuori).toMatch(/^Conferma chiesta · Filo vuole impostare/);
+    expect(r.fuori).not.toMatch(/fornitore|confermalo/);
+    expect(r.dentro).toMatch(/^fornit/);
     await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui.png' });
 
     // Riaperta senza risposta: bottone e popup tornano coi riquadri.
