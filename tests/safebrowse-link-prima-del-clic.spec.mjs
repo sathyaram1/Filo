@@ -413,7 +413,7 @@ test('un link «scarica» a un file travestito: al clic l\'avviso, il file non p
     await fuocoAllaPagina(app);
     await contaScaricamenti(app);
     await clicFermato(app, '#nominato');
-    await expect(avviso.getByText(/«ricevuta\.jpg\.scr»/)).toBeVisible();
+    await expect(nomeNellAvviso(avviso, 'ricevuta.jpg.scr')).toBeVisible();
     await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
     expect(await scaricamenti(app)).toEqual([]);
   } finally { await s.chiudi(); }
