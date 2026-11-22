@@ -165,10 +165,10 @@ test('un archivio col proxy senza schema e senza credenziali non cancella quello
   const parsed = readExportZip(buildExportZip(dati));
   assert.equal(parsed.data.settings.proxy.datacenter, 'gate.example.com:7000');
   assert.deepEqual(parsed.proxySenzaCredenziali, ['datacenter']);
-  const qui = mergeImportedData({ settings: { proxy: { datacenter: completo } } }, parsed.data).merged;
+  const qui = importa({ settings: { proxy: { datacenter: completo } } }, parsed).merged;
   assert.equal(qui.settings.proxy.datacenter, completo);
   assert.deepEqual(proxyDaCompletare(qui, parsed.proxySenzaCredenziali), []);
-  const altrove = mergeImportedData({ settings: {} }, parsed.data).merged;
+  const altrove = importa({ settings: {} }, parsed).merged;
   assert.deepEqual(proxyDaCompletare(altrove, parsed.proxySenzaCredenziali), ['datacenter'], 'la conferma deve dirlo');
 });
 
