@@ -27,8 +27,46 @@
     }
   }
 
+  // Tavily si paga come un modello (#591.6): parte solo sotto il limite di spesa del mese ed entra nel suo conto.
+  // Prezzo del credito a consumo del listino pubblico, il più alto: con un piano il conto sbaglia per eccesso, mai sotto.
+  const USD_PER_CREDITO_TAVILY = 0.008;
+  const AZIONE_RICERCA = 'ricerca_web';
+
+  async function impostazioniDelConto() {
+    try { return (await global.SN_STORAGE?.getSettings?.()) || {}; } catch (_) { return {}; }
+  }
+
+  function limiteRaggiunto() {
+    const G = global.SN_MODEL_GATE;
+    if (G && typeof G.limitError === 'function') return G.limitError();
+    const e = new Error('Limite di spesa mensile raggiunto.');
+    e.code = 'LIMIT_REACHED';
+    return e;
+  }
+
+  // Il servizio dice i crediti spesi quando li dice; se no una ricerca base ne costa uno, una avanzata due.
+  function creditiDi(data, profondita) {
+    const detti = Number(data && data.usage && data.usage.credits);
+    if (Number.isFinite(detti) && detti >= 0) return detti;
+    return profondita === 'advanced' ? 2 : 1;
+  }
+
+  async function segnaNelConto(data, profondita, s) {
+    const C = global.SN_COSTS;
+    if (!C || typeof C.record !== 'function') return;
+    const costUsd = creditiDi(data, profondita) * USD_PER_CREDITO_TAVILY;
+    if (!(costUsd > 0)) return;
+    // `keySource` non è la chiave personale di OpenRouter: il registro d'uso sul server non la scrive come sua.
+    try {
+      await C.record({ action: AZIONE_RICERCA, provider: 'tavily', model: 'tavily', usage: { costUsd, keySource: 'tavily' }, usdToEur: s.usdToEur });
+    } catch (e) { console.warn('[SN] costo della ricerca non registrato:', (e && e.message) || e); }
+  }
+
   // L'unica domanda a Tavily: la usano anche le immagini della chat (#2272), che chiedono `extra` in più.
   async function richiestaTavily({ query, apiKey, maxResults, extra = {}, signal }) {
+    const s = await impostazioniDelConto();
+    const C = global.SN_COSTS;
+    if (C && typeof C.isOverLimit === 'function' && await C.isOverLimit(s.monthlyLimitEur)) throw limiteRaggiunto();
     const r = await fetch(TAVILY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
