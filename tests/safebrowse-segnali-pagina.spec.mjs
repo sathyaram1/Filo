@@ -158,7 +158,12 @@ test('doppia estensione: aprire /fattura.pdf.exe, o scaricare fattura.pdf.exe co
   const archivio = await openTab('https://archivio-fatture.it/');
   await archivio.click('#fattura', { noWaitAfter: true });
   const avviso = await vistaAvviso(app);
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible({ timeout: 6000 });
+  await expect(avviso.locator('#corpo')).toContainText(': sembra un documento, ma è un programma', { timeout: 6000 });
+  // Il nome lo sceglie chi serve il file: sta nel suo riquadro, non fra le parole di Filo (#592.25).
+  const nome = avviso.locator('#corpo .altrui');
+  await expect(nome).toHaveText('fattura.pdf.exe');
+  expect(await nome.evaluate((el) => getComputedStyle(el).borderLeftWidth)).toBe('3px');
+  await avviso.screenshot({ path: 'tests/.shots/safebrowse-nome-nel-riquadro.png' });
   // Il clic c'è stato: il file non è partito da solo.
   await expect(avviso.getByText(/da sola/)).toHaveCount(0);
   const continua = avviso.getByRole('button', { name: 'Continua' });
