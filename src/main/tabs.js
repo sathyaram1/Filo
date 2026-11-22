@@ -2280,10 +2280,31 @@ class TabManager {
       }
       this._dichiaraGiudizio(giudizioMancato, errore, trigger);
 
+      // Il modello ha giudicato la barra di quando è partito il giro: si applica solo a chi ne è ancora parte.
+      const ancora = cands.map((t) => this._delGiro(t, trigger, dal));
+      // 2) Duplicati esatti, sulla barra di adesso: l'esemplare da tenere può essere stato chiuso o ripreso nell'attesa.
+      const T = globalThis.SN_TAB_TRIAGE;
+      let dupIdx = new Set();
+      if (T) {
+        const activeUrl = (this.tabs.find((t) => t.id === this.activeId) || {}).url || '';
+        const restanti = this.tabs.filter((t) => !cands.includes(t) || !ancora[cands.indexOf(t)]);
+        const vive = cands.map((t, i) => ({ t, i })).filter(({ i }) => ancora[i]);
+        // Una scheda fuori dal giro con lo stesso indirizzo è l'esemplare tenuto: le sue copie nel giro sono doppioni.
+        const dup = T.findDuplicateIndices(
+          [...vive.map(({ t }) => t), ...restanti].map((t, j) => ({
+            url: t.url,
+            formDirty: !!t.formDirty,
+            lastInteractionAt: j < vive.length ? t.lastInteractionAt || 0 : Infinity,
+          })),
+          activeUrl,
+        );
+        for (const j of dup) if (j < vive.length) dupIdx.add(vive[j].i);
+      }
+
       // I duplicati vincono sempre su un "tieni" dell'LLM.
       const byIndex = new Map();
       for (const d of decisions) {
-        if (d && typeof d.i === 'number') byIndex.set(d.i, d);
+        if (d && typeof d.i === 'number' && ancora[d.i]) byIndex.set(d.i, d);
       }
       for (const i of dupIdx) {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
