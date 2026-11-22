@@ -116,6 +116,7 @@ test('il bottone di un comando mette la spiegazione scritta dal modello nel suo 
     const b = await pezzi(bottone.locator('.dash-cmd-btn-cosa'));
     expect(b.fuori.trim()).toBe('▶');
     expect(b.dentro).toBe(FINTO);
+    await page.screenshot({ path: 'tests/.shots/chat-conferma-testo-altrui-comando.png' });
   } finally {
     await ripristina(app);
     togliCartella(dir);
