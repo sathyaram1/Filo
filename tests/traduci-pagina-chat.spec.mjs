@@ -355,7 +355,8 @@ test('Alt+T senza selezione dopo un clic nel riquadro incorporato traduce la pag
   const riquadro = page.frameLocator('#embed');
 
   // Con il testo scelto nel riquadro (doppio clic vero, come lo manda il sistema): la risposta su quello, e la pagina resta com'è.
-  await expect.poll(() => page.frames().length).toBeGreaterThan(1);
+  await expect(riquadro.locator('#w')).toBeVisible();
+  await page.waitForTimeout(500);
   const box = await riquadro.locator('#w').boundingBox();
   await app.evaluate(({ BrowserWindow }, { x, y }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
