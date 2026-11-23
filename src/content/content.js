@@ -3107,6 +3107,13 @@
     return lastMouseEvent;
   }
 
+  // Sulle pagine di Filo non c'è niente da tradurre.
+  function traduciDalTasto() {
+    if (location.protocol === 'filo:' || !TranslatePage || !TranslatePage.dalTasto || !TranslatePage.dalTasto()) {
+      Popup.toastErrore('err_no_selection');
+    }
+  }
+
   function handleShortcut(command, context) {
     if (isBlocked()) return;
     const selInfo = Extract.getSelectionWithSentence();
