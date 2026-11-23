@@ -1,5 +1,5 @@
 // #591.7 — la copia nascosta riceve la pagina e i suoi riquadri in sandbox senza `allow-modals`, così print() non apre la
-// finestra del sistema neanche a pagina caricata; la politica del sito resta intera accanto. Regola in safebrowse/sandbox.js.
+// finestra del sistema neanche a pagina caricata, né servita da un service worker. Regola in safebrowse/sandbox.js.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
