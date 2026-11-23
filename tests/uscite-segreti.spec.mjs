@@ -1652,7 +1652,7 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
 
   // La domanda dopo, l'assistente sa che il collegamento non si è aperto.
   await scriviAllAiuto(aiuto, 'l’hai aperta?');
-  await expect.poll(() => app.evaluate(() => JSON.stringify(globalThis.__visti.at(-1))), { timeout: 20_000 }).toContain('non si è aperto');
+  expect(JSON.stringify(await turnoDellAiuto(app, 'l’hai aperta?'))).toContain('non si è aperto');
 
   await link('la guida').first().click();
   await expect.poll(() => apertoVerso(app, 'guida.example'), { timeout: 10_000 }).toBe(true);
