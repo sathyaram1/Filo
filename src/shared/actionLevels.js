@@ -1949,15 +1949,19 @@
     return '';
   }
 
-  // TRADUCI_PAGINA che torna all'originale: il popup e chi esegue leggono lo stesso campo, anche scritto come testo.
+  // TRADUCI_PAGINA: le regole stanno in src/shared/traduzioneDellaPagina.js, lette anche dall'Aiuto della pagina.
+  const traduzione = () => {
+    if (!global.SN_TRADUZIONE_PAGINA && typeof require === 'function') require('./traduzioneDellaPagina.js');
+    return global.SN_TRADUZIONE_PAGINA;
+  };
   function alOriginale(action) {
-    const v = action && action.originale;
-    return v === true || String(v ?? '').trim().toLowerCase() === 'true';
+    return traduzione().alOriginale(action && action.originale);
   }
 
-  // Gli esiti di TRADUCI_PAGINA in cui la pagina è cambiata davvero: chiudono il turno da soli e contano come uso.
+  // Gli esiti in cui la pagina è cambiata davvero: chiudono il turno da soli e contano come uso.
   function traduzioneFatta(stato) {
-    return stato === 'partita' || stato === 'originale' || stato === 'fermata';
+    const S = traduzione();
+    return S.STATI[S.stato(stato)].cambiata;
   }
 
   // Quanti file per richiesta si cancellano (#1909) e si rinominano (#950: ognuno costa una lettura e una chiamata al
