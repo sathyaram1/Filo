@@ -1800,12 +1800,13 @@ test('#1994 — le graffe si aprono in un tempo che cresce con la lunghezza, non
 test('#1994.1 — una lunga catena che si passa $_ si misura in un tempo che cresce con la lunghezza', () => {
   for (const shell of ['bash', 'sh']) {
     const ctx = { cwd: '/home/u/proj', home: '/home/u', shell };
-    // Col conto rifatto a ogni `$_` quattromila comandi costavano più di cento unità, dodicimila più di mille.
+    // Col conto rifatto a ogni `$_` le tre righe costavano quasi quattromila unità; lineari una ventina su Linux e
+    // quasi settanta sul Windows del cancello (#2652): il tetto sta in mezzo, lontano da tutti e due.
     const c = costoInUnita(() => {
       C.classify(`echo a; ${'git log $_; '.repeat(4000)}`, ctx);
       C.classify(`echo a; ${'git log $_; '.repeat(12000)}`, ctx);
       C.classify(`${'echo x || '.repeat(15)}echo a; ${'git log $_; '.repeat(12000)}`, ctx);
-    }, { tetto: 60 });
+    }, { tetto: 500 });
     assert.ok(c.entro, `${shell}: ${c.come}`);
     // Dentro il tetto delle misure `$_` vale ancora il suo valore; oltre, la riga chiede.
     assert.equal(C.classify(`echo a; ${'git log $_; '.repeat(4000)}`, ctx), 1, shell);
