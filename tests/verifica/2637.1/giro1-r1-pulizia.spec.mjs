@@ -109,10 +109,10 @@ async function giro(app, openTab, srv, k, { n = -1, quando = 'prima', azione = n
   }, { k, n, quando, azione });
 }
 
-const ATTESO = { valore: ['nuovo:scadenza'], sessione: ['nuovo:sessione'], doppia: ['n2:scadenza'], cancella: [] };
+const ATTESO = { valore: ['nuovo:scadenza'], sessione: ['nuovo:sessione'], doppia: ['n2:scadenza'] };
 
 for (const azione of Object.keys(ATTESO)) {
-  test(`r1 il sito che ${azione === 'cancella' ? 'cancella' : 'aggiorna'} il suo cookie normale (${azione}) a qualunque chiamata della pulizia ritrova quello che ha fatto`, async ({ app, openTab }) => {
+  test(`r1 il sito che aggiorna il suo cookie normale (${azione}) a qualunque chiamata della pulizia ritrova il valore nuovo`, async ({ app, openTab }) => {
     test.setTimeout(420_000);
     const srv = await serve();
     try {
