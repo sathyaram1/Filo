@@ -408,7 +408,7 @@ async function azioneTraduciPagina(action, { sender }) {
     return { executed: false, kept: false, output: { traduzione: 'coperta', originale } };
   }
   const r = await chiediTraduzione(tab, originale);
-  const stato = Object.hasOwn(STATI_TRADUZIONE, r && r.stato) ? r.stato : 'muto';
+  const stato = S.stato(r && r.stato);
   const output = { traduzione: stato, originale };
   // Chiesta dalla home, la pagina è l'ultima scheda web usata: l'utente non la vede cambiare, e va detto dove.
   if (tab.id !== tm.activeId) output.dietro = true;
