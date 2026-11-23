@@ -149,6 +149,7 @@ require(path.join(SHARED, 'marchiInvisibili.js'));  // #889 — i marchi aperti 
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 // #530 — la regola «Filo può fare X?» come dati: prima del registro, che le passa gli ingressi.
 require(path.join(SHARED, 'autonomia.js'));
+require(path.join(SHARED, 'traduzioneDellaPagina.js'));  // #504 — le risposte della pagina sulla traduzione: chat, Aiuto e pagina
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'azioniPerModello.js'));  // come un'azione torna al modello: «voce N» e testi salvati recintati (#592.4)
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
