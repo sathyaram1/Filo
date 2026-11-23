@@ -474,14 +474,11 @@ test('#2085 nell\'Aiuto la pagina di una scheda lasciata resta nella conversazio
   const { aiuto } = await gettoneNellAiuto(app, shell, openTab, testServer);
   await aiutoFinto(app);
   await chiediAllAiuto(aiuto, 'come ha fatto a volare?');
-  await expect.poll(() => app.evaluate(() => (globalThis.__visti || []).length), { timeout: 15_000 }).toBeGreaterThan(0);
+  await turnoDellAiuto(app, 'come ha fatto a volare?', 0, { timeout: 15_000 });
   await expect(aiuto.locator('.sn-sidebar-msg-user .sn-bolla-gettone')).toHaveCount(1, { timeout: 15_000 });
   await aiuto.waitForTimeout(2000);
-  const prima = await app.evaluate(() => globalThis.__visti.length);
   await chiediAllAiuto(aiuto, 'e chi la ha lanciata?');
-  await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 15_000 }).toBeGreaterThan(prima);
-  const seconda = await app.evaluate(() => JSON.stringify(globalThis.__visti.at(-1)));
-  expect(seconda).toContain('e chi la ha lanciata?');
+  const seconda = JSON.stringify(await turnoDellAiuto(app, 'e chi la ha lanciata?', 0, { timeout: 15_000 }));
   expect(seconda).toContain('Falcon Heavy');
   // Una volta sola: la cronologia la porta, il messaggio nuovo non la ripete.
   expect(seconda.split('Falcon Heavy').length - 1).toBe(1);
