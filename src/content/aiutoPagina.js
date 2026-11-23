@@ -183,23 +183,14 @@
     translate_page: { target: 'none', costo: 1, label: 'traduci la pagina' },
   });
 
-  // Com'è andata la traduzione chiesta all'Aiuto, in una riga del diario: gli stati sono quelli di SN_TRANSLATE_PAGE.daChat.
-  const RIGHE_TRADUZIONE = Object.freeze({
-    partita: (r) => (r.come === 'ripresa' ? 'traduzione della pagina ripresa da dove si era fermata'
-      : r.come === 'nuovo' ? 'traduzione partita sul solo testo comparso dopo' : 'traduzione della pagina partita'),
-    in_corso: () => 'la pagina si sta già traducendo',
-    gia_tradotta: () => 'la pagina è già tradotta tutta',
-    originale: () => 'pagina rimessa nella lingua originale',
-    fermata: () => 'traduzione fermata, pagina rimessa nella lingua originale',
-    niente: () => 'la pagina non era tradotta: è già nella lingua originale',
-  });
+  // Le risposte e le loro righe sono quelle della chat (src/shared/traduzioneDellaPagina.js).
   function traduciPagina(page) {
     const T = global.SN_TRANSLATE_PAGE;
-    const originale = page.originale === true || String(page.originale ?? '').trim().toLowerCase() === 'true';
-    const r = T && typeof T.daChat === 'function' ? T.daChat(originale) : null;
-    const riga = r && RIGHE_TRADUZIONE[r.stato];
-    if (!riga) return { ok: false, riga: 'traduci la pagina: qui non si può tradurre' };
-    return { ok: true, riga: riga(r) };
+    const S = global.SN_TRADUZIONE_PAGINA;
+    if (!S) return { ok: false, riga: 'traduci la pagina: non riuscita' };
+    const r = (T && typeof T.daChat === 'function' && T.daChat(S.alOriginale(page.originale))) || {};
+    const voce = S.STATI[S.stato(r.stato)];
+    return { ok: voce.fatta, riga: voce.aiuto(r) };
   }
 
   // Come Alt+S: le pagine di Filo non si mettono da parte, tranne quella d'errore, che salva il sito non caricato.

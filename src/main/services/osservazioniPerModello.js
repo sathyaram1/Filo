@@ -1320,27 +1320,6 @@ function conTitolo(frase, titolo) {
   return t ? `${frase}\nIl titolo della scheda:\n${E.imbusta({ tipo: 'DATI_PAGINA', testo: t })}` : frase;
 }
 
-// #504 — com'è andata la traduzione chiesta a parole: «già tradotta» o «già com'era» non sono un fatto da annunciare.
-const DILLO = ' Dillo all\'utente, e non ripetere l\'azione uguale.';
-const ESITI_TRADUZIONE = Object.freeze({
-  partita: (o) => {
-    if (o.come === 'ripresa') {
-      const quanti = o.mancanti && o.di ? ` (mancavano ${o.mancanti} blocchi su ${o.di})` : '';
-      return `Traduzione ripresa da dove si era fermata${quanti}: la parte già tradotta non si rifà. La pagina mostra a che punto è e avvisa quando ha finito.`;
-    }
-    if (o.come === 'nuovo') return 'Traduzione partita sul solo testo comparso dopo; il resto era già tradotto. La pagina avvisa quando ha finito.';
-    return 'Traduzione della pagina partita: la pagina mostra a che punto è e avvisa quando ha finito.';
-  },
-  in_corso: () => `La pagina si sta già traducendo: niente rilanciato.${DILLO}`,
-  gia_tradotta: () => `La pagina è già tradotta tutta: non c'è altro da tradurre.${DILLO} Per tornare alla lingua originale: scheda(traduci, originale).`,
-  originale: () => 'Pagina rimessa nella lingua originale.',
-  fermata: () => 'Traduzione fermata a metà e pagina rimessa nella lingua originale.',
-  niente: () => `La pagina non era tradotta: è già nella lingua originale.${DILLO}`,
-  spento: () => `Non fatto: Filo è spento su questo sito, e lì non traduce.${DILLO}`,
-  muto: () => `Non fatto: la pagina davanti non risponde (può essere una pagina di sistema, un PDF, o non aver finito di caricare).${DILLO}`,
-  'no-page': () => `Non fatto: non c'è nessuna pagina web aperta.${DILLO}`,
-  coperta: () => `Non fatto: la pagina è coperta dall'avviso di sito pericoloso, e finché l'utente non sceglie lì non si traduce.${DILLO}`,
-});
 
 function toolResultText({ action, res, rendered }, giro = null) {
   const type = String(action.type || '').toUpperCase();
@@ -1566,9 +1545,11 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'muto') {
     return 'Zoom non cambiato: la pagina davanti non risponde ai comandi di zoom (può essere una pagina di sistema, o non aver finito di caricare). Dillo all\'utente, e non ripetere l\'azione uguale.';
   }
-  if (type === 'TRADUCI_PAGINA' && res.output && ESITI_TRADUZIONE[res.output.traduzione]) {
+  // #504 — «già tradotta» o «già com'era» non sono un fatto da annunciare: i testi stanno con le risposte della pagina.
+  if (type === 'TRADUCI_PAGINA' && res.output && typeof res.output.traduzione === 'string') {
+    const S = globalThis.SN_TRADUZIONE_PAGINA;
     const dove = res.output.dietro ? '\nLa pagina è l\'ultima scheda web che l\'utente ha usato, non quella che ha davanti: diglielo.' : '';
-    return `${ESITI_TRADUZIONE[res.output.traduzione](res.output)}${dove}`;
+    return `${S.STATI[S.stato(res.output.traduzione)].modello(res.output)}${dove}`;
   }
   if (type === 'ANNULLA_CAMBIO' && res.output) {
     const o = res.output;

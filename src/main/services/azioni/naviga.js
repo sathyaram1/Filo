@@ -382,24 +382,24 @@ async function azioneZoomPagina(action, { sender }) {
 }
 
 // #504 — «traducimi la pagina», «riprendi la traduzione», «torna all'originale»: la traduzione la fa la pagina, come
-// dall'icona (page-preload.js → SN_TRANSLATE_PAGE.daChat), e risponde com'è andata. Gli stati sono quelli di daChat.
-const STATI_TRADUZIONE = Object.freeze({
-  partita: true, in_corso: true, gia_tradotta: true, originale: true, fermata: true, niente: true, spento: false, muto: false,
-});
-// La pagina aspetta che Filo si monti al massimo `entroMs`, che le diamo noi: così risponde sempre prima della scadenza.
+// dall'icona (page-preload.js → SN_TRANSLATE_PAGE.daChat), e risponde com'è andata (src/shared/traduzioneDellaPagina.js).
 const ATTESA_TRADUZIONE_MS = 5000;
+// «Apri … e traducilo»: la pagina appena aperta può metterci molto ad arrivare e a far montare Filo, e la risposta
+// «non risponde» lì sarebbe falsa. Il tetto copre un sito lento, non uno fermo.
+const CARICAMENTO_TRADUZIONE_MS = 30000;
 const MARGINE_RISPOSTA_MS = 1500;
 
 async function chiediTraduzione(tab, originale) {
   const wc = tab.view && tab.view.webContents;
   const r = await chiediAllaPagina(wc, {
     canale: 'filo:traduci-pagina', eco: 'filo:traduci-pagina-esito', attesaMs: ATTESA_TRADUZIONE_MS,
-    dati: { originale, entroMs: ATTESA_TRADUZIONE_MS - MARGINE_RISPOSTA_MS },
+    caricamentoMs: CARICAMENTO_TRADUZIONE_MS, margineMs: MARGINE_RISPOSTA_MS, dati: { originale },
   });
   return r || { stato: 'muto' };
 }
 
 async function azioneTraduciPagina(action, { sender }) {
+  const S = globalThis.SN_TRADUZIONE_PAGINA;
   const originale = globalThis.SN_ACTION_LEVELS.alOriginale(action);
   const { win, tm, tab } = targetWebTab(sender);
   if (!tm || !tab) return { executed: false, kept: false, output: { traduzione: 'no-page', originale } };
@@ -408,7 +408,7 @@ async function azioneTraduciPagina(action, { sender }) {
     return { executed: false, kept: false, output: { traduzione: 'coperta', originale } };
   }
   const r = await chiediTraduzione(tab, originale);
-  const stato = Object.hasOwn(STATI_TRADUZIONE, r && r.stato) ? r.stato : 'muto';
+  const stato = S.stato(r && r.stato);
   const output = { traduzione: stato, originale };
   // Chiesta dalla home, la pagina è l'ultima scheda web usata: l'utente non la vede cambiare, e va detto dove.
   if (tab.id !== tm.activeId) output.dietro = true;
@@ -420,7 +420,7 @@ async function azioneTraduciPagina(action, { sender }) {
   if (globalThis.SN_ACTION_LEVELS.traduzioneFatta(stato) && dallaChat()) {
     require('../contatoriStrade').misura('azione', 'translate', 'chat', { incognito: !!(win && win._filoIncognito) });
   }
-  return { executed: STATI_TRADUZIONE[stato], kept: false, output };
+  return { executed: S.STATI[stato].fatta, kept: false, output };
 }
 
 async function azioneChiudiSchede(action, { sender }) {

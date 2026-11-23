@@ -153,6 +153,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
   safe(path.join(SHARED, 'immaginePrincipale.js'), 'SN_IMMAGINE_PRINCIPALE'); // #2371 — PRIMA di aiutoPagina.js
+  safe(path.join(SHARED, 'traduzioneDellaPagina.js'), 'SN_TRADUZIONE_PAGINA'); // #504 — PRIMA di aiutoPagina.js
   safe(path.join(CONTENT, 'aiutoPagina.js')); // #1509.3 — quello che l'Aiuto fa sulla pagina: DOPO highlight.js
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js

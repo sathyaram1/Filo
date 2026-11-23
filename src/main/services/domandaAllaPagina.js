@@ -5,10 +5,39 @@
 
 const { randomUUID } = require('node:crypto');
 
-function chiediAllaPagina(wc, { canale, eco, dati = {}, attesaMs }) {
-  if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) return Promise.resolve(null);
+const vivo = (wc) => !!wc && !(typeof wc.isDestroyed === 'function' && wc.isDestroyed());
+
+// Prima che il sito risponda, il documento che riceverebbe la domanda è quello che sta per sparire: la si manda al nuovo.
+function documentoArrivato(wc, tettoMs) {
+  if (typeof wc.isWaitingForResponse !== 'function' || !wc.isWaitingForResponse()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const EVENTI = ['did-navigate', 'did-fail-load', 'did-stop-loading', 'destroyed'];
+    const fine = () => {
+      clearTimeout(scadenza);
+      for (const ev of EVENTI) { try { wc.removeListener(ev, fine); } catch (_) {} }
+      resolve();
+    };
+    const scadenza = setTimeout(fine, tettoMs);
+    for (const ev of EVENTI) wc.once(ev, fine);
+  });
+}
+
+// `caricamentoMs`: su una pagina ancora in arrivo («apri … e traducilo») si aspetta fino a qui che il documento ci sia e
+// che Filo ci si monti. `margineMs`: la pagina riceve in `entroMs` quanto può aspettare lei, e risponde prima di noi.
+async function chiediAllaPagina(wc, { canale, eco, dati = {}, attesaMs, caricamentoMs = 0, margineMs = 0 }) {
+  if (!vivo(wc)) return null;
+  let budget = attesaMs;
+  if (caricamentoMs > 0) {
+    const inizio = Date.now();
+    await documentoArrivato(wc, caricamentoMs);
+    if (!vivo(wc)) return null;
+    let carica = false;
+    try { carica = wc.isLoadingMainFrame(); } catch (_) {}
+    if (carica) budget = Math.max(attesaMs, caricamentoMs - (Date.now() - inizio));
+  }
   const { ipcMain } = require('electron');
   const rid = `${canale}-${randomUUID()}`;
+  const conEntro = margineMs > 0 ? { ...dati, entroMs: Math.max(0, budget - margineMs) } : dati;
   return new Promise((resolve) => {
     let chiuso = false;
     const fine = (v) => {
@@ -23,9 +52,9 @@ function chiediAllaPagina(wc, { canale, eco, dati = {}, attesaMs }) {
       if (e.senderFrame && e.senderFrame !== wc.mainFrame) return;
       fine(msg);
     };
-    const scadenza = setTimeout(() => fine(null), attesaMs);
+    const scadenza = setTimeout(() => fine(null), budget);
     ipcMain.on(eco, ascolta);
-    try { wc.send(canale, { ...dati, rid }); } catch (_) { fine(null); }
+    try { wc.send(canale, { ...conEntro, rid }); } catch (_) { fine(null); }
   });
 }
 

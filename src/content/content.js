@@ -3024,6 +3024,7 @@
         else if (msg.surface === 'redteam') apriAttaccoSeConsentito();
         else if (msg.surface === 'help') openHelpSidebar();
         else if (msg.surface === 'valuta') valutaDalRiquadro();
+        else if (msg.surface === 'traduci') traduciDalTasto();
         else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId, msg.colore);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
@@ -3107,6 +3108,13 @@
     return lastMouseEvent;
   }
 
+  // Sulle pagine di Filo non c'è niente da tradurre.
+  function traduciDalTasto() {
+    if (location.protocol === 'filo:' || !TranslatePage || !TranslatePage.dalTasto || !TranslatePage.dalTasto()) {
+      Popup.toastErrore('err_no_selection');
+    }
+  }
+
   function handleShortcut(command, context) {
     if (isBlocked()) return;
     const selInfo = Extract.getSelectionWithSentence();
@@ -3117,10 +3125,9 @@
       else Popup.toastErrore('err_no_selection');
     } else if (command === 'translate-selection') {
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
-      // Senza selezione il tasto fa quello che farebbe l'icona Traduci (#504): sulle pagine di Filo non c'è niente da tradurre.
-      else if (location.protocol === 'filo:' || !TranslatePage || !TranslatePage.dalTasto || !TranslatePage.dalTasto()) {
-        Popup.toastErrore('err_no_selection');
-      }
+      // Senza selezione il tasto fa l'icona Traduci (#504), che è della pagina: da un riquadro o dallo strato la fa lei.
+      else if (IS_SUBFRAME) openSurface('traduci', () => {});
+      else traduciDalTasto();
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     } else if (command === 'aiuto-dalla-barra') {
