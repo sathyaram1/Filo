@@ -52,6 +52,20 @@ async function scriviAllAiuto(aiuto, testo) {
   await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 }
 
+// L'immagine dell'n-esimo turno dell'Aiuto per `frase` (null se è partito senza). Si contano solo i turni con la frase:
+// il saluto della giornata nella home parte da sé appena c'è un modello e passa dallo stesso finto (#2654).
+async function fotoDelTurno(app, frase, n) {
+  const turni = () => app.evaluate((_electron, frase) => globalThis.__visti.map((ms) => {
+    const utente = [...ms].reverse().find((m) => m.role === 'user');
+    const parti = Array.isArray(utente?.content) ? utente.content : [{ type: 'text', text: String(utente?.content || '') }];
+    if (!parti.some((p) => p.type === 'text' && String(p.text).includes(frase))) return undefined;
+    const foto = parti.find((p) => p.type === 'image_url');
+    return foto ? foto.image_url.url : null;
+  }).filter((f) => f !== undefined), frase);
+  await expect.poll(async () => (await turni()).length, { timeout: 20_000 }).toBe(n + 1);
+  return (await turni())[n];
+}
+
 // Il testo arrivato al modello, senza l'indirizzo del server di prova e l'immagine della pagina: la porta e il
 // base64 possono contenere per caso le cifre di un codice corto.
 async function arrivato(app, page) {
