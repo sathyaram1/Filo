@@ -65,8 +65,10 @@ function prepara(app) {
         if (I.conta < 0) return orig[m](...a);
         const mia = I.conta++;
         const tocca = mia === I.n && I.azione;
-        if (tocca && I.quando === 'prima') await sito();
+        // «prima»: la scrittura del sito parte subito prima di quella di Filo, senza cambiare l'ordine delle sue.
+        const s = tocca && I.quando === 'prima' ? sito() : null;
         const r = await orig[m](...a);
+        if (s) await s;
         if (tocca && I.quando === 'dopo') await sito();
         return r;
       };
