@@ -204,6 +204,35 @@ test('un allegato in UTF-16, con o senza segno d\'ordine, si legge come testo', 
   assert.equal(utf8.stato, 'pulito');
 });
 
+// #2645 — la password che l'utente ha appena lasciato uscire con la parola «conferma» non si ripropone; il resto sì.
+test('un segreto già confermato con la parola non torna nell\'avviso, gli altri casi sì', async () => {
+  require(join(ROOT, 'src', 'shared', 'autonomia.js'));
+  const testo = 'Non riesco a entrare nel sito della banca. La mia password è Gatto!2024 e mi dice che è sbagliata.';
+  const { valori } = globalThis.SN_AUTONOMIA.segretoDettaglio(testo, { richiesta: testo });
+  assert.deepEqual(valori, ['Gatto!2024'], 'la porta delle uscite e la rilettura parlano dello stesso valore');
+  const modello = (trovati) => servizio({ risposte: { feedback_l0: JSON.stringify({ trovati }) } }).L0;
+
+  // Lo trovano sia il controllo senza modello sia il modello, anche con un pezzo più lungo del valore.
+  for (const pezzo of ['Gatto!2024', 'password è Gatto!2024']) {
+    const L0 = modello([{ tipo: 'segreto', pezzo }]);
+    assert.equal((await L0.controlla({ testo })).stato, 'trovato', 'senza conferma si ferma');
+    assert.deepEqual(await L0.controlla({ testo, confermati: valori }), { stato: 'pulito' }, pezzo);
+  }
+
+  const conTelefono = `${testo} Chiamatemi al 333 1234567.`;
+  const r = await modello([{ tipo: 'segreto', pezzo: 'Gatto!2024' }, { tipo: 'recapito', pezzo: '333 1234567' }])
+    .controlla({ testo: conTelefono, confermati: valori });
+  assert.equal(r.stato, 'trovato');
+  assert.deepEqual(r.esito.frasi, [globalThis.SN_FEEDBACK_L0.FRASI_TESTO.recapito], 'resta solo il recapito');
+  assert.deepEqual(r.esito.pezzi.map((p) => p.testo), ['333 1234567']);
+
+  const altra = await modello([{ tipo: 'segreto', pezzo: 'Pippo#99x' }]).controlla({ testo: `${testo} Quella vecchia era Pippo#99x.`, confermati: valori });
+  assert.deepEqual(altra.esito.pezzi.map((p) => p.testo), ['Pippo#99x'], 'un segreto che la parola non copriva resta');
+
+  const log = await modello([]).controlla({ testo, confermati: valori, allegati: [{ name: 'filo.log', type: 'text/plain', dataUrl: dataUrl('password = Gatto!2024') }] });
+  assert.deepEqual(log.esito.allegati, [0], 'un allegato non l\'ha visto il riquadro della parola');
+});
+
 // r3: una carta scritta nel testo del feedback ha la frase delle carte, non quella delle password.
 test('una carta valida nel testo: la frase di carte e conti, e la carta evidenziata', async () => {
   const { L0 } = servizio();

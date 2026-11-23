@@ -229,6 +229,22 @@
     return [...tipi].map((tipo) => ({ tipo, dove: 'allegato', allegato: k }));
   }
 
+  // Tolti i segreti del testo che l'utente ha già lasciato uscire con la parola «conferma» (#2645): un secondo riquadro
+  // per lo stesso motivo è solo attrito. Restano gli altri tipi, gli allegati, le immagini e ogni segreto non confermato.
+  function senzaConfermati(trovati, testo, valori) {
+    const lista = Array.isArray(trovati) ? trovati : [];
+    const t = String(testo == null ? '' : testo);
+    const tratti = [];
+    for (const v of Array.isArray(valori) ? valori : []) {
+      const s = String(v == null ? '' : v);
+      if (!s) continue;
+      for (let i = t.indexOf(s); i >= 0; i = t.indexOf(s, i + 1)) tratti.push([i, i + s.length]);
+    }
+    if (!tratti.length) return lista;
+    return lista.filter((x) => !(x && x.dove === 'testo' && x.tipo === 'segreto'
+      && tratti.some(([a, b]) => x.inizio < b && a < x.fine)));
+  }
+
   // Le frasi dell'avviso, una per caso e nell'ordine dei tipi: mai un punteggio, mai una cifra.
   function avviso(trovati, { redTeam = false } = {}) {
     const lista = Array.isArray(trovati) ? trovati : [];
@@ -264,6 +280,6 @@
     TIPI_TESTO, TIPI_IMMAGINE, MAX_TESTO, FRASI_TESTO, FRASI_IMMAGINE, FRASI_ALLEGATO, FRASE_RED_TEAM, TITOLO,
     ISTRUZIONI_TESTO, ISTRUZIONI_IMMAGINI,
     richiestaTesto, richiestaImmagini, troppoLungo, trovaPezzo, leggiTesto, leggiImmagini, daValori, daTratti, daAllegato,
-    avviso, esito,
+    senzaConfermati, avviso, esito,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

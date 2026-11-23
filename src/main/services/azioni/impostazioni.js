@@ -81,7 +81,7 @@ async function azioneOnboarding(action, { intervista }) {
 }
 
 async function azioneInviaFeedback(action, {
-  confirmed, sender, contesto, fontiLette, assistente, chatId, impostazioni, senzaRilettura = false,
+  confirmed, sender, contesto, fontiLette, assistente, chatId, impostazioni, senzaRilettura = false, segretiConfermati = [],
 }) {
   // Filo invia un feedback a nome dell'utente (#146.5). Livello 2: a
   // questo punto la conferma è già passata (il gate sopra ha lasciato
@@ -119,7 +119,9 @@ async function azioneInviaFeedback(action, {
     // secondo sì («Manda così») arriva con `senzaRilettura`. Al modello e al diario vanno solo le frasi, mai i pezzi.
     const L0 = senzaRilettura ? null : require('../feedbackL0').corrente();
     if (L0) {
-      const letto = await L0.controlla({ testo, immagini: (payload.images || []).map((i) => i && i.dataUrl), allegati: payload.files });
+      const letto = await L0.controlla({
+        testo, immagini: (payload.images || []).map((i) => i && i.dataUrl), allegati: payload.files, confermati: segretiConfermati,
+      });
       if (letto.stato === 'trovato' && letto.esito) {
         const { titolo: t, frasi } = letto.esito;
         return {

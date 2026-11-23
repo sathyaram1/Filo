@@ -101,8 +101,9 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
   }
 
   // → { stato: 'pulito' | 'trovato' | 'saltato', esito? }. Non lancia mai. `allegati`: i file del feedback
-  // ({ name, type, dataUrl }); si rileggono quelli di testo, nell'indice che hanno nel feedback.
-  async function controlla({ testo = '', immagini = [], allegati = [], entroMs = ATTESA_MS } = {}) {
+  // ({ name, type, dataUrl }); si rileggono quelli di testo, nell'indice che hanno nel feedback. `confermati`: i segreti
+  // del testo che l'utente ha già lasciato uscire con la parola «conferma», che non si ripropongono.
+  async function controlla({ testo = '', immagini = [], allegati = [], confermati = [], entroMs = ATTESA_MS } = {}) {
     try {
       if (!(await acceso())) return { stato: 'saltato', motivo: 'spento' };
       const t = String(testo || '');
@@ -123,7 +124,7 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
       const [st, tx, im] = await Promise.all(parti);
       clearTimeout(timer);
       if (tx === 'scaduto' || im === 'scaduto') log.warn('[Filo L0] nessuna risposta entro', entroMs, 'ms: vale quello che è arrivato');
-      const trovati = [...st, ...(Array.isArray(tx) ? tx : []), ...(Array.isArray(im) ? im : [])];
+      const trovati = L().senzaConfermati([...st, ...(Array.isArray(tx) ? tx : []), ...(Array.isArray(im) ? im : [])], t, confermati);
       if (trovati.length) {
         let rt = false;
         try { rt = !!redTeam(); } catch (_) {}

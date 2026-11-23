@@ -334,45 +334,64 @@ const confermaConLaParola = async (page) => {
   await clickConfirm(page, 'danger');
 };
 
-test('dalla chat della home: dopo l\'OK la rilettura ferma la password, «Non mandarla» la tiene, «Manda così» la manda', async ({ app, shell }) => {
+// #2645 — la parola «conferma» l'utente l'ha scritta per quella password: la rilettura non la ripropone, e il
+// feedback parte senza un secondo riquadro per lo stesso motivo.
+test('dalla chat della home: confermata la password con la parola, il feedback parte senza un secondo riquadro', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
   await finti(app);
   await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }] }) });
   const action = await segnalazioneDaChat(app, TESTO);
-  // Il riquadro che vuole la parola non si apre da solo: si apre col clic sul bottone della proposta.
-  const proponi = async (id) => {
-    await page.evaluate(({ a, id }) => {
-      const host = document.createElement('div');
-      host.id = id;
-      document.body.appendChild(host);
-      window.__filoDashActions.renderActions(host, [a], { autoConfirm: true });
-    }, { a: action, id });
-    await page.locator(`#${id} .dash-action-btn`).click();
-  };
-
   await page.evaluate((t) => window.__filoDashActions.scriveUtente(t), TESTO);
+  await proponiInChat(page, action, 'prova-chat-1');
+  await confermaConLaParola(page);
+  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([TESTO]);
+  expect(await app.evaluate(() => globalThis.__invii[0].clientId)).toBe('filo:chat');
+  expect(await chiamateTesto(app), 'la rilettura c\'è stata').toBeGreaterThan(0);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+});
 
-  await proponi('prova-chat-1');
+// Il riquadro che vuole la parola non si apre da solo: si apre col clic sul bottone della proposta.
+async function proponiInChat(page, action, id) {
+  await page.evaluate(({ a, id }) => {
+    const host = document.createElement('div');
+    host.id = id;
+    document.body.appendChild(host);
+    window.__filoDashActions.renderActions(host, [a], { autoConfirm: true });
+  }, { a: action, id });
+  await page.locator(`#${id} .dash-action-btn`).click();
+}
+
+test('dalla chat della home: dopo la parola la rilettura ferma ancora un recapito, «Non mandarla» la tiene, «Manda così» la manda', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  const TELEFONO = '333 1234567';
+  const testo = `${TESTO} Richiamatemi al ${TELEFONO}.`;
+  await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'segreto', pezzo: PASSWORD }, { tipo: 'recapito', pezzo: TELEFONO }] }) });
+  const action = await segnalazioneDaChat(app, testo);
+  await page.evaluate((t) => window.__filoDashActions.scriveUtente(t), testo);
+
+  await proponiInChat(page, action, 'prova-chat-1');
   await confermaConLaParola(page);
   await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
-  expect(await confirmText(page)).toContain('password');
+  expect(await confirmText(page)).toContain('recapito');
+  expect(await confirmText(page), 'la password l\'ha già confermata con la parola').not.toContain('password');
   await page.screenshot({ path: `${SHOTS}/1403.1-chat-rilettura.png` });
   await clickConfirm(page, 'cancel');
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   expect(await invii(app), '«Non mandarla»: non parte').toEqual([]);
 
-  await proponi('prova-chat-2');
+  await proponiInChat(page, action, 'prova-chat-2');
   await confermaConLaParola(page);
   await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
   const chiamate = await chiamateTesto(app);
   await clickConfirm(page, 'ok');
-  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([TESTO]);
-  expect(await app.evaluate(() => globalThis.__invii[0].clientId)).toBe('filo:chat');
+  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([testo]);
   expect(await chiamateTesto(app), '«Manda così» non rilegge').toBe(chiamate);
 });
 
-test('dall\'Aiuto: la segnalazione confermata con una password si ferma, e «Manda così» la manda', async ({ app, shell }) => {
+test('dall\'Aiuto: la segnalazione confermata con la parola per la password parte, senza un secondo riquadro', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
   await finti(app);
@@ -386,11 +405,9 @@ test('dall\'Aiuto: la segnalazione confermata con una password si ferma, e «Man
   await page.evaluate((t) => window.__filoSidebarTest.scriveUtente(t), TESTO);
   await page.evaluate((a) => { window.__filoSidebarTest.runFiloAction(a); }, azione);
   await confermaConLaParola(page);
-  // Il modello finto non trova niente: la password la riconosce il controllo senza modello.
-  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
-  expect(await invii(app)).toEqual([]);
-  await clickConfirm(page, 'ok');
+  // Il modello finto non trova niente e la password, che il controllo senza modello riconosce, è quella confermata.
   await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([TESTO]);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
 });
 
