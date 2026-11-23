@@ -196,9 +196,10 @@ function createDetonator({
     const dbg = wc && wc.debugger;
     if (!dbg || typeof dbg.attach !== 'function') return null;
     try { if (!dbg.isAttached()) dbg.attach('1.3'); } catch (_) { return null; }
+    const viva = () => { if (typeof wc.isDestroyed === 'function' && wc.isDestroyed()) throw new Error('finestra chiusa'); };
     const fatto = Promise.resolve()
-      .then(() => dbg.sendCommand('Network.enable'))
-      .then(() => dbg.sendCommand('Network.setBypassServiceWorker', { bypass: true }))
+      .then(() => { viva(); return dbg.sendCommand('Network.enable'); })
+      .then(() => { viva(); return dbg.sendCommand('Network.setBypassServiceWorker', { bypass: true }); })
       .catch(() => {});
     return Promise.race([fatto, wait(CLEAR_TIMEOUT_MS)]);
   }
