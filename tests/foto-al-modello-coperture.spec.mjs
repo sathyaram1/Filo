@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { turnoDellAiuto, partiDellUtente } from './helpers/turniDellAiuto.mjs';
 import { chiedi } from './helpers/chatFinta.mjs';
 import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
@@ -59,13 +60,9 @@ async function chiediAllAiuto(app, shell, page) {
   await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
   await aiuto.fill('.sn-sidebar-input textarea', 'aiutami a pagare');
   await aiuto.press('.sn-sidebar-input textarea', 'Enter');
-  await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBeGreaterThan(0);
-  return app.evaluate(() => {
-    const utente = [...globalThis.__visti[0]].reverse().find((m) => m.role === 'user');
-    const parti = Array.isArray(utente.content) ? utente.content : [{ type: 'text', text: utente.content }];
-    const img = parti.find((p) => p.type === 'image_url');
-    return { immagine: img ? img.image_url.url : null, testi: parti.filter((p) => p.type === 'text').map((p) => p.text) };
-  });
+  const parti = partiDellUtente(await turnoDellAiuto(app, 'aiutami a pagare'));
+  const img = parti.find((p) => p.type === 'image_url');
+  return { immagine: img ? img.image_url.url : null, testi: parti.filter((p) => p.type === 'text').map((p) => p.text) };
 }
 
 // Quanti pixel della foto hanno il colore `rgb`, con la tolleranza del JPEG.

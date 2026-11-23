@@ -14,6 +14,7 @@ import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { turnoDellAiuto } from './helpers/turniDellAiuto.mjs';
 import { paginaDellAiuto, statoDi, clicca, scrivi } from './helpers/riquadri.mjs';
 
 const CODICE = '482913';
@@ -1652,7 +1653,7 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
 
   // La domanda dopo, l'assistente sa che il collegamento non si è aperto.
   await scriviAllAiuto(aiuto, 'l’hai aperta?');
-  await expect.poll(() => app.evaluate(() => JSON.stringify(globalThis.__visti.at(-1))), { timeout: 20_000 }).toContain('non si è aperto');
+  expect(JSON.stringify(await turnoDellAiuto(app, 'l’hai aperta?'))).toContain('non si è aperto');
 
   await link('la guida').first().click();
   await expect.poll(() => apertoVerso(app, 'guida.example'), { timeout: 10_000 }).toBe(true);
