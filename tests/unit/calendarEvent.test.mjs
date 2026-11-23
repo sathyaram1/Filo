@@ -184,6 +184,27 @@ test('l\'ultimo giorno dice in che giorno finisce, la durata a che ora: uguale a
   assert.equal(corta.fine, '20260816T000000');
 });
 
+// «Sabato dalle 22 alle 2» col sabato come ultimo giorno: scartata o tagliata a mezzanotte (#567.6).
+test('un ultimo giorno uguale al primo non tiene la serata di qua dalla mezzanotte', () => {
+  const base = { titolo: 'Festa da Bruno', data: '2026-10-24', ora: '22:00', data_fine: '2026-10-24' };
+  for (const forma of [{ ora_fine: '02:00' }, { durata_min: 240 }]) {
+    const v = C.verifica({ ...base, ...forma });
+    assert.equal(v.errore, undefined, JSON.stringify(forma));
+    const festa = v.evento;
+    assert.equal(festa.inizio, '20261024T220000');
+    assert.equal(festa.fine, '20261025T020000', JSON.stringify(forma));
+    assert.equal(festa.durataMin, 240);
+    assert.equal(festa.quando, 'dal 24/10/2026 alle 22:00 al 25/10/2026 alle 02:00');
+    assert.match(C.buildIcs(festa), /DTEND:20261025T020000/);
+    assert.deepEqual(C.normalize(festa), festa);
+    const { data_fine: _, ...senza } = { ...base, ...forma };
+    assert.equal(C.normalize(senza).fine, festa.fine);
+  }
+  // Con l'ultimo giorno che è davvero il giorno dopo, la stessa festa finisce uguale.
+  const domenica = C.normalize({ ...base, data_fine: '2026-10-25', ora_fine: '02:00' });
+  assert.equal(domenica.fine, '20261025T020000');
+});
+
 test('una fine che non si può rispettare si rifiuta col suo perché', () => {
   const casi = [
     [{ titolo: 'Mostra', data: '2026-08-15', data_fine: '2026-08-10' }, /ultimo giorno \(10\/08\/2026\) viene prima del primo \(15\/08\/2026\)/],
@@ -191,7 +212,6 @@ test('una fine che non si può rispettare si rifiuta col suo perché', () => {
     [{ titolo: 'Viaggio', data: '2026-08-01', ora: '09:00', durata_min: 400 * 24 * 60 }, /più di un anno/],
     [{ titolo: 'F', data: '2026-08-10', data_fine: '2028-08-10' }, /più di un anno/],
     [{ titolo: 'F', data: '2026-08-10', data_fine: 'il 15' }, /ultimo giorno non valido/],
-    [{ titolo: 'F', data: '2026-08-10', ora: '10:00', data_fine: '2026-08-10', ora_fine: '09:00' }, /viene prima dell'inizio/],
     [{ titolo: 'F', data: '2026-08-10', ora: '10:00', ora_fine: 'tardi' }, /ora di fine non valida/],
     [{ titolo: 'F', data: '2026-02-31', ora: '10:00' }, /^data o ora non valide: «2026-02-31» non è un giorno$/],
     [{ titolo: 'F', data: '2026-08-10', ora: '25:00' }, /^data o ora non valide: «25:00» non è un'ora$/],

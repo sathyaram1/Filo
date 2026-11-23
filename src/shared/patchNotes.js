@@ -20,6 +20,7 @@
         { testo: 'La pagina Sicurezza mostra subito le risposte date ai siti, anche se era già aperta, e quello che togli lì resta tolto anche se l\'hai aperta in una finestra in incognito.', segnalazione: 591 },
         { testo: 'Le ricerche sul web che Filo fa per te entrano nella spesa del mese come le risposte dei modelli, e col limite di spesa raggiunto passano a un motore di ricerca gratuito.', segnalazione: 591 },
         { testo: 'Il correttore torna a correggere quello che scrivi sotto «password dimenticata» o sotto l\'etichetta «Password» di una pagina di accesso, e Filo legge intere le righe di quelle pagine.', segnalazione: 2638 },
+        { testo: 'Una serata che passa la mezzanotte, come una festa sabato dalle 22 alle 2, entra intera nel calendario anche quando Filo segna il sabato come ultimo giorno: prima finiva a mezzanotte o non compariva il bottone «Aggiungi al calendario».', segnalazione: 567 },
       ],
     },
     {
