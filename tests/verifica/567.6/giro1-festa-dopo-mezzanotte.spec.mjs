@@ -2,6 +2,7 @@
 // come ultimo giorno: nelle due forme (ora di fine, durata) il bottone c'è, il diario dice le 2 di domenica e il
 // file consegnato al calendario finisce alle 2.
 
+import { readFileSync } from 'node:fs';
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function newtabPage(app) {
