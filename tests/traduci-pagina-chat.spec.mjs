@@ -354,8 +354,19 @@ test('Alt+T senza selezione dopo un clic nel riquadro incorporato traduce la pag
   await guardaAvvisi(page);
   const riquadro = page.frameLocator('#embed');
 
-  // Con il testo scelto nel riquadro: la risposta su quello, e la pagina resta com'è.
-  await riquadro.locator('#w').selectText();
+  // Con il testo scelto nel riquadro (doppio clic vero, come lo manda il sistema): la risposta su quello, e la pagina resta com'è.
+  await expect.poll(() => page.frames().length).toBeGreaterThan(1);
+  const box = await riquadro.locator('#w').boundingBox();
+  await app.evaluate(({ BrowserWindow }, { x, y }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'mouseMove', x, y });
+    for (const c of [1, 2]) {
+      wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: c });
+      wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: c });
+    }
+  }, { x: Math.round(box.x + 8), y: Math.round(box.y + box.height / 2) });
+  await expect.poll(() => page.frames().find((f) => f !== page.mainFrame()).evaluate(() => String(getSelection()).trim())).not.toBe('');
   await premiAltT(app);
   await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 15_000 }).toBe(1);
   await page.waitForTimeout(800);
