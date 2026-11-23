@@ -112,7 +112,7 @@ test('--consegna fuori dalla messa in revisione si rifiuta; dalla ripresa (--rec
       '--consegna', fileConsegna(), '--ticket', 'biglietto-di-prova'], port, casa);
     const d = consegne(ricevuti).at(-1)?.body.data;
     assert.ok(d, `la ripresa deve arrivare al server (uscita ${r.code}): ${r.se}`);
-    assert.equal(d.consegna.criteri.length, 9);
+    assert.equal(d.consegna.criteri.length, 10);
     assert.equal(d.consegna.provaTest.app.casi.length, 1);
   } finally { srv.close(); togliCartella(casa); }
 });
