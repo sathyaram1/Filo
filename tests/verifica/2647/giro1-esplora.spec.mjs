@@ -27,7 +27,7 @@ for (const [nome, tipo, args] of CASI) {
     if (apparso) await clickConfirm(page, 'cancel');
     await page.waitForTimeout(1500);
     const bolla = page.locator('.dash-bubble-filo').last();
-    const html = await bolla.evaluate((el) => el.innerHTML);
+    const html = await bolla.evaluate((el) => el.innerHTML, null, { timeout: 5000 }).catch(() => 'NESSUNA BOLLA');
     console.log(nome, 'HTML:', html.replace(/\s+/g, ' ').slice(0, 3000));
     await page.screenshot({ path: `tests/.shots/v2647-${nome}.png` });
     await ripristina(app);
