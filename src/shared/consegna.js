@@ -99,7 +99,7 @@
     if (!c || typeof c !== 'object' || Array.isArray(c)) return ['la consegna non è un oggetto JSON'];
     const m = [];
     const righe = Array.isArray(c.criteri) ? c.criteri : null;
-    if (!righe) m.push('manca la tabella dei criteri («criteri»: una riga per ognuno dei nove)');
+    if (!righe) m.push('manca la tabella dei criteri («criteri»: una riga per ognuno dei dieci)');
     else {
       for (const k of CRITERI) {
         const riga = righe.find((x) => x && Number(x.criterio) === k.n);
