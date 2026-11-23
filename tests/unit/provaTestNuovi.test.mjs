@@ -65,9 +65,28 @@ test('un ramo senza prove nuove lo dice, non inventa casi', () => {
   } finally { togliCartella(root); }
 });
 
+// Il perché di un caso «non trovato» sta nell'uscita di Playwright e negli errori del suo rapporto: il cancello di
+// Windows ne stampa solo il messaggio dell'asserzione, e tre correzioni sono andate alla cieca (#2505).
+function conUscita() {
+  const uscite = [];
+  const corri = (dir, voce, o) => corriFile(dir, voce, { ...o, lancia: (cmd, args, opz) => {
+    const r = spawnSync(cmd, args, opz);
+    let errori = '';
+    try {
+      const json = JSON.parse(readFileSync(opz.env.PLAYWRIGHT_JSON_OUTPUT_FILE, 'utf8'));
+      errori = (json.errors || []).map((e) => String(e.message || e.value || '').split('\n').slice(0, 6).join(' | ')).join(' || ');
+    } catch (_) { /* senza rapporto restano stdout e stderr */ }
+    const coda = (t) => String(t || '').trim().split(/\r?\n/).slice(-12).join(' | ');
+    uscite.push(`${dir} [${cmd} ${args.join(' ')}] esce ${r.status}; errori del rapporto: ${errori || 'nessuno'}; stderr: ${coda(r.stderr)}; stdout: ${coda(r.stdout)}`);
+    return r;
+  } });
+  return { corri, uscita: () => uscite.join('\n') };
+}
+
 test('uno spec Playwright nuovo: lanciato davvero nelle due copie, rosso senza il lavoro e verde con', () => {
   const { root, base } = ramoDiProva();
   const g = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' }).trim();
+  const { corri, uscita } = conUscita();
   try {
     symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'junction');
     writeFileSync(join(root, '.gitignore'), 'node_modules\n');
