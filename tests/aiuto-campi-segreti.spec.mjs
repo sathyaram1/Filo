@@ -447,12 +447,7 @@ test('la password resa visibile dal sito non arriva al modello, né nella descri
     await page.click('#occhio');
     await expect(page.locator('#c')).toHaveAttribute('type', 'text');
     await scriviAllAiuto(aiuto, 'non riesco ad entrare');
-    await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBe(i + 1);
-    immagini.push(await app.evaluate(() => {
-      const utente = [...globalThis.__visti.at(-1)].reverse().find((m) => m.role === 'user');
-      const parte = Array.isArray(utente.content) && utente.content.find((p) => p.type === 'image_url');
-      return parte ? parte.image_url.url : null;
-    }));
+    immagini.push(await fotoDelTurno(app, 'non riesco ad entrare', i));
   }
   const testo = await arrivato(app, page);
   expect(testo, 'la password è arrivata al modello').not.toMatch(/Gatto\.Rosso|Mela\.Verde/);
