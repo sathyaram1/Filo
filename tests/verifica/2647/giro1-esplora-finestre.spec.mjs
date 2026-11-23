@@ -67,18 +67,7 @@ for (const come of ['invio', 'clic']) {
     const dopoRotella = await finestrelle(app);
     console.log(come, 'dopo la rotella di là, finestrella visibile:', dopoRotella);
     if (come === 'invio') await vista.keyboard.press('Enter');
-    else {
-      const b = await vista.evaluate(() => {
-        const h = document.querySelector('.sn-confirm-host');
-        const root = h && (h.shadowRoot || window.SN_CONFIRM_UI._test?.root?.());
-        const ok = root ? root.querySelector('[data-act="ok"], .sn-confirm-ok, button.ok') : null;
-        if (!ok) return null;
-        const r = ok.getBoundingClientRect();
-        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-      });
-      console.log('bottone OK', b);
-      if (b) await vista.mouse.click(b.x, b.y);
-    }
+    else await mouseClickConfirm(vista, 'ok');
     await new Promise((r) => setTimeout(r, 1200));
     const e = await nelMondoDiFilo(app, host, 'globalThis.__e');
     console.log(come, 'esito della domanda:', e, 'finestrelle:', await finestrelle(app));
