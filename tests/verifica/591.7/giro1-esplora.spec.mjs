@@ -41,7 +41,7 @@ const pagine = {
   // La pagina si riapre da un blob: che si è scritta da sola.
   '/blob': () => `<!doctype html><meta charset="utf-8"><title>Blob</title><script>${SEGNA}
   addEventListener('load', () => {
-    const html = '<!doctype html><scr' + 'ipt>const m = (x) => fetch("${'http://127.0.0.1:'}' + location.port + '/esito?m=" + encodeURIComponent(x));'
+    const html = '<!doctype html><scr' + 'ipt>const m = (x) => fetch("${origine}/esito?m=" + encodeURIComponent(x));'
       + 'm("blob:aperta"); addEventListener("load", () => setTimeout(() => { m("prima:stampa"); print(); m("dopo:stampa"); }, 300));</scr' + 'ipt>';
     location.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
   });</script>`,
