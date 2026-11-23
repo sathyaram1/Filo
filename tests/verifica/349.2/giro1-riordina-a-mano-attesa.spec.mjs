@@ -28,12 +28,14 @@ test('riordino a mano: la scheda ripresa nell’attesa resta, quella chiusa a ma
   await shell.evaluate((x) => window.filoShell.tabs.activate(x), await id(/^Quattro$/));
   await shell.evaluate((x) => window.filoShell.tabs.close(x), await id(/^Tre$/));
   await expect.poll(titoli, { timeout: 10_000 }).not.toContain('Tre');
+  const primaDellaRisposta = (await titoli()).length;
   await app.evaluate(() => globalThis.__rispondi());
   await expect.poll(() => app.evaluate(() => globalThis.__esito), { timeout: 20_000 }).not.toBeNull();
   const t = await titoli();
   expect(t, 'la scheda ripresa nell’attesa è stata chiusa').toContain('Due');
   expect(t).not.toContain('Uno');
-  expect((await app.evaluate(() => globalThis.__esito)).archived, 'la scheda chiusa a mano è contata dalla pulizia').toBe(1);
+  // Il conto della pulizia è quello delle schede che ha chiuso lei, non di più.
+  expect((await app.evaluate(() => globalThis.__esito)).archived, 'la scheda chiusa a mano è contata dalla pulizia').toBe(primaDellaRisposta - t.length);
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     return tm.riapriPulizia(tm._ultimaPulizia.id);
