@@ -78,6 +78,17 @@ PAGINE['/avviso-caricato'] = `<!doctype html><meta charset="utf-8"><title>Avviso
     setTimeout(() => { location.href = '/arrivo'; }, 800);
   });
 </script>`;
+// La stessa pagina servita dal suo service worker, che non passa dalla rete dove Filo mette la sandbox.
+const SW = `self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', (e) => {
+  if (e.request.mode !== 'navigate') return;
+  e.respondWith(new Response(${JSON.stringify(PAGINE['/avviso-caricato'].replace("'/arrivo'", "'/arrivo-sw'"))}, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+});`;
+PAGINE['/avviso-sw'] = `<!doctype html><meta charset="utf-8"><title>Attendi</title><script>
+  navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).then(() => { location.href = '/avviso-sw?di-nuovo'; },
+    (e) => fetch('/esito?m=' + encodeURIComponent('sw:' + e.name)));
+</script>`;
 PAGINE['/microfono'] = PAGINE['/media'].replace('{ audio: true, video: true }', '{ audio: true }');
 PAGINE['/fotocamera'] = `<!doctype html><meta charset="utf-8"><title>Modulo</title><textarea autofocus></textarea><script>
   window.__prova = () => navigator.mediaDevices.getUserMedia({ video: true }).then(
