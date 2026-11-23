@@ -166,7 +166,8 @@ function createDetonator({
         javascript: true,
         images: false,
         webgl: false,
-        // Nessuno la vede (#591.6): un finto avviso di virus non suona, non parla e non apre avvisi, domande o stampa.
+        // Nessuno la vede (#591.6): un finto avviso di virus non suona, non parla e non apre avvisi né domande; la stampa
+        // la ferma SANDBOX_COPIA.
         disableDialogs: true,
         autoplayPolicy: 'document-user-activation-required',
         // niente preload: la pagina gira nuda, isolata dall'app.
