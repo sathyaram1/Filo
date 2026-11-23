@@ -3,7 +3,7 @@
 // Prima del clic non esce niente: né verso i link né verso Google, i registri, il modello o la finestra isolata.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
+import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA, nomeNellAvviso } from './helpers/avvisoSito.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { serviSiti, richiesteVerso } from './helpers/reteChiusa.mjs';
 import { fileURLToPath } from 'node:url';
@@ -224,7 +224,8 @@ test('un link a un file travestito: l\'avviso nomina il file prima che parta', a
   await clicFermato(app, '#file');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('File travestito')).toBeVisible();
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
+  await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
+  await expect(avviso.locator('#corpo')).toContainText(': sembra un documento, ma è un programma');
   await foto(avviso, '965-file-travestito.png');
   expect(await richiesteVerso(app, 'archivio-documenti.example.com')).toEqual([]);
 });
@@ -396,7 +397,8 @@ test('un link «scarica» a un file travestito: al clic l\'avviso, il file non p
     await contaScaricamenti(app);
     await clicFermato(app, '#file');
     const avviso = await vistaAvviso(app);
-    await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
+    await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
+    await expect(avviso.locator('#corpo')).toContainText(': sembra un documento, ma è un programma');
     await expect.poll(() => copertura(app)).toEqual(COPERTA);
     expect(await scaricamenti(app)).toEqual([]);
     const continua = avviso.getByRole('button', { name: 'Continua' });
@@ -411,7 +413,7 @@ test('un link «scarica» a un file travestito: al clic l\'avviso, il file non p
     await fuocoAllaPagina(app);
     await contaScaricamenti(app);
     await clicFermato(app, '#nominato');
-    await expect(avviso.getByText(/«ricevuta\.jpg\.scr»/)).toBeVisible();
+    await expect(nomeNellAvviso(avviso, 'ricevuta.jpg.scr')).toBeVisible();
     await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
     expect(await scaricamenti(app)).toEqual([]);
   } finally { await s.chiudi(); }
@@ -425,7 +427,7 @@ test('un file travestito che il sito nomina solo rispondendo: l\'avviso lo ferma
     await contaScaricamenti(app);
     await clicFermato(app, '#allegato');
     const avviso = await vistaAvviso(app);
-    await expect(avviso.getByText(/«fattura\.pdf\.exe»/)).toBeVisible();
+    await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
     await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
     expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
   } finally { await s.chiudi(); }
@@ -441,7 +443,8 @@ test('un file travestito che la pagina costruisce da sé (blob, data): l\'avviso
   await contaScaricamenti(app);
   await clicFermato(app, '#blob');
   const avviso = await vistaAvviso(app);
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
+  await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
+  await expect(avviso.locator('#corpo')).toContainText(': sembra un documento, ma è un programma');
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
   expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
   await expect(avviso.getByRole('button', { name: 'Continua' })).toBeEnabled({ timeout: 5_000 });
@@ -459,7 +462,7 @@ test('un file travestito che la pagina costruisce da sé (blob, data): l\'avviso
   await app.evaluate(() => { globalThis.__scaricamenti = []; });
   await clicFermato(app, '#data');
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»/)).toBeVisible();
+  await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
   expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
 });
 
@@ -472,7 +475,8 @@ test('un file travestito su un sito noto (Dropbox, il CDN di Discord): al clic l
   await expect.poll(() => verdettoPronto(app, 'https://cdn.discordapp.com/attachments/1/2/foto.jpg.scr')).toBe('sospetto');
   await clicFermato(app, '#dropbox');
   const avviso = await vistaAvviso(app);
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento/)).toBeVisible();
+  await expect(nomeNellAvviso(avviso, 'fattura.pdf.exe')).toBeVisible();
+  await expect(avviso.locator('#corpo')).toContainText(': sembra un documento');
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
   expect(await richiesteVerso(app, 'dropbox.com')).toEqual([]);
 });

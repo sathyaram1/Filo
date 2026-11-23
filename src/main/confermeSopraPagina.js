@@ -41,18 +41,54 @@ function partiPulite(parti) {
 
 // Le finestre che apre un sito (i popup di accesso) stanno sopra quella di Filo: con una domanda a schermo il sito ci
 // posava sopra il testo finto, lasciando scoperto l'OK vero (#592.6, giro 7). Finché una domanda si vede, si nascondono
-// quelle nate dalla stessa finestra di Filo: una domanda lasciata in un'altra finestra non spegne gli accessi qui (giro 8).
+// quelle nate dalla stessa finestra di Filo, e quelle di un'altra che coprono la domanda (#592.17); una domanda lasciata
+// in una finestra da cui l'utente è passato a un'altra non spegne gli accessi di là (giro 8). Regole: il pattern in testa.
 const finestreDelSito = new Map();
 const nascoste = new Set();
 const aSchermo = new Set();
+// Dove l'utente è adesso: la finestra di Filo che ha avuto per ultima un suo tasto, clic o rotella (quelli di una
+// finestrella contano per la sua). Non il fuoco: lo sposta anche il sito, aprendo una finestrella o chiamando focus().
+const usata = new WeakMap();
+let giroUso = 0;
+
+const casaDi = (w) => finestreDelSito.get(w) || w;
+
+// L'area della domanda sullo schermo: tutta la scheda che copre, col suo velo.
+function areaSulloSchermo(c) {
+  try {
+    if (!c.vista || !c.win || c.win.isDestroyed()) return null;
+    const v = c.vista.getBounds();
+    const f = c.win.getContentBounds();
+    return v.width > 0 && v.height > 0 ? { x: f.x + v.x, y: f.y + v.y, width: v.width, height: v.height } : null;
+  } catch (_) { return null; }
+}
+
+const siToccano = (a, b) => !!a && !!b && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+// Le domande a schermo che la finestra `w` (nata da `padre`) copre, fra quelle dove l'utente è adesso.
+function domandeCoperte(w, padre) {
+  let b = null;
+  try { b = w.getBounds(); } catch (_) { return []; }
+  return [...aSchermo].filter((c) => {
+    const casa = casaDi(c.win);
+    if (casa === padre || c.win === w) return false;
+    if ((usata.get(casa) || 0) < (usata.get(padre) || 0)) return false;
+    return siToccano(b, areaSulloSchermo(c));
+  });
+}
 
 function allineaFinestre() {
   const esenti = new Set([...aSchermo].map((c) => c.win));
-  const conDomanda = new Set([...aSchermo].map((c) => finestreDelSito.get(c.win) || c.win));
+  const conDomanda = new Set([...aSchermo].map((c) => casaDi(c.win)));
   for (const [w, padre] of [...finestreDelSito]) {
     if (!w || w.isDestroyed()) { finestreDelSito.delete(w); nascoste.delete(w); continue; }
-    if (conDomanda.has(padre) && !esenti.has(w)) {
-      if (w.isVisible()) { nascoste.add(w); try { w.hide(); } catch (_) {} }
+    const coperte = esenti.has(w) ? [] : domandeCoperte(w, padre);
+    if ((conDomanda.has(padre) && !esenti.has(w)) || coperte.length) {
+      if (!w.isVisible()) continue;
+      nascoste.add(w);
+      try { w.hide(); } catch (_) {}
+      // Il testo finto è stato a schermo sopra la domanda: un clic partito leggendo quello non vale un sì.
+      for (const c of coperte) c.ridisegna();
     } else if (nascoste.has(w)) {
       nascoste.delete(w);
       try { w.showInactive(); } catch (_) {}
@@ -60,13 +96,49 @@ function allineaFinestre() {
   }
 }
 
+const riallinea = () => { if (aSchermo.size) setImmediate(allineaFinestre); };
+const GESTI = new Set(['mouseDown', 'rawKeyDown', 'keyDown', 'mouseWheel', 'touchStart', 'gestureTapDown']);
+const seguiti = new WeakSet();
+function finestraDi(wc) {
+  try { const w = BrowserWindow.fromWebContents(wc); if (w) return w; } catch (_) {}
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { if ((w.contentView.children || []).some((v) => v.webContents === wc)) return w; } catch (_) {}
+  }
+  return null;
+}
+function seguiGesti(wc) {
+  if (!wc || seguiti.has(wc)) return;
+  seguiti.add(wc);
+  wc.on('input-event', (_e, input) => {
+    if (!input || !GESTI.has(input.type)) return;
+    const w = finestraDi(wc);
+    if (!w) return;
+    const casa = casaDi(w);
+    const cambia = casa !== ultimaUsata;
+    ultimaUsata = casa;
+    usata.set(casa, ++giroUso);
+    if (cambia) riallinea();
+  });
+}
+let ultimaUsata = null;
+let gestiSeguiti = false;
+function seguiGestiDiTutti() {
+  if (gestiSeguiti) return;
+  gestiSeguiti = true;
+  try {
+    require('electron').app.on('web-contents-created', (_e, wc) => seguiGesti(wc));
+    for (const wc of WebContents.getAllWebContents()) seguiGesti(wc);
+  } catch (_) {}
+}
+
 // Ogni finestra nata da una pagina web passa di qui, con la finestra di Filo da cui viene (`padre`); se il sito la
-// rimostra mentre c'è una domanda, torna nascosta.
+// rimostra o la sposta mentre c'è una domanda, si riguarda.
 function registraFinestraDelSito(win, padre) {
   if (!win || finestreDelSito.has(win) || win.isDestroyed()) return;
+  seguiGestiDiTutti();
   finestreDelSito.set(win, padre || null);
   win.once('closed', () => { finestreDelSito.delete(win); nascoste.delete(win); });
-  win.on('show', () => { if (aSchermo.size) setImmediate(allineaFinestre); });
+  for (const ev of ['show', 'move', 'resize']) win.on(ev, riallinea);
   allineaFinestre();
 }
 
@@ -89,6 +161,18 @@ class ConfermeSopraPagina {
     this.seq = 0;
     this.seguite = new WeakSet();
     if (win && typeof win.once === 'function') win.once('closed', () => { this._togli(() => true); this._butta(); });
+    seguiGestiDiTutti();
+    if (win && typeof win.on === 'function') for (const ev of ['move', 'resize']) win.on(ev, riallinea);
+  }
+
+  // La domanda a schermo si ridisegna da capo, e col popup riparte il mezzo secondo prima che OK valga.
+  // Con un numero nuovo: la vista chiude il popup vecchio, e la sua risposta (un Annulla) non vale per quello nuovo.
+  ridisegna() {
+    const voce = this.mostrata ? this.coda.find((v) => v.id === this.mostrata) : null;
+    if (!voce) return;
+    voce.id = ++this.seq;
+    this.mostrata = null;
+    setImmediate(() => this.posa());
   }
 
   chiedi(wc, frame, richiesta) {

@@ -37,6 +37,17 @@
     corpo.textContent = s.body || (pericoloso
       ? 'Questo sito potrebbe essere una truffa o tentare di rubare i tuoi dati.'
       : 'Questo sito ha alcune caratteristiche sospette. Fai attenzione ai dati che inserisci.');
+    // Il nome scelto da chi serve il file nel suo riquadro, riempito con textContent: nessun carattere lo chiude.
+    if (s.parti) {
+      corpo.replaceChildren();
+      for (const p of s.parti) {
+        if (typeof p === 'string') { corpo.append(p); continue; }
+        const q = document.createElement('span');
+        q.className = 'altrui';
+        q.textContent = p.citazione;
+        corpo.append(q);
+      }
+    }
     conferma.hidden = !pericoloso;
     indietro.textContent = s.prima ? 'Non aprire' : 'Torna indietro';
     parola.value = '';
@@ -60,6 +71,7 @@
       level: s.level === 'pericoloso' ? 'pericoloso' : 'sospetto',
       title: String(s.title || ''),
       body: String(s.body || ''),
+      parti: Array.isArray(s.parti) && s.parti.every((p) => typeof p === 'string' || (p && typeof p.citazione === 'string')) ? s.parti : null,
       prima: Number(s.prima) > 0,
     });
   });

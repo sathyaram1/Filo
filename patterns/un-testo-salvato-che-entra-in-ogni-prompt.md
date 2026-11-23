@@ -55,6 +55,14 @@ Valgono insieme queste regole:
   il filtro e i caratteri del popup: lì il popup sta sopra la scheda (vedi
   [la conferma su un sito](una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md)),
   e le parti gli arrivano dal canale come dati, ripulite di nuovo dal main.
+  **Fuori dal popup la domanda resta a pezzi** (#592.25): il bottone che la
+  riapre, la riga del diario, la voce d'archivio e la chat riaperta prendono la
+  prima riga da `SN_ESITO.rigaDellaDomanda`, che tiene il riquadro; la riga
+  piatta serve al modello. Così l'avviso del sito pericoloso (le parti del
+  messaggio, col nome del file) e la domanda alla chiusura di una finestra in
+  incognito. Il segno ha una copia per documento (popup, home, cornice,
+  avviso): `tests/unit/segnoTestoAltrui.test.mjs` le tiene uguali e vuole ogni
+  copia nuova nel suo elenco.
 - **Si conferma quello che si è visto.** La pulizia dei caratteri non basta da
   sola: tre giri di verifica di fila hanno spinto l'istruzione sotto il bordo
   con righe vuote, poi di spazi a larghezza zero, poi di righe innocue o di un

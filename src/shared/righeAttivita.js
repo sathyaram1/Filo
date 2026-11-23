@@ -538,9 +538,12 @@
     if (a._confirm) {
       // Due parole, non l'intera spiegazione: quella sta nel popup, che è
       // aperto davanti all'utente proprio in quel momento.
-      let prima = global.SN_ESITO.primaRigaConferma(a._confirm.text);
+      // Il testo altrui della domanda resta a pezzi, per il suo riquadro (#592.25).
+      const d = global.SN_ESITO.rigaDellaDomanda(a._confirm, 58);
+      let prima = d.riga;
       if (prima.length > 60) prima = `${prima.slice(0, 57)}…`;
-      return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
+      const text = `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`;
+      return { icon: '❔', text, failed: true, ...(d.parti ? { parti: ['Conferma chiesta · ', ...d.parti] } : {}) };
     }
     const type = String(a.type || '').toUpperCase();
     // Un segreto che sarebbe uscito (#810): cosa è stato fermato e da dove veniva, frase del main.

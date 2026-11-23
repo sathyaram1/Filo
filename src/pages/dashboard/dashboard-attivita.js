@@ -423,11 +423,11 @@
       fineDiretta() { inDiretta = false; },
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»), dentro il nodo della sua azione.
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la conta.
-      addRow(type, rowIcon, text, failed = false, cambi = null, a = null, title = '') {
+      addRow(type, rowIcon, text, failed = false, cambi = null, a = null, title = '', parti = null) {
         closeTurnReasoning();
         const gia = contaAzione(type, a, failed);
         const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
-        const riga = makeActivityRow(rowIcon, text, cambi, title);
+        const riga = makeActivityRow(rowIcon, parti || text, cambi, title);
         segnaSistema(riga, a);
         // La proposta finita col bottone diventa il suo esito nella stessa riga: due frasi che si contraddicono no.
         if (gia && gia.prima === global.SN_ESITO.PROPOSTO && gia.voce.riga && gia.voce.riga.isConnected) gia.voce.riga.replaceWith(riga);
@@ -727,9 +727,24 @@
     ic.setAttribute('aria-hidden', 'true');
     ic.textContent = rowIcon || '';
     const tx = document.createElement('span');
-    tx.textContent = String(text || '').trim();
+    if (Array.isArray(text)) conRiquadri(tx, text);
+    else tx.textContent = String(text || '').trim();
     el.append(ic, tx);
     return el;
+  }
+
+  // Una riga a pezzi (SN_ESITO.primaRigaParti): le parole di Filo come testo, quello che non è suo nel suo riquadro,
+  // riempito con textContent. Ricucito nella frase, il nome scelto dal modello si leggeva come parola di Filo (#592.25).
+  function conRiquadri(el, parti) {
+    el.replaceChildren();
+    for (const p of parti) {
+      if (typeof p === 'string') { el.append(p); continue; }
+      if (!p || typeof p.citazione !== 'string') continue;
+      const q = document.createElement('span');
+      q.className = 'dash-altrui';
+      q.textContent = p.citazione;
+      el.append(q);
+    }
   }
 
   // Le parole del diario stanno in src/shared/righeAttivita.js: la chat riaperta le legge uguali (#1294).
@@ -768,7 +783,7 @@
     }
     const row = activityRowFor(a);
     if (row) {
-      activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
+      activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '', row.parti || null);
       if (rifiutataDallaRegola(a) && activity.mostra) activity.mostra(a);
       return true;
     }
@@ -935,7 +950,7 @@
     const chip = document.querySelector(`[data-call-id="${CSS.escape(String(callId))}"]`);
     if (chip && apribileComunque(a)) {
       const row = activityRowFor(a);
-      if (row) chip.before(makeActivityRow(row.icon, row.text, row.cambi, row.title || ''));
+      if (row) chip.before(makeActivityRow(row.icon, row.parti || row.text,row.cambi, row.title || ''));
       chip.replaceWith(bottoneApriComunque(a));
     }
     return true;
@@ -989,7 +1004,7 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          const riga = makeActivityRow(row.icon, row.text, row.cambi, row.title || '');
+          const riga = makeActivityRow(row.icon, row.parti || row.text,row.cambi, row.title || '');
           segnaSistema(riga, a);
           wrap.appendChild(riga);
           if (!anche) continue;
@@ -1509,7 +1524,8 @@
     // dell'utente l'azione parte davvero via MSG.FILO_CONFIRM_ACTION.
     if (a._confirm && a._confirm.level >= 2) {
       if (gruppo) gruppo.pendenti.add(a);
-      if (!a._rigaChiesta) a._rigaChiesta = primaRigaConferma(a);
+      const domanda = global.SN_ESITO.rigaDellaDomanda(a._confirm);
+      if (!a._rigaChiesta) { a._rigaChiesta = domanda.riga; a._rigaChiestaParti = domanda.parti; }
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.type = 'button';
@@ -1529,7 +1545,8 @@
         if (!cosa) { btn.textContent = `${simbolo} ${short}`; return; }
         const riga = document.createElement('span');
         riga.className = 'dash-cmd-btn-cosa';
-        riga.textContent = `${simbolo} ${cosa}`;
+        // La spiegazione l'ha scritta il modello: nel suo riquadro, come nel popup.
+        conRiquadri(riga, [`${simbolo} `, { citazione: cosa }]);
         const codice = document.createElement('code');
         codice.className = 'dash-cmd-btn-codice';
         codice.textContent = short;
@@ -1540,7 +1557,11 @@
         if (short !== cmdText) btn.title = cmdText;
         segnaComando('▶');
       } else {
-        btn.textContent = shortLabel;
+        if (domanda.parti) {
+          const s = document.createElement('span');
+          conRiquadri(s, domanda.parti);
+          btn.replaceChildren(s);
+        } else btn.textContent = shortLabel;
         const segnalazione = RA.testoSegnalazione(a);
         if (segnalazione) btn.title = segnalazione;
       }
@@ -1651,7 +1672,7 @@
           a._executed = false;
           delete a._confirm;
           const row = activityRowFor(a);
-          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
+          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '', row.parti || null);
           btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
           archiviaEsito(a, { chat: c });
           return;
@@ -1955,7 +1976,7 @@
 
   // Cosa chiedeva la conferma, prima che il sì la tolga: riaperta, la chat dice cosa non è riuscito.
   function primaRigaConferma(a) {
-    return global.SN_ESITO.primaRigaConferma(a && a._confirm && a._confirm.text);
+    return global.SN_ESITO.rigaDellaDomanda(a && a._confirm).riga;
   }
 
   // Com'è andata un'azione decisa dopo il turno entra nell'archivio, nella conversazione dove è nato il bottone (#1294):
@@ -1966,7 +1987,11 @@
     const esito = E.esitoAzione(a);
     // La stessa voce che archivia il turno (le parole del diario coi numeri, il perché di un no): una regola sola.
     const voce = E.voceArchivio(a) || { type, esito };
-    if (voce.esito === E.FALLITO && chiesta && voce.type !== 'FERMATA') voce.riga = chiesta;
+    if (voce.esito === E.FALLITO && chiesta && voce.type !== 'FERMATA') {
+      voce.riga = chiesta;
+      if (a && a._rigaChiesta === chiesta && a._rigaChiestaParti) voce.parti = a._rigaChiestaParti;
+      else delete voce.parti;
+    }
     if (!voce.riga && fatto) voce.riga = fatto;
     // Quale domanda chiude, fra quelle aperte della risposta che l'aveva proposta.
     if (a) a._voce = { ...voce };
@@ -1981,7 +2006,7 @@
     a._executed = false;
     if (r && r.output) a._output = r.output;
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, true, row.cambi, a);
+    if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, true, row.cambi, a, '', row.parti || null);
     archiviaEsito(a, { chat, chiesta });
   }
 
@@ -2321,13 +2346,14 @@
       // La conferma rimasta senza risposta ritrova il suo bottone: il popup richiede il sì come allora (#1685).
       if (v.esito === E.CHIESTO && v.azione && v.conferma) {
         const btn = renderActionButton({
-          ...v.azione, type: v.type, _confirm: { level: v.conferma.livello, text: v.conferma.testo }, _executed: false,
+          ...v.azione, type: v.type, _executed: false,
+          _confirm: { level: v.conferma.livello, text: v.conferma.testo, ...(v.conferma.parti ? { parti: v.conferma.parti } : {}) },
           ...(v.conferma.domanda ? { _domanda: v.conferma.domanda } : {}),
         }, { chat, gruppo });
         if (btn) { wrap.appendChild(btn); continue; }
       }
       const riga = E.rigaDellaVoce(v);
-      if (riga && (tutte || riga.fallita)) wrap.appendChild(makeActivityRow(riga.icona, riga.testo, null, riga.fumetto || ''));
+      if (riga && (tutte || riga.fallita)) wrap.appendChild(makeActivityRow(riga.icona, riga.parti || riga.testo, null, riga.fumetto || ''));
       else if (riga) riuscite.push(riga.testo);
     }
     let nota = null;

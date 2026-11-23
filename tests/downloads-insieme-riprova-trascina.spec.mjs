@@ -222,7 +222,10 @@ for (const [scelta, arriva] of [['Annulla', false], ['Lascia finire', true]]) {
       await chiudiIncognito(app);
       const domanda = incog.locator('#dl-panel #dl-chiusura');
       await expect(domanda).toBeVisible({ timeout: 10000 });
-      await expect(domanda).toContainText(nome);
+      // Il nome scelto dal sito sta nel suo riquadro, fuori dalla frase di Filo (#592.25).
+      await expect(domanda.locator('.dl-row-ask-nome')).toHaveText(nome);
+      expect(await domanda.locator('.dl-chiusura-testo > div:not(.dl-row-ask-nome)').allTextContents()).not.toContain(nome);
+      await expect(domanda.locator('.dl-chiusura-testo')).toContainText('lo lascio finire?');
       expect(await incognitoAperta(app)).toBe(true);
       await incog.locator('#dl-panel').screenshot({ path: join(SHOTS, `download-1287-chiusura-${arriva ? 'finire' : 'annulla'}.png`) });
       const bottone = domanda.locator('.dl-row-btn', { hasText: scelta });

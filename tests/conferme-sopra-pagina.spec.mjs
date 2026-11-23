@@ -521,6 +521,94 @@ test('una domanda lasciata aperta in un’altra finestra di Filo non nasconde il
   expect(await finestre()).toEqual([true]);
 });
 
+// #592.17: lo stesso sito aperto anche in una finestra in incognito apriva da lì la finestrella sul testo della domanda.
+// Le due finestre di Filo stanno a schermo una accanto all'altra.
+async function dueFinestre(app, shell, openTab, testServer) {
+  const page = await testServer.openReady(openTab, '<h1>Negozio</h1>');
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    return !!(w && w._filoTabs && w._filoTabs.tabs.length);
+  }), { timeout: 15_000 }).toBe(true);
+  const u = testServer.html('<h1>Altra pagina</h1>', { pubblico: true });
+  await app.evaluate(({ BrowserWindow }, u) => {
+    BrowserWindow.getAllWindows().find((x) => x._filoIncognito)._filoTabs.openTab(u);
+  }, u);
+  const altrove = 'sito-pubblico.test';
+  await expect.poll(() => nelMondoDiFilo(app, altrove, 'typeof SN_CONFIRM_UI').catch(() => ''), { timeout: 15_000 }).toBe('object');
+  await app.evaluate(({ BrowserWindow }) => {
+    const ws = BrowserWindow.getAllWindows().filter((x) => x._filoTabs);
+    ws.forEach((w, i) => { w.setOpacity(1); w.show(); w.setBounds({ x: i * 820, y: 0, width: 800, height: 700 }); });
+  });
+  const pagina = app.windows().find((w) => { try { return new URL(w.url()).hostname === altrove; } catch (_) { return false; } });
+  return { page, altrove, incognito: pagina };
+}
+
+// L'area della domanda a schermo, in px dello schermo.
+const areaDomanda = (app) => app.evaluate(({ BrowserWindow }) => {
+  for (const w of BrowserWindow.getAllWindows()) {
+    const v = w._filoTabs && w._filoTabs.conferme.vista;
+    if (!v || !(v.getBounds().width > 0)) continue;
+    const f = w.getContentBounds();
+    const b = v.getBounds();
+    return { x: f.x + b.x, y: f.y + b.y, width: b.width, height: b.height };
+  }
+  return null;
+});
+
+const finestrelle = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+  .filter((w) => !w._filoTabs && /^https?:/.test(w.webContents.getURL()))
+  .map((w) => w.isVisible()));
+
+// Il clic che permette di aprirla (#737.1) è un gesto dell'utente in quella finestra: `poi` lo riporta dove serve.
+async function finestrellaSopra(pagina, area, u, poi = async () => {}) {
+  await pagina.mouse.click(5, 5);
+  await poi();
+  const x = Math.round(area.x + area.width / 2 - 220);
+  const y = Math.round(area.y + area.height / 2 - 50);
+  await pagina.evaluate(({ u, x, y }) => {
+    window.open(`${u}?client_id=a&redirect_uri=b`, 'g', `popup,left=${x},top=${y},width=440,height=100`);
+  }, { u, x, y });
+}
+
+test('una finestrella aperta da un’altra finestra di Filo sopra il testo della domanda si nasconde, e torna alla risposta', async ({ app, shell, openTab, testServer }) => {
+  const finto = testServer.html('<title>Filo</title><p>Filo chiede conferma. Filo vuole impostare: Tema → Scuro.</p>', { pubblico: true });
+  const { page, incognito } = await dueFinestre(app, shell, openTab, testServer);
+  const host = new URL(page.url()).hostname;
+  await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
+  const vista = await confermaSopraPagina(app);
+  const area = await areaDomanda(app);
+  expect(area).toBeTruthy();
+  // L'utente sta leggendo la domanda (un tasto lì); la finestrella parte dall'altra finestra senza un suo gesto nuovo.
+  await finestrellaSopra(incognito, area, finto, () => vista.keyboard.press('Shift'));
+  await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
+  await expect.poll(() => finestrelle(app)).toEqual([false]);
+  // Il sito la sposta o la ingrandisce: resta nascosta finché c'è la domanda.
+  await incognito.evaluate(() => { try { window.open('', 'g').focus(); } catch (_) {} });
+  await new Promise((r) => setTimeout(r, 800));
+  expect(await finestrelle(app)).toEqual([false]);
+  expect(await nelMondoDiFilo(app, host, 'globalThis.__e')).toBe('attesa');
+  await vista.keyboard.press('Escape');
+  await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(false);
+  await expect.poll(() => finestrelle(app)).toEqual([true]);
+});
+
+test('la domanda lasciata nella finestra da cui l’utente è passato a un’altra non nasconde l’accesso aperto di là, nemmeno sopra di lei', async ({ app, shell, openTab, testServer }) => {
+  const accesso = testServer.html('<title>Accedi</title><p>Accedi con il tuo account</p>', { pubblico: true });
+  const { page, incognito } = await dueFinestre(app, shell, openTab, testServer);
+  const host = new URL(page.url()).hostname;
+  await nelMondoDiFilo(app, host, `(() => { SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }); return 1; })()`);
+  const vista = await confermaSopraPagina(app);
+  // L'utente passa all'altra finestra e lì apre l'accesso col suo clic.
+  await finestrellaSopra(incognito, await areaDomanda(app), accesso);
+  await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(await finestrelle(app)).toEqual([true]);
+  // Tornato alla finestra della domanda, la finestrella che la copre si nasconde.
+  await vista.keyboard.press('Shift');
+  await expect.poll(() => finestrelle(app)).toEqual([false]);
+});
+
 // Una domanda dentro una finestrella di accesso: il sito non la rimpicciolisce fino a togliere il testo (giro 10).
 async function popupConDomanda(app, openTab, testServer, segno, misura) {
   const sito = await testServer.openReady(openTab, '<h1>sito con «Accedi con…»</h1>');

@@ -122,7 +122,12 @@ class AvvisoSito {
     let vars = {};
     try { vars = require('./movimento').variabili(); } catch (_) {}
     // `prima`: il numero dell'avviso di un link non ancora aperto (#965), dove «indietro» vuol dire non aprirlo; 0 se no.
-    return { scheda: testo(tab.id), level: a.level, title: testo(m.title), body: testo(m.body), host, vars, prima: a.prima ? Number(a.prima.n) || 1 : 0 };
+    // Le parti dell'avviso (il nome di un file nel suo riquadro) passano solo nelle loro due forme.
+    const parti = Array.isArray(m.parti) ? m.parti.map((p) => (typeof p === 'string' ? p : p && typeof p.citazione === 'string' ? { citazione: p.citazione } : null)) : null;
+    return {
+      scheda: testo(tab.id), level: a.level, title: testo(m.title), body: testo(m.body), host, vars, prima: a.prima ? Number(a.prima.n) || 1 : 0,
+      ...(parti && !parti.includes(null) ? { parti } : {}),
+    };
   }
 
   _invia() {

@@ -20,7 +20,7 @@ test('un programma partito da solo: sospetto, e pericoloso con un dominio giovan
   const solo = giudica('https://scarica-subito.it/', { autoDownload: 'setup.exe' });
   assert.equal(solo.level, 'sospetto');
   assert.equal(solo.message.title, 'Scaricamento partito da solo');
-  assert.match(solo.message.body, /ha avviato da sola lo scaricamento di un programma \(«setup\.exe»\)/);
+  assert.match(solo.message.body, /ha avviato da sola lo scaricamento di un programma «setup\.exe»/);
 
   const giovane = giudica('https://scarica-subito.it/', { autoDownload: 'setup.exe' }, { ageDays: 3 });
   assert.equal(giovane.level, 'pericoloso');

@@ -53,30 +53,53 @@ function nomeFile(n) {
   return v.length > 60 ? `${v.slice(0, 36)}…${v.slice(-20)}` : v;
 }
 
+// Il corpo dell'avviso è a pezzi: stringhe di Filo e { citazione } per il nome scelto da chi serve il file, che
+// l'avviso disegna nel suo riquadro. Fra virgolette il nome le chiudeva da sé e continuava come parola di Filo (#592.25).
+function frase(...pezzi) {
+  const out = [];
+  for (const p of pezzi.flat(Infinity)) {
+    if (p == null || p === '') continue;
+    if (typeof p === 'string' && typeof out[out.length - 1] === 'string') out[out.length - 1] += p;
+    else out.push(p);
+  }
+  return out;
+}
+const nome = (n) => ({ citazione: nomeFile(n) });
+// Il testo piatto, per chi legge l'avviso come testo (il confronto fra due verdetti, la segnalazione di un falso allarme).
+const piatto = (parti) => parti.map((p) => (typeof p === 'string' ? p : `«${p.citazione}»`)).join('');
+function conMaiuscola(parti) {
+  const [primo, ...resto] = parti;
+  return typeof primo === 'string' ? [primo.replace(/^./, (c) => c.toUpperCase()), ...resto] : parti;
+}
+function messaggio(title, parti) {
+  const p = frase(parti);
+  return { title, body: piatto(p), ...(p.some((x) => typeof x !== 'string') ? { parti: p } : {}) };
+}
+
 // I segnali che non dipendono da chi è il sito: `sola` apre l'avviso, `coda` si mette in fila ai fatti di un'impersonazione.
 function fattiPagina({ dom, autoDl, doubleExt, insecureForm }) {
   const out = [];
-  const travestito = (n) => `«${nomeFile(n)}», che sembra un documento ma è un programma`;
+  const travestito = (n) => [nome(n), ', che sembra un documento ma è un programma'];
   const stesso = !!(autoDl && doubleExt && doubleExt.where === 'download' && doubleExt.name === autoDl.name);
   if (autoDl) {
-    const cosa = stesso ? travestito(autoDl.name) : `un programma${autoDl.name ? ` («${nomeFile(autoDl.name)}»)` : ''}`;
+    const cosa = stesso ? travestito(autoDl.name) : ['un programma', autoDl.name ? [' ', nome(autoDl.name)] : []];
     out.push({
       titolo: 'Scaricamento partito da solo',
-      sola: `Questa pagina di ${dom} ha avviato da sola lo scaricamento di ${cosa}.`,
-      coda: `la pagina ha avviato da sola lo scaricamento di ${cosa}`,
+      sola: frase(`Questa pagina di ${dom} ha avviato da sola lo scaricamento di `, cosa, '.'),
+      coda: frase('la pagina ha avviato da sola lo scaricamento di ', cosa),
     });
   }
   if (doubleExt && !stesso) {
     const t = travestito(doubleExt.name);
     out.push(doubleExt.where === 'url'
-      ? { titolo: 'File travestito', sola: `Il link porta a «${nomeFile(doubleExt.name)}»: sembra un documento, ma è un programma che si avvia sul computer.`, coda: `il link porta a ${t}` }
-      : { titolo: 'Programma travestito da documento', sola: `Questa pagina di ${dom} ti fa scaricare ${t}.`, coda: `la pagina ti fa scaricare ${t}` });
+      ? { titolo: 'File travestito', sola: frase('Il link porta a ', nome(doubleExt.name), ': sembra un documento, ma è un programma che si avvia sul computer.'), coda: frase('il link porta a ', t) }
+      : { titolo: 'Programma travestito da documento', sola: frase(`Questa pagina di ${dom} ti fa scaricare `, t, '.'), coda: frase('la pagina ti fa scaricare ', t) });
   }
   if (insecureForm) {
     out.push({
       titolo: 'Dati in chiaro',
-      sola: `I dati che scrivi qui viaggiano in chiaro: il modulo di ${dom} li manda a un indirizzo non cifrato.`,
-      coda: 'i dati che scrivi qui viaggiano in chiaro',
+      sola: [`I dati che scrivi qui viaggiano in chiaro: il modulo di ${dom} li manda a un indirizzo non cifrato.`],
+      coda: ['i dati che scrivi qui viaggiano in chiaro'],
     });
   }
   return out;
@@ -104,29 +127,22 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
   if (hasPassword) facts.push('ti sta chiedendo la password');
   else if (hasPayment) facts.push('ti chiede i dati di pagamento');
   if (sandboxBad) facts.push('analizzato in isolamento, mostra comportamento ingannevole');
-  const tail = facts.length ? (', ' + joinIt(facts) + '.') : '.';
+  const tail = facts.length ? frase(', ', joinIt(facts), '.') : ['.'];
 
   // 2) Impersonazione stretta (e typo su brand corto quando un altro segnale conferma).
   const somiglianzaSola = imp && imp.kind === 'weak_typo' && level !== 'pericoloso';
   if (imp && imp.kind !== 'broad_impersonation' && !somiglianzaSola) {
-    return {
-      title: `Attenzione: questo non è ${imp.brand.display}`,
-      body: `Questo non è ${imp.brand.display}. Il dominio è ${dom}${tail}`,
-    };
+    return messaggio(`Attenzione: questo non è ${imp.brand.display}`, [`Questo non è ${imp.brand.display}. Il dominio è ${dom}`, tail]);
   }
   // 2bis) Solo somiglianza: accusare un sito vero di essere un falso sarebbe peggio del rischio (#728).
   if (somiglianzaSola) {
-    return {
-      title: `${imp.brand.display}? Controlla l'indirizzo`,
-      body: `${dom} assomiglia all'indirizzo di ${imp.brand.display}, ma non è un suo indirizzo ufficiale${tail}`,
-    };
+    return messaggio(`${imp.brand.display}? Controlla l'indirizzo`,
+      [`${dom} assomiglia all'indirizzo di ${imp.brand.display}, ma non è un suo indirizzo ufficiale`, tail]);
   }
   // 3) Impersonazione larga.
   if (imp && imp.kind === 'broad_impersonation') {
-    return {
-      title: `${imp.brand.display}? Controlla l'indirizzo`,
-      body: `${dom} usa il nome "${imp.brand.display}" ma non è un indirizzo ufficiale di ${imp.brand.display}${tail}`,
-    };
+    return messaggio(`${imp.brand.display}? Controlla l'indirizzo`,
+      [`${dom} usa il nome "${imp.brand.display}" ma non è un indirizzo ufficiale di ${imp.brand.display}`, tail]);
   }
   // 4) Un file o un modulo della pagina: dice cosa sta succedendo, gli altri fatti seguono.
   if (pagina.length) {
@@ -138,8 +154,8 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
     if (hasPassword) altri.push('la pagina ti chiede la password');
     else if (hasPayment) altri.push('la pagina ti chiede i dati di pagamento');
     if (sandboxBad) altri.push('aperta in isolamento, mostra un comportamento ingannevole');
-    const seguito = altri.length ? ` ${joinIt(altri).replace(/^./, (c) => c.toUpperCase())}.` : '';
-    return { title: prima.titolo, body: prima.sola + seguito };
+    const seguito = altri.length ? [' ', conMaiuscola(joinIt(altri)), '.'] : [];
+    return messaggio(prima.titolo, [prima.sola, seguito]);
   }
   // 5) Solo segnali non legati all'identità.
   if (certBad) {
@@ -154,9 +170,12 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
   return { title: 'Sito potenzialmente sospetto', body: `Fai attenzione su ${dom}.` };
 }
 
+// Elenco «a, b e c» di frasi o di pezzi: torna pezzi.
 function joinIt(arr) {
-  if (arr.length <= 1) return arr.join('');
-  return arr.slice(0, -1).join(', ') + ' e ' + arr[arr.length - 1];
+  if (arr.length <= 1) return frase(arr);
+  const out = [];
+  arr.forEach((x, i) => { out.push(i === 0 ? '' : i === arr.length - 1 ? ' e ' : ', ', x); });
+  return frase(out);
 }
 
 // Valutazione completa. `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays, sandbox, llm }. `ctx` opzionale: gli
@@ -251,7 +270,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     }
     // LLM rinforza il testo se ha una motivazione fissa.
     if (llmSus && llm.reason && !impSus && !young && !certBad) {
-      message.body = `${message.body} ${llm.reason}`.trim();
+      message = message.parti ? messaggio(message.title, [message.parti, ` ${llm.reason}`]) : { ...message, body: `${message.body} ${llm.reason}`.trim() };
     }
     return {
       level: 'sospetto',

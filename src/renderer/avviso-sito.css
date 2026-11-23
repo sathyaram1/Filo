@@ -68,6 +68,17 @@ body {
 .icona { font-size: 46px; line-height: 1; margin-bottom: 12px; }
 h1 { font: 700 22px/1.25 var(--font); color: var(--accento); margin: 0 0 10px; overflow-wrap: anywhere; }
 #corpo { font-size: 15.5px; color: var(--corpo); margin: 0 0 22px; overflow-wrap: anywhere; }
+/* Il nome scelto da chi serve il file sta su un foglietto suo, come il testo altrui nei popup di conferma (#592.25):
+   il filo a sinistra è per metà colore del testo. */
+.altrui {
+  padding: 0 5px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--accento) 50%, currentColor);
+  border-radius: 6px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
 
 #conferma label { display: block; font-size: 13px; color: var(--tenue); margin-bottom: 8px; }
 #parola {

@@ -1905,14 +1905,10 @@
     return d.filter((p) => (typeof p === 'string' ? p : riquadro(p)));
   }
 
-  // La stessa spiegazione in una riga di testo: il bottone, il diario, il
-  // modello. I riquadri tornano fra virgolette, gli elenchi a punti.
+  // La stessa spiegazione in una riga di testo: la regola sta in SN_ESITO, che disegna anche le righe a pezzi.
   function piatto(parti) {
-    return parti.map((p) => {
-      if (typeof p === 'string') return p;
-      if (Array.isArray(p.elenco)) return p.elenco.map((v) => `• ${v}`).join('\n');
-      return p.nuda ? p.citazione : `«${p.citazione}»`;
-    }).join('');
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
+    return global.SN_ESITO.piatto(parti);
   }
 
   function describe(action) {
@@ -1967,5 +1963,5 @@
   const LOTTO_ELIMINA = 200;
   const LOTTO_RINOMINA = 40;
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale, traduzioneFatta, LOTTO_ELIMINA, LOTTO_RINOMINA };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, piatto, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale, traduzioneFatta, LOTTO_ELIMINA, LOTTO_RINOMINA };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

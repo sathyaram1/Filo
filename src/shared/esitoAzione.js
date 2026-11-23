@@ -140,6 +140,91 @@
   // La prima riga di una domanda di conferma, senza i due punti che annunciano il testo sotto: la usano il bottone, il
   // diario e la voce d'archivio, che devono dire la stessa cosa.
   const primaRiga = (s) => String(s || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
+
+  // La stessa prima riga a pezzi, quando ci sta un testo non di Filo (#592.25): stringhe di Filo e { citazione }. Chi
+  // la mostra disegna il riquadro; ricomposta in una frase, il testo altrui si legge come parola di Filo. null se la
+  // prima riga è tutta di Filo. Il suo testo piatto (`rigaDiParti`) è quello che leggono il modello e l'archivio.
+  const riquadro = (p) => !!p && typeof p === 'object' && (Array.isArray(p.elenco) || typeof p.citazione === 'string');
+  const spazi = (s) => String(s).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ');
+  function primaRigaParti(parti) {
+    if (!Array.isArray(parti) || !parti.some(riquadro)) return null;
+    const out = [];
+    for (const p of parti) {
+      const t = typeof p === 'string' ? p : riquadro(p) && typeof p.citazione === 'string' ? p.citazione : null;
+      if (t == null) break;
+      const a = t.indexOf('\n');
+      const pezzo = a < 0 ? t : t.slice(0, a);
+      if (typeof p === 'string') out.push(pezzo);
+      else out.push({ citazione: a < 0 ? pezzo : `${pezzo}…`, ...(p.nuda === true ? { nuda: true } : {}) });
+      if (a >= 0) break;
+    }
+    return ripulite(out);
+  }
+  // Spazi e caratteri di controllo come nella riga piatta (`pulito`), stringhe vicine unite, i due punti finali via.
+  function ripulite(parti) {
+    const out = [];
+    for (const p of parti) {
+      if (typeof p === 'string') {
+        if (typeof out[out.length - 1] === 'string') out[out.length - 1] += spazi(p);
+        else out.push(spazi(p));
+      } else if (p && typeof p.citazione === 'string' && p.citazione.trim()) {
+        out.push({ citazione: spazi(p.citazione).trim(), ...(p.nuda === true ? { nuda: true } : {}) });
+      }
+    }
+    if (typeof out[0] === 'string') out[0] = out[0].replace(/^\s+/, '');
+    const u = out.length - 1;
+    if (typeof out[u] === 'string') out[u] = out[u].replace(/\s*:?\s*$/, '');
+    const buone = out.filter((p) => p !== '');
+    return buone.some(riquadro) ? buone : null;
+  }
+  // Le parti di una spiegazione in una riga di testo (il bottone, il diario, il modello): i riquadri fra virgolette, i
+  // nudi senza, gli elenchi a punti. La usa anche SN_ACTION_LEVELS.describe: una regola sola.
+  function piatto(parti) {
+    return (Array.isArray(parti) ? parti : []).map((p) => {
+      if (typeof p === 'string') return p;
+      if (Array.isArray(p.elenco)) return p.elenco.map((v) => `• ${v}`).join('\n');
+      return p.nuda ? p.citazione : `«${p.citazione}»`;
+    }).join('');
+  }
+  const rigaDiParti = (parti) => (Array.isArray(parti) ? piatto(parti) : '');
+  // Al più `max` caratteri del testo piatto: si taglia dove si arriva, e il taglio si vede.
+  function accorciaParti(parti, max) {
+    if (!Array.isArray(parti) || rigaDiParti(parti).length <= max) return parti;
+    return ripulite(taglia(parti, max));
+  }
+  function taglia(parti, max) {
+    const out = [];
+    let resta = max - 1;
+    for (const p of parti) {
+      const giro = typeof p === 'string' ? 0 : p.nuda ? 0 : 2;
+      const t = typeof p === 'string' ? p : p.citazione;
+      if (t.length + giro <= resta) { out.push(p); resta -= t.length + giro; continue; }
+      const pezzo = t.slice(0, Math.max(0, resta - giro));
+      if (typeof p === 'string') out.push(`${pezzo}…`);
+      else if (pezzo) out.push({ ...p, citazione: `${pezzo}…` });
+      else out.push('…');
+      break;
+    }
+    return out;
+  }
+  // Le parti salvate di una riga valgono solo se dicono la riga piatta salvata accanto: una sola frase, due forme.
+  function partiDellaRiga(parti, riga) {
+    if (!Array.isArray(parti) || parti.length > 60 || !riga) return null;
+    const p = parti.map((x) => (typeof x === 'string' ? x
+      : x && typeof x === 'object' && typeof x.citazione === 'string' ? { citazione: x.citazione, ...(x.nuda === true ? { nuda: true } : {}) } : null));
+    if (p.some((x) => x == null) || !p.some(riquadro)) return null;
+    return rigaDiParti(p) === riga ? p : null;
+  }
+  // Riga piatta e riga a pezzi di una domanda, accorciate insieme: `parti` null se la riga è tutta di Filo.
+  // Tagliata prima del riquadro, restano le sole parole di Filo: mai il testo piatto, che lo ricucirebbe.
+  function rigaDellaDomanda(c, max = MAX_RIGA) {
+    const intera = primaRigaParti(c && c.parti);
+    if (!intera) return { riga: primaRiga(c && c.text), parti: null };
+    const p = accorciaParti(intera, max);
+    if (p) return { riga: rigaDiParti(p), parti: p };
+    const sole = taglia(intera, max).filter((x) => typeof x === 'string').join('').replace(/\s+/g, ' ').trim();
+    return { riga: sole, parti: null };
+  }
   function frase(fn, a) {
     try { return primaRiga(fn(a)); } catch (_) { return ''; }
   }
@@ -194,6 +279,8 @@
   function senzaVuoti(v) {
     const out = { type: v.type, esito: v.esito };
     if (v.riga) out.riga = v.riga;
+    const parti = v.riga ? partiDellaRiga(v.parti, v.riga) : null;
+    if (parti) out.parti = parti;
     if (v.motivo) out.motivo = v.motivo;
     if (v.file) out.file = v.file;
     if (v.link) out.link = v.link;
@@ -242,7 +329,20 @@
     const testo = String((c && (c.text ?? c.testo)) || '');
     if (!(livello === 2 || livello === 3) || !testo.trim() || testo.length > MAX_AZIONE) return null;
     const d = String(domanda ?? (c && c.domanda) ?? '');
-    return /^[a-z]{1,12}$/.test(d) ? { livello, testo, domanda: d } : { livello, testo };
+    const parti = partiDellaConferma(c && c.parti, testo);
+    return { livello, testo, ...(parti ? { parti } : {}), ...(/^[a-z]{1,12}$/.test(d) ? { domanda: d } : {}) };
+  }
+  // Riaperta, la domanda torna coi suoi riquadri: solo le forme del popup, e solo se dicono il testo salvato accanto.
+  function partiDellaConferma(parti, testo) {
+    if (!Array.isArray(parti) || parti.length > 200) return null;
+    const p = parti.map((x) => {
+      if (typeof x === 'string') return x;
+      if (x && typeof x === 'object' && Array.isArray(x.elenco) && x.elenco.every((v) => typeof v === 'string')) return { elenco: x.elenco.slice() };
+      if (x && typeof x === 'object' && typeof x.citazione === 'string') return { citazione: x.citazione, ...(x.nuda === true ? { nuda: true } : {}) };
+      return null;
+    });
+    if (p.some((x) => x == null) || !p.some(riquadro) || rigaDiParti(p) !== testo) return null;
+    return JSON.stringify(p).length <= MAX_AZIONE ? p : null;
   }
   // Il pannello dell'eliminazione dall'archivio cerca appena è disegnato: riaperta la chat resta la riga, non si paga
   // un giudizio a ogni riapertura.
@@ -263,7 +363,7 @@
       const f = type === 'APRI_FILE' && x.file ? fileDi(x.file) : null;
       const generica = SENZA_TITOLO[type] ? SENZA_TITOLO[type][x.esito === CHIESTO ? 0 : 1] : '';
       return senzaVuoti({
-        type, esito: x.esito, riga: generica || breve(x.riga, MAX_RIGA), motivo: breve(x.motivo, MAX_MOTIVO), file: f,
+        type, esito: x.esito, riga: generica || breve(x.riga, MAX_RIGA), parti: generica ? null : x.parti, motivo: breve(x.motivo, MAX_MOTIVO), file: f,
         link: type === 'NAVIGA' && x.link ? linkDi(x.link) : null,
         salvate: type === 'CERCA_SALVATE' && x.salvate ? salvateDi(x.salvate) : null,
         proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
@@ -280,9 +380,9 @@
     const L = global.SN_ACTION_LEVELS;
     // Un no alla conferma è un esito: chi rilegge sa che l'utente ha rifiutato, e il modello non la ripropone (#1373).
     if (x._confirm && x._rifiutata) {
-      const chiesta = SENZA_TITOLO[type] ? SENZA_TITOLO[type][0] : primaRiga(x._confirm.text) || (L ? frase(L.describe, x) : '');
+      const d = SENZA_TITOLO[type] ? { riga: SENZA_TITOLO[type][0], parti: null } : domandaDi(x, L);
       return senzaVuoti({
-        type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO, no: true,
+        type, esito: FALLITO, riga: breve(d.riga, MAX_RIGA), parti: d.parti, motivo: MOTIVO_NO, no: true,
         autore: x._proposta === true ? 'segnalazione' : '', ...segnalazioneDi(type, x),
       });
     }
@@ -292,12 +392,17 @@
     const diretta = esito === CHIESTO || esito === FALLITO ? null : rigaDelDiario(x);
     if (diretta && diretta.failed) esito = FALLITO;
     let riga = '';
-    if (esito === CHIESTO) riga = primaRiga(x._confirm && x._confirm.text) || (L ? frase(L.describe, x) : '');
+    let parti = null;
+    const chiesta = (d) => { riga = d.riga; parti = d.parti; };
+    if (esito === CHIESTO) chiesta(domandaDi(x, L));
     // Non riuscita dopo un OK: la domanda a cui l'utente ha risposto, come la diceva il bottone.
-    else if (esito === FALLITO) riga = primaRiga(x._rigaChiesta) || (L ? frase(L.describe, x) : '');
+    else if (esito === FALLITO) {
+      chiesta(x._confirm ? domandaDi(x, L)
+        : x._rigaChiesta ? { riga: primaRiga(x._rigaChiesta), parti: x._rigaChiestaParti || null } : domandaDi(x, L));
+    }
     else riga = (diretta && primaRiga(diretta.text)) || (L ? frase(L.describeDone, x) : '');
-    if (!riga && x._domanda && L) riga = frase(L.describe, x);
-    if (SENZA_TITOLO[type]) riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1];
+    if (!riga && x._domanda && L) chiesta(domandaDi({ ...x, _confirm: null }, L));
+    if (SENZA_TITOLO[type]) { riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1]; parti = null; }
     const fatta = esito !== FALLITO && esito !== CHIESTO;
     const file = type === 'APRI_FILE' && fatta ? fileDi(x) : null;
     const link = type === 'NAVIGA' && fatta ? linkDi(x) : null;
@@ -305,7 +410,7 @@
     const perche = esito === FALLITO ? motivo(x) || (diretta ? diretta.text : '') : '';
     const evento = type === 'EVENTO_CALENDARIO' && esito === PROPOSTO ? eventoDi(x) : null;
     return senzaVuoti({
-      type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file, link, salvate, evento,
+      type, esito, riga: breve(riga, MAX_RIGA), parti, motivo: breve(perche, MAX_MOTIVO), file, link, salvate, evento,
       partita: esito === FALLITO && partita(x),
       // Un no della regola di autonomia: riaperta, la riga dice «Non dimenticato» come il diario in diretta.
       no: esito === FALLITO && !!(o && o.no),
@@ -313,6 +418,13 @@
       autore: x._proposta === true ? 'segnalazione' : '', ...segnalazioneDi(type, x),
       ...(SENZA_TITOLO[type] || !x._confirm ? {} : bottoneDi(esito, type, x, x._confirm, x._domanda)),
     });
+  }
+  // La domanda di un'azione in una riga, piatta e a pezzi: quella del popup, o la sua spiegazione se non c'è.
+  function domandaDi(x, L) {
+    const c = x && x._confirm;
+    const d = c ? rigaDellaDomanda(c) : { riga: '', parti: null };
+    if (d.riga || !L) return d;
+    try { return rigaDellaDomanda({ text: L.describe(x), parti: L.describeParts(x) }); } catch (_) { return { riga: '', parti: null }; }
   }
   function rigaDelDiario(x) {
     const R = global.SN_RIGHE_ATTIVITA;
@@ -364,14 +476,21 @@
     if (!v || !v.type) return null;
     const riga = pulito(v.riga);
     if (v.type === 'FERMATA') return { icona: '🔒', testo: riga || 'Fermata: avrebbe portato fuori un segreto', fallita: true };
-    if (v.esito === CHIESTO) return { icona: '❔', testo: `Conferma chiesta${riga ? ` · ${riga}` : ''}`, fallita: true };
+    // La riga a pezzi, se il testo altrui c'è: chi disegna lo mette nel suo riquadro (#592.25).
+    const parti = partiDellaRiga(v.parti, riga);
+    if (v.esito === CHIESTO) {
+      const testo = `Conferma chiesta${riga ? ` · ${riga}` : ''}`;
+      return { icona: '❔', testo, fallita: true, ...(parti ? { parti: ['Conferma chiesta · ', ...parti] } : {}) };
+    }
     if (v.esito === FALLITO) {
       const perche = pulito(v.motivo);
       // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
       const R = global.SN_RIGHE_ATTIVITA;
       const no = v.no === true || v.motivo === MOTIVO_NO;
       const etichetta = R ? R.etichettaNonFatta(v.type, { no, partita: v.partita === true }) : '';
-      return { icona: '⚠', testo: [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · '), fallita: true };
+      const testo = [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · ');
+      const aPezzi = !etichetta && parti ? ['Non riuscita · ', ...parti, ...(perche ? [` · ${perche}`] : [])] : null;
+      return { icona: '⚠', testo, fallita: true, ...(aPezzi ? { parti: aPezzi } : {}) };
     }
     if (!riga) return null;
     return { icona: '✓', testo: riga, fallita: false };
@@ -438,6 +557,6 @@
     daRaccontare,
     esitoAzione, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
     perTrascrizione, testoSegnalazione,
-    unisciDopo, primaRigaConferma: primaRiga, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
+    unisciDopo, primaRigaConferma: primaRiga, primaRigaParti, rigaDellaDomanda, rigaDiParti, piatto, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -85,10 +85,11 @@ test('una pagina che al caricamento fa partire un programma, senza clic: sospett
   await openTab('https://scarica-subito.it/');
   const a = await avvisoDi(app, 'scarica-subito.it');
   expect(a.level).toBe('sospetto');
-  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma («setup.exe»)');
+  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma «setup.exe»');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('Scaricamento partito da solo')).toBeVisible({ timeout: 6000 });
-  await expect(avviso.getByText(/ha avviato da sola lo scaricamento/)).toBeVisible();
+  await expect(avviso.locator('#corpo')).toContainText('ha avviato da sola lo scaricamento');
+  await expect(avviso.locator('#corpo .altrui')).toHaveText('setup.exe');
   await avviso.screenshot({ path: 'tests/.shots/814-scaricamento-partito-da-solo.png' }).catch(() => {});
   // La domanda di #588 non cambia: il programma aspetta la risposta fuori dalla cartella Download.
   await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 10000 }).toBe('pending');
@@ -105,12 +106,12 @@ test('un programma partito da solo da una scheda aperta dalla pagina o da un riq
   await openTab('https://apre-schede.it/');
   const scheda = await avvisoDi(app, 'apre-schede.it');
   expect(scheda.level).toBe('sospetto');
-  expect(scheda.body).toContain('ha avviato da sola lo scaricamento di un programma («regalo.exe»)');
+  expect(scheda.body).toContain('ha avviato da sola lo scaricamento di un programma «regalo.exe»');
 
   await openTab('https://riquadro-nascosto.it/');
   const riquadro = await avvisoDi(app, 'riquadro-nascosto.it');
   expect(riquadro.level).toBe('sospetto');
-  expect(riquadro.body).toContain('ha avviato da sola lo scaricamento di un programma («lettore.exe»)');
+  expect(riquadro.body).toContain('ha avviato da sola lo scaricamento di un programma «lettore.exe»');
 });
 
 test('un programma partito da solo su un dominio registrato da pochi giorni: pericoloso', async ({ app, openTab }) => {
@@ -120,7 +121,7 @@ test('un programma partito da solo su un dominio registrato da pochi giorni: per
   await openTab('https://scarica-giovane.it/');
   const a = await avvisoDi(app, 'scarica-giovane.it', { livello: 'pericoloso' });
   expect(a.level).toBe('pericoloso');
-  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma («aggiorna.exe»)');
+  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma «aggiorna.exe»');
   expect(a.body).toContain('registrato 3 giorni fa');
 });
 
@@ -158,7 +159,12 @@ test('doppia estensione: aprire /fattura.pdf.exe, o scaricare fattura.pdf.exe co
   const archivio = await openTab('https://archivio-fatture.it/');
   await archivio.click('#fattura', { noWaitAfter: true });
   const avviso = await vistaAvviso(app);
-  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible({ timeout: 6000 });
+  await expect(avviso.locator('#corpo')).toContainText(': sembra un documento, ma è un programma', { timeout: 6000 });
+  // Il nome lo sceglie chi serve il file: sta nel suo riquadro, non fra le parole di Filo (#592.25).
+  const nome = avviso.locator('#corpo .altrui');
+  await expect(nome).toHaveText('fattura.pdf.exe');
+  expect(await nome.evaluate((el) => getComputedStyle(el).borderLeftWidth)).toBe('3px');
+  await avviso.screenshot({ path: 'tests/.shots/safebrowse-nome-nel-riquadro.png' });
   // Il clic c'è stato: il file non è partito da solo.
   await expect(avviso.getByText(/da sola/)).toHaveCount(0);
   const continua = avviso.getByRole('button', { name: 'Continua' });
@@ -486,5 +492,5 @@ test('il clic che Filo dà da sé sul «Salta» di una pubblicità non rende vol
   }, { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) });
   const a = await avvisoDi(app, 'salta-pubblicita.it');
   expect(a.level).toBe('sospetto');
-  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma («setup.exe»)');
+  expect(a.body).toContain('ha avviato da sola lo scaricamento di un programma «setup.exe»');
 });
