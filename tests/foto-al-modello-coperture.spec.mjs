@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { turnoDellAiuto, partiDellUtente } from './helpers/turniDellAiuto.mjs';
 import { chiedi } from './helpers/chatFinta.mjs';
 import { CONFIRM_HOST, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
