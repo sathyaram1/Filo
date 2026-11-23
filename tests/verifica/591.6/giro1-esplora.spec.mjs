@@ -183,6 +183,6 @@ test('esplora: pagina Sicurezza in una scheda dietro, risposta nella scheda dava
   await consentiMicrofono();
   await shell.locator('#tabs .tab', { hasText: /Sicurezza/i }).first().click();
   await expect(sec.locator('#sec-perm-list li', { hasText: 'Microfono' })).toBeVisible({ timeout: 10_000 });
-  await app.evaluate(async () => process.mainModule.require('./services/permessiPagine').togliPerChat('127.0.0.1', 'microfono'));
+  await togliDallaChat();
   await expect(sec.locator('#sec-perm-list')).toContainText('Nessuna risposta data a un sito', { timeout: 10_000 });
 });
