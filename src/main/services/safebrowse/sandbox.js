@@ -186,7 +186,7 @@ function createDetonator({
       try { if (typeof ses.removeListener === 'function') ses.removeListener('will-download', onDownload); } catch (_) {}
       try { return Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) { return null; }
     };
-    const sw = null && senzaServiceWorker(wc);
+    const sw = senzaServiceWorker(wc);
     return { wc, download, cleanup, pronta: sw ? Promise.all([pronta, sw]) : pronta };
   }
 
