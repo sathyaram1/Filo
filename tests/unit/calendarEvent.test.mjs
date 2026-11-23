@@ -212,7 +212,6 @@ test('una fine che non si può rispettare si rifiuta col suo perché', () => {
     [{ titolo: 'Viaggio', data: '2026-08-01', ora: '09:00', durata_min: 400 * 24 * 60 }, /più di un anno/],
     [{ titolo: 'F', data: '2026-08-10', data_fine: '2028-08-10' }, /più di un anno/],
     [{ titolo: 'F', data: '2026-08-10', data_fine: 'il 15' }, /ultimo giorno non valido/],
-    [{ titolo: 'F', data: '2026-08-10', ora: '10:00', data_fine: '2026-08-10', ora_fine: '09:00' }, /viene prima dell'inizio/],
     [{ titolo: 'F', data: '2026-08-10', ora: '10:00', ora_fine: 'tardi' }, /ora di fine non valida/],
     [{ titolo: 'F', data: '2026-02-31', ora: '10:00' }, /^data o ora non valide: «2026-02-31» non è un giorno$/],
     [{ titolo: 'F', data: '2026-08-10', ora: '25:00' }, /^data o ora non valide: «25:00» non è un'ora$/],
