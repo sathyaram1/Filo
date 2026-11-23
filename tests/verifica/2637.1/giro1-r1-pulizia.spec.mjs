@@ -123,10 +123,11 @@ for (const azione of Object.keys(ATTESO)) {
       expect(await stato(app, `j${k}`)).toEqual(['mio2:scadenza']);
       expect(chiamate).toBeGreaterThan(4);
       const sbagliati = [];
-      // La lettura iniziale del giro (chiamata 0, prima) vede un cookie di sessione già lì: muore con la visita.
+      // Un normale di sessione che la lettura della pulizia (chiamata 1) vede già lì è per scelta una copia di Filo, e
+      // muore con la visita: per lui contano le chiamate dopo quella lettura.
       for (let n = 0; n < chiamate; n++) {
         for (const quando of ['prima', 'dopo']) {
-          if (azione === 'sessione' && n === 0 && quando === 'prima') continue;
+          if (azione === 'sessione' && (n === 0 || (n === 1 && quando === 'prima'))) continue;
           k++;
           await giro(app, openTab, srv, k, { n, quando, azione });
           const c = await stato(app, `c${k}`);
