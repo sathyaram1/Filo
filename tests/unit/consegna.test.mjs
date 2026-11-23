@@ -16,7 +16,7 @@ const buona = (extra = {}) => ({ criteri: tabella(), classe: { valore: 'nascosto
 const elemento = (extra = {}) => ({ elemento: 'Riquadro Consegna', perche: 'Senza, la classe non si vede.', clic: 'apre le righe',
   destro: 'menu del riquadro', trascina: 'non serve: è un riquadro fisso', hover: 'non serve: il testo è già lì', ...extra });
 
-test('i nove criteri del modulo sono quelli di _criteri-verifica.md, nello stesso ordine', () => {
+test('i dieci criteri del modulo sono quelli di _criteri-verifica.md, nello stesso ordine', () => {
   const md = readFileSync(resolve(ROOT, 'routines/roles/_criteri-verifica.md'), 'utf8');
   const nomi = [...md.matchAll(/^\d+\.\s+\*\*(.+?)\.?\*\*/gm)].map((m) => m[1]);
   assert.deepEqual(nomi, C.CRITERI.map((k) => k.nome));
