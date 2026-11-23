@@ -109,6 +109,7 @@ test('uno spec Playwright nuovo si trova anche dove lo spec non risolve il colle
   const { root, base } = ramoDiProva();
   const g = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' }).trim();
   const prima = process.env.NODE_OPTIONS;
+  const { corri, uscita } = conUscita();
   try {
     symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'junction');
     writeFileSync(join(root, '.gitignore'), 'node_modules\n');
