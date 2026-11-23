@@ -14,6 +14,7 @@ import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { turnoDellAiuto } from './helpers/turniDellAiuto.mjs';
 import { paginaDellAiuto, statoDi, clicca, scrivi } from './helpers/riquadri.mjs';
 
 const CODICE = '482913';
