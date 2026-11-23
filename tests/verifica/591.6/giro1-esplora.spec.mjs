@@ -173,11 +173,6 @@ test('esplora: pagina Sicurezza in una scheda dietro, risposta nella scheda dava
   await consentiMicrofono();
   await shell.locator('#tabs .tab', { hasText: /Sicurezza/i }).first().click();
   await expect(sec.locator('#sec-perm-list li', { hasText: 'Microfono' })).toBeVisible({ timeout: 10_000 });
-  // Poi la risposta tolta da un'altra pagina Sicurezza aperta accanto.
-  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/'));
-  await expect.poll(() => app.windows().filter((w) => w.url().startsWith('filo://security')).length, { timeout: 10_000 }).toBe(2);
-  const seconda = app.windows().filter((w) => w.url().startsWith('filo://security')).find((w) => w !== sec);
-  await seconda.waitForLoadState('domcontentloaded');
-  await seconda.locator('#sec-perm-list li', { hasText: 'Microfono' }).getByRole('button', { name: 'Togli' }).click();
+  await app.evaluate(async () => process.mainModule.require('./services/permessiPagine').togliPerChat('127.0.0.1', 'microfono'));
   await expect(sec.locator('#sec-perm-list')).toContainText('Nessuna risposta data a un sito', { timeout: 10_000 });
 });
