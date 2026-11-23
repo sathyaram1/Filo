@@ -205,7 +205,11 @@ function createDetonator({
 
   // Carica `url` appena la rete è pronta (`fallito`: il caricamento rifiutato); se non lo diventa, `senzaRete()`.
   function carica(wc, url, pronta, fallito, senzaRete) {
-    const vai = () => { Promise.resolve(wc.loadURL(url)).catch(fallito); };
+    // Un controllo annullato mentre la rete si preparava ha già chiuso la finestra.
+    const vai = () => {
+      if (typeof wc.isDestroyed === 'function' && wc.isDestroyed()) return;
+      Promise.resolve().then(() => wc.loadURL(url)).catch(fallito);
+    };
     if (!pronta) vai();
     else pronta.then(vai, senzaRete);
   }
