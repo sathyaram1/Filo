@@ -8,8 +8,9 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { createDetonator } = require('../../src/main/services/safebrowse/sandbox.js');
 
-function electronFinto() {
+function electronFinto({ debuggerRotto = false } = {}) {
   const ascolti = [];
+  const fatti = [];
   const ses = {
     on() {},
     clearStorageData: async () => {},
