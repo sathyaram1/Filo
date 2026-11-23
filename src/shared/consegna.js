@@ -9,7 +9,7 @@
   // I nomi in grassetto di routines/roles/_criteri-verifica.md, nell'ordine: la sentinella li confronta col file.
   const CRITERI = Object.freeze([
     'La lamentela', 'Strade equivalenti', 'Stress', 'Sicurezza funzionale', 'Aspetto',
-    'Completezza', 'Pattern', 'Miglioramenti', 'Una causa, tutte le porte',
+    'Completezza', 'Pattern', 'Miglioramenti', 'Una causa, tutte le porte', 'Oggetti e tipi',
   ].map((nome, i) => Object.freeze({ n: i + 1, nome })));
   const ESITI = Object.freeze(['fatto', 'non si applica']);
   // In ordine di gravità: la classe finale è la più alta fra la dichiarata e il minimo.
