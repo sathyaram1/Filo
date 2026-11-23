@@ -414,7 +414,11 @@ async function sitoLento(use) {
   }
 }
 
-for (const [come, percorso] of [['finisce di mandare la pagina dopo cinque secondi', '/corpo'], ['risponde dopo sei secondi e mezzo', '/primo-byte']]) {
+for (const [come, percorso] of [
+  ['risponde subito', '/subito'],
+  ['finisce di mandare la pagina dopo dieci secondi', '/corpo'],
+  ['risponde dopo undici secondi', '/primo-byte'],
+]) {
   test(`«apri … e traducilo» dalla chat della home, su un sito che ${come}: la pagina si traduce`, async ({ app, shell }) => {
     test.setTimeout(90_000);
     await fornitoreFinto(app);
