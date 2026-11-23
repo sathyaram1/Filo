@@ -118,7 +118,7 @@
       const doppie = righe.filter((x, i) => x && righe.findIndex((y) => y && Number(y.criterio) === Number(x.criterio)) !== i);
       if (doppie.length) m.push(`criterio ${Number(doppie[0].criterio)}: la riga c'è due volte`);
       const fuori = righe.filter((x) => !x || !CRITERI.some((k) => k.n === Number(x.criterio)));
-      if (fuori.length) m.push(`la tabella ha una riga che non è uno dei nove criteri («criterio» va da 1 a ${CRITERI.length})`);
+      if (fuori.length) m.push(`la tabella ha una riga che non è uno dei dieci criteri («criterio» va da 1 a ${CRITERI.length})`);
     }
     const ui = Array.isArray(interfaccia) ? interfaccia : [];
     if (c.elementi !== undefined && !Array.isArray(c.elementi)) m.push('«elementi» è un elenco');
