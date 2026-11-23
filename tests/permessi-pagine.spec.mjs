@@ -36,6 +36,32 @@ const PAGINE = {
 
 // La finestra nascosta si chiude a caricamento finito: un riquadro lento tiene viva la pagina mentre chiede.
 PAGINE['/media-lenta'] = PAGINE['/media'] + '<iframe src="/lento"></iframe>';
+// Un finto avviso di virus (#591.6): allarme sonoro, voce e finestra di dialogo appena si apre.
+const BIP = (() => {
+  const n = 8000; const b = Buffer.alloc(44 + n);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20);
+  b.writeUInt16LE(1, 22); b.writeUInt32LE(8000, 24); b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34);
+  b.write('data', 36); b.writeUInt32LE(n, 40);
+  for (let i = 0; i < n; i++) b[44 + i] = 128 + Math.round(100 * Math.sin(i / 3));
+  return 'data:audio/wav;base64,' + b.toString('base64');
+})();
+PAGINE['/allarme'] = `<!doctype html><meta charset="utf-8"><title>Avviso</title><p>Il tuo computer è infetto</p>
+<iframe src="/lento"></iframe>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  const a = new Audio(${JSON.stringify(BIP)}); a.loop = true;
+  a.play().then(() => m('allarme:suona'), (e) => m('allarme:' + e.name));
+  const ctx = new AudioContext();
+  setTimeout(() => m('contesto:' + ctx.state), 500);
+  try {
+    const u = new SpeechSynthesisUtterance('Il tuo computer è infetto, chiama il numero');
+    u.onstart = () => m('voce:parla'); u.onerror = (e) => m('voce:' + e.error);
+    speechSynthesis.speak(u);
+  } catch (e) { m('voce:' + e.name); }
+  setTimeout(() => { alert('Il tuo computer è infetto, chiama il numero'); m('dopo:avviso'); }, 200);
+  setTimeout(() => { m('conferma:' + confirm('Chiami adesso?')); }, 400);
+  setTimeout(() => { window.print(); m('dopo:stampa'); }, 600);
+</script>`;
 PAGINE['/microfono'] = PAGINE['/media'].replace('{ audio: true, video: true }', '{ audio: true }');
 PAGINE['/fotocamera'] = `<!doctype html><meta charset="utf-8"><title>Modulo</title><textarea autofocus></textarea><script>
   window.__prova = () => navigator.mediaDevices.getUserMedia({ video: true }).then(
@@ -340,6 +366,26 @@ test('la finestra nascosta del controllo profondo nega microfono e fotocamera al
   await app.evaluate(async (_e, u) => globalThis.SN_SAFEBROWSE.sandbox.detonate(u), origine + '/media-lenta');
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['negato:NotAllowedError']);
   await expect(barra()).toBeHidden();
+});
+
+// La copia nascosta di un finto avviso di virus non suona, non parla e non mostra finestre di dialogo (#591.6).
+test('la finestra nascosta del controllo profondo è muta e non mostra le finestre di dialogo della pagina', async () => {
+  test.setTimeout(60_000);
+  // Playwright chiude da sé le finestre di dialogo che vede: chi le ascolta le lascia aperte, come davanti all'utente.
+  app.on('window', (p) => p.on('dialog', () => {}));
+  const finito = app.evaluate(async (_e, u) => { await globalThis.SN_SAFEBROWSE.sandbox.detonate(u); return true; }, origine + '/allarme');
+  await expect.poll(() => esiti.includes('dopo:stampa'), { timeout: 10_000, message: JSON.stringify(esiti) }).toBe(true);
+  const muta = await app.evaluate(({ webContents }) => webContents.getAllWebContents()
+    .filter((w) => /\/allarme$/.test(w.getURL())).map((w) => w.isAudioMuted()));
+  expect(muta).toEqual([true]);
+  expect(esiti).toContain('allarme:NotAllowedError');
+  expect(esiti).toContain('contesto:suspended');
+  expect(esiti).toContain('voce:not-allowed');
+  expect(esiti).toContain('dopo:avviso');
+  expect(esiti).toContain('conferma:false');
+  expect(await finito).toBe(true);
+  const rimaste = await app.evaluate(({ webContents }) => webContents.getAllWebContents().filter((w) => /\/allarme$/.test(w.getURL())).length);
+  expect(rimaste, 'a controllo finito della copia non resta niente').toBe(0);
 });
 
 const paginaDi = (base) => app.windows().find((w) => w.url().startsWith(base));
@@ -763,6 +809,74 @@ test('le risposte date restano dopo aver riaperto Filo, e dalla pagina Sicurezza
   await apri('/microfono');
   await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
 });
+
+const paginaSicurezza = async () => {
+  let p = null;
+  await expect.poll(() => { p = app.windows().find((w) => w.url().startsWith('filo://security')); return Boolean(p); }, { timeout: 10_000 }).toBe(true);
+  return p;
+};
+const NESSUNA = ['Nessuna risposta data a un sito.'];
+
+// La pagina Sicurezza già aperta mostra le risposte date dopo, e quelle tolte dal menu della scheda (#591.6).
+test('la pagina Sicurezza già aperta si aggiorna da sé quando si risponde a un sito o si toglie la risposta dalla scheda', async () => {
+  test.setTimeout(90_000);
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  const sicurezza = await paginaSicurezza();
+  const righe = sicurezza.locator('#sec-perm-list li');
+  await expect(righe).toHaveText(NESSUNA, { timeout: 10_000 });
+  await apri('/microfono');
+  const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+  await expect(si).toBeEnabled({ timeout: 10_000 });
+  await si.click();
+  await expect.poll(() => esiti.includes('concesso:audio'), { timeout: 10_000 }).toBe(true);
+  await expect(righe.filter({ hasText: 'Microfono: consentito' })).toHaveCount(1, { timeout: 5_000 });
+
+  // Il «dimentica» del menu della scheda, per la strada che usa la cornice.
+  const id = await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.view && x.view.webContents.getURL().startsWith(u));
+    return t ? t.id : null;
+  }, origine + '/microfono');
+  const tolte = await shell.evaluate((x) => window.filoShell.tabs.dimenticaPermessi(x), id);
+  expect(tolte.tolte, 'la scheda aveva la risposta da togliere').toBe(1);
+  await expect(righe).toHaveText(NESSUNA, { timeout: 5_000 });
+});
+
+// Quello che si toglie dalla pagina Sicurezza aperta in incognito resta tolto, come dalla finestra normale (#591.6).
+for (const incognito of [true, false]) {
+  test(`tolta dalla pagina Sicurezza ${incognito ? 'in incognito' : 'della finestra normale'}, la risposta non torna alla riapertura`, async () => {
+    test.setTimeout(120_000);
+    await apri('/microfono');
+    const si = barra().getByRole('button', { name: 'Consenti', exact: true });
+    await expect(si).toBeEnabled({ timeout: 10_000 });
+    await si.click();
+    await expect.poll(() => esiti.includes('concesso:audio'), { timeout: 10_000 }).toBe(true);
+
+    if (incognito) {
+      await shell.evaluate(() => window.filoShell.openIncognito());
+      await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+        const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+        if (!w || !w._filoTabs || !w._filoTabs.tabs.length) return false;
+        w._filoTabs.openTab('filo://security/security.html');
+        return true;
+      }), { timeout: 15_000 }).toBe(true);
+    } else {
+      await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+    }
+    const sicurezza = await paginaSicurezza();
+    const righe = sicurezza.locator('#sec-perm-list li');
+    await expect(righe.filter({ hasText: 'Microfono: consentito' })).toHaveCount(1, { timeout: 10_000 });
+    await righe.filter({ hasText: 'Microfono' }).getByRole('button', { name: 'Togli' }).click();
+    await expect(righe).toHaveText(NESSUNA);
+    await chiudiApp(app);
+
+    esiti.length = 0;
+    await avvia();
+    await apri('/microfono');
+    await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
+    expect(esiti, 'il sito non riprende il microfono da solo').toEqual([]);
+  });
+}
 
 // Quello che Chrome chiede si chiede, quello che concede passa: prima di #591 passava tutto, dopo il giro 19 niente.
 for (const [via, dopo, domanda] of [

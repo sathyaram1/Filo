@@ -7,7 +7,7 @@ const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const Onboarding = globalThis.SN_ONBOARDING;
-const { cancelliAperti, broadcastToFiloPages, annunciaCarteHome, annunciaBarraSiti } = require('../broadcast');
+const { cancelliAperti, annunciaCarteHome, annunciaBarraSiti } = require('../broadcast');
 const { winOf, bannerDellaScheda } = require('../handlersComuni');
 const { getEffectiveSettings, applySettingsUpdate, resolveTheme } = require('../impostazioniEffettive');
 const { idDelCambio } = require('../porteUscita');
@@ -274,7 +274,6 @@ async function azioneTogliPermessoSito(action) {
     const ci = r.restano.length ? `ci sono: ${r.restano.join('; ')}` : 'non ce n\'è nessuna';
     return { executed: false, kept: false, output: { error: `nessuna risposta ricordata per ${r.host}${action.permesso ? ` (${action.permesso})` : ''}: ${ci}`, invariato: true } };
   }
-  broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
   return { executed: true, kept: false, output: { tolte: r.tolte } };
 }
 

@@ -148,10 +148,14 @@ function createDetonator({
         javascript: true,
         images: false,
         webgl: false,
+        // Nessuno la vede (#591.6): un finto avviso di virus non suona, non parla e non apre avvisi, domande o stampa.
+        disableDialogs: true,
+        autoplayPolicy: 'document-user-activation-required',
         // niente preload: la pagina gira nuda, isolata dall'app.
       },
     });
     const wc = win.webContents;
+    try { wc.setAudioMuted(true); } catch (_) {}
     // Come nella scheda col proxy: niente UDP fuori dal proxy, o WebRTC direbbe l'indirizzo vero.
     if (rete) { try { wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch (_) {} }
     try {
