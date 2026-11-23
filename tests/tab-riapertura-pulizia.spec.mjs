@@ -33,8 +33,11 @@ function lancia(userData) {
 }
 
 // `tutte`: un modello deciso fino in fondo, come chiede il prompt della riapertura, che archivia tutto quello che riceve.
-async function modelloFinto(app, { tutte = false } = {}) {
-  await app.evaluate((_, tutte) => {
+// `lento`: il giudizio aspetta `globalThis.__rispondiPulizia()`, come un modello vero che ci mette decine di secondi.
+async function modelloFinto(app, { tutte = false, lento = false } = {}) {
+  await app.evaluate((_, { tutte, lento }) => {
+    globalThis.__giudizioChiesto = false;
+    const via = lento ? new Promise((r) => { globalThis.__rispondiPulizia = r; }) : Promise.resolve();
     globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => ({ vectors: texts.map(() => [0.5, 0.2, 0.9, 0.1]) });
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       const sistema = String((messages[0] && messages[0].content) || '');
@@ -42,6 +45,8 @@ async function modelloFinto(app, { tutte = false } = {}) {
       const fine = (text) => ({ text, provider: attempts[0].provider, model: attempts[0].model, usage: {} });
       if (/METADATI/.test(sistema + utente)) return fine('{"suspicious":false,"reason":null,"confidence":"low"}');
       if (!/gestore delle schede/.test(sistema)) return fine('ok');
+      globalThis.__giudizioChiesto = true;
+      await via;
       const decisions = [];
       for (const riga of utente.split('\n')) {
         const m = /^#(\d+)\s/.exec(riga);
@@ -52,7 +57,7 @@ async function modelloFinto(app, { tutte = false } = {}) {
       }
       return fine(JSON.stringify({ decisions }));
     };
-  }, tutte);
+  }, { tutte, lento });
 }
 
 const avvisi = (shell) => shell.evaluate(() => [...document.querySelectorAll('.shell-notif.show .shell-notif-msg')]
@@ -124,6 +129,43 @@ test('una scheda aperta dopo la riapertura non finisce nella pulizia della sessi
     });
     await expect.poll(() => avvisi(shell), { timeout: 60_000 }).toEqual(expect.arrayContaining([expect.stringMatching(/^Schede riordinate/)]));
     expect(await titoliTest(shell), 'la scheda appena aperta dall’utente è stata chiusa dalla pulizia della sessione di prima').toContain('Nuova');
+    await chiudiApp(app);
+  } finally {
+    server.close();
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+test('mentre il modello decide, una scheda ripresa resta e una chiusa a mano non è della pulizia (#349.2)', async () => {
+  test.setTimeout(150_000);
+  const { server, port } = await servitore();
+  const userData = cartellaTemporanea('filo-test-349-');
+  try {
+    await primaSessione(userData, port);
+    const app = await lancia(userData);
+    const shell = await primaFinestra(app);
+    await modelloFinto(app, { tutte: true, lento: true });
+    await expect.poll(() => app.evaluate(() => globalThis.__giudizioChiesto), { timeout: 60_000 }).toBe(true);
+    // Nell'attesa l'utente passa al verde, lo guarda, torna al documento; e chiude lui il rosso.
+    const id = async (re) => (await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs))
+      .find((t) => re.test(t.url || '')).id;
+    await shell.evaluate((x) => window.filoShell.tabs.activate(x), await id(/verde\.test/));
+    await new Promise((r) => setTimeout(r, 500));
+    await shell.evaluate((x) => window.filoShell.tabs.activate(x), await id(/blu\.test/));
+    await shell.evaluate((x) => window.filoShell.tabs.close(x), await id(/rosso\.test/));
+    await expect.poll(() => titoliTest(shell), { timeout: 10_000 }).not.toContain('Rosso');
+    await app.evaluate(() => globalThis.__rispondiPulizia());
+    // Chiuse dalla pulizia: la vecchia e la home della prima sessione, non il verde ripreso né il rosso chiuso a mano.
+    await expect.poll(() => avvisi(shell), { timeout: 30_000 }).toContain('Schede riordinate, 2 chiuse. Le ritrovi nel filo della home');
+    expect(await titoliTest(shell), 'la scheda appena ripresa in mano è stata chiusa dalla pulizia').toContain('Verde');
+    expect(await titoliTest(shell)).not.toContain('Vecchia');
+    const vista = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'la vista degli avvisi non è nata');
+    const riapri = vista.locator('.shell-notif.show', { hasText: 'Schede riordinate' }).locator('.shell-notif-action', { hasText: 'Riapri' });
+    await expect(riapri).toBeEnabled({ timeout: 10_000 });
+    await riapri.click();
+    await expect.poll(() => titoliTest(shell), { timeout: 15_000 }).toContain('Vecchia');
+    await new Promise((r) => setTimeout(r, 2000));
+    expect(await titoliTest(shell), '«Riapri» ha riportato anche la scheda chiusa a mano').not.toContain('Rosso');
     await chiudiApp(app);
   } finally {
     server.close();

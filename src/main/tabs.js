@@ -2147,15 +2147,20 @@ class TabManager {
   // scheda, impostazioni). Prima erano esclusi TUTTI i filo:// interni, quindi
   // il riordino poteva chiudere un sito (es. YouTube) ma mai le impostazioni
   // aperte o le home duplicate. (Incognito è escluso a monte.)
-  _triageCandidates(trigger) {
+  _triageCandidates(trigger, dal) {
+    return this.tabs.filter((t) => this._delGiro(t, trigger, dal));
+  }
+
+  // Vale alla partenza e di nuovo alla risposta del modello (#349.2): una scheda chiusa, o ripresa in mano da `dal`
+  // (alla riapertura: da quando Filo si è riaperto), è del lavoro di adesso, e la pulizia non la tocca né la conta.
+  _delGiro(t, trigger, dal) {
+    if (!this.tabs.includes(t) || this._intoccabileDalTriage(t)) return false;
+    if (t.lastInteractionAt >= dal) return false;
+    // La pulizia decisa della riapertura è per la sessione di prima: una scheda nata dopo non è sua (#349).
+    if (trigger === 'reopen' && !t._dallaSessione) return false;
     const T = globalThis.SN_TAB_TRIAGE;
-    return this.tabs.filter((t) => {
-      if (this._intoccabileDalTriage(t)) return false;
-      // La pulizia decisa della riapertura è per la sessione di prima: una scheda nata o usata dopo è del lavoro di adesso (#349).
-      if (trigger === 'reopen' && !(t._dallaSessione && !(t.lastInteractionAt >= this._riapertaAlle))) return false;
-      if (T) return T.isTriageableUrl(t.url);
-      return !t.isInternal && /^https?:\/\//i.test(t.url || '');
-    });
+    if (T) return T.isTriageableUrl(t.url);
+    return !t.isInternal && /^https?:\/\//i.test(t.url || '');
   }
 
   // «Tieni sempre aperto X» (#823): la regola la applica Filo, qualunque cosa risponda il modello.
@@ -2229,7 +2234,7 @@ class TabManager {
     try {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
-      const cands = this._triageCandidates(trigger);
+      const cands = this._triageCandidates(trigger, dal);
       // Un giro si conta coi suoi numeri, mai con le schede (#1467): quante candidate, archiviate, duplicate.
       const contaGiro = (archiviate, duplicati, giudizioMancato) => {
         try {
@@ -2242,22 +2247,7 @@ class TabManager {
         // Niente da giudicare non vuol dire niente da fare: alla riapertura la barra si riordina comunque (#349).
         return this._esitoTriage(this.applyTriageDecisions([], [], opzioni()), { trigger, valutate: 0 });
       }
-      // 1) Duplicati esatti: decisione deterministica e affidabile.
-      const T = globalThis.SN_TAB_TRIAGE;
-      let dupIdx = new Set();
-      if (T) {
-        const activeUrl = (this.tabs.find((t) => t.id === this.activeId) || {}).url || '';
-        dupIdx = T.findDuplicateIndices(
-          cands.map((t) => ({
-            url: t.url,
-            formDirty: !!t.formDirty,
-            lastInteractionAt: t.lastInteractionAt || 0,
-          })),
-          activeUrl,
-        );
-      }
-
-      // 2) LLM per il resto (giudizio). No-op sui duplicati (già decisi sopra).
+      // 1) LLM per il giudizio. I duplicati li decide la regola, alla risposta.
       // Il giudizio può non arrivare (crediti finiti, chiave sbagliata, rete
       // giù): chi ha chiesto il riordino deve saperlo, o legge lo stesso esito
       // di un riordino riuscito in cui non c'era niente da chiudere.
@@ -2290,10 +2280,29 @@ class TabManager {
       }
       this._dichiaraGiudizio(giudizioMancato, errore, trigger);
 
+      // Il modello ha giudicato la barra di quando è partito il giro: si applica solo a chi ne è ancora parte.
+      const ancora = cands.map((t) => this._delGiro(t, trigger, dal));
+      // 2) Duplicati esatti, sulla barra di adesso: l'esemplare da tenere può essere stato chiuso o ripreso nell'attesa.
+      const T = globalThis.SN_TAB_TRIAGE;
+      let dupIdx = new Set();
+      if (T) {
+        const activeUrl = (this.tabs.find((t) => t.id === this.activeId) || {}).url || '';
+        const vive = cands.map((t, i) => ({ t, i })).filter(({ i }) => ancora[i]);
+        const dup = T.findDuplicateIndices(
+          vive.map(({ t }) => ({
+            url: t.url,
+            formDirty: !!t.formDirty,
+            lastInteractionAt: t.lastInteractionAt || 0,
+          })),
+          activeUrl,
+        );
+        for (const j of dup) dupIdx.add(vive[j].i);
+      }
+
       // I duplicati vincono sempre su un "tieni" dell'LLM.
       const byIndex = new Map();
       for (const d of decisions) {
-        if (d && typeof d.i === 'number') byIndex.set(d.i, d);
+        if (d && typeof d.i === 'number' && ancora[d.i]) byIndex.set(d.i, d);
       }
       for (const i of dupIdx) {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
@@ -2352,8 +2361,7 @@ class TabManager {
     cands.forEach((tab, i) => {
       const d = byIndex.get(i);
       if (!d || d.action !== 'archive') return;
-      // Ricontrollata qui: mentre il modello rispondeva l'utente può aver scritto.
-      if (this._intoccabileDalTriage(tab)) return;
+      // Chi la chiama ha già tolto, alla risposta, le schede chiuse o riprese nell'attesa (_delGiro).
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 

@@ -87,6 +87,41 @@ test('la pulizia della riapertura giudica solo le schede della sessione di prima
   assert.deepEqual(ordine(tm).sort(), ['blu', 'nuova', 'verde']);
 });
 
+// #349.2 — il giudizio arriva dopo secondi: alla risposta conta la barra di adesso, non quella mandata al modello.
+test('alla risposta del modello una scheda ripresa nell’attesa resta, e una chiusa a mano non si conta né si riapre', async () => {
+  const tm = gestore();
+  const esito = await conDecisione(async ({ tabs }) => {
+    tm.setTabActivity('verde', { lastInteractionAt: Date.now() });
+    tm.tabs = tm.tabs.filter((t) => t.id !== 'rosso');
+    return { decisions: tabs.map((_, i) => ({ i, action: 'archive' })) };
+  }, () => tm.runAutoTriage({ trigger: 'reopen' }));
+  assert.equal(esito.archived, 0);
+  assert.deepEqual(ordine(tm), ['verde', 'blu']);
+  assert.deepEqual(tm.avvisi, ['Schede riordinate, nessuna da chiudere']);
+  assert.deepEqual(tm.azioni, [[]]);
+});
+
+test('anche fuori dalla riapertura una scheda usata mentre il modello decide non si chiude', async () => {
+  const tm = gestore();
+  await conDecisione(async ({ tabs }) => {
+    tm.setTabActivity('verde', { lastInteractionAt: Date.now() });
+    return { decisions: tabs.map((_, i) => ({ i, action: 'archive' })) };
+  }, () => tm.runAutoTriage({ trigger: 'idle' }));
+  assert.deepEqual(ordine(tm).sort(), ['blu', 'verde']);
+});
+
+test('il doppione si decide alla risposta: chiusa a mano la copia da tenere, l’altra resta', async () => {
+  const tm = gestore();
+  tm.tabs.find((t) => t.id === 'verde').lastInteractionAt = tm._riapertaAlle - 1000;
+  tm.tabs.push({ id: 'verde2', url: 'https://verde.example/', title: 'verde2', identityColor: VERDE, view: {}, _dallaSessione: true, lastInteractionAt: tm._riapertaAlle - 3_600_000 });
+  const esito = await conDecisione(async ({ tabs }) => {
+    tm.tabs = tm.tabs.filter((t) => t.id !== 'verde');
+    return { decisions: tabs.map((_, i) => ({ i, action: 'keep' })) };
+  }, () => tm.runAutoTriage({ trigger: 'reopen' }));
+  assert.equal(esito.archived, 0);
+  assert.ok(ordine(tm).includes('verde2'), 'chiusa la copia tenuta, la pulizia ha chiuso anche l’altra');
+});
+
 test('l’avviso di una pulizia che ha chiuso schede le riapre con «Riapri», una volta e senza doppioni', async () => {
   const tm = gestore();
   const aperte = [];
