@@ -350,7 +350,7 @@ test('Alt+T senza selezione dopo un clic nel riquadro incorporato traduce la pag
     const orig = globalThis.SN_PROVIDER_OPENROUTER;
     globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta('I commenti sono chiusi.'); return { text: 'I commenti sono chiusi.', usage: {} }; } };
   });
-  const page = await testServer.openReady(openTab, conRiquadro(testServer.html(RIQUADRO, { pubblico: true })));
+  const page = await testServer.openReady(openTab, conRiquadro(testServer.html(RIQUADRO)));
   await guardaAvvisi(page);
   const riquadro = page.frameLocator('#embed');
 
