@@ -146,9 +146,11 @@ test('il tipo di un allegato è sempre una stringa, anche coi nomi di serie', ()
 test('il selettore offre esattamente i tipi che il controllo accetta, senza famiglie con l\'asterisco', () => {
   const voci = A.ACCEPT.split(',');
   assert.ok(!voci.some((v) => v.includes('*')), `famiglia con asterisco nel selettore: ${A.ACCEPT}`);
+  // Le immagini che si allegano ridisegnate (#1664) il controllo non le vede: passano da immaginiChat prima.
+  const ridisegnata = (v) => A.RIDISEGNABILI_EXT.has(v.slice(1)) || v === 'image/avif';
   for (const v of voci) {
     const prova = v.startsWith('.') ? f(`x${v}`, '') : f('x', v);
-    assert.ok(prova, `il selettore offre ${v}, che il controllo rifiuta`);
+    assert.ok(prova || ridisegnata(v), `il selettore offre ${v}, che il controllo rifiuta`);
   }
   for (const t of A.TIPI) {
     for (const m of t.mime) assert.ok(voci.includes(m), `${m} accettato ma non offerto`);
