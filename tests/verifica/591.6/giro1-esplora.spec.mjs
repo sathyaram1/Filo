@@ -149,11 +149,11 @@ test('esplora: tolto dalla pagina Sicurezza in incognito, alla riapertura resta 
 test('esplora: tolto dalla chat di una finestra in incognito, alla riapertura resta tolto', async () => {
   test.setTimeout(90_000);
   await consentiMicrofono();
-  const r = await app.evaluate(async () => {
-    const S = process.mainModule.require('./shim/storage');
-    const P = process.mainModule.require('./services/permessiPagine');
+  const r = await app.evaluate(async (_e, root) => {
+    const S = process.mainModule.require(root + '/src/main/shim/storage.js');
+    const P = process.mainModule.require(root + '/src/main/services/permessiPagine.js');
     return S.runIncognito(async () => P.togliPerChat('127.0.0.1', 'microfono'));
-  });
+  }, APP_ROOT);
   console.log('CHAT', JSON.stringify(r));
   await chiudiApp(app);
   esiti.length = 0;
