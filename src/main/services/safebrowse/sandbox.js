@@ -22,7 +22,24 @@ const MAX_PASSI = 8;
 // Lo svuotamento della memoria fra due controlli non deve poter tenere fermo il posto.
 const CLEAR_TIMEOUT_MS = 3000;
 let detonators = 0;
-const wait = (ms) => new Promise((ok) => { const t = setTimeout(ok, ms); if (t && t.unref) t.unref(); });
+// Tutto come una pagina normale tranne `allow-modals`: senza, Chromium ignora alert, confirm, prompt e print() in ogni
+// riquadro, anche a pagina caricata, dove `disableDialogs` lascia passare la finestra di stampa del sistema (#591.7).
+const SANDBOX_COPIA = 'sandbox allow-scripts allow-same-origin allow-forms allow-downloads allow-popups '
+  + 'allow-popups-to-escape-sandbox allow-top-navigation allow-pointer-lock allow-orientation-lock allow-presentation';
+const sessioniSenzaFinestre = new WeakSet();
+function senzaFinestreDellaPagina(ses) {
+  if (!ses || sessioniSenzaFinestre.has(ses) || !ses.webRequest || typeof ses.webRequest.onHeadersReceived !== 'function') return;
+  sessioniSenzaFinestre.add(ses);
+  ses.webRequest.onHeadersReceived((d, callback) => {
+    if (d.resourceType !== 'mainFrame' && d.resourceType !== 'subFrame') return callback({});
+    const responseHeaders = { ...(d.responseHeaders || {}) };
+    const chiave = Object.keys(responseHeaders).find((k) => k.toLowerCase() === 'content-security-policy') || 'Content-Security-Policy';
+    const prima = responseHeaders[chiave];
+    responseHeaders[chiave] = [...(Array.isArray(prima) ? prima : prima ? [prima] : []), SANDBOX_COPIA];
+    callback({ responseHeaders });
+  });
+}
+const wait =(ms) => new Promise((ok) => { const t = setTimeout(ok, ms); if (t && t.unref) t.unref(); });
 
 let _electron = null;
 function realElectron() {
