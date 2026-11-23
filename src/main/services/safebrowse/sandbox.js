@@ -186,7 +186,21 @@ function createDetonator({
       try { if (typeof ses.removeListener === 'function') ses.removeListener('will-download', onDownload); } catch (_) {}
       try { return Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) { return null; }
     };
-    return { wc, download, cleanup, pronta };
+    const sw = senzaServiceWorker(wc);
+    return { wc, download, cleanup, pronta: sw ? Promise.all([pronta, sw]) : pronta };
+  }
+
+  // Una pagina servita dal suo service worker non passa dalla rete, dove arriva SANDBOX_COPIA (#591.7): si va sempre in
+  // rete. Se non si riesce la copia si apre lo stesso, col resto delle difese.
+  function senzaServiceWorker(wc) {
+    const dbg = wc && wc.debugger;
+    if (!dbg || typeof dbg.attach !== 'function') return null;
+    try { if (!dbg.isAttached()) dbg.attach('1.3'); } catch (_) { return null; }
+    const fatto = Promise.resolve()
+      .then(() => dbg.sendCommand('Network.enable'))
+      .then(() => dbg.sendCommand('Network.setBypassServiceWorker', { bypass: true }))
+      .catch(() => {});
+    return Promise.race([fatto, wait(CLEAR_TIMEOUT_MS)]);
   }
 
   // Carica `url` appena la rete è pronta (`fallito`: il caricamento rifiutato); se non lo diventa, `senzaRete()`.
