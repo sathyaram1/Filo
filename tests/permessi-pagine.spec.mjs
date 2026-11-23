@@ -433,11 +433,12 @@ test('la copia nascosta non apre la stampa neanche della pagina che si fa servir
   test.setTimeout(60_000);
   app.on('window', (p) => p.on('dialog', () => {}));
   const dest = await app.evaluate(async (_e, u) => {
-    const r = await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, (x) => x.includes('/avviso-sw'));
+    const r = await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, (x) => /\/avviso-(sw|caricato)$/.test(x));
     return r && r.destinazione;
   }, origine + '/avviso-sw');
   expect(esiti).toEqual(expect.arrayContaining(['dopo:avviso', 'dopo:stampa', 'dopo:stampa-riquadro']));
-  expect(dest).toBe(origine + '/arrivo-sw');
+  // La copia del service worker rimanderebbe altrove: arriva quella della rete, con la sandbox.
+  expect(dest).toBe(origine + '/arrivo');
 });
 
 const paginaDi = (base) => app.windows().find((w) => w.url().startsWith(base));
