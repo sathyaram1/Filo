@@ -39,7 +39,7 @@ function senzaFinestreDellaPagina(ses) {
     callback({ responseHeaders });
   });
 }
-const wait =(ms) => new Promise((ok) => { const t = setTimeout(ok, ms); if (t && t.unref) t.unref(); });
+const wait = (ms) => new Promise((ok) => { const t = setTimeout(ok, ms); if (t && t.unref) t.unref(); });
 
 let _electron = null;
 function realElectron() {
