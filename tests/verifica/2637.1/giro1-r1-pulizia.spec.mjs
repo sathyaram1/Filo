@@ -1,5 +1,5 @@
 // #2637.1 giro 1: a fine visita Filo toglie i cookie partizionati del riquadro e rimette i normali con lo stesso nome.
-// Se il sito cambia il suo normale (valore nuovo, di sessione, due volte, cancellato) a QUALUNQUE chiamata della
+// Se il sito cambia il suo normale (valore nuovo, di sessione, due volte di fila) a QUALUNQUE chiamata della
 // pulizia, prima o dopo, deve restare quello che ha fatto il sito. Electron vero; ogni giro ha un nome di cookie suo.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
