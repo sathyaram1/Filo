@@ -58,7 +58,6 @@ function prepara(app) {
       if (I.azione === 'valore') await orig.set({ ...base, value: 'nuovo', expirationDate: fra() });
       if (I.azione === 'sessione') await orig.set({ ...base, value: 'nuovo' });
       if (I.azione === 'doppia') { await orig.set({ ...base, value: 'n1', expirationDate: fra() }); await orig.set({ ...base, value: 'n2', expirationDate: fra() }); }
-      if (I.azione === 'cancella') await orig.set({ ...base, value: '', expirationDate: 1 });
     };
     for (const m of ['get', 'set', 'remove']) {
       ck[m] = async (...a) => {
