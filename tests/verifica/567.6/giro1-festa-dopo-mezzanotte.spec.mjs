@@ -37,7 +37,7 @@ async function preparaModello(app, giri) {
       };
     };
     globalThis.__festaAperti = [];
-    require('electron').shell.openPath = async (p) => { globalThis.__festaAperti.push(p); return ''; };
+    sh.openPath = async (p) => { globalThis.__festaAperti.push(p); return ''; };
   }, giri);
 }
 
