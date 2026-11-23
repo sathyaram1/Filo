@@ -19,7 +19,7 @@ come la domanda. Canale e server la controllano con la stessa regola
 }
 ```
 
-- **`criteri`**: una riga per ognuno dei nove criteri qui sopra, col loro
+- **`criteri`**: una riga per ognuno dei dieci criteri qui sopra, col loro
   numero. La prova è una cosa che un altro controlla senza rifare il lavoro:
   il nome di un test e del caso, il percorso di una schermata in
   `tests/.shots/`, un elenco (strade provate, file, input insoliti). «L'ho
