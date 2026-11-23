@@ -61,6 +61,8 @@ test.afterEach(async () => {
 
 test('r1 la copia nascosta di un finto avviso, a pagina caricata, non apre la finestra di stampa', async () => {
   test.setTimeout(60_000);
+  // Playwright chiude da sé le finestre di dialogo che vede: chi le ascolta le lascia come davanti all'utente.
+  app.on('window', (p) => p.on('dialog', () => {}));
   // La copia che segue un link accorciato resta aperta qualche secondo dopo il caricamento, ad aspettare un rimando.
   const finito = app.evaluate(async (_e, u) => { await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, () => true); return true; }, origine + '/avviso');
   expect(await finito).toBe(true);
