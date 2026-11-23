@@ -171,7 +171,7 @@ test('esplora: la pagina Sicurezza aperta in incognito vede la risposta data nel
   await expect(sec.locator('#sec-perm-list')).toContainText('Nessuna risposta data a un sito', { timeout: 10_000 });
   await consentiMicrofono();
   await expect(sec.locator('#sec-perm-list li', { hasText: 'Microfono' })).toBeVisible({ timeout: 10_000 });
-  await app.evaluate(async () => process.mainModule.require('./services/permessiPagine').togliPerChat('127.0.0.1', 'microfono'));
+  await togliDallaChat();
   await expect(sec.locator('#sec-perm-list')).toContainText('Nessuna risposta data a un sito', { timeout: 10_000 });
 });
 
