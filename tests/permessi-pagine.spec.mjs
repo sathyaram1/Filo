@@ -275,6 +275,7 @@ test.beforeAll(async () => {
   server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/esito') { esiti.push(u.searchParams.get('m')); res.end('ok'); return; }
+    if (u.pathname === '/sw.js') { res.writeHead(200, { 'Content-Type': 'text/javascript' }); res.end(SW); return; }
     if (u.pathname === '/lento') { const t = setTimeout(() => { try { res.end('x'); } catch (_) {} }, 20_000); t.unref?.(); return; }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     if (u.pathname === '/ospite') { res.end(ospite(`http://${LUNGO}:${server.address().port}`)); return; }
