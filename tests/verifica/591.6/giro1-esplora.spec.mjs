@@ -30,13 +30,15 @@ const PAGINE = {
   '/dopo-carico': `<!doctype html><meta charset="utf-8"><title>Avviso</title><p>Il tuo computer è infetto</p>
 <script>
   const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  m('inizio');
   addEventListener('load', () => {
-    setTimeout(() => { const t = performance.now(); alert('Il tuo computer è infetto, chiama il numero'); m('avviso:' + Math.round(performance.now() - t)); }, 100);
-    setTimeout(() => { const t = performance.now(); window.print(); m('stampa:' + Math.round(performance.now() - t)); }, 400);
-    setTimeout(() => { const a = new Audio(${JSON.stringify(BIP)}); a.loop = true; a.play().then(() => m('allarme:suona'), (e) => m('allarme:' + e.name)); }, 700);
-    setTimeout(() => { const u = new SpeechSynthesisUtterance('chiama il numero'); u.onstart = () => m('voce:parla'); u.onerror = (e) => m('voce:' + e.error); speechSynthesis.speak(u); }, 800);
-    setTimeout(() => { m('notifica:' + Notification.permission); }, 900);
-    setTimeout(() => { m('fine'); }, 1200);
+    m('caricata');
+    setTimeout(() => { const a = new Audio(${JSON.stringify(BIP)}); a.loop = true; a.play().then(() => m('allarme:suona'), (e) => m('allarme:' + e.name)); }, 100);
+    setTimeout(() => { const u = new SpeechSynthesisUtterance('chiama il numero'); u.onstart = () => m('voce:parla'); u.onerror = (e) => m('voce:' + e.error); speechSynthesis.speak(u); }, 150);
+    setTimeout(() => { m('notifica:' + Notification.permission); }, 200);
+    setTimeout(() => { const t = performance.now(); alert('Il tuo computer è infetto, chiama il numero'); m('avviso:' + Math.round(performance.now() - t)); }, 400);
+    setTimeout(() => { const t = performance.now(); window.print(); m('stampa:' + Math.round(performance.now() - t)); }, 700);
+    setTimeout(() => { m('fine'); }, 1000);
   });
 </script>`,
   '/microfono': `<!doctype html><meta charset="utf-8"><title>Riunione</title><p>stanza</p>
