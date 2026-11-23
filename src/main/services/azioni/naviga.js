@@ -420,7 +420,7 @@ async function azioneTraduciPagina(action, { sender }) {
   if (globalThis.SN_ACTION_LEVELS.traduzioneFatta(stato) && dallaChat()) {
     require('../contatoriStrade').misura('azione', 'translate', 'chat', { incognito: !!(win && win._filoIncognito) });
   }
-  return { executed: STATI_TRADUZIONE[stato], kept: false, output };
+  return { executed: S.STATI[stato].fatta, kept: false, output };
 }
 
 async function azioneChiudiSchede(action, { sender }) {
