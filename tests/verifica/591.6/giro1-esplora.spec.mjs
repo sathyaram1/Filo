@@ -108,16 +108,24 @@ async function consentiMicrofono() {
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toContain('concesso:audio');
 }
 
-test('esplora: copia nascosta a pagina caricata (destinazione)', async () => {
-  test.setTimeout(60_000);
-  app.on('window', (p) => p.on('dialog', () => {}));
-  const finito = app.evaluate(async (_e, u) => { await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, () => true); return true; }, origine + '/dopo-carico');
-  await expect.poll(() => esiti.includes('fine'), { timeout: 15_000, message: JSON.stringify(esiti) }).toBe(true);
-  fotoSchermo('5916-durante.png');
-  console.log('ESITI', JSON.stringify(esiti));
-  expect(await finito).toBe(true);
-  fotoSchermo('5916-dopo.png');
-});
+for (const via of ['destinazione', 'detonate']) {
+  test(`esplora: copia nascosta a pagina caricata (${via})`, async () => {
+    test.setTimeout(60_000);
+    app.on('window', (p) => p.on('dialog', () => {}));
+    const finito = app.evaluate(async (_e, [u, v]) => {
+      const S = globalThis.SN_SAFEBROWSE.sandbox;
+      // Per detonate: la destinazione finale «lenta» tiene viva la copia dopo il caricamento.
+      const r = v === 'destinazione' ? await S.destinazione(u, () => true) : await S.detonate(u + '?x', () => new Promise((ok) => setTimeout(() => ok(null), 3000)));
+      return JSON.stringify(r);
+    }, [origine + '/dopo-carico', via]);
+    await new Promise((ok) => setTimeout(ok, 2000));
+    fotoSchermo(`5916-${via}-durante.png`);
+    console.log('RISULTATO', via, await finito);
+    console.log('ESITI', via, JSON.stringify(esiti));
+    fotoSchermo(`5916-${via}-dopo.png`);
+    expect(esiti).toContain('fine');
+  });
+}
 
 test('esplora: tolto dalla pagina Sicurezza in incognito, alla riapertura resta tolto', async () => {
   test.setTimeout(90_000);
