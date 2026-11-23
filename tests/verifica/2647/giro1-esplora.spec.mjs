@@ -18,7 +18,8 @@ for (const [nome, tipo, args] of CASI) {
     test.setTimeout(60_000);
     const page = await home(app);
     await livelloAutonomia(app, 'conservativo');
-    await modelloFinto(app, [{ text: '', toolCalls: [{ id: 't1', name: tipo, arguments: JSON.stringify(args) }] }, { text: 'ok' }]);
+    const leggi = { id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' };
+    await modelloFinto(app, [{ text: 'Provo.', toolCalls: [leggi, { id: 't1', name: tipo, arguments: JSON.stringify(args) }] }, { text: 'ok' }, { text: 'ok' }]);
     await chiedi(page, `prova ${nome}`);
     const popup = page.locator(CONFIRM_HOST);
     const apparso = await popup.waitFor({ state: 'visible', timeout: 6000 }).then(() => true, () => false);
