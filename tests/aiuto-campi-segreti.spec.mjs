@@ -58,7 +58,7 @@ async function fotoDelTurno(app, frase, n) {
   const turni = () => app.evaluate((_electron, frase) => globalThis.__visti.map((ms) => {
     const utente = [...ms].reverse().find((m) => m.role === 'user');
     const parti = Array.isArray(utente?.content) ? utente.content : [{ type: 'text', text: String(utente?.content || '') }];
-    if (!parti.some((p) => p.type === 'text' && String(p.text).includes(frase))) return undefined;
+    if (!parti.some((p) => p.type === 'text' && String(p.text).trim() === frase)) return undefined;
     const foto = parti.find((p) => p.type === 'image_url');
     return foto ? foto.image_url.url : null;
   }).filter((f) => f !== undefined), frase);
