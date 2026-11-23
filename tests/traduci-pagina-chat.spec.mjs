@@ -397,13 +397,15 @@ async function sitoLento(use) {
     const pagina = `<!doctype html><html lang="en"><head><title>A slow English site</title></head><body style="font:16px sans-serif;padding:20px">
   <h1 id="head">A slow English site that takes its time</h1>`;
     const resto = '<p id="p1">The rest of the article arrives a few seconds later.</p></body></html>';
+    // Oltre l'attesa dell'apertura (5 s) e quella della domanda alla pagina messe in fila.
     if (req.url.startsWith('/primo-byte')) {
-      setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(pagina + resto); }, 6500);
+      setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(pagina + resto); }, 11000);
       return;
     }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.write(pagina);
-    setTimeout(() => res.end(resto), 5000);
+    if (req.url.startsWith('/subito')) res.end(resto);
+    else setTimeout(() => res.end(resto), 10000);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   try { await use(`http://127.0.0.1:${server.address().port}`); } finally {
