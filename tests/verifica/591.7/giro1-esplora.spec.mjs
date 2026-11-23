@@ -131,6 +131,22 @@ for (const [nome, percorso] of [
   });
 }
 
+for (const [nome, corpo] of [
+  ['meta refresh', '<meta http-equiv="refresh" content="0;url=/arrivo">'],
+  ['script', '<script>location.replace("/arrivo")</script>'],
+  ['script a pagina caricata', '<script>addEventListener("load", () => setTimeout(() => { location.href = "/arrivo"; }, 200))</script>'],
+]) {
+  test(`destinazione: l'accorciatore che rimanda con ${nome} si segue ancora`, async () => {
+    test.setTimeout(60_000);
+    pagine['/accorciatore'] = () => `<!doctype html><meta charset="utf-8">${corpo}`;
+    const r = await app.evaluate(async (_e, u) => {
+      const v = await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, (x) => !x.endsWith('/arrivo'));
+      return v && v.destinazione;
+    }, origine + '/accorciatore');
+    expect(r).toBe(origine + '/arrivo');
+  });
+}
+
 test('controllo profondo: rimando a un finto avviso, la stampa non apre la sua finestra', async () => {
   test.setTimeout(60_000);
   const r = await app.evaluate(async (_e, u) => {
