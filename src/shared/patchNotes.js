@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.301', date: '2026-11-23',
+      fixes: [
+        { testo: 'Una serata che passa la mezzanotte, come una festa sabato dalle 22 alle 2, entra intera nel calendario anche quando Filo segna il sabato come ultimo giorno: prima finiva a mezzanotte o non compariva il bottone «Aggiungi al calendario».', segnalazione: 567 },
+      ],
+    },
+    {
       version: '0.2.300', date: '2026-11-22',
       fixes: [
         { testo: 'Quando in una chat hai già dato la password a chi te l\'ha chiesta, il correttore torna a controllare intere le frasi che scrivi dopo. Una password scritta come «Pass: …», accanto al nome utente o come seconda password nella stessa risposta resta fuori da quello che legge.', segnalazione: 1723 },
