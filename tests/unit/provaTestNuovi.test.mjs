@@ -6,12 +6,16 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { apriCopia, corriFile, esitiDaPlaywright, esitiDaTap, esitoDelCaso, provaTestNuovi, testNuoviDelRamo, testoDellaProva } from '../../scripts/lib/prova-test-nuovi.mjs';
 import { cloneDellUltimaProva, esitoSalvato, provaDelRamo } from '../../scripts/prova-test-nuovi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// Le dipendenze dove Node le trova risalendo, non REPO/node_modules: nella prova sulla fusione stanno sopra il
+// worktree, e il collegamento a una cartella che non c'è lasciava la copia senza Playwright (#2505).
+const MODULI = dirname(dirname(dirname(createRequire(join(REPO, 'package.json')).resolve('@playwright/test/package.json'))));
 
 function ramoDiProva() {
   const root = cartellaTemporanea('filo-prova-nuovi-test-');
