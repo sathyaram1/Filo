@@ -39,7 +39,7 @@ const finestrelle = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.g
   .map((w) => w.isVisible()));
 // Una rotella vera sulla pagina dell'altra finestra.
 const rotellaDiLa = (app) => app.evaluate(({ BrowserWindow }) => {
-  const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
   const tm = w._filoTabs;
   const t = tm.tabs.find((x) => x.id === tm.activeId);
   t.view.webContents.sendInputEvent({ type: 'mouseWheel', x: 200, y: 200, deltaX: 0, deltaY: -120 });
