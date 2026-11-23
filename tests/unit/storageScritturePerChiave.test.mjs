@@ -222,3 +222,39 @@ test('le chiavi API si cifrano solo quando cambiano', async () => {
     cifraturaAccesa = false;
   }
 });
+
+// #905.5: la password del proxy e la chiave di Safe Browsing stanno in un secondo blob, con la sua memoria.
+test('la password del proxy e la chiave di Safe Browsing si cifrano solo quando cambiano, e il file non si riscrive', async () => {
+  cifraturaAccesa = true;
+  const impostazioni = (tema, password) => ({ settings: {
+    tema, proxy: { datacenter: `http://mario:${password}@gate.esempio.com:8080` },
+    security: { safeBrowse: { enabled: true, safeBrowsingKey: 'FINTA-safe-browsing-1234567' } },
+  } });
+  try {
+    const n0 = cifrature;
+    await Storage.set(impostazioni('caldo', 'pw-uno-segreta'));
+    await Storage.whenSettled();
+    const primo = JSON.parse(leggiFile()).settings;
+    assert.match(primo.segretiEnc, /^safeStorage:v1:/);
+    assert.equal(primo.proxy.datacenter, undefined, 'la password del proxy è finita in chiaro');
+    assert.equal(cifrature, n0 + 1);
+
+    await Storage.set(impostazioni('freddo', 'pw-uno-segreta'));
+    await Storage.whenSettled();
+    assert.equal(cifrature, n0 + 1, 'i segreti fuori dalle chiavi API sono stati ricifrati senza essere cambiati');
+    assert.equal(JSON.parse(leggiFile()).settings.segretiEnc, primo.segretiEnc);
+
+    const s0 = scritture;
+    await Storage.set(impostazioni('freddo', 'pw-uno-segreta'));
+    await Storage.whenSettled();
+    assert.equal(scritture, s0, 'le stesse impostazioni hanno riscritto il file');
+
+    await Storage.set(impostazioni('freddo', 'pw-due-segreta'));
+    await Storage.whenSettled();
+    assert.equal(cifrature, n0 + 2);
+    const blob = JSON.parse(leggiFile()).settings.segretiEnc.slice('safeStorage:v1:'.length);
+    assert.match(Buffer.from(blob, 'base64').toString(), /pw-due-segreta/);
+  } finally {
+    cifraturaAccesa = false;
+  }
+});

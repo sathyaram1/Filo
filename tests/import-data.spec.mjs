@@ -330,6 +330,32 @@ async function importaDaSicurezza(zipPath, userData) {
   return { app, page };
 }
 
+// #905.5: il backup vince anche sul proxy; resta quello di qui solo se l'esportazione ha tolto utente e password.
+for (const [caso, proxyDelBackup, atteso] of [
+  ['un proxy del backup che autorizza per indirizzo prende il posto di quello di qui', 'nuovo.esempio.com:3128', 'nuovo.esempio.com:3128'],
+  ['un proxy a cui l\'esportazione ha tolto la password lascia quello di qui', 'http://anna:pw-del-backup@vecchio.esempio.com:8080', null],
+]) {
+  test(`importa dati: ${caso} (#905.5)`, async () => {
+    const userData = cartellaTemporanea('filo-imp-proxy-');
+    const qui = 'http://mario:password-di-qui@vecchio.esempio.com:8080';
+    writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { theme: 'light', proxy: { datacenter: qui } } }), 'utf8');
+    const zipPath = join(userData, 'proxy.zip');
+    writeFileSync(zipPath, buildExportZip({ settings: { theme: 'dark', proxy: { datacenter: proxyDelBackup } } }));
+    const { app, page } = await importaDaSicurezza(zipPath, userData);
+    try {
+      await expect.poll(() => confirmText(page), { timeout: 10000 }).toContain('proxy.zip');
+      expect(await confirmText(page)).not.toContain('Il proxy arriva senza utente e password');
+      await clickConfirm(page, 'ok');
+      const impostazioni = () => app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
+      await expect.poll(async () => (await impostazioni()).theme, { timeout: 10000 }).toBe('dark');
+      expect((await impostazioni()).proxy.datacenter).toBe(atteso || qui);
+    } finally {
+      try { await app.close(); } catch (_) {}
+      rmSync(userData, { recursive: true, force: true });
+    }
+  });
+}
+
 test('indice dell\'archivio rotto sulla voce delle chat: la conferma dice che chat e pagine visitate non si leggono', async () => {
   const { conIndiceRotto } = await import('./helpers/zipRovinato.mjs');
   const userData = cartellaTemporanea('filo-imp-indice-');

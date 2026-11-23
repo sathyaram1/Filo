@@ -134,7 +134,7 @@ const VOCE_FILO = 'filo/eventi.jsonl';
 // I segreti dell'utente (SN_CONST.campiSegreti) entrano nell'archivio solo se chi esporta lo chiede (#905).
 // Una chiave incollata in chat o copiata negli appunti è nell'archivio quanto quella delle Opzioni: si toglie ovunque.
 const SEGRETO_TOLTO = '[chiave tolta dall’esportazione]';
-const CAMPI_PROXY = ['datacenter', 'residential'];
+const campiProxy = () => costanti().CAMPI_PROXY;
 const pieno = (v) => typeof v === 'string' && v.trim() !== '';
 
 function costanti() {
@@ -183,8 +183,6 @@ function togliSegreti(dati, filo) {
     if (!m) { delete o[k]; continue; }
     // Gli stessi valori che i segreti custoditi tengono lontani da uscite e modelli.
     for (const x of costanti().segretiDelProxy(v)) segna(x);
-    // Anche come la usa chi si collega: decodificata e senza i ritorni a capo che l'indirizzo scarta.
-    try { if (m.password) segna({ valore: decodeURIComponent(m.password.replace(/[\t\n\r]/g, '')), password: true }); } catch (_) {}
     o[k] = m.senza;
     proxy.push(k);
   }
@@ -418,7 +416,7 @@ function readExportZip(zipBuffer) {
       dichiarate = Number.isInteger(m.imageCount) && m.imageCount > 0 ? m.imageCount : 0;
       if (typeof m.filo === 'boolean') filoDichiarato = m.filo;
       contoNoto = Number.isInteger(m.imageCount);
-      if (Array.isArray(m.proxySenzaCredenziali)) proxyTolti = CAMPI_PROXY.filter((k) => m.proxySenzaCredenziali.includes(k));
+      if (Array.isArray(m.proxySenzaCredenziali)) proxyTolti = campiProxy().filter((k) => m.proxySenzaCredenziali.includes(k));
     } catch (_) {}
   }
 
@@ -683,21 +681,22 @@ function unisciSveglie(local, imported, prossima, adesso) {
   return out;
 }
 
-// `opzioni`: { tettoPagine, tettoAppunti, tettoDownload, prossimaSveglia(t, adesso) → ms, adesso }. Le statistiche
-// contano le sezioni di primo livello; `restano` sono quelle del backup che non si importano perché sono stato.
-// Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905); un proxy arrivato
-// senza utente e password non prende il posto di quello di qui che li ha.
-function senzaSegretiVuoti(dati, cur) {
+// `opzioni`: { tettoPagine, tettoAppunti, tettoDownload, prossimaSveglia(t, adesso) → ms, adesso, proxySenzaCredenziali }.
+// Le statistiche contano le sezioni di primo livello; `restano` sono quelle del backup che non si importano perché sono stato.
+// Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905); un proxy a cui
+// l'esportazione ha tolto utente e password (`tolti`, dal manifesto) non prende il posto di quello di qui che li ha.
+// Uno che non li aveva, perché autorizza per indirizzo, vince come ogni altra impostazione (#905.5).
+function senzaSegretiVuoti(dati, cur, tolti) {
   if (!isPlainObject(dati.settings)) return dati;
   const settings = JSON.parse(JSON.stringify(dati.settings));
   const via = (o, campi) => { if (isPlainObject(o)) for (const k of campi) if (k in o && !pieno(o[k])) delete o[k]; };
   via(settings.apiKeys, isPlainObject(settings.apiKeys) ? Object.keys(settings.apiKeys) : []);
-  via(settings.proxy, CAMPI_PROXY);
+  via(settings.proxy, campiProxy());
   const proxyQui = isPlainObject(cur) && isPlainObject(cur.settings) && isPlainObject(cur.settings.proxy) ? cur.settings.proxy : {};
-  if (isPlainObject(settings.proxy)) {
-    for (const k of CAMPI_PROXY) {
+  if (isPlainObject(settings.proxy) && Array.isArray(tolti)) {
+    for (const k of campiProxy()) {
       const v = settings.proxy[k];
-      if (pieno(v) && !haCredenziali(v) && haCredenziali(proxyQui[k])) delete settings.proxy[k];
+      if (tolti.includes(k) && pieno(v) && !haCredenziali(v) && haCredenziali(proxyQui[k])) delete settings.proxy[k];
     }
   }
   via(isPlainObject(settings.security) ? settings.security.safeBrowse : null, ['safeBrowsingKey']);
@@ -722,7 +721,7 @@ function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
   const prima = require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {});
   const conLivello = require('./privacyMigrazione').perImportazione(prima);
-  const imp = senzaSegretiVuoti(require('./correttoreMigrazione').perImportazione(conLivello), cur);
+  const imp = senzaSegretiVuoti(require('./correttoreMigrazione').perImportazione(conLivello), cur, opzioni.proxySenzaCredenziali);
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
   const stats = {

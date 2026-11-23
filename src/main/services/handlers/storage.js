@@ -169,8 +169,10 @@ module.exports = function register(on, ctx) {
     if (mie && mie.length) current[Mie.CHIAVE_BACKUP] = mie;
     return current;
   }
-  function opzioniFusione() {
+  // `proxySenzaCredenziali`: i campi del proxy a cui l'esportazione ha tolto utente e password (readExportZip).
+  function opzioniFusione(proxySenzaCredenziali = []) {
     return {
+      proxySenzaCredenziali,
       tettoPagine: SN_CONST.SAVED_PAGES_LIMIT,
       tettoAppunti: SN_CONST.CLIPBOARD_HISTORY_MAX,
       tettoDownload: require('../downloads').HISTORY_LIMIT,
@@ -211,11 +213,11 @@ module.exports = function register(on, ctx) {
       const parsed = readExportZip(buf); // lancia se non è un export di Filo
 
       const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, at: Date.now() };
+      PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, proxySenzaCredenziali: parsed.proxySenzaCredenziali, at: Date.now() };
       const filo = contaFilo(parsed);
       const { mergeImportedData, regolaImport, haSegreti, proxyDaCompletare } = require('../exportData');
       const dati = datiDaFondere(parsed.data);
-      const { merged, stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
+      const { merged, stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione(parsed.proxySenzaCredenziali));
       return {
         ok: true,
         token,
@@ -315,7 +317,7 @@ module.exports = function register(on, ctx) {
       const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
       const Mie = globalThis.SN_SEGNALAZIONI_MIE;
       const MIE_KEY = Mie ? Mie.CHIAVE_BACKUP : null;
-      const { merged, stats } = mergeImportedData(current, dati, opzioniFusione());
+      const { merged, stats } = mergeImportedData(current, dati, opzioniFusione(pending.proxySenzaCredenziali));
 
       // Le impostazioni passano da applySettingsUpdate, così il backup è attivo subito senza
       // riavviare. Si riscrivono solo le chiavi che cambiano: gli altri listener non si svegliano.

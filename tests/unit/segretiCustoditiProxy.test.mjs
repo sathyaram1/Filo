@@ -82,6 +82,22 @@ test('una password corta del proxy non esce e non arriva al modello; una chiave 
   assert.deepEqual(chiave, [], 'una chiave corta non è una password nota');
 });
 
+// #905.2, #905.4, #905.5: la password della forma degli elenchi e quella con spazi o tabulazioni, come la usa chi si
+// collega, non escono e non arrivano ai modelli.
+test('la password del proxy in ogni forma che Filo usa non esce e non arriva al modello', () => {
+  for (const [proxy, password] of [
+    ['gate.fornitore.example:8080:mario:FintaElenco77q', 'FintaElenco77q'],
+    ['mario:Finta Con Spazio42@gate.fornitore.example:8080', 'Finta Con Spazio42'],
+    ['mario:Finta\tTab42x@gate.fornitore.example:8080', 'FintaTab42x'],
+  ]) {
+    const lista = conProxy({ datacenter: proxy });
+    assert.ok(valori(lista).includes(password), `${JSON.stringify(proxy)}: manca ${JSON.stringify(password)} fra ${JSON.stringify(lista)}`);
+    assert.equal(X.valutaUscita({ type: 'CERCA_WEB', query: `la password è ${password}` }, { segreti: lista }).blocca, true, proxy);
+    assert.ok(!G.oscuraSegreti(`la password è ${password}`, valori(lista)).includes(password), proxy);
+    assert.ok(!valori(lista).some((x) => x.includes('fornitore.example')), 'l\'host del proxy non è un segreto');
+  }
+});
+
 test('il cancello dei modelli oscura la password corta del proxy (porta il segno di password fino al guardiano)', async () => {
   require(join(ROOT, 'src', 'main', 'services', 'modelGate.js'));
   const corta = 'Kq7vRt2x';
