@@ -414,6 +414,50 @@ test('il cookie partizionato di un riquadro se ne va con la visita, come gli alt
   }
 });
 
+// #2637.1 — la pulizia toglie anche il normale con lo stesso nome e lo rimette: se il sito lo aggiorna mentre Filo
+// pulisce, resta il valore del sito. Il sito scrive subito prima della prima scrittura di Filo, o subito dopo la rimozione.
+for (const quando of ['prima della scadenza', 'dopo la rimozione']) {
+  test(`il sito che aggiorna il suo cookie normale mentre Filo pulisce il partizionato lo ritrova (${quando})`, async ({ app, openTab }) => {
+    const srv = await serve();
+    const stato = () => app.evaluate(async ({ session }) => (await session.defaultSession.cookies.get({ domain: 'b.localhost' }))
+      .filter((c) => c.name === 'chips').map((c) => `${c.value}:${c.session ? 'sessione' : 'scadenza'}`));
+    try {
+      await app.evaluate(async ({ session }) => {
+        await session.defaultSession.cookies.set({ url: 'https://b.localhost/', name: 'chips', value: 'mio', path: '/', secure: true,
+          sameSite: 'no_restriction', expirationDate: Date.now() / 1000 + 86400 * 30 });
+      });
+      await openTab(srv.articoloPartizionato);
+      await expect.poll(stato, { timeout: 10_000 }).toHaveLength(2);
+      await new Promise((r) => setTimeout(r, 800));
+      await app.evaluate(({ session }, momento) => {
+        const ck = session.defaultSession.cookies;
+        const set = ck.set.bind(ck);
+        const remove = ck.remove.bind(ck);
+        const delSito = () => set({ url: 'https://b.localhost/', name: 'chips', value: 'nuovo', path: '/', secure: true,
+          sameSite: 'no_restriction', expirationDate: Date.now() / 1000 + 86400 * 30 });
+        let fatto = false;
+        if (momento === 'prima della scadenza') {
+          ck.set = async (d) => {
+            if (!fatto && d.name === 'chips' && d.expirationDate === 1) { fatto = true; await delSito(); }
+            return set(d);
+          };
+        } else {
+          ck.remove = async (url, nome) => {
+            const r = await remove(url, nome);
+            if (!fatto && nome === 'chips') { fatto = true; await delSito(); }
+            return r;
+          };
+        }
+      }, quando);
+      await chiudiSchede(app, 'a.localhost');
+      await pulisci(app);
+      expect(await stato()).toEqual(['nuovo:scadenza']);
+    } finally {
+      await srv.chiudi();
+    }
+  });
+}
+
 test('all\'uscita da Filo il cookie partizionato di un riquadro ancora aperto non resta', async ({ app, openTab }) => {
   const srv = await serve();
   try {

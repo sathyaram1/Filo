@@ -48,6 +48,11 @@ const partizionati = new Map();
 // una partita da una lettura vecchia può coprire un valore più nuovo del sito; lo dice l'avviso che la segue (#2637).
 const nostre = new Map();
 const NOSTRE_MS = 30 * 1000;
+// Le pulizie dei partizionati in corso (dominio|percorso|nome). Un set già scaduto toglie solo il normale, e il suo
+// avviso ne porta il valore di quel momento: se il sito l'ha cambiato dopo la nostra lettura, si rimette quello.
+const pulizie = new Map();
+// Decisa la pulizia, gli avvisi delle sue scritture arrivano entro un attimo: oltre, una cancellazione è del sito.
+const PULIZIA_DECISA_MS = 5 * 1000;
 
 let modo = 'default';
 let fidati = new Sito.ElencoSiti();
@@ -235,29 +240,85 @@ function navigazione(url) {
 
 // La rimozione per indirizzo toglie anche il cookie normale con lo stesso nome, e nessuna lettura dice quale dei due è
 // partizionato. Lo dice una scrittura: un set già scaduto toglie solo il normale, quello che resta è partizionato e si
-// toglie per indirizzo. I normali con scadenza si rimettono com'erano.
+// toglie per indirizzo. I normali con scadenza si rimettono com'erano, o come il sito li ha riscritti nel frattempo.
 async function togliPartizionati(ses, sito, nomi) {
   let lista = [];
   try { lista = await ses.cookies.get({ domain: sito }); } catch (_) { return; }
   const uguali = (a, b) => a.domain === b.domain && (a.path || '/') === (b.path || '/') && a.value === b.value
     && !!a.session === !!b.session && a.expirationDate === b.expirationDate;
+  const scadi = (c) => ses.cookies.set({ ...posto(c), value: '', expirationDate: 1 }).catch(() => {});
   for (const nome of nomi) {
     const tutti = lista.filter((c) => c.name === nome);
-    for (const c of tutti) { try { await ses.cookies.set({ ...posto(c), value: '', expirationDate: 1 }); } catch (_) {} }
+    const posti = new Map();
+    for (const c of tutti) posti.set(chiaveCookie(c), c);
+    for (const [k, c] of posti) { apriPulizia(k, tutti); await scadi(c); }
     let partizionati = [];
     try { partizionati = (await ses.cookies.get({ domain: sito })).filter((c) => c.name === nome); } catch (_) {}
-    for (const url of new Set(partizionati.map(urlDi))) { try { await ses.cookies.remove(url, nome); } catch (_) {} }
+    for (const c of partizionati) {
+      const k = chiaveCookie(c);
+      if (!posti.has(k)) { posti.set(k, c); apriPulizia(k, tutti); }
+    }
+    // Un normale scritto dal sito dopo la prima passata lo toglie (e lo dice) la seconda: la rimozione per indirizzo
+    // parte insieme, senza un'attesa in mezzo in cui il sito lo riscriverebbe e lei lo porterebbe via muto.
+    const passi = [...posti.values()].map(scadi);
+    for (const url of new Set(partizionati.map(urlDi))) passi.push(ses.cookies.remove(url, nome).catch(() => {}));
+    await Promise.all(passi);
     const restati = [...partizionati];
-    const normali = tutti.filter((c) => {
+    const normali = new Map();
+    for (const c of tutti) {
       const i = restati.findIndex((p) => uguali(p, c));
-      if (i >= 0) { restati.splice(i, 1); return false; }
-      return !c.session;
-    });
-    for (const c of normali) {
-      preesistenti.set(chiaveCookie(c), Date.now());
-      try { await scriviNostra(ses, c, { ...posto(c), value: c.value, expirationDate: c.expirationDate }); } catch (_) {}
+      if (i >= 0) restati.splice(i, 1);
+      else if (!c.session) normali.set(chiaveCookie(c), c);
+    }
+    for (const k of posti.keys()) {
+      const p = pulizie.get(k);
+      const c = (p && p.prova) || normali.get(k) || null;
+      if (p) { p.fatta = true; p.at = Date.now(); p.attesa = !p.prova && !!c; }
+      if (c && daRimettere(p, c)) await rimetti(ses, k, c);
     }
   }
+}
+
+function apriPulizia(k, tutti) {
+  const diSessione = new Set(tutti.filter((x) => x.session && chiaveCookie(x) === k).map((x) => String(x.value)));
+  pulizie.delete(k);
+  pulizie.set(k, { at: Date.now(), prova: null, fatta: false, rimessa: null, diSessione });
+  while (pulizie.size > MAX_NOMI) pulizie.delete(pulizie.keys().next().value);
+}
+
+// Un normale di sessione che c'era già alla lettura l'aveva declassato Filo, e muore con la visita.
+function daRimettere(p, c) {
+  return !c.session || !p || !p.diSessione.has(String(c.value));
+}
+
+async function rimetti(ses, k, c) {
+  const p = pulizie.get(k);
+  if (p) p.rimessa = String(c.value);
+  preesistenti.set(k, Date.now());
+  const dati = { ...posto(c), value: c.value, ...(c.session ? {} : { expirationDate: c.expirationDate }) };
+  try { await scriviNostra(ses, c, dati); } catch (_) {}
+}
+
+// Gli avvisi possono arrivare dopo le risposte: la prova di un normale riscritto dal sito che arriva a pulizia decisa
+// corregge quello che si è rimesso (o si rimette da sola, se non si era rimesso niente). Il primo arrivo nostro chiude.
+// Torna vero per un avviso di prima della nostra scadenza, che la sorveglianza delle riscritture prenderebbe per nostro.
+function osservaPulizia(ses, k, c, causa, rimosso) {
+  const p = pulizie.get(k);
+  if (!p) return false;
+  if (Date.now() - p.at > (p.fatta ? PULIZIA_DECISA_MS : NOSTRE_MS)) { pulizie.delete(k); return false; }
+  if (rimosso && causa === 'expired-overwrite') {
+    p.prova = c;
+    if (p.fatta && p.rimessa == null && daRimettere(p, c)) rimetti(ses, k, c).catch(() => {});
+    return false;
+  }
+  if (p.attesa && !p.prova) return true;
+  if (rimosso || !p.fatta || p.rimessa == null || String(c.value) !== p.rimessa) return false;
+  pulizie.delete(k);
+  const v = nostre.get(k);
+  // Una sovrascrittura di un valore ancora più nuovo la rimette già la sorveglianza delle riscritture.
+  if (v && v.rimosso) return false;
+  if (p.prova && p.prova.value !== p.rimessa && daRimettere(p, p.prova)) rimetti(ses, k, p.prova).catch(() => {});
+  return false;
 }
 
 // All'uscita da Filo i cookie di sessione se ne vanno da soli; i partizionati ancora in attesa si tolgono qui.
@@ -486,7 +547,9 @@ function aggancia(ses) {
     ses.cookies.on('changed', (_e, c, cause, removed) => {
       if (!c || !c.name) return;
       const k = chiaveCookie(c);
-      try { osservaNostra(ses, k, c, cause, removed); } catch (_) {}
+      let diPrima = false;
+      try { diPrima = osservaPulizia(ses, k, c, cause, removed); } catch (_) {}
+      if (!diPrima) { try { osservaNostra(ses, k, c, cause, removed); } catch (_) {} }
       if (removed) {
         if (cause === 'overwrite' && !c.session) {
           preesistenti.set(k, Date.now());

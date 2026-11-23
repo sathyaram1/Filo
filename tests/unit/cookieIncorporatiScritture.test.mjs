@@ -1,5 +1,5 @@
-// #2637 — il declassamento di un cookie di riquadro legge e poi riscrive: se il riquadro lo aggiorna fra le due,
-// la riscrittura non deve rimettere il valore vecchio. Electron è finto, il deposito dei cookie avvisa come Chromium.
+// #2637 — il declassamento di un cookie di riquadro e la pulizia dei partizionati leggono e poi riscrivono: se il sito
+// aggiorna il cookie fra le due, non deve tornare il valore vecchio. Electron è finto, il deposito avvisa come Chromium.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,9 +20,10 @@ const scheda = {
     },
   },
 };
+const schede = [scheda];
 const electron = {
   session: { defaultSession: null },
-  BrowserWindow: { getAllWindows: () => [{ _filoTabs: { tabs: [scheda] } }] },
+  BrowserWindow: { getAllWindows: () => [{ _filoTabs: { tabs: schede } }] },
   webContents: { fromId: () => null },
 };
 const origLoad = Module._load;
@@ -35,19 +36,35 @@ const dopo = () => new Promise((r) => setImmediate(r));
 async function quiete() { for (let i = 0; i < 300; i++) await dopo(); }
 
 // Un deposito come quello di Chromium: una sovrascrittura che cambia valore avvisa prima della rimozione del vecchio e
-// poi dell'arrivo del nuovo; a valore uguale avvisa solo l'arrivo. Gli avvisi e le risposte arrivano dopo, in ordine.
-function deposito({ rispostaDopoGliAvvisi }) {
+// poi dell'arrivo del nuovo; a valore uguale avvisa solo l'arrivo. Gli avvisi e le risposte arrivano dopo, in ordine;
+// con `avvisiInRitardo` gli avvisi arrivano dopo le risposte. I partizionati hanno una chiave loro, che né gli avvisi
+// né le letture mostrano: le scritture di Filo toccano solo i normali, la rimozione per indirizzo tutti e due.
+function deposito({ rispostaDopoGliAvvisi, avvisiInRitardo = 0 }) {
   const cookie = new Map();
   const ascolti = [];
   let dopoLettura = null;
-  const chiave = (c) => `${c.domain}|${c.path}|${c.name}`;
-  const avvisa = (c, causa, tolto) => setImmediate(() => { for (const f of ascolti) f({}, { ...c }, causa, tolto); });
-  function scrivi(d) {
+  // Passi di Filo contati da `contaPassi`: al passo `alPasso.n` il sito scrive mentre Filo aspetta la risposta.
+  let passi = null;
+  let alPasso = null;
+  let intestazioni = null;
+  const chiave = (c) => `${c.partizionato ? 'P' : ''}|${c.domain}|${c.path}|${c.name}`;
+  const pubblico = ({ partizionato, ...c }) => c;
+  const piuTardi = (n, f) => (n ? setImmediate(() => piuTardi(n - 1, f)) : f());
+  const avvisa = (c, causa, tolto) => piuTardi(1 + avvisiInRitardo, () => { for (const f of ascolti) f({}, pubblico(c), causa, tolto); });
+  function rispondi(valore) {
+    const n = passi == null ? -1 : passi++;
+    return new Promise((r) => setImmediate(() => {
+      if (alPasso && alPasso.n === n) alPasso.f();
+      r(valore);
+    }));
+  }
+  function scrivi(d, { partizionato = false } = {}) {
     const ospite = new URL(d.url).hostname;
     const c = {
       name: d.name, value: String(d.value), domain: d.domain || ospite, hostOnly: !d.domain, path: d.path || '/',
       secure: !!d.secure, httpOnly: !!d.httpOnly, sameSite: d.sameSite || 'no_restriction',
       session: d.expirationDate == null, ...(d.expirationDate != null ? { expirationDate: d.expirationDate } : {}),
+      ...(partizionato ? { partizionato: true } : {}),
     };
     const k = chiave(c);
     const vecchio = cookie.get(k);
@@ -68,18 +85,36 @@ function deposito({ rispostaDopoGliAvvisi }) {
         const host = f.url ? new URL(f.url).hostname : String(f.domain || '');
         const foto = [...cookie.values()]
           .filter((c) => c.domain.replace(/^\./, '') === host && (!f.name || c.name === f.name))
-          .map((c) => ({ ...c }));
+          .map(pubblico);
         const passo = dopoLettura;
         dopoLettura = null;
         if (rispostaDopoGliAvvisi && passo) passo();
-        return new Promise((r) => setImmediate(() => { if (!rispostaDopoGliAvvisi && passo) passo(); r(foto); }));
+        if (passo && !rispostaDopoGliAvvisi) return new Promise((r) => setImmediate(() => { passo(); r(foto); }));
+        return rispondi(foto);
       },
-      set: (d) => new Promise((r) => { scrivi(d); setImmediate(r); }),
-      remove: async () => {},
+      set: (d) => { scrivi(d); return rispondi(); },
+      remove: (url, nome) => {
+        const host = new URL(url).hostname;
+        for (const [k, c] of [...cookie]) {
+          if (c.name !== nome || c.domain.replace(/^\./, '') !== host) continue;
+          cookie.delete(k);
+          avvisa(c, 'explicit', true);
+        }
+        return rispondi();
+      },
     },
-    webRequest: { onHeadersReceived() {} },
+    webRequest: { onHeadersReceived(f) { intestazioni = f; } },
   };
-  return { ses, scrivi, cookie: (nome) => [...cookie.values()].filter((c) => c.name === nome), poiLettura: (f) => { dopoLettura = f; } };
+  return {
+    ses,
+    scrivi,
+    cookie: (nome) => [...cookie.values()].filter((c) => c.name === nome),
+    poiLettura: (f) => { dopoLettura = f; },
+    contaPassi: () => { passi = 0; },
+    passiContati: () => passi,
+    alPasso: (n, f) => { alPasso = { n, f }; },
+    intestazioni: (d) => new Promise((r) => intestazioni(d, r)),
+  };
 }
 
 function caricaModulo() {
@@ -118,3 +153,88 @@ test('senza scritture in mezzo il declassamento tiene il valore e toglie la scad
   assert.deepEqual(d.cookie('stato').map((c) => `${c.value}:${c.session ? 'sessione' : 'scadenza'}`), ['1:sessione']);
   assert.equal(scritture, 1);
 });
+
+// #2637.1 — la pulizia a fine visita del partizionato di un riquadro toglie anche il normale con lo stesso nome e poi
+// lo rimette: se il sito lo aggiorna mentre Filo pulisce, deve restare il valore del sito.
+const NORMALE = { url: 'https://video.com/', name: 'stato', secure: true, sameSite: 'no_restriction' };
+const fraUnGiorno = () => Math.floor(Date.now() / 1000) + 86400;
+const stati = (d) => d.cookie('stato')
+  .map((c) => `${c.value}:${c.partizionato ? 'partizionato' : 'normale'}:${c.session ? 'sessione' : 'scadenza'}`).sort();
+
+// Un normale del sito da prima della visita, il partizionato del riquadro dall'intestazione, poi la scheda si chiude e
+// la pulizia parte; `sito` scrive mentre Filo aspetta la risposta del passo `n` della pulizia.
+async function pulizia(variante, n = -1, sito = null, { normale = true } = {}) {
+  process.env.NODE_ENV = 'test';
+  schede.splice(0, schede.length, scheda);
+  const CI = caricaModulo();
+  const d = deposito(variante);
+  if (normale) d.scrivi({ ...NORMALE, value: 'mio', expirationDate: fraUnGiorno() });
+  await quiete();
+  CI.aggancia(d.ses);
+  CI.margineTest(1);
+  await d.intestazioni({
+    url: 'https://video.com/riquadro', resourceType: 'subFrame', frame: { top: { url: 'https://articolo.it/' } },
+    responseHeaders: { 'set-cookie': ['stato=p1; Max-Age=3600; Path=/; SameSite=None; Secure; Partitioned'] },
+  });
+  d.scrivi({ ...NORMALE, value: 'p1' }, { partizionato: true });
+  await quiete();
+  schede.length = 0;
+  await CI.giroDiPulizia();
+  await new Promise((r) => setTimeout(r, 5));
+  if (sito) d.alPasso(n, () => sito(d));
+  d.contaPassi();
+  await CI.giroDiPulizia();
+  await quiete();
+  return d;
+}
+
+// Con gli avvisi molto in ritardo la pulizia decide prima di sapere cosa ha tolto, e si corregge quando lo sa.
+const VARIANTI = [
+  { nome: 'avvisi prima delle risposte', avvisiInRitardo: 0 },
+  { nome: 'avvisi dopo le risposte', avvisiInRitardo: 3 },
+  { nome: 'avvisi dopo la fine della pulizia', avvisiInRitardo: 30 },
+];
+
+for (const v of VARIANTI) {
+  test(`senza scritture in mezzo la pulizia toglie il partizionato e rimette il normale com'era (${v.nome})`, async () => {
+    const d = await pulizia(v);
+    assert.deepEqual(stati(d), ['mio:normale:scadenza']);
+  });
+
+  for (const durata of ['scadenza', 'sessione']) {
+    test(`il sito che aggiorna il suo cookie normale (${durata}) a qualunque passo della pulizia lo ritrova col valore nuovo (${v.nome})`, async () => {
+      const passi = (await pulizia(v)).passiContati();
+      assert.ok(passi >= 5, `la pulizia fa ${passi} passi`);
+      const sbagliati = [];
+      // Il passo 0 è la lettura del giro, prima della pulizia: un cookie di sessione che c'è già lì muore con la visita.
+      for (let n = durata === 'sessione' ? 1 : 0; n < passi; n++) {
+        const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'nuovo', ...(durata === 'scadenza' ? { expirationDate: fraUnGiorno() } : {}) }));
+        const resta = stati(d);
+        if (resta.join() !== `nuovo:normale:${durata}`) sbagliati.push(`passo ${n}: ${resta.join(', ')}`);
+      }
+      assert.deepEqual(sbagliati, []);
+    });
+  }
+
+  test(`il normale che il sito crea mentre Filo pulisce, senza averne uno prima, resta (${v.nome})`, async () => {
+    const passi = (await pulizia(v, -1, null, { normale: false })).passiContati();
+    const sbagliati = [];
+    for (let n = 0; n < passi; n++) {
+      const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'nuovo', expirationDate: fraUnGiorno() }), { normale: false });
+      const resta = stati(d);
+      if (resta.join() !== 'nuovo:normale:scadenza') sbagliati.push(`passo ${n}: ${resta.join(', ')}`);
+    }
+    assert.deepEqual(sbagliati, []);
+  });
+
+  test(`il riquadro che aggiorna il partizionato durante la pulizia non diventa un cookie normale (${v.nome})`, async () => {
+    const passi = (await pulizia(v)).passiContati();
+    const sbagliati = [];
+    for (let n = 0; n < passi; n++) {
+      const d = await pulizia(v, n, (x) => x.scrivi({ ...NORMALE, value: 'p2' }, { partizionato: true }));
+      const normali = stati(d).filter((s) => s.includes(':normale:'));
+      if (normali.join() !== 'mio:normale:scadenza') sbagliati.push(`passo ${n}: ${normali.join(', ')}`);
+    }
+    assert.deepEqual(sbagliati, []);
+  });
+}
