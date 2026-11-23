@@ -17,6 +17,7 @@ const PASSWORD = 'FintaElencoInsolito77q';
 const CASI = [
   ['utente email', `gate.fornitore.example:8080:mario@posta.example:${PASSWORD}`, 'mario@posta.example', 'http://gate.fornitore.example:8080'],
   ['host IPv6', `[2001:db8::1]:8080:mario:${PASSWORD}`, 'mario', 'http://[2001:db8::1]:8080'],
+  ['CONTROLLO', `gate.fornitore.example:8080:mario:${PASSWORD}`, 'mario', 'http://gate.fornitore.example:8080'],
 ];
 
 for (const [nome, proxy, utente, regole] of CASI) {
