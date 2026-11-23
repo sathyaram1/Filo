@@ -429,6 +429,16 @@ test('la copia nascosta che segue un link accorciato non apre la stampa di una p
   expect(dest).toBe(origine + '/arrivo');
 });
 
+test('SPERIMENTALE sw', async () => {
+  test.setTimeout(60_000);
+  app.on('window', (p) => p.on('dialog', () => {}));
+  const dest = await app.evaluate(async (_e, u) => {
+    const r = await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, (x) => x.includes('/avviso-sw'));
+    return r;
+  }, origine + '/avviso-sw');
+  console.log('ESITI', JSON.stringify(esiti), JSON.stringify(dest));
+});
+
 const paginaDi = (base) => app.windows().find((w) => w.url().startsWith(base));
 
 test('un clic che arriva appena la domanda compare non concede: Consenti si arma dopo un attimo', async () => {
