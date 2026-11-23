@@ -1,6 +1,6 @@
 // Esplorazione #592.17: la finestrella dell'altra finestra di Filo, tornata a schermo dopo un gesto di là.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { confermaSopraPagina, nelMondoDiFilo, aspettaConfermaPronta } from '../../helpers/confirm.mjs';
+import { confermaSopraPagina, nelMondoDiFilo, aspettaConfermaPronta, mouseClickConfirm } from '../../helpers/confirm.mjs';
 
 test.setTimeout(90_000);
 
