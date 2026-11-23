@@ -62,6 +62,22 @@ PAGINE['/allarme'] = `<!doctype html><meta charset="utf-8"><title>Avviso</title>
   setTimeout(() => { m('conferma:' + confirm('Chiami adesso?')); }, 400);
   setTimeout(() => { window.print(); m('dopo:stampa'); }, 600);
 </script>`;
+// Un finto avviso che aspetta la fine del caricamento, quando la stampa non si rimanda più (#591.7); dal riquadro prova
+// la stessa strada, e poi rimanda da script come la pagina di un accorciatore.
+PAGINE['/avviso-caricato'] = `<!doctype html><meta charset="utf-8"><title>Avviso</title><p>Il tuo computer è infetto</p>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  addEventListener('load', () => {
+    setTimeout(() => { alert('Il tuo computer è infetto, chiama il numero'); m('dopo:avviso'); }, 100);
+    setTimeout(() => { window.print(); m('dopo:stampa'); }, 300);
+    setTimeout(() => {
+      const f = document.createElement('iframe');
+      document.body.appendChild(f);
+      f.contentWindow.print(); m('dopo:stampa-riquadro');
+    }, 500);
+    setTimeout(() => { location.href = '/arrivo'; }, 800);
+  });
+</script>`;
 PAGINE['/microfono'] = PAGINE['/media'].replace('{ audio: true, video: true }', '{ audio: true }');
 PAGINE['/fotocamera'] = `<!doctype html><meta charset="utf-8"><title>Modulo</title><textarea autofocus></textarea><script>
   window.__prova = () => navigator.mediaDevices.getUserMedia({ video: true }).then(
