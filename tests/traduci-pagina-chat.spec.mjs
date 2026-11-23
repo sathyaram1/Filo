@@ -329,3 +329,94 @@ test('Alt+T senza selezione fa l\'icona Traduci: traduce la pagina, e di nuovo l
   await expect(page.locator('#head')).toHaveText('A feed that keeps growing while you scroll it', { timeout: 15_000 });
   expect(await tradotti(page)).toBe(0);
 });
+
+// #504.2 — il riquadro incorporato (un video, un modulo, i commenti) non è la pagina: senza selezione il tasto va a chi lo
+// ospita; con del testo scelto lì dentro traduce quello.
+const RIQUADRO = `<!doctype html><html lang="en"><body style="margin:0;padding:16px;font:16px sans-serif">
+  <button id="play">Play video</button> <span id="w">Comments are closed</span>
+</body></html>`;
+const conRiquadro = (src) => `<!doctype html><html lang="en"><head><title>Football era</title></head>
+<body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">The end of an era in European football</h1>
+  <p id="p1">First paragraph of the body text, long enough to be picked up.</p>
+  <iframe id="embed" src="${src}" width="420" height="120" style="border:1px solid #333"></iframe>
+</body></html>`;
+
+test('Alt+T senza selezione dopo un clic nel riquadro incorporato traduce la pagina che lo ospita; con del testo scelto lì traduce quello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await fornitoreFinto(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ models: { [globalThis.SN_CONST.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash', [globalThis.SN_CONST.ACTIONS.TRANSLATE_SELECTION]: 'deepseek-flash' } });
+    const orig = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta('I commenti sono chiusi.'); return { text: 'I commenti sono chiusi.', usage: {} }; } };
+  });
+  const page = await testServer.openReady(openTab, conRiquadro(testServer.html(RIQUADRO, { pubblico: true })));
+  await guardaAvvisi(page);
+  const riquadro = page.frameLocator('#embed');
+
+  // Con il testo scelto nel riquadro: la risposta su quello, e la pagina resta com'è.
+  await riquadro.locator('#w').selectText();
+  await premiAltT(app);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 15_000 }).toBe(1);
+  await page.waitForTimeout(800);
+  await expect(page.locator('#head')).toHaveText('The end of an era in European football');
+  expect(await app.evaluate(() => globalThis.__filoChiamate)).toBe(0);
+  await page.keyboard.press('Escape');
+
+  // Senza selezione, dopo il clic su «play»: si traduce la pagina, senza l'avviso della selezione mancante.
+  await riquadro.locator('#play').click();
+  await page.frames().find((f) => f !== page.mainFrame()).evaluate(() => getSelection().removeAllRanges());
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText(/^IT The end of an era/, { timeout: 30_000 });
+  await expect(page.locator('#p1')).toHaveText(/^IT First paragraph/);
+  expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
+  await page.screenshot({ path: 'tests/.shots/traduci-pagina-alt-t-riquadro.png' }).catch(() => {});
+
+  // Di nuovo dal riquadro: come l'icona, la rimette com'era.
+  await riquadro.locator('#play').click();
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText('The end of an era in European football', { timeout: 15_000 });
+});
+
+// #504.2 — «apri … e traducilo» in una frase: la chat apre la scheda e chiede subito la traduzione, mentre il sito sta
+// ancora arrivando. Un sito lento a rispondere, o a finire di mandare la pagina, non è una pagina che «non risponde».
+async function sitoLento(use) {
+  const server = createServer((req, res) => {
+    const pagina = `<!doctype html><html lang="en"><head><title>A slow English site</title></head><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A slow English site that takes its time</h1>`;
+    const resto = '<p id="p1">The rest of the article arrives a few seconds later.</p></body></html>';
+    if (req.url.startsWith('/primo-byte')) {
+      setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(pagina + resto); }, 6500);
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.write(pagina);
+    setTimeout(() => res.end(resto), 5000);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try { await use(`http://127.0.0.1:${server.address().port}`); } finally {
+    server.closeAllConnections?.();
+    await new Promise((r) => server.close(r));
+  }
+}
+
+for (const [come, percorso] of [['finisce di mandare la pagina dopo cinque secondi', '/corpo'], ['risponde dopo sei secondi e mezzo', '/primo-byte']]) {
+  test(`«apri … e traducilo» dalla chat della home, su un sito che ${come}: la pagina si traduce`, async ({ app, shell }) => {
+    test.setTimeout(90_000);
+    await fornitoreFinto(app);
+    await expect(shell.locator('body')).toBeVisible();
+    await sitoLento(async (origine) => {
+      const url = `${origine}${percorso}`;
+      const aperta = await chiedi(app, { type: 'NAVIGA', url });
+      expect(aperta.executed).toBe(true);
+      const r = await traduci(app);
+      expect(r.output).toMatchObject({ traduzione: 'partita' });
+      expect(r.executed).toBe(true);
+      const page = await expect.poll(async () => app.windows().find((w) => w.url().startsWith(origine)) || null, { timeout: 10_000 })
+        .not.toBeNull().then(() => app.windows().find((w) => w.url().startsWith(origine)));
+      await expect(page.locator('#head')).toHaveText(/^IT A slow English site/, { timeout: 30_000 });
+      await expect(page.locator('#p1')).toHaveText(/^IT The rest/, { timeout: 30_000 });
+    });
+  });
+}
