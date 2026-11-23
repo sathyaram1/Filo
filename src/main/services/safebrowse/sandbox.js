@@ -22,6 +22,23 @@ const MAX_PASSI = 8;
 // Lo svuotamento della memoria fra due controlli non deve poter tenere fermo il posto.
 const CLEAR_TIMEOUT_MS = 3000;
 let detonators = 0;
+// Tutto come una pagina normale tranne `allow-modals`: senza, Chromium ignora alert, confirm, prompt e print() in ogni
+// riquadro, anche a pagina caricata, dove `disableDialogs` lascia passare la finestra di stampa del sistema (#591.7).
+const SANDBOX_COPIA = 'sandbox allow-scripts allow-same-origin allow-forms allow-downloads allow-popups '
+  + 'allow-popups-to-escape-sandbox allow-top-navigation allow-pointer-lock allow-orientation-lock allow-presentation';
+const sessioniSenzaFinestre = new WeakSet();
+function senzaFinestreDellaPagina(ses) {
+  if (!ses || sessioniSenzaFinestre.has(ses) || !ses.webRequest || typeof ses.webRequest.onHeadersReceived !== 'function') return;
+  sessioniSenzaFinestre.add(ses);
+  ses.webRequest.onHeadersReceived((d, callback) => {
+    if (d.resourceType !== 'mainFrame' && d.resourceType !== 'subFrame') return callback({});
+    const responseHeaders = { ...(d.responseHeaders || {}) };
+    const chiave = Object.keys(responseHeaders).find((k) => k.toLowerCase() === 'content-security-policy') || 'Content-Security-Policy';
+    const prima = responseHeaders[chiave];
+    responseHeaders[chiave] = [...(Array.isArray(prima) ? prima : prima ? [prima] : []), SANDBOX_COPIA];
+    callback({ responseHeaders });
+  });
+}
 const wait = (ms) => new Promise((ok) => { const t = setTimeout(ok, ms); if (t && t.unref) t.unref(); });
 
 let _electron = null;
@@ -129,6 +146,7 @@ function createDetonator({
     if (pronta) pronta.catch(() => {});
     // Una pagina riaperta di nascosto: nessuno può rispondere a una sua domanda, microfono e appunti compresi.
     Permessi.negaTutto(ses);
+    try { senzaFinestreDellaPagina(ses); } catch (_) {}
     const download = { started: false, name: '' };
     const onDownload = (ev, item) => {
       download.started = true;
@@ -148,7 +166,8 @@ function createDetonator({
         javascript: true,
         images: false,
         webgl: false,
-        // Nessuno la vede (#591.6): un finto avviso di virus non suona, non parla e non apre avvisi, domande o stampa.
+        // Nessuno la vede (#591.6): un finto avviso di virus non suona, non parla e non apre avvisi né domande; la stampa
+        // la ferma SANDBOX_COPIA.
         disableDialogs: true,
         autoplayPolicy: 'document-user-activation-required',
         // niente preload: la pagina gira nuda, isolata dall'app.
@@ -163,16 +182,37 @@ function createDetonator({
       wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     } catch (_) {}
     const cleanup = () => {
+      // Electron cade (SIGTRAP) se la finestra muore col debugger ancora agganciato.
+      try { if (!wc.isDestroyed() && wc.debugger.isAttached()) wc.debugger.detach(); } catch (_) {}
       try { if (!win.isDestroyed()) win.destroy(); } catch (_) {}
       try { if (typeof ses.removeListener === 'function') ses.removeListener('will-download', onDownload); } catch (_) {}
       try { return Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) { return null; }
     };
-    return { wc, download, cleanup, pronta };
+    const sw = senzaServiceWorker(wc);
+    return { wc, download, cleanup, pronta: sw ? Promise.all([pronta, sw]) : pronta };
+  }
+
+  // Una pagina servita dal suo service worker non passa dalla rete, dove arriva SANDBOX_COPIA (#591.7): si va sempre in
+  // rete. Se non si riesce la copia si apre lo stesso, col resto delle difese.
+  function senzaServiceWorker(wc) {
+    const dbg = wc && wc.debugger;
+    if (!dbg || typeof dbg.attach !== 'function') return null;
+    try { if (!dbg.isAttached()) dbg.attach('1.3'); } catch (_) { return null; }
+    const viva = () => { if (typeof wc.isDestroyed === 'function' && wc.isDestroyed()) throw new Error('finestra chiusa'); };
+    const fatto = Promise.resolve()
+      .then(() => { viva(); return dbg.sendCommand('Network.enable'); })
+      .then(() => { viva(); return dbg.sendCommand('Network.setBypassServiceWorker', { bypass: true }); })
+      .catch(() => {});
+    return Promise.race([fatto, wait(CLEAR_TIMEOUT_MS)]);
   }
 
   // Carica `url` appena la rete è pronta (`fallito`: il caricamento rifiutato); se non lo diventa, `senzaRete()`.
   function carica(wc, url, pronta, fallito, senzaRete) {
-    const vai = () => { Promise.resolve(wc.loadURL(url)).catch(fallito); };
+    // Un controllo annullato mentre la rete si preparava ha già chiuso la finestra.
+    const vai = () => {
+      if (typeof wc.isDestroyed === 'function' && wc.isDestroyed()) return;
+      Promise.resolve().then(() => wc.loadURL(url)).catch(fallito);
+    };
     if (!pronta) vai();
     else pronta.then(vai, senzaRete);
   }

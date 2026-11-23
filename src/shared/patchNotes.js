@@ -16,7 +16,7 @@
         { testo: 'Mentre Filo ti chiede conferma su un sito, una finestrella aperta dallo stesso sito in un\'altra finestra di Filo non può più coprire il testo della richiesta.', segnalazione: 592 },
         { testo: 'Quando riapri Filo e la pulizia delle schede ci mette un po\' a decidere, una scheda che nel frattempo hai ripreso resta aperta, e una che hai chiuso tu non finisce nel conto dell\'avviso né torna con «Riapri».', segnalazione: 349 },
         { testo: 'Se in chat o nell\'Aiuto mandi una segnalazione con dentro una password tua, dopo che hai scritto «conferma» parte: Filo non ti ferma una seconda volta per la stessa password.', segnalazione: 2645 },
-        { testo: 'Quando Filo controlla di nascosto un link sospetto, la pagina non suona, non parla e non lascia sullo schermo i suoi avvisi, come quelli dei finti virus.', segnalazione: 591 },
+        { testo: 'Quando Filo controlla di nascosto un link sospetto, la pagina non suona, non parla e non lascia sullo schermo i suoi avvisi, come quelli dei finti virus, né la finestra di stampa.', segnalazione: 591 },
         { testo: 'La pagina Sicurezza mostra subito le risposte date ai siti, anche se era già aperta, e quello che togli lì resta tolto anche se l\'hai aperta in una finestra in incognito.', segnalazione: 591 },
         { testo: 'Le ricerche sul web che Filo fa per te entrano nella spesa del mese come le risposte dei modelli, e col limite di spesa raggiunto passano a un motore di ricerca gratuito.', segnalazione: 591 },
         { testo: 'Il correttore torna a correggere quello che scrivi sotto «password dimenticata» o sotto l\'etichetta «Password» di una pagina di accesso, e Filo legge intere le righe di quelle pagine.', segnalazione: 2638 },

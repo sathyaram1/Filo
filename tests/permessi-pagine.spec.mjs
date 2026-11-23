@@ -62,6 +62,34 @@ PAGINE['/allarme'] = `<!doctype html><meta charset="utf-8"><title>Avviso</title>
   setTimeout(() => { m('conferma:' + confirm('Chiami adesso?')); }, 400);
   setTimeout(() => { window.print(); m('dopo:stampa'); }, 600);
 </script>`;
+// Un finto avviso che aspetta la fine del caricamento, quando la stampa non si rimanda più (#591.7); dal riquadro prova
+// la stessa strada, e poi rimanda da script come la pagina di un accorciatore.
+PAGINE['/avviso-caricato'] = `<!doctype html><meta charset="utf-8"><title>Avviso</title><p>Il tuo computer è infetto</p>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  addEventListener('load', () => {
+    setTimeout(() => { alert('Il tuo computer è infetto, chiama il numero'); m('dopo:avviso'); }, 100);
+    setTimeout(() => { window.print(); m('dopo:stampa'); }, 300);
+    setTimeout(() => {
+      const f = document.createElement('iframe');
+      document.body.appendChild(f);
+      f.contentWindow.print(); m('dopo:stampa-riquadro');
+    }, 500);
+    setTimeout(() => { location.href = '/arrivo'; }, 800);
+  });
+</script>`;
+// La stessa pagina servita dal suo service worker, che non passa dalla rete dove Filo mette la sandbox: la sua copia
+// rimanda a /arrivo-sw, quella della rete a /arrivo.
+const SW = `self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', (e) => {
+  if (e.request.mode !== 'navigate') return;
+  e.respondWith(new Response(${JSON.stringify(PAGINE['/avviso-caricato'].replace("'/arrivo'", "'/arrivo-sw'"))}, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+});`;
+PAGINE['/avviso-sw'] = `<!doctype html><meta charset="utf-8"><title>Attendi</title><script>
+  navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).then(() => { location.href = '/avviso-caricato'; },
+    (e) => fetch('/esito?m=' + encodeURIComponent('sw:' + e.name)));
+</script>`;
 PAGINE['/microfono'] = PAGINE['/media'].replace('{ audio: true, video: true }', '{ audio: true }');
 PAGINE['/fotocamera'] = `<!doctype html><meta charset="utf-8"><title>Modulo</title><textarea autofocus></textarea><script>
   window.__prova = () => navigator.mediaDevices.getUserMedia({ video: true }).then(
@@ -259,6 +287,7 @@ test.beforeAll(async () => {
   server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/esito') { esiti.push(u.searchParams.get('m')); res.end('ok'); return; }
+    if (u.pathname === '/sw.js') { res.writeHead(200, { 'Content-Type': 'text/javascript' }); res.end(SW); return; }
     if (u.pathname === '/lento') { const t = setTimeout(() => { try { res.end('x'); } catch (_) {} }, 20_000); t.unref?.(); return; }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     if (u.pathname === '/ospite') { res.end(ospite(`http://${LUNGO}:${server.address().port}`)); return; }
@@ -386,6 +415,31 @@ test('la finestra nascosta del controllo profondo è muta e non mostra le finest
   expect(await finito).toBe(true);
   const rimaste = await app.evaluate(({ webContents }) => webContents.getAllWebContents().filter((w) => /\/allarme$/.test(w.getURL())).length);
   expect(rimaste, 'a controllo finito della copia non resta niente').toBe(0);
+});
+
+// La stampa chiesta a pagina caricata, dalla pagina o da un suo riquadro, non apre la finestra del sistema (#591.7).
+test('la copia nascosta che segue un link accorciato non apre la stampa di una pagina già caricata e trova lo stesso dove rimanda', async () => {
+  test.setTimeout(60_000);
+  app.on('window', (p) => p.on('dialog', () => {}));
+  const dest = await app.evaluate(async (_e, u) => {
+    const r = await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, (x) => x === u);
+    return r && r.destinazione;
+  }, origine + '/avviso-caricato');
+  // Con la finestra di stampa aperta la pagina resta ferma sulla chiamata: non segna niente e non rimanda.
+  expect(esiti).toEqual(expect.arrayContaining(['dopo:avviso', 'dopo:stampa', 'dopo:stampa-riquadro']));
+  expect(dest).toBe(origine + '/arrivo');
+});
+
+test('la copia nascosta non apre la stampa neanche della pagina che si fa servire dal suo service worker', async () => {
+  test.setTimeout(60_000);
+  app.on('window', (p) => p.on('dialog', () => {}));
+  const dest = await app.evaluate(async (_e, u) => {
+    const r = await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, (x) => /\/avviso-(sw|caricato)$/.test(x));
+    return r && r.destinazione;
+  }, origine + '/avviso-sw');
+  expect(esiti).toEqual(expect.arrayContaining(['dopo:avviso', 'dopo:stampa', 'dopo:stampa-riquadro']));
+  // La copia del service worker rimanderebbe altrove: arriva quella della rete, con la sandbox.
+  expect(dest).toBe(origine + '/arrivo');
 });
 
 const paginaDi = (base) => app.windows().find((w) => w.url().startsWith(base));
