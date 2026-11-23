@@ -101,6 +101,9 @@ const fotoSchermo = (nome) => {
   try { execFileSync('import', ['-window', 'root', join(SHOTS, nome)], { env: process.env, timeout: 10_000 }); } catch (e) { console.log('foto non riuscita', e.message); }
 };
 
+const togliDallaChat = () => app.evaluate(async (_e, root) => process.mainModule
+  .require(root + '/src/main/services/permessiPagine.js').togliPerChat('127.0.0.1', 'microfono'), APP_ROOT);
+
 async function consentiMicrofono() {
   await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/microfono');
   await expect(barra()).toBeVisible({ timeout: 10_000 });
