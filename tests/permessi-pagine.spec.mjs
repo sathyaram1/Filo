@@ -78,7 +78,8 @@ PAGINE['/avviso-caricato'] = `<!doctype html><meta charset="utf-8"><title>Avviso
     setTimeout(() => { location.href = '/arrivo'; }, 800);
   });
 </script>`;
-// La stessa pagina servita dal suo service worker, che non passa dalla rete dove Filo mette la sandbox.
+// La stessa pagina servita dal suo service worker, che non passa dalla rete dove Filo mette la sandbox: la sua copia
+// rimanda a /arrivo-sw, quella della rete a /arrivo.
 const SW = `self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {
