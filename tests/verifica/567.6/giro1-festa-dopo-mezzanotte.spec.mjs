@@ -71,7 +71,7 @@ for (const [forma, args] of FORME) {
 
     await btn.click();
     await expect.poll(() => app.evaluate(() => globalThis.__festaAperti.length), { timeout: 10_000 }).toBe(1);
-    const ics = await app.evaluate(() => require('node:fs').readFileSync(globalThis.__festaAperti[0], 'utf8'));
+    const ics = readFileSync(await app.evaluate(() => globalThis.__festaAperti[0]), 'utf8');
     expect(ics).toContain('DTSTART:20261128T220000');
     expect(ics).toContain('DTEND:20261129T020000');
   });
