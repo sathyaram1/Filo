@@ -391,6 +391,20 @@ test('Alt+T senza selezione dopo un clic nel riquadro incorporato traduce la pag
   await expect(page.locator('#head')).toHaveText('The end of an era in European football', { timeout: 15_000 });
 });
 
+test('Alt+T senza selezione dopo un clic in un riquadro di un altro sito (il video incorporato) traduce la pagina che lo ospita', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await fornitoreFinto(app);
+  const page = await testServer.openReady(openTab, conRiquadro(testServer.html(RIQUADRO, { pubblico: true })));
+  await guardaAvvisi(page);
+  const riquadro = page.frameLocator('#embed');
+  await riquadro.locator('#play').click();
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText(/^IT The end of an era/, { timeout: 30_000 });
+  await expect(page.locator('#p1')).toHaveText(/^IT First paragraph/);
+  expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
+});
+
 // #504.2 — «apri … e traducilo» in una frase: la chat apre la scheda e chiede subito la traduzione, mentre il sito sta
 // ancora arrivando. Un sito lento a rispondere, o a finire di mandare la pagina, non è una pagina che «non risponde».
 async function sitoLento(use) {
