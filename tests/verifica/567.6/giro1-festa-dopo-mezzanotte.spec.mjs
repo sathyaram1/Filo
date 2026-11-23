@@ -15,7 +15,7 @@ async function newtabPage(app) {
 }
 
 async function preparaModello(app, giri) {
-  await app.evaluate(async (_e, g) => {
+  await app.evaluate(async ({ shell: sh }, g) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
