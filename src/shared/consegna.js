@@ -15,7 +15,7 @@
   // In ordine di gravità: la classe finale è la più alta fra la dichiarata e il minimo.
   const CLASSI = Object.freeze(['visibile', 'nascosto', 'irreparabile']);
   const AZIONI = Object.freeze(['clic', 'destro', 'trascina', 'hover']);
-  // Una tabella di nove righe e una ventina di elementi stanno in pochi KB: il tetto ferma solo un file sbagliato.
+  // Una tabella di dieci righe e una ventina di elementi stanno in pochi KB: il tetto ferma solo un file sbagliato.
   const MAX_BYTE = 64 * 1024;
   const MIN_PROVA = 10;
   // «L'ho guardato» non vale (#2505), in nessuna forma: una prova fatta SOLO di parole che dicono «ho controllato» senza
