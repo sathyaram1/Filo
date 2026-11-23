@@ -25,14 +25,35 @@ function electronFinto({ debuggerRotto = false } = {}) {
       this.webContents = {
         on: (ev, fn) => { (on[ev] = on[ev] || []).push(fn); },
         setWindowOpenHandler() {},
-        loadURL: () => { setTimeout(() => (on['did-stop-loading'] || []).forEach((f) => f({})), 1); return Promise.resolve(); },
+        debugger: {
+          isAttached: () => false,
+          attach: () => { if (debuggerRotto) throw new Error('già agganciato'); fatti.push('attach'); },
+          sendCommand: async (c, p) => { await new Promise((ok) => setTimeout(ok, 5)); fatti.push([c, p]); },
+        },
+        loadURL: () => {
+          fatti.push('carica');
+          setTimeout(() => (on['did-stop-loading'] || []).forEach((f) => f({})), 1);
+          return Promise.resolve();
+        },
       };
     }
     isDestroyed() { return false; }
     destroy() {}
   }
-  return { electron: { BrowserWindow, session: { fromPartition: () => ses } }, ascolti };
+  return { electron: { BrowserWindow, session: { fromPartition: () => ses } }, ascolti, fatti };
 }
+
+test('la copia nascosta carica solo dopo aver chiesto di saltare i service worker, e senza debugger carica lo stesso', async () => {
+  const f = electronFinto();
+  await createDetonator({ electron: f.electron, maxConcurrent: 1, vitaDestinazioneMs: 200, attesaRimandoMs: 5 })
+    .destinazione('https://bit.ly/a', () => false);
+  assert.deepEqual(f.fatti, ['attach', ['Network.enable', undefined], ['Network.setBypassServiceWorker', { bypass: true }], 'carica']);
+
+  const rotto = electronFinto({ debuggerRotto: true });
+  await createDetonator({ electron: rotto.electron, maxConcurrent: 1, vitaDestinazioneMs: 200, attesaRimandoMs: 5 })
+    .destinazione('https://bit.ly/a', () => false);
+  assert.deepEqual(rotto.fatti, ['carica']);
+});
 
 const risposta = (fn, d) => new Promise((ok) => fn(d, ok));
 
