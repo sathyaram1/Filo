@@ -136,16 +136,16 @@
     // Una regola sola per la fine: l'ultimo giorno dice IN CHE GIORNO finisce, l'ora di fine o la durata A CHE ORA.
     // L'ora di fine vince sulla durata; la durata (o l'ora di default) vale se cade nell'ultimo giorno, altrimenti
     // l'ultimo giorno si occupa tutto («torno il 15» non dice a che ora). Un ultimo giorno uguale al primo non
-    // allunga niente (#567, decimo giro).
+    // conta niente: né allunga la cena (#567, decimo giro) né tiene di qua dalla mezzanotte la festa dalle 22 alle 2.
+    const oltre = ultimo && ultimo > giorno ? ultimo : null;
     let fine = null;
     if (!vuoto(oraFine)) {
-      fine = pezziData(isoGiorno(ultimo || giorno), oraFine);
-      // «dalle 22 alle 2» senza un ultimo giorno passa la mezzanotte.
-      if (!ultimo && fine <= inizio) fine = new Date(fine.getTime() + GIORNO_MS);
+      fine = pezziData(isoGiorno(oltre || giorno), oraFine);
+      if (!oltre && fine <= inizio) fine = new Date(fine.getTime() + GIORNO_MS);
     } else {
       fine = new Date(inizio.getTime() + (durataValida ? Math.round(durataScritta) : 60) * 60_000);
-      if (ultimo && isoGiorno(new Date(fine.getTime() - 60_000)) !== isoGiorno(ultimo)) {
-        fine = new Date(ultimo.getTime() + GIORNO_MS);
+      if (oltre && isoGiorno(new Date(fine.getTime() - 60_000)) !== isoGiorno(oltre)) {
+        fine = new Date(oltre.getTime() + GIORNO_MS);
       }
     }
     if (fine <= inizio) return { errore: `la fine (${leggibile(fine)} alle ${orario(fine)}) viene prima dell'inizio` };
