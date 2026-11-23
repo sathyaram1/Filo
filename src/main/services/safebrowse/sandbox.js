@@ -146,7 +146,7 @@ function createDetonator({
     if (pronta) pronta.catch(() => {});
     // Una pagina riaperta di nascosto: nessuno può rispondere a una sua domanda, microfono e appunti compresi.
     Permessi.negaTutto(ses);
-    try { senzaFinestreDellaPagina(ses); } catch (_) {}
+    // try { senzaFinestreDellaPagina(ses); } catch (_) {}
     const download = { started: false, name: '' };
     const onDownload = (ev, item) => {
       download.started = true;
