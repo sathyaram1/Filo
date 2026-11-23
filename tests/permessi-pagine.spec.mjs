@@ -404,6 +404,19 @@ test('la finestra nascosta del controllo profondo è muta e non mostra le finest
   expect(rimaste, 'a controllo finito della copia non resta niente').toBe(0);
 });
 
+// La stampa chiesta a pagina caricata, dalla pagina o da un suo riquadro, non apre la finestra del sistema (#591.7).
+test('la copia nascosta che segue un link accorciato non apre la stampa di una pagina già caricata e trova lo stesso dove rimanda', async () => {
+  test.setTimeout(60_000);
+  app.on('window', (p) => p.on('dialog', () => {}));
+  const dest = await app.evaluate(async (_e, u) => {
+    const r = await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, (x) => x === u);
+    return r && r.destinazione;
+  }, origine + '/avviso-caricato');
+  // Con la finestra di stampa aperta la pagina resta ferma sulla chiamata: non segna niente e non rimanda.
+  expect(esiti).toEqual(expect.arrayContaining(['dopo:avviso', 'dopo:stampa', 'dopo:stampa-riquadro']));
+  expect(dest).toBe(origine + '/arrivo');
+});
+
 const paginaDi = (base) => app.windows().find((w) => w.url().startsWith(base));
 
 test('un clic che arriva appena la domanda compare non concede: Consenti si arma dopo un attimo', async () => {
