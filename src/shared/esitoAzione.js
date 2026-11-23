@@ -30,6 +30,14 @@
     return FATTO;
   }
 
+  // Le azioni che l'archivio nomina in `actions`, quelle successe: chi legge solo i nomi le dà per fatte, quindi una mossa
+  // senza effetto non ci entra (#553.14). Una fermata per un segreto sì: il nome FERMATA la racconta (#810).
+  function successa(a) {
+    if (!a) return false;
+    if (a._output && a._output.blocked === 'segreto') return true;
+    return !!a._executed && !a._confirm && esitoAzione(a) !== FALLITO;
+  }
+
   // Partita e finita male (un comando uscito con errore): non si racconta come «non eseguita».
   function partita(a) {
     const o = a && a._output;
