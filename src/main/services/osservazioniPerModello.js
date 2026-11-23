@@ -1546,7 +1546,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return 'Zoom non cambiato: la pagina davanti non risponde ai comandi di zoom (può essere una pagina di sistema, o non aver finito di caricare). Dillo all\'utente, e non ripetere l\'azione uguale.';
   }
   // #504 — «già tradotta» o «già com'era» non sono un fatto da annunciare: i testi stanno con le risposte della pagina.
-  if (type === 'TRADUCI_PAGINA' && res.output) {
+  if (type === 'TRADUCI_PAGINA' && res.output && typeof res.output.traduzione === 'string') {
     const S = globalThis.SN_TRADUZIONE_PAGINA;
     const dove = res.output.dietro ? '\nLa pagina è l\'ultima scheda web che l\'utente ha usato, non quella che ha davanti: diglielo.' : '';
     return `${S.STATI[S.stato(res.output.traduzione)].modello(res.output)}${dove}`;
