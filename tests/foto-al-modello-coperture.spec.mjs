@@ -62,7 +62,6 @@ async function chiediAllAiuto(app, shell, page) {
   const parti = partiDellUtente(await turnoDellAiuto(app, 'aiutami a pagare'));
   const img = parti.find((p) => p.type === 'image_url');
   return { immagine: img ? img.image_url.url : null, testi: parti.filter((p) => p.type === 'text').map((p) => p.text) };
-  });
 }
 
 // Quanti pixel della foto hanno il colore `rgb`, con la tolleranza del JPEG.
