@@ -92,7 +92,7 @@ test('uno spec Playwright nuovo: lanciato davvero nelle due copie, rosso senza i
   const g = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' }).trim();
   const { corri, uscita } = conUscita();
   try {
-    symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'junction');
+    symlinkSync(MODULI, join(root, 'node_modules'), 'junction');
     writeFileSync(join(root, '.gitignore'), 'node_modules\n');
     mkdirSync(join(root, 'tests'), { recursive: true });
     writeFileSync(join(root, 'tests', 'somma.spec.mjs'), [
@@ -115,7 +115,7 @@ test('uno spec Playwright nuovo si trova anche dove lo spec non risolve il colle
   const prima = process.env.NODE_OPTIONS;
   const { corri, uscita } = conUscita();
   try {
-    symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'junction');
+    symlinkSync(MODULI, join(root, 'node_modules'), 'junction');
     writeFileSync(join(root, '.gitignore'), 'node_modules\n');
     writeFileSync(join(root, 'tests', 'somma.spec.mjs'), [
       "import { test, expect } from '@playwright/test';",
