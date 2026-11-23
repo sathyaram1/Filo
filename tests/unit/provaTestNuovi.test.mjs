@@ -121,8 +121,8 @@ test('uno spec Playwright nuovo si trova anche dove lo spec non risolve il colle
     ].join('\n'));
     g('add', '-A'); g('commit', '-qm', 'spec');
     process.env.NODE_OPTIONS = `${prima || ''} --preserve-symlinks`.trim();
-    const p = provaTestNuovi({ root, base, head: g('rev-parse', 'HEAD') });
-    assert.deepEqual(p.casi.find((c) => c.file === 'tests/somma.spec.mjs'), { file: 'tests/somma.spec.mjs', caso: 'la somma nello spec', senza: 'rosso', con: 'verde' });
+    const p = provaTestNuovi({ root, base, head: g('rev-parse', 'HEAD'), corri });
+    assert.deepEqual(p.casi.find((c) => c.file === 'tests/somma.spec.mjs'), { file: 'tests/somma.spec.mjs', caso: 'la somma nello spec', senza: 'rosso', con: 'verde' }, uscita());
   } finally {
     if (prima === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = prima;
     togliCartella(root);
