@@ -98,8 +98,8 @@ test('uno spec Playwright nuovo: lanciato davvero nelle due copie, rosso senza i
       '',
     ].join('\n'));
     g('add', '-A'); g('commit', '-qm', 'spec');
-    const p = provaTestNuovi({ root, base, head: g('rev-parse', 'HEAD') });
-    assert.deepEqual(p.casi.find((c) => c.file === 'tests/somma.spec.mjs'), { file: 'tests/somma.spec.mjs', caso: 'la somma nello spec', senza: 'rosso', con: 'verde' });
+    const p = provaTestNuovi({ root, base, head: g('rev-parse', 'HEAD'), corri });
+    assert.deepEqual(p.casi.find((c) => c.file === 'tests/somma.spec.mjs'), { file: 'tests/somma.spec.mjs', caso: 'la somma nello spec', senza: 'rosso', con: 'verde' }, uscita());
   } finally { togliCartella(root); }
 });
 
