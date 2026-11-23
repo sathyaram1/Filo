@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { fotoDelTurno } from './helpers/turniDellAiuto.mjs';
 
 async function preparaModelli(app) {
   await app.evaluate(async () => {
