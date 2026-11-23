@@ -3,8 +3,9 @@
 // dire com'è andata. Lo stesso dall'Aiuto della pagina, e Alt+T senza selezione fa l'icona. Il fornitore finto antepone
 // "IT " a ogni blocco, come in translate-page.spec.mjs.
 
+import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { paginaDellAiuto, conta } from './helpers/riquadri.mjs';
 import { copertura } from './helpers/avvisoSito.mjs';
 
 const ARTICOLO = `<!doctype html><html lang="en"><head><title>An English article</title></head>
