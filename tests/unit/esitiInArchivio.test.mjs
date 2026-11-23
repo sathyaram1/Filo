@@ -113,6 +113,26 @@ test('toStoredMessage tiene i nomi delle successe in `actions` e com\'è andata 
   assert.equal(CA.toStoredMessage({ role: 'user', text: 'ciao', esiti: TURNO }).esiti, undefined, 'solo le risposte di Filo');
 });
 
+// #553.14 — la home chiesta dalla home il sistema la segna eseguita: fra i nomi delle successe la chat riaperta la
+// contava («Ha azionato un comando della finestra») e il modello la rileggeva fatta.
+test('una mossa senza effetto non sta fra le successe: riaperta, si legge come in diretta', () => {
+  const home = { type: 'COMANDO_FINESTRA', comando: 'home', _executed: true, _output: { window: 'home', already: true } };
+  const timer = { type: 'TIMER', secondi: 60, _executed: true };
+  const fermata = { type: 'NAVIGA', _executed: false, _output: { blocked: 'segreto', frase: 'Fermato' } };
+  const turno = [home, timer, fermata, TURNO[1], TURNO[2]];
+  assert.deepEqual(turno.filter(E.successa), [timer, fermata], 'le eseguite, più la fermata per un segreto');
+  assert.equal(E.successa({ type: 'BARRA_SITI', _executed: true, _output: { invariata: true } }), false);
+
+  const m = CA.toStoredMessage({ role: 'filo', text: 'Sei già qui.', actions: turno.filter(E.successa), esiti: [home] });
+  assert.deepEqual(m.actions, ['TIMER', 'FERMATA']);
+  assert.equal(E.voci(m.actions).some((v) => v.type === 'COMANDO_FINESTRA'), false, 'chi legge solo i nomi non la conta');
+  const [v] = m.esiti;
+  assert.equal(v.esito, 'fallito');
+  assert.equal(E.rigaDellaVoce(v).testo, 'Comando non eseguito · Sei già nella home', 'la frase del diario in diretta');
+  assert.match(E.perModello(m.esiti), /- NON riuscita: .*\(perché: Sei già nella home\)/);
+  assert.doesNotMatch(E.perModello(m.esiti), /- fatta/);
+});
+
 test('le righe della chat riaperta dicono fatto, non riuscito col perché, e conferma chiesta', () => {
   const righe = E.vociArchivio(TURNO).map((v) => E.rigaDellaVoce(v));
   assert.equal(righe[0].icona, '✓');
