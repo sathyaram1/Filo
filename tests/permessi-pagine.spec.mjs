@@ -86,7 +86,7 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(new Response(${JSON.stringify(PAGINE['/avviso-caricato'].replace("'/arrivo'", "'/arrivo-sw'"))}, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
 });`;
 PAGINE['/avviso-sw'] = `<!doctype html><meta charset="utf-8"><title>Attendi</title><script>
-  navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).then(() => { location.href = '/avviso-sw?di-nuovo'; },
+  navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).then(() => { location.href = '/avviso-caricato'; },
     (e) => fetch('/esito?m=' + encodeURIComponent('sw:' + e.name)));
 </script>`;
 PAGINE['/microfono'] = PAGINE['/media'].replace('{ audio: true, video: true }', '{ audio: true }');
