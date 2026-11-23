@@ -19,6 +19,7 @@
         { testo: 'Quando Filo controlla di nascosto un link sospetto, la pagina non suona, non parla e non lascia sullo schermo i suoi avvisi, come quelli dei finti virus.', segnalazione: 591 },
         { testo: 'La pagina Sicurezza mostra subito le risposte date ai siti, anche se era già aperta, e quello che togli lì resta tolto anche se l\'hai aperta in una finestra in incognito.', segnalazione: 591 },
         { testo: 'Le ricerche sul web che Filo fa per te entrano nella spesa del mese come le risposte dei modelli, e col limite di spesa raggiunto passano a un motore di ricerca gratuito.', segnalazione: 591 },
+        { testo: 'Il correttore torna a correggere quello che scrivi sotto «password dimenticata» o sotto l\'etichetta «Password» di una pagina di accesso, e Filo legge intere le righe di quelle pagine.', segnalazione: 2638 },
       ],
     },
     {

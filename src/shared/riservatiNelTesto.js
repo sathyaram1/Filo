@@ -27,13 +27,20 @@ const RICHIESTA = new RegExp([
   // «ti ricordi la password», «come è la password», «che password ha il wifi», «e la password del wifi».
   '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?<=^|:\\s*)e\\s+(?:la|il))',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
+// Un elenco solo per il saluto in testa alla risposta e per quello prima della richiesta corta (#2638.1).
+const SALUTI = 'ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera';
+const SALUTO = new RegExp(`^(?:${SALUTI})$`, 'u');
 // La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
-// dopo l'ultima virgola o i due punti al più un articolo o un saluto, dopo il nome solo di cosa è e poi la fine della
-// riga; «Il pw del documento. Il documento è pronto» continua, e non chiede (#2638).
-const ELLITTICA_PRIMA = /^\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|ciao+|ehi|hey|hi|wi-?fi|router|home)\s+))*$/u;
-const DI_COSA = String.raw`(?:(?:del(?:la|lo)?|dell['’]|di|de|per|for|of)\s*(?:(?:la|il|lo|l['’]|the|my|mio|mia|tuo|tua)\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
+// sulla riga, prima, chi parla o un'altra frase, poi al più un articolo o un saluto; dopo il nome solo di cosa è e la
+// fine della riga. «Password del wifi» da sola è l'etichetta di una pagina, «password dimenticata» non chiede (#2638.1).
+const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|${SALUTI}|wi-?fi|router|home)\\s+))*$`, 'u');
+const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|per|for|of)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
 const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:grazie|thanks|thx))?[^\\p{L}\\p{N}]*$`, 'u');
-const ellittica = (prima, dopo) => ELLITTICA_PRIMA.test(prima.split(/[,;:]|\s[-–—]\s/).pop()) && ELLITTICA_DOPO.test(dopo);
+const ellittica = (testa, dopo) => {
+  const pezzi = testa.split(/[,;:]|[.!?]+\s|\s[-–—]\s/);
+  return pezzi.length > 1 && /[\p{L}\p{N}]/u.test(pezzi.slice(0, -1).join(''))
+    && ELLITTICA_PRIMA.test(pezzi[pezzi.length - 1]) && ELLITTICA_DOPO.test(dopo);
+};
 // In chat la password si chiama anche così: «pass» solo con l'articolo o col wifi, da solo è anche l'inglese «to pass».
 const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|pass\\s+(?:del(?:la)?\\s+)?wi-?fi'
   + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
@@ -53,7 +60,6 @@ const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'ecc
 // la parola dopo, né fanno di una riga la risposta.
 const NON_IN_RISPOSTA = new Set(['sono', 'are', 'vale', 'risulta', 'here']);
 const PRESENTA_RISPOSTA = new Set([...PRESENTA_DATO].filter((w) => !NON_IN_RISPOSTA.has(w)));
-const SALUTO = /^(?:ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera)$/;
 // «check-in», «self-service»: parole col trattino, non password.
 const formaDiPassword = (v) => !!guardiano().sembraPassword(v) && !/^\p{L}+(?:-\p{L}+)+$/u.test(v);
 // Una parola di sole lettere conta come password solo nelle prime parole della risposta o dopo PRESENTA_DATO: più in là
@@ -109,9 +115,10 @@ function richieste(l, tutte = false) {
     const a = f ? m.j + f.index + f[0].length : Math.min(l.length, m.j + FRASE_MAX);
     const prima = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop();
     const riga = l.slice(m.j, m.j + FRASE_MAX).split('\n')[0];
+    const testa = l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split('\n').pop();
     // Il punto di domanda conta nell'inciso che nomina la password: «la password è gattonero, tu quando arrivi?» la dà.
     const inciso = /[,;]\s|[.!?]+(?=\s|$)|\n/.exec(l.slice(m.j, a));
-    const chiesta = !!((inciso && inciso[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(prima(), riga));
+    const chiesta = !!((inciso && inciso[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(testa, riga));
     if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, nome: m.j, fine: a, tipo: m.tipo, chiesta });
   }
   return out;
