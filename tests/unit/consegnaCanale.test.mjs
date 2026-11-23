@@ -93,7 +93,7 @@ test('una consegna buona arriva intera, con la prova dei test nuovi corsa sul ra
     assert.equal(r.code, 0, r.se);
     assert.match(r.se, /il doppio di tre è sei: senza rosso, con verde/);
     const d = consegne(ricevuti).at(-1).body.data;
-    assert.equal(d.consegna.criteri.length, 9);
+    assert.equal(d.consegna.criteri.length, 10);
     assert.deepEqual(d.consegna.classe, consegnaBuona().classe);
     assert.deepEqual(d.consegna.provaTest.app.casi, [{ file: 'tests/unit/conto.test.mjs', caso: 'il doppio di tre è sei', senza: 'rosso', con: 'verde' }],
       'la prova scritta a mano nel file non vale: la sostituisce quella vera');
