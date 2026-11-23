@@ -147,6 +147,25 @@ for (const [nome, corpo] of [
   });
 }
 
+for (const quando of ['subito', 'a pagina caricata']) {
+  test(`la pagina che chiude da sé la copia (${quando}) non porta giù Filo`, async () => {
+    test.setTimeout(60_000);
+    const chiudi = quando === 'subito' ? 'window.close();' : 'addEventListener("load", () => setTimeout(() => window.close(), 200));';
+    pagine['/chiude'] = () => `<!doctype html><meta charset="utf-8"><script>fetch('/esito?m=aperta');${chiudi}</script>`;
+    let caduta = false;
+    app.process().on('exit', () => { caduta = true; });
+    const r = await app.evaluate(async (_e, u) => {
+      const a = await globalThis.SN_SAFEBROWSE.sandbox.destinazione(u, () => true);
+      const b = await globalThis.SN_SAFEBROWSE.sandbox.detonate(u, () => null);
+      return { a: !!a, b: !!b };
+    }, origine + '/chiude').catch((e) => ({ errore: String(e) }));
+    console.log('chiude', quando, JSON.stringify(r), JSON.stringify(esiti));
+    await new Promise((ok) => setTimeout(ok, 1500));
+    expect(caduta, 'Filo resta aperto').toBe(false);
+    expect(await app.evaluate(() => 1 + 1)).toBe(2);
+  });
+}
+
 test('controllo profondo: rimando a un finto avviso, la stampa non apre la sua finestra', async () => {
   test.setTimeout(60_000);
   const r = await app.evaluate(async (_e, u) => {
