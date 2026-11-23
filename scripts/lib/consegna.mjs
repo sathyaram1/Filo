@@ -10,7 +10,7 @@ import { estremiDelLavoro } from './lettura-diff.mjs';
 
 const C = globalThis.SN_CONSEGNA;
 
-export const FORMA_CONSEGNA = 'un JSON con «criteri» (nove righe { criterio, esito, prova } o { criterio, esito: «non si applica», motivo }), '
+export const FORMA_CONSEGNA = 'un JSON con «criteri» (dieci righe { criterio, esito, prova } o { criterio, esito: «non si applica», motivo }), '
   + '«elementi» in un lavoro sull\'interfaccia ({ elemento, perche, clic, destro, trascina, hover }) e «classe» ({ valore, motivo })';
 
 function percorsiDelRamo(root) {
