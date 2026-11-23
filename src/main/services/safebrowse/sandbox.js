@@ -182,6 +182,8 @@ function createDetonator({
       wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     } catch (_) {}
     const cleanup = () => {
+      // Electron cade (SIGTRAP) se la finestra muore col debugger ancora agganciato.
+      try { if (!wc.isDestroyed() && wc.debugger.isAttached()) wc.debugger.detach(); } catch (_) {}
       try { if (!win.isDestroyed()) win.destroy(); } catch (_) {}
       try { if (typeof ses.removeListener === 'function') ses.removeListener('will-download', onDownload); } catch (_) {}
       try { return Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) { return null; }
