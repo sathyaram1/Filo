@@ -200,12 +200,7 @@ test('nell’immagine della pagina che va al modello il numero della carta è co
   for (const [i, valore] of ['4111 1111 1111 1111', '5500 0000 0000 0004'].entries()) {
     await page.fill('#c', valore);
     await scriviAllAiuto(aiuto, 'aiutami a pagare');
-    await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBe(i + 1);
-    immagini.push(await app.evaluate(() => {
-      const utente = [...globalThis.__visti.at(-1)].reverse().find((m) => m.role === 'user');
-      const parte = Array.isArray(utente.content) && utente.content.find((p) => p.type === 'image_url');
-      return parte ? parte.image_url.url : null;
-    }));
+    immagini.push(await fotoDelTurno(app, 'aiutami a pagare', i));
   }
   expect(immagini[0], 'al modello deve arrivare l’immagine della pagina').toMatch(/^data:image\//);
   expect(immagini[1]).toMatch(/^data:image\//);
