@@ -1,4 +1,4 @@
-// La consegna con la prova accanto (#2505): tabella dei nove criteri, elementi nuovi di un lavoro sull'interfaccia,
+// La consegna con la prova accanto (#2505): tabella dei dieci criteri, elementi nuovi di un lavoro sull'interfaccia,
 // classe di rischio e il suo minimo dai percorsi. La stessa regola la usa il server (bake del modulo).
 
 import { test } from 'node:test';
