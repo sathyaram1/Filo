@@ -413,8 +413,8 @@ for (const [come, percorso] of [['finisce di mandare la pagina dopo cinque secon
       const r = await traduci(app);
       expect(r.output).toMatchObject({ traduzione: 'partita' });
       expect(r.executed).toBe(true);
-      const page = await expect.poll(async () => app.windows().find((w) => w.url().startsWith(origine)) || null, { timeout: 10_000 })
-        .not.toBeNull().then(() => app.windows().find((w) => w.url().startsWith(origine)));
+      let page = null;
+      await expect.poll(() => Boolean(page = app.windows().find((w) => w.url().startsWith(origine))), { timeout: 10_000 }).toBe(true);
       await expect(page.locator('#head')).toHaveText(/^IT A slow English site/, { timeout: 30_000 });
       await expect(page.locator('#p1')).toHaveText(/^IT The rest/, { timeout: 30_000 });
     });
