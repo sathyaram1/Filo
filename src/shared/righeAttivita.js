@@ -248,22 +248,19 @@
       const f = frasiCambi(a);
       if (f) return { icon: '🎨', text: `Aspetto · ${f.replace(/^aspetto, /, '')}` };
       // Senza evento il valore era già quello: si dice come per le preferenze, mai «token = valore» (#557).
-      return { icon: '🎨', text: `Aspetto già così · ${(t && t.label) || 'un dettaglio'}${val ? `: ${pulito(val)}` : ''}` };
+      return aPezzi('🎨', [`Aspetto già così · ${(t && t.label) || 'un dettaglio'}`, ...(val ? [': ', suo(val)] : [])]);
     },
-    PROXY_TAB: (a) => ({ icon: '🌍', text: `Scheda aperta da · ${String(a.country || a.paese || '').toUpperCase()}` }),
+    PROXY_TAB: (a) => aPezzi('🌍', ['Scheda aperta da · ', suo(String(a.country || a.paese || '').toUpperCase())]),
     RIMUOVI_PROXY: () => ({ icon: '🌍', text: 'Scheda riportata in Italia' }),
     RIMUOVI_PROXY_TUTTE: () => ({ icon: '🌍', text: 'Tutte le schede riportate in Italia' }),
-    REGOLA_PROXY_DOMINIO: (a) => ({ icon: '🌍', text: `Regola · ${a.dominio || a.domain || a.sito || 'questo sito'} sempre da ${String(a.country || a.paese || '').toUpperCase()}` }),
-    RIMUOVI_REGOLA_PROXY: (a) => ({ icon: '🌍', text: `Regola tolta · ${a.dominio || a.domain || a.sito || 'questo sito'}` }),
-    TIENI_APERTA: (a) => ({ icon: '📌', text: `Sempre aperto · ${(a._output && a._output.sito) || a.dominio || a.sito || 'questo sito'}` }),
+    REGOLA_PROXY_DOMINIO: (a) => aPezzi('🌍', ['Regola · ', suo(a.dominio || a.domain || a.sito) || 'questo sito', ' sempre da ', suo(String(a.country || a.paese || '').toUpperCase())]),
+    RIMUOVI_REGOLA_PROXY: (a) => aPezzi('🌍', ['Regola tolta · ', suo(a.dominio || a.domain || a.sito) || 'questo sito']),
+    TIENI_APERTA: (a) => aPezzi('📌', ['Sempre aperto · ', suo((a._output && a._output.sito) || a.dominio || a.sito) || 'questo sito']),
     NON_TENERE_APERTA: (a) => {
       const siti = a._output && Array.isArray(a._output.siti) ? a._output.siti.join(', ') : '';
-      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || a.sito || 'questo sito'}` };
+      return aPezzi('📌', ['Non più tenuto aperto · ', suo(siti || a.dominio || a.sito) || 'questo sito']);
     },
-    STILE_PAGINA: (a) => {
-      const d = String(a.descrizione || a.description || '').trim();
-      return { icon: '🖌', text: `Aspetto della pagina · ${d || 'modificato'}` };
-    },
+    STILE_PAGINA: (a) => aPezzi('🖌', ['Aspetto della pagina · ', suo(a.descrizione || a.description) || 'modificato']),
     RIPRISTINA_STILE_PAGINA: () => ({ icon: '🖌', text: 'Aspetto della pagina ripristinato' }),
     PULISCI_TAB: (a) => {
       const n = Number(a._output && a._output.archived) || 0;
