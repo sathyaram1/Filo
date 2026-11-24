@@ -292,7 +292,7 @@ async function azioneAnnullaCambio(action, { assistente }) {
   // Il cancello ha già chiesto la parola scritta: un annullo che alza quanto esce ha il livello di una difesa.
   const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat', confermato: true });
   if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
-  return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [], ...(r.saltatiPerche ? { saltatiPerche: r.saltatiPerche } : {}) } };
+  return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, ...(r.parti ? { fraseParti: r.parti } : {}), saltati: r.saltati || [], ...(r.saltatiPerche ? { saltatiPerche: r.saltatiPerche } : {}) } };
 }
 
 async function azioneRimedioCrediti(action) {
