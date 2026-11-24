@@ -1218,8 +1218,8 @@
         uso = { proxyRules: `${u.protocol.replace(/:$/, '')}://${u.port ? `${u.hostname}:${u.port}` : u.hostname}`, auth };
       }
     } catch (_) {}
-    if (!letta) scritte = senzaHost(resto);
-    else if (!scritte && uso && uso.auth) {
+    if (!letta) return { uso: null, scritte: senzaHost(resto) };
+    if (!scritte && uso && uso.auth) {
       scritte = { credenziali: `${uso.auth.username}:${uso.auth.password}`, password: uso.auth.password, senza: uso.proxyRules };
     }
     return { uso, scritte, senzaSchema: !sm };
