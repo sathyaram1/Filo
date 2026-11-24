@@ -241,7 +241,7 @@
       document.body.appendChild(hint);
     }
     const r = el.getBoundingClientRect();
-    hint.textContent = testo;
+    if (Array.isArray(testo)) scriviAPezzi(hint, testo); else hint.textContent = testo;
     hint.style.left = `${r.left + r.width / 2}px`;
     hint.style.top = `${r.top}px`;
     hint.classList.add('dash-filo-hint-vis');
