@@ -198,7 +198,9 @@ async function azioneImpostaPreferenza(action, { sender }) {
   const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
   const costo = typeof action._costoModello === 'string' && action._costoModello ? { costoModello: action._costoModello } : {};
   const avviso = built.avviso ? { avviso: built.avviso } : {};
-  return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo, ...avviso } };
+  // `campo` e `valore`: il valore scritto dal modello, che la riga chiude nel riquadro (#2648.1).
+  const scritto = built.valore ? { campo: built.campo, valore: built.valore } : {};
+  return { executed: true, kept: true, output: { etichetta: built.label, ...scritto, ...(stile ? { stile } : {}), ...costo, ...avviso } };
 }
 
 async function azioneImpostaEstetica(action) {
