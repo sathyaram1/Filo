@@ -149,7 +149,7 @@
       const x = v[0];
       const t = TITOLI[String(x.tipo || '').toUpperCase()];
       if (x.esito !== 'ok' || !t) {
-        const r = pulite(aPezzi(x) ? x.parti : [String(x.testo == null ? '' : x.testo)]);
+        const r = parti(x);
         return titolo(r.length ? r : [t ? t[0] : 'Azione']);
       }
       const d = dettaglio(x);
