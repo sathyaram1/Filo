@@ -1,7 +1,6 @@
 // Sentinella (#504.8): «Alt+T senza selezione in un riquadro passa alla pagina» si decide in un posto solo, prima di
-// guardare se Filo lì è spento. Una seconda copia per i riquadri spenti resterebbe indietro al primo cambio, e il
-// video di un sito spento tornerebbe a fare diverso dagli altri riquadri. Il comportamento lo provano gli spec di
-// tests/traduci-pagina-chat.spec.mjs (#504.2, #504.7).
+// guardare se Filo lì è spento; una copia per i riquadri spenti resterebbe indietro al primo cambio.
+// Il comportamento lo provano gli spec di tests/traduci-pagina-chat.spec.mjs (#504.2, #504.7).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
