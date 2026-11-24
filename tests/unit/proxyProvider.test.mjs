@@ -127,6 +127,11 @@ test('endpointFor: un elenco con l\'utente email o l\'host IPv6 si collega con u
   const url = P.endpointFor('mario:1234@gate.esempio.com:8080', 'it');
   assert.equal(url.proxyRules, 'http://gate.esempio.com:8080', 'una password di sole cifre non lo fa leggere come elenco');
   assert.deepEqual(url.auth, { username: 'mario', password: '1234' });
+  const dueLetture = P.endpointFor('mario:123:x@gate.esempio.com:8080', 'it');
+  assert.equal(dueLetture.proxyRules, 'http://gate.esempio.com:8080', 'cifre e due punti in testa alla password non fanno un elenco');
+  assert.deepEqual(dueLetture.auth, { username: 'mario', password: '123:x' });
+  assert.equal(P.endpointFor('proxyinterno:8080:mario:pw', 'it').proxyRules, 'http://proxyinterno:8080', 'un nome senza punto resta un elenco');
+  assert.deepEqual(P.endpointFor('localhost:8080:mario@posta.it:123', 'it').auth, { username: 'mario@posta.it', password: '123' });
   assert.equal(P.providerHost({ proxy: { datacenter: 'gate.esempio.com:8080:mario@posta.esempio.it:pw' } }, {}), 'gate.esempio.com');
 });
 
