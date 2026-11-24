@@ -107,6 +107,27 @@ test('una riga fatta lunghissima si accorcia insieme ai suoi pezzi, e il taglio 
   assert.equal(E.rigaDiParti(v.parti), v.riga);
 });
 
+test('il titolo del nodo nel filo tiene il testo del modello nel suo riquadro', () => {
+  require(join(SRC, 'pages', 'dashboard', 'filo-attesa.js'));
+  const Filo = globalThis.SN_FILO_ATTESA;
+  const voce = (a) => { const r = RA.riga(a); return { tipo: a.type, testo: r.text, parti: r.parti, esito: 'ok' }; };
+  const uno = Filo.titoloNodo([voce(azione('TIMER'))]);
+  assert.deepEqual(uno, ['Avviato un timer · ', { citazione: F, nuda: true }, ' · 5 min']);
+  // Più dello stesso tipo: il primo pezzo di ciascuno è il riquadro intero, non il suo inizio fino al «·».
+  const due = Filo.titoloNodo([voce(azione('TIMER')), voce({ type: 'TIMER', seconds: 60, etichetta: 'Uovo', _executed: true })]);
+  assert.deepEqual(due, ['Avviati due timer · ', { citazione: F, nuda: true }, ', ', { citazione: 'Uovo', nuda: true }]);
+  // Un nodo che non è andato, o in attesa, dice la sua riga coi pezzi.
+  const chiesta = Filo.titoloNodo([{ tipo: 'TIMER', testo: 'x', parti: ['Conferma chiesta · ', { citazione: F }], esito: 'chiesta' }]);
+  assert.deepEqual(chiesta, ['Conferma chiesta · ', { citazione: F }]);
+  // Un comando e un file mostrato: spiegazione e nome li ha scritti il modello.
+  const cmd = Filo.titoloNodo([{ tipo: 'ESEGUI_COMANDO', testo: `Eseguito · ${F}`, parti: ['Eseguito · ', { citazione: F, nuda: true }], esito: 'ok' }]);
+  assert.equal(paroleDiFilo(cmd), 'Eseguito un comando · ');
+  const file = Filo.titoloNodo([{ tipo: 'APRI_FILE', testo: '', dettaglio: [{ citazione: F, nuda: true }], esito: 'ok' }]);
+  assert.deepEqual(file, ['Mostrato un file · ', { citazione: F, nuda: true }]);
+  // Senza riquadri resta la frase di sempre.
+  assert.equal(Filo.titoloNodo([{ tipo: 'TIMER', testo: 'Timer avviato · 5 min', esito: 'ok' }]), 'Avviato un timer · 5 min');
+});
+
 test('pezzi salvati che non dicono la riga fatta non si disegnano', () => {
   const v = E.voceArchivio(azione('TIMER'));
   const falsa = E.voceArchivio({ ...JSON.parse(JSON.stringify(v)), parti: ['Timer avviato · ', { citazione: 'altro' }] });
