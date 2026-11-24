@@ -62,11 +62,11 @@
     // quando la si toglie.
     CANCELLA_SVEGLIA: (a) => {
       const list = (a._output && Array.isArray(a._output.removed)) ? a._output.removed : [];
-      return { icon: '⏰', text: `Cancellata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
+      return aPezzi('⏰', ['Cancellata · ', ...nomiSveglie(list, a)]);
     },
     MODIFICA_SVEGLIA: (a) => {
       const list = (a._output && Array.isArray(a._output.updated)) ? a._output.updated : [];
-      return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
+      return aPezzi('⏰', ['Spostata · ', ...nomiSveglie(list, a)]);
     },
     // Nel calendario l'evento ci entra col bottone: qui si racconta la
     // proposta, e chiamarla «creata» era una promessa che nessuno manteneva.
