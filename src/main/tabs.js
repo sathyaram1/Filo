@@ -478,6 +478,13 @@ function letturaNota(tab) {
   if (typeof tab._letturaSalvata === 'number') return tab._letturaSalvata;
   return typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null;
 }
+// Fin dove è arrivato il video o l'audio lungo della pagina, o null. Vale per la pagina su cui è stato misurato: quella
+// salvata con la sessione anche dopo un gesto, perché toccare la pagina senza far ripartire il video non lo azzera.
+function visioneNota(tab) {
+  if (!tab) return null;
+  if (typeof tab.mediaPct === 'number' && tab._mediaPer === tab.url) return tab.mediaPct;
+  return typeof tab._mediaSalvata === 'number' && tab._salvataPer === tab.url ? tab._mediaSalvata : null;
+}
 function letturaValida(v) {
   return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : null;
 }
