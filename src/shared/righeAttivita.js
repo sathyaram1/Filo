@@ -637,7 +637,7 @@
     const quanti = n == null ? '' : (n ? ` · ${n === 1 ? 'uno trovato' : `${n} trovati`}` : ' · nessuno trovato');
     return ['Cercato fra i documenti', ...(breve ? [' · ', breve] : []), `${quanti}${o.fermata ? ' · fermata da te' : ''}`];
   }
-  const testoRicercaDocumenti = (a) => global.SN_ESITO.piatto(pezziRicercaDocumenti(a));
+  const testoRicercaDocumenti = (a) => piatto(pezziRicercaDocumenti(a));
 
   function pezziRicercaSalvate(a) {
     const o = (a && a._output) || {};
