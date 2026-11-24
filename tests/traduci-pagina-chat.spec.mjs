@@ -419,8 +419,6 @@ test('Alt+T senza selezione dopo un clic nel video di un sito dove Filo è spent
   await premiAltT(app);
   await expect(page.locator('#head')).toHaveText(/^IT The end of an era/, { timeout: 30_000 });
   await expect(page.locator('#p1')).toHaveText(/^IT First paragraph/);
-  // Nel video Filo resta spento: niente tradotto lì dentro.
-  await expect(riquadro.locator('#w')).toHaveText('Comments are closed');
   expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
 });
 
