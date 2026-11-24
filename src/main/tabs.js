@@ -4938,9 +4938,10 @@ class TabManager {
     // Fin dove era arrivata la lettura: la pulizia alla riapertura distingue l'articolo a metà, e la pagina riparte da lì.
     // Lo 0 non si scrive: «scroll 0%» direbbe al riordino «letta in parte», e terrebbe la pagina mai cominciata.
     const letture = kept.map((t) => letturaValida(letturaNota(t)) || null);
+    const visioni = kept.map((t) => letturaValida(visioneNota(t)) || null);
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, aperte, pagine, usate, ids, audio, letture, activeIndex };
+    return { tabs, colors, aperte, pagine, usate, ids, audio, letture, visioni, activeIndex };
   }
 
   _sessionKey() {
