@@ -5009,6 +5009,7 @@ class TabManager {
         const savedUsate = Array.isArray(saved.usate) ? saved.usate : [];
         const savedAudio = Array.isArray(saved.audio) ? saved.audio : [];
         const savedIds = Array.isArray(saved.ids) ? saved.ids : [];
+        const savedLetture = Array.isArray(saved.letture) ? saved.letture : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
             urls.push(u);
