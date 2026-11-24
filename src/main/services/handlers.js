@@ -481,6 +481,7 @@ async function eseguiAzioneFilo(action, {
     const bersaglio = await Registro.livelloDi(idDelCambio(action));
     action._livelloCambio = bersaglio ? bersaglio.livello : 1;
     action._fraseCambio = bersaglio ? bersaglio.frase : '';
+    action._fraseCambioParti = bersaglio && bersaglio.parti ? bersaglio.parti : null;
     action._allentaCambio = !bersaglio || bersaglio.allenta !== false;
     action._doveCambio = bersaglio && action._allentaCambio ? String(bersaglio.dove || '') : '';
   }
