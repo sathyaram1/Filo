@@ -110,16 +110,21 @@
     // La frase è quella dell'evento del filo, col nome della pagina Preferenze (#557, #867); senza
     // evento il valore era già quello.
     IMPOSTA_PREFERENZA: (a) => {
-      const f = frasiCambi(a);
+      const o = a._output || {};
+      const f = pezziCambi(a);
       // Il costo del modello scelto per una funzione resta scritto anche se il modello non lo ripete (#819).
-      const costo = pulito(a._output && a._output.costoModello);
-      if (f) return { icon: '⚙', text: `Impostato · ${f}${costo ? ` · ${costo}` : ''}` };
-      const etichetta = pulito(a._output && a._output.etichetta);
-      return { icon: '⚙', text: `${etichetta ? `Già così · ${etichetta}` : 'Impostazione già così'}${costo ? ` · ${costo}` : ''}` };
+      const costo = pulito(o.costoModello);
+      const coda = costo ? ` · ${costo}` : '';
+      if (f.length) return aPezzi('⚙', ['Impostato · ', ...f, coda]);
+      const valore = suo(o.valore);
+      if (valore && pulito(o.campo)) return aPezzi('⚙', [`Già così · ${pulito(o.campo)} → `, valore, coda]);
+      const etichetta = pulito(o.etichetta);
+      return { icon: '⚙', text: `${etichetta ? `Già così · ${etichetta}` : 'Impostazione già così'}${coda}` };
     },
     ANNULLA_CAMBIO: (a) => {
-      const f = pulito(a._output && a._output.frase);
-      return { icon: '↩', text: `Rimesso com’era${f ? ` · prima di: ${f}` : ''}` };
+      const o = a._output || {};
+      const f = pezziCambi({ _cambi: [{ frase: o.frase, parti: o.fraseParti }] });
+      return aPezzi('↩', ['Rimesso com’era', ...(f.length ? [' · prima di: ', ...f] : [])]);
     },
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
