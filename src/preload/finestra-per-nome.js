@@ -131,7 +131,7 @@ function installa({ ipcRenderer, webFrame }) {
   ascolta();
   // La riscrittura da capo (document.open) toglie gli ascolti.
   try { new MutationObserver(ascolta).observe(document, { childList: true }); } catch (_) {}
-  try { webFrame.executeJavaScript(sorgente(!webFrame.parent), false).catch(() => {}); } catch (_) {}
+  try { webFrame.executeJavaScript(sorgente(!sottoriquadro), false).catch(() => {}); } catch (_) {}
 }
 
 module.exports = { installa, CANALE };
