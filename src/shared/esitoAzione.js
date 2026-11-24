@@ -408,7 +408,12 @@
       chiesta(x._confirm ? domandaDi(x, L)
         : x._rigaChiesta ? { riga: primaRiga(x._rigaChiesta), parti: x._rigaChiestaParti || null } : domandaDi(x, L));
     }
-    else riga = (diretta && primaRiga(diretta.text)) || (L ? frase(L.describeDone, x) : '');
+    else {
+      // La riga fatta che porta un testo altrui resta a pezzi anche riaperta (#2648).
+      const d = diretta && diretta.parti ? rigaDellaDomanda({ text: diretta.text, parti: diretta.parti }) : null;
+      if (d && d.riga) chiesta(d);
+      else riga = (diretta && primaRiga(diretta.text)) || (L ? frase(L.describeDone, x) : '');
+    }
     if (!riga && x._domanda && L) chiesta(domandaDi({ ...x, _confirm: null }, L));
     if (SENZA_TITOLO[type]) { riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1]; parti = null; }
     const fatta = esito !== FALLITO && esito !== CHIESTO;
