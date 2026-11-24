@@ -13,7 +13,7 @@
       fixes: [
         { testo: 'Un proxy degli elenchi con un indirizzo email come utente, o con un indirizzo IPv6 fra quadre, ora si collega e la sua password resta protetta. Scritto senza http:// o socks5:// davanti, Filo chiede al fornitore che tipo di proxy è e lo usa nel modo giusto, anche per scaricare i video.', segnalazione: 2646 },
         { testo: 'Un proxy scritto in una forma che Filo non sa leggere, come un indirizzo IPv6 senza parentesi quadre, è protetto intero come una chiave API: si salva cifrato, l\'assistente non lo passa ai modelli e l\'archivio esportato non lo porta se non spunti «Includi le chiavi».', segnalazione: 2646 },
-        { testo: 'Un articolo o una pagina lasciati a metà, dopo aver chiuso e riaperto Filo, ripartono dal punto in cui eri, e la pulizia delle schede alla riapertura sa che li stavi leggendo.', segnalazione: 349 },
+        { testo: 'Un articolo lasciato a metà, dopo aver chiuso e riaperto Filo, riparte dal punto in cui eri. La pulizia delle schede alla riapertura sa fin dove eri arrivato negli articoli, nei video e negli audio, e non li tratta come pagine mai aperte.', segnalazione: 349 },
       ],
     },
     {
