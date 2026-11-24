@@ -65,21 +65,37 @@ function endpointFor(template, country) {
   if (!p || !p.uso) return null;
   if (!p.senzaSchema) return p.uso;
   const indirizzo = p.uso.proxyRules.replace(/^[^:]+:\/\//, '');
-  const sentito = schemaSentito.get(indirizzo);
+  const sentito = schemaSentito.get(chiaveSentito(indirizzo, p.uso.auth));
   return sentito ? { ...p.uso, proxyRules: `${sentito}://${indirizzo}` } : { ...p.uso, daSentire: indirizzo };
 }
 
 // Uno schema non scritto è un'ipotesi (SN_CONST.leggiProxy): chi parla solo socks5 si perderebbe in http, e viceversa
-// (#2646.1). Lo si chiede al fornitore la prima volta, con un saluto socks5 seguito da una riga vuota: un socks5
-// risponde 0x05, un proxy http «HTTP/». Restano solo le risposte certe; senza, vale l'ipotesi.
-const schemaSentito = new Map(); // 'host:porta' → 'socks5' | 'http'
+// (#2646.1). Lo si chiede al fornitore la prima volta: un socks5 risponde 0x05, un proxy http «HTTP/». Con le
+// credenziali si chiede prima l'http, perché in socks5 Chromium non le manda e chi parla i due sulla stessa porta
+// (gli elenchi di Webshare) va preso in http. Restano solo le risposte certe; senza, vale l'ipotesi.
+const schemaSentito = new Map(); // chiaveSentito → 'socks5' | 'http'
+const chiaveSentito = (indirizzo, auth) => `${auth && auth.username ? 'c' : ''}|${indirizzo}`;
 const SONDA_MS = 2500;
 const SALUTO = Buffer.from([0x05, 0x01, 0x00, 0x0d, 0x0a, 0x0d, 0x0a]);
-function sondaSchema(indirizzo, { ms = SONDA_MS } = {}) {
+const DOMANDA_HTTP = Buffer.from('GET / HTTP/1.0\r\n\r\n', 'latin1');
+async function sondaSchema(indirizzo, { ms = SONDA_MS, primaHttp = false } = {}) {
   let u;
-  try { u = new URL(`http://${indirizzo}`); } catch (_) { return Promise.resolve(null); }
-  if (!u.port) return Promise.resolve(null);
+  try { u = new URL(`http://${indirizzo}`); } catch (_) { return null; }
+  if (!u.port) return null;
   const host = u.hostname.replace(/^\[|\]$/g, '');
+  const domande = primaHttp ? [DOMANDA_HTTP, SALUTO] : [SALUTO];
+  const scadenza = Date.now() + ms;
+  for (let i = 0; i < domande.length; i++) {
+    const resto = scadenza - Date.now();
+    if (resto <= 0) return null;
+    // Un socks5 che tace davanti all'http non deve mangiarsi anche il tempo del saluto socks5.
+    const r = await chiediSchema(host, Number(u.port), domande[i], Math.floor(resto / (domande.length - i)));
+    if (r) return r;
+  }
+  return null;
+}
+
+function chiediSchema(host, port, domanda, ms) {
   return new Promise((fine) => {
     let s = null;
     let finito = false;
