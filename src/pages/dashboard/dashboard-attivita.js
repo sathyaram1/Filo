@@ -2049,9 +2049,10 @@
     a._executed = false;
     delete a._confirm;
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a, row.title || '');
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a, row.title || '', row.parti || null);
     archiviaEsito(a, { chat, chiesta });
     btn.textContent = `✗ ${row ? row.text : 'Non eseguita'}`;
+    if (row && row.parti) conRiquadri(btn, ['✗ ', ...row.parti]);
     if (permessoDaConcedere(a)) btn.after(bottonePermesso(a));
   }
 
