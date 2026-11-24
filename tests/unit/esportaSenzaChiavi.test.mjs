@@ -266,7 +266,7 @@ test('un proxy che Filo non sa leggere è un segreto: senza la spunta l\'archivi
   const PW = 'passwordsegreta-illeggibile';
   for (const riga of [
     `2001:db8::1:8080:mario:${PW}`, `gate.esempio.com:8080:ma/rio:${PW}`, `gate.esempio.com:8080:ma#rio:${PW}`,
-    `gate.esempio.com:8080:ma?rio:${PW}`, `gate.esempio.com:8080:ma@rio:${PW}`, `mario:${PW}/x@gate.esempio.com:8080`,
+    `gate.esempio.com:8080:ma?rio:${PW}`, `gate.esempio.com:8080:ma@rio:${PW}`, `ma/rio:${PW}@gate.esempio.com:8080`,
     `[2001:db8::1]:8080:mario:${PW}`,
   ]) {
     const dati = { settings: { proxy: { datacenter: riga } }, filo_notes: [{ id: 'n', text: `la password è ${PW}` }] };
