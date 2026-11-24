@@ -150,7 +150,7 @@
     },
     {
       id: 'restore-tabs', title: 'Ritrovi le schede della volta prima', category: 'navigation',
-      desc: 'Quando riapri Filo ritrovi le schede che avevi lasciato, con davanti quella che stavi guardando. Quella si carica per prima e da sola; le altre dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se apri una scheda che non si è ancora caricata, passa davanti alle altre e si carica subito. Una pagina che avevi letto fino a metà riparte dal punto in cui eri, e la pulizia della riapertura sa fin dove l’avevi letta. I video delle schede riaperte non partono da soli.',
+      desc: 'Quando riapri Filo ritrovi le schede che avevi lasciato, con davanti quella che stavi guardando. Quella si carica per prima e da sola; le altre dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se apri una scheda che non si è ancora caricata, passa davanti alle altre e si carica subito. Una pagina che avevi letto fino a metà riparte dal punto in cui eri, e la pulizia della riapertura sa fin dove eri arrivato nella pagina e nel suo video o audio più lungo (il video riparte invece dall’inizio, o da dove lo rimette il sito). I video delle schede riaperte non partono da soli.',
       invoke: 'Automatico a ogni apertura di Filo.',
       doesNot: 'Le finestre in incognito non si riaprono. Una pagina che non finisce mai di caricarsi non ferma le altre: dopo quindici secondi parte la successiva.',
     },
