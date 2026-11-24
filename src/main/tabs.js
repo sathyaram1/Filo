@@ -5075,6 +5075,8 @@ class TabManager {
         // Lo scroll che la pagina ricaricata manda prima di tornare al punto non è la lettura: vale quella salvata.
         nata._scrollIgnoto = true;
         nata._letturaSalvata = letture[i];
+        nata._mediaSalvata = visioni[i];
+        nata._salvataPer = url;
         nata._dallaSessione = true;
         nata.paginaDal = pagine[i] || null;
         nate.push(nata);
