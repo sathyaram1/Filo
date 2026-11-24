@@ -87,10 +87,7 @@ test('preferenza: il valore del modello nella riga «Impostato» sta nel riquadr
     const call = { id: 'm1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'modello_funzione', valore: `Chat con Filo: fornitore-nuovo/modello-x ${v}` }) };
     await modelloFinto(app, [{ text: 'Cambio.', toolCalls: [call] }, { text: 'Fatto.' }]);
     await chiedi(page, 'cambia il modello della chat');
-    const bottone = page.locator('.dash-bubble-filo .dash-action-btn-primary').first();
-    await expect(bottone).toBeVisible({ timeout: 10_000 });
-    await bottone.click();
-    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
     await clickConfirm(page, 'ok');
     const riga = page.locator('.dash-activity-row, .dash-bubble-filo', { hasText: /Impostato/ }).last();
     await expect(riga).toBeAttached({ timeout: 10_000 });
