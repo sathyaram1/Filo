@@ -4026,7 +4026,7 @@ class TabManager {
             const id = this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } });
             daLei(id);
             const tenuta = this.tabs.find((t) => t.id === id);
-            if (tenuta) Object.assign(tenuta, { _nomeFinestra: details.frameName || '', _chiestaDa: wc, _adottataAlle: Date.now() });
+            if (tenuta) Object.assign(tenuta, { _nomeFinestra: details.frameName || '', _apertaPer: url || 'about:blank', _chiestaDa: wc, _adottataAlle: Date.now() });
             return options.webContents;
           },
         };
