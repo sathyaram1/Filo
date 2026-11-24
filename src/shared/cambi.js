@@ -490,37 +490,40 @@
     return T && T.fmtDurationLabel ? T.fmtDurationLabel(sec) : `${Math.round(sec / 60)} min`;
   }
   function nomeTimer(t) {
-    const label = breve(t && t.label, 40);
+    const label = fra(breve(t && t.label, 40));
+    const nome = label ? [' ', label] : [];
     if (t && t.kind === 'alarm') {
       const M = global.SN_FILO_MEMORY;
       const rip = ricorrente(t) && M && M.formatRepeat ? ` ${M.formatRepeat(t.repeat)}` : '';
-      return `sveglia${label ? ` «${label}»` : ''} delle ${t.atTime || oraDi(t.endsAt)}${rip}`;
+      return ['sveglia', ...nome, ` delle ${t.atTime || oraDi(t.endsAt)}${rip}`];
     }
-    return `timer${label ? ` «${label}»` : ''}`;
+    return ['timer', ...nome];
   }
 
-  function fraseCambio(c) {
+  const fraseCambio = (c) => piatto(partiCambio(c));
+  // La frase di un cambio a pezzi: stringhe di Filo e riquadri coi valori che non sono suoi.
+  function partiCambio(c) {
     const k = String(c && c.chiave || '');
     if (k.startsWith('timer:')) {
       if (!c.prima && c.dopo) {
         const d = c.dopo.kind === 'alarm' ? '' : durataDi(c.dopo);
-        return `nuov${c.dopo.kind === 'alarm' ? 'a' : 'o'} ${nomeTimer(c.dopo)}${d ? `, ${d}` : ''}`;
+        return [`nuov${c.dopo.kind === 'alarm' ? 'a' : 'o'} `, ...nomeTimer(c.dopo), d ? `, ${d}` : ''];
       }
-      if (c.prima && !c.dopo) return `tolt${c.prima.kind === 'alarm' ? 'a' : 'o'} ${c.prima.kind === 'alarm' ? 'la' : 'il'} ${nomeTimer(c.prima)}`;
+      if (c.prima && !c.dopo) return [`tolt${c.prima.kind === 'alarm' ? 'a' : 'o'} ${c.prima.kind === 'alarm' ? 'la' : 'il'} `, ...nomeTimer(c.prima)];
       if (c.prima && c.dopo) {
         const oraPrima = c.prima.kind === 'alarm' ? (c.prima.atTime || oraDi(c.prima.endsAt)) : oraDi(c.prima.endsAt);
         const oraDopo = c.dopo.kind === 'alarm' ? (c.dopo.atTime || oraDi(c.dopo.endsAt)) : oraDi(c.dopo.endsAt);
-        if (oraPrima === oraDopo && !uguale(c.prima.label, c.dopo.label)) return `${nomeTimer(c.prima)} → «${breve(c.dopo.label, 40)}»`;
-        if (c.dopo.kind === 'alarm') return `${nomeTimer(c.prima)} → ${oraDopo}`;
-        return `${nomeTimer(c.dopo)}: scade alle ${oraPrima} → ${oraDopo}`;
+        if (oraPrima === oraDopo && !uguale(c.prima.label, c.dopo.label)) return [...nomeTimer(c.prima), ' → ', fra(breve(c.dopo.label, 40)) || '«»'];
+        if (c.dopo.kind === 'alarm') return [...nomeTimer(c.prima), ` → ${oraDopo}`];
+        return [...nomeTimer(c.dopo), `: scade alle ${oraPrima} → ${oraDopo}`];
       }
-      return 'un timer';
+      return ['un timer'];
     }
     if (k.startsWith('proxy:')) {
-      const dom = k.slice(6);
-      if (!c.prima && c.dopo) return `${dom} sempre da ${nomePaese(c.dopo.country)}`;
-      if (c.prima && !c.dopo) return `${dom}: tolta la regola su ${nomePaese(c.prima.country)}`;
-      return `${dom}: da ${nomePaese(c.prima && c.prima.country)} → da ${nomePaese(c.dopo && c.dopo.country)}`;
+      const dom = suo(k.slice(6));
+      if (!c.prima && c.dopo) return [dom, ` sempre da ${nomePaese(c.dopo.country)}`];
+      if (c.prima && !c.dopo) return [dom, `: tolta la regola su ${nomePaese(c.prima.country)}`];
+      return [dom, `: da ${nomePaese(c.prima && c.prima.country)} → da ${nomePaese(c.dopo && c.dopo.country)}`];
     }
     if (k.startsWith('zoom:')) {
       const p = (x) => (Number.isFinite(Number(x)) ? `${Math.round(Number(x))}%` : '?');
