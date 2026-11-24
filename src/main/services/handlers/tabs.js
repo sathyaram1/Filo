@@ -187,6 +187,7 @@ module.exports = function register(on, ctx) {
       win._filoTabs.setTabActivity(sender.tab.id, {
         lastInteractionAt: msg.lastInteractionAt,
         scrollPct: msg.scrollPct,
+        mediaPct: msg.mediaPct,
         formDirty: msg.formDirty,
         impronte: msg.impronte,
         invioPagina: msg.invioPagina === true,
