@@ -154,6 +154,16 @@
     const P = global.SN_PULSANTI_PREFERENZE;
     return P ? P.pulsanteDi(a) : '';
   };
+  // La frase del cambio da rimettere, coi valori non di Filo nel riquadro (`_fraseCambioParti`, del main): pezzi che
+  // non dicono la frase, o nessun pezzo, e la frase sta tutta nel riquadro come prima (#2648.1). null senza frase.
+  function fraseDelCambio(a) {
+    const f = String((a && a._fraseCambio) || '').trim();
+    if (!f) return null;
+    const p = a._fraseCambioParti;
+    const buone = Array.isArray(p) && p.length <= 60
+      && p.every((x) => typeof x === 'string' || (x && typeof x === 'object' && typeof x.citazione === 'string'));
+    return buone && piatto(p).trim() === f ? p.map((x) => (typeof x === 'string' ? x : cit(x.citazione, x.nuda === true))) : [cit(f, true)];
+  }
   // Le frasi di cosa cambierebbe il ripristino: un elenco del main, ognuna nel suo riquadro.
   const frasiRipristino = (a) => {
     const f = a && a._ripristino && a._ripristino.frasi;
