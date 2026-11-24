@@ -70,7 +70,7 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
     '  ormai consultate) sono raggiungibili in ogni momento: se non le stai più',
     '  usando → ARCHIVIA senza esitare (le home e impostazioni extra sono rumore).',
     'Segnali per TENERE: interazione recente, form compilato non inviato, audio in',
-    'riproduzione, contenuto consumato solo in parte (scroll a metà, video visto in',
+    'riproduzione, contenuto consumato solo in parte (scroll basso, video visto in',
     'parte), task in corso',
     'collegato ad altre schede co-aperte.',
     'Fra le marcature MEMORIA_FILO c\'è quello che Filo ha imparato sull\'utente',
