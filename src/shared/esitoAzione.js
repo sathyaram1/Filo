@@ -551,12 +551,14 @@
     }
     if (v.esito === FALLITO) {
       const perche = pulito(v.motivo);
+      const pezziPerche = perche ? partiDellaRiga(v.motivoParti, perche) : null;
       // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
       const R = global.SN_RIGHE_ATTIVITA;
       const no = v.no === true || v.motivo === MOTIVO_NO;
       const etichetta = R ? R.etichettaNonFatta(v.type, { no, partita: v.partita === true }) : '';
       const testo = [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · ');
-      const aPezzi = !etichetta && parti ? ['Non riuscita · ', ...parti, ...(perche ? [` · ${perche}`] : [])] : null;
+      const testa = etichetta || !parti ? [[etichetta || 'Non riuscita', etichetta ? '' : riga].filter(Boolean).join(' · ')] : ['Non riuscita · ', ...parti];
+      const aPezzi = (!etichetta && parti) || pezziPerche ? [...testa, ...(perche ? [' · ', ...(pezziPerche || [perche])] : [])] : null;
       return { icona: '⚠', testo, fallita: true, ...(aPezzi ? { parti: aPezzi } : {}) };
     }
     if (!riga) return null;
