@@ -410,9 +410,9 @@
       base: [], indirizzo: 'il fornitore di proxy scritto nelle impostazioni',
       quando: 'funzione',
       occasione: 'solo se ne hai impostato uno, nelle schede che apri da un altro paese',
-      riceve: 'tutto il traffico di quelle schede',
+      riceve: 'tutto il traffico di quelle schede; se l’indirizzo non dice se è http o socks5, la prima volta una domanda di pochi byte per saperlo',
       frase: 'Il proxy che imposti tu.',
-      dove: ['src/main/tabs.js'], prova: 'setProxy(',
+      dove: ['src/main/tabs.js', 'src/main/services/proxyTab.js'], prova: ['setProxy(', "require('net').connect("],
     },
   ];
 
