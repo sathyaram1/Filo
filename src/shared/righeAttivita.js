@@ -606,7 +606,7 @@
     const dopo = [suo(titolo), sito !== titolo ? sito : '', o.fonte === 'scheda' ? 'dalla tua scheda' : ''].filter(Boolean);
     return dopo.length ? [`${verbo}: `, ...unisci(dopo, ' · ')] : [verbo];
   }
-  const rigaLetturaPagina = (a) => global.SN_ESITO.piatto(pezziLetturaPagina(a));
+  const rigaLetturaPagina = (a) => piatto(pezziLetturaPagina(a));
   function indirizzoLetto(a) {
     const o = (a && a._output) || {};
     return String(o.url || (a && a.url) || '').slice(0, 300);
