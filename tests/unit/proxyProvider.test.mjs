@@ -138,7 +138,12 @@ async function fornitore(risposta) {
     s.on('error', () => {});
     s.once('data', (b) => {
       visti.push(b);
-      if (risposta === 'socks5') s.end(Buffer.from([0x05, 0x00]));
+      const saluto = b[0] === 0x05;
+      if (risposta === 'socks5') { if (saluto) s.end(Buffer.from([0x05, 0x00])); else s.destroy(); }
+      // Chi tace davanti a quello che non capisce, senza chiudere.
+      else if (risposta === 'socks5-muto') { if (saluto) s.end(Buffer.from([0x05, 0xff])); }
+      // http e socks5 sulla stessa porta, con la password (gli elenchi di Webshare).
+      else if (risposta === 'misto') s.end(saluto ? Buffer.from([0x05, 0xff]) : 'HTTP/1.1 407 Proxy Authentication Required\r\n\r\n');
       else if (risposta === 'http' && b.includes(Buffer.from('\r\n\r\n'))) s.end('HTTP/1.1 400 Bad Request\r\n\r\n');
     });
   });
