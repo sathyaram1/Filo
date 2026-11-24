@@ -433,6 +433,12 @@ test('Alt+T senza selezione con la risposta di una traduzione aperta traduce la 
     globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta('Un feed che cresce.'); return { text: 'Un feed che cresce.', usage: {} }; } };
   });
   const page = await testServer.openReady(openTab, ARTICOLO);
+  // Finestra davanti: la risposta che si apre prende la tastiera solo da lì.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.show(); w.focus();
+    w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.focus();
+  });
   // Il doppio clic vero, come lo manda il sistema.
   await page.waitForTimeout(500);
   const box = await page.locator('#r0').boundingBox();
