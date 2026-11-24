@@ -430,7 +430,7 @@
       addRow(type, rowIcon, text, failed = false, cambi = null, a = null, title = '', parti = null) {
         closeTurnReasoning();
         const gia = contaAzione(type, a, failed);
-        const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
+        const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type), ...(parti ? { parti } : {}) }, a);
         const riga = makeActivityRow(rowIcon, parti || text, cambi, title);
         segnaSistema(riga, a);
         // La proposta finita col bottone diventa il suo esito nella stessa riga: due frasi che si contraddicono no.
