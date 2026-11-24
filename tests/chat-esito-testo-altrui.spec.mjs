@@ -140,6 +140,8 @@ test('#2648.1 il cambio di un\'impostazione chiesto in chat e il suo annullo ten
 
     // L'annullo dalla chat: la riga «Rimesso com'era · prima di: …» e il suo bottone.
     await chiedi(page, 'rimetti com\'era');
+    // L'annullo chiede l'OK dal suo bottone in chat.
+    await page.locator('.dash-action-btn', { hasText: 'Filo vuole rimettere' }).click({ timeout: 10_000 });
     await clickConfirm(page, 'ok', { timeout: 10_000 });
     const rimesso = page.locator('.dash-activity-row', { hasText: /Rimesso com/ }).last();
     await expect(rimesso).toBeAttached({ timeout: 10_000 });
