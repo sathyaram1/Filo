@@ -120,8 +120,9 @@ function chiediSchema(host, port, domanda, ms) {
 async function resolveSentito(country, opzioni = {}, { sonda = sondaSchema } = {}) {
   const r = resolve(country, opzioni);
   if (!r || !r.daSentire) return r;
-  const schema = await sonda(r.daSentire);
-  if (schema === 'socks5' || schema === 'http') schemaSentito.set(r.daSentire, schema);
+  const primaHttp = !!(r.auth && r.auth.username);
+  const schema = await sonda(r.daSentire, { primaHttp });
+  if (schema === 'socks5' || schema === 'http') schemaSentito.set(chiaveSentito(r.daSentire, r.auth), schema);
   return resolve(country, opzioni);
 }
 
