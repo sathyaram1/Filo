@@ -417,10 +417,11 @@
     SPOSTA_ICONA: (a) => {
       const D = global.SN_DISPOSIZIONE_ICONE;
       const id = String(a.icona || a.id || '');
-      const nome = D && D.esiste && D.esiste(id) ? D.nome(id) : id;
+      // Un'icona che Filo non conosce ha il nome che le ha dato il modello.
+      const nome = D && D.esiste && D.esiste(id) ? D.nome(id) : suo(id);
       const zona = D && D.zonaDellAzione ? D.zonaDellAzione(a) : '';
       const dove = zona ? `${D.nomeZona(zona).in} ${D.nomeZona(zona).nome}` : '';
-      return { icon: '📌', text: `Icona spostata · ${nome}${dove ? ` ${dove}` : ''}` };
+      return aPezzi('📌', ['Icona spostata · ', nome, dove ? ` ${dove}` : '']);
     },
     PANNELLO_APP: (a) => {
       const P = global.SN_PANNELLI_APP;
