@@ -2212,7 +2212,7 @@ class TabManager {
         ageMin: minutiDa(Date.parse(t.openedAt)),
         // Mai toccata da quando c'è: inattiva da quando è arrivata la sua pagina (#1618).
         idleMin: minutiDa(t.lastInteractionAt || Date.parse(t.paginaDal) || Date.parse(t.openedAt)),
-        scrollPct: typeof t.scrollPct === 'number' && !t._scrollIgnoto ? t.scrollPct : null,
+        scrollPct: letturaNota(t),
         formDirty: !!t.formDirty,
         audible: !!t.audible,
         coOpenUrls: this.tabs
