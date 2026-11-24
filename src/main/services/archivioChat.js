@@ -120,7 +120,7 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
     if (typeof t.idleMin === 'number') sig.push(`inattiva da ${t.idleMin}min`);
     if (typeof t.ageMin === 'number') sig.push(`aperta da ${t.ageMin}min`);
     if (typeof t.scrollPct === 'number') sig.push(`scroll ${t.scrollPct}%`);
-    if (typeof t.mediaPct === 'number') sig.push(`video visto al ${t.mediaPct}%`);
+    if (typeof t.mediaPct === 'number') sig.push(`video o audio riprodotto fino al ${t.mediaPct}%`);
     if (t.formDirty) sig.push('form non inviato');
     if (t.audible) sig.push('audio in riproduzione');
     if (Array.isArray(t.coOpenUrls) && t.coOpenUrls.length) sig.push(`co-aperte: ${t.coOpenUrls.length}`);
