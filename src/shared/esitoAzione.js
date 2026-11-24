@@ -24,10 +24,34 @@
     if (o && o.fatto) return COMPIUTO;
     if (o && o.proposta) return PROPOSTO;
     if (a._executed === false) return FALLITO;
-    // Un comando della finestra che non ha mosso niente (la home chiesta dalla
-    // home): il sistema lo segna eseguito, ma raccontarlo come fatto mente.
-    if (o && (o.already || o.invariata)) return FALLITO;
+    // Il sistema la segna eseguita, ma raccontarla come fatta mente.
+    if (senzaEffetto(a)) return FALLITO;
     return FATTO;
+  }
+
+  // Eseguita senza cambiare niente (la home chiesta dalla home, la barra dei siti già così, nessuna scheda da chiudere):
+  // non è fatta e non è un guasto. Diario, archivio e riepilogo dopo un guasto la leggono da qui (#553.15).
+  function senzaEffetto(a) {
+    const o = a && a._output;
+    if (!o || a._executed === false || a._confirm || a._domanda || o.blocked || o.proposta || o.fatto) return false;
+    if (o.already || o.invariata) return true;
+    const d = rigaDelDiario(a);
+    return !!(d && d.failed);
+  }
+
+  // I nomi delle azioni fatte di una risposta archiviata, meno quelli che i suoi esiti danno per non riusciti: le chat
+  // salvate prima di #553.14 tengono fra le fatte la mossa senza effetto. Un nome senza esiti del suo tipo resta.
+  function nomiFatti(nomi, esiti) {
+    const voci = Array.isArray(esiti) ? esiti.filter((v) => v && typeof v.type === 'string') : [];
+    if (!Array.isArray(nomi) || !voci.length) return nomi;
+    const riuscite = new Map();
+    for (const v of voci) riuscite.set(v.type, (riuscite.get(v.type) || 0) + (conta(v.esito) ? 1 : 0));
+    return nomi.filter((t) => {
+      if (typeof t !== 'string' || t === 'FERMATA' || !riuscite.has(t)) return true;
+      const n = riuscite.get(t);
+      riuscite.set(t, n - 1);
+      return n > 0;
+    });
   }
 
   // Le azioni che l'archivio nomina in `actions`, quelle successe: chi legge solo i nomi le dà per fatte, quindi una mossa
