@@ -1711,6 +1711,12 @@
         // A cosa fatta il bottone è una ricevuta: «Filo vuole…» con la spunta davanti diceva fatto e da fare insieme.
         const ricevuta = fatto || (row && !row.failed ? row.text : '') || 'Fatto';
         btn.textContent = (r && r.executed) ? `✓ ${ricevuta.length > 140 ? `${ricevuta.slice(0, 139)}…` : ricevuta}` : `✗ ${guasto.length > 70 ? `${guasto.slice(0, 67)}…` : guasto}`;
+        // Un testo non di Filo nella ricevuta o nel perché resta nel suo riquadro, accorciato coi suoi pezzi (#2648.1).
+        const pezzi = (r && r.executed)
+          ? (fatto ? r.fattoParti : (row && !row.failed && row.parti)) : (row && row.failed && row.parti);
+        const corta = Array.isArray(pezzi)
+          ? global.SN_ESITO.rigaDellaDomanda({ text: r && r.executed ? ricevuta : guasto, parti: pezzi }, r && r.executed ? 140 : 70) : null;
+        if (corta && corta.parti) conRiquadri(btn, [(r && r.executed) ? '✓ ' : '✗ ', ...corta.parti]);
         if (fatto.length > 140) btn.title = fatto;
         else if (!(r && r.executed)) btn.title = guasto;
         // #874 — il sistema ha detto no dopo l'OK (un permesso, una rete fuori portata): la frase e, se serve, il tasto.
