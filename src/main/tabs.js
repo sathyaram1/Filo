@@ -100,8 +100,6 @@ const HOVER_INPUT_TYPES = new Set([
 const gestoPerIlFilo = (tab) => Math.max(tab._userInputAt || 0, tab._gestoFiloAt || 0);
 // Il salto dalla pagina d'errore al sito è un «Riprova» premuto se arriva entro questo tempo da un input vero (#1469).
 const RIPROVA_GESTO_MS = 5_000;
-// Il focus chiesto dalla pagina che tiene la finestra arriva subito dopo il suo clic (#737.8, richiamataDallaPagina).
-const RICHIAMO_DA_FOCUS_MS = 1500;
 
 // #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
 // conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
