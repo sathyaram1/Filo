@@ -104,24 +104,74 @@
     return mostrati.length ? `${mostrati.join(', ')}${restano > 0 ? ` +${restano}` : ''}` : '';
   }
 
-  // `voci`: [{ tipo, testo, esito: 'ok' | 'fallita' | 'chiesta', dettaglio? }]. Una fallita o in attesa di conferma
-  // ha già la sua frase (la riga del diario dice cosa non è successo): il titolo non promette il contrario.
+  // La riga a pezzi (#2648): un testo non di Filo resta un pezzo suo anche nel titolo, mai cucito nelle sue parole.
+  const riquadro = (p) => !!p && typeof p === 'object' && typeof p.citazione === 'string';
+  const piatto = (p) => (global.SN_ESITO ? global.SN_ESITO.piatto(p) : p.join(''));
+  function pulite(parti) {
+    const out = [];
+    for (const p of parti) {
+      if (typeof p === 'string') {
+        if (typeof out[out.length - 1] === 'string') out[out.length - 1] += p; else out.push(p);
+      } else if (riquadro(p) && pulisci(p.citazione)) out.push({ ...p, citazione: pulisci(p.citazione) });
+    }
+    const s = out.map((p) => (typeof p === 'string' ? p.replace(/\s+/g, ' ') : p));
+    if (typeof s[0] === 'string') s[0] = s[0].trimStart();
+    if (typeof s[s.length - 1] === 'string') s[s.length - 1] = s[s.length - 1].trimEnd();
+    return s.filter((p) => p !== '');
+  }
+  const aPezzi = (x) => Array.isArray(x.parti) && x.parti.some(riquadro);
+  // Il separatore lo cerca solo fra le parole di Filo prima del primo riquadro.
+  function dettaglio(x) {
+    const d = pulisci(x.dettaglio);
+    if (d) return [d];
+    if (!aPezzi(x)) { const s = dettaglioDi(x.testo); return s ? [s] : []; }
+    const p0 = x.parti[0];
+    const m = typeof p0 === 'string' ? p0.match(/^[^·:]*?(?:\s·\s|:\s)([\s\S]*)$/) : null;
+    return m ? pulite([m[1], ...x.parti.slice(1)]) : [];
+  }
+  function primoPezzoParti(d) {
+    const out = [];
+    for (const p of d) {
+      const i = typeof p === 'string' ? p.indexOf(' · ') : -1;
+      if (i >= 0) { out.push(p.slice(0, i)); break; }
+      out.push(p);
+    }
+    return pulite(out);
+  }
+  function elencoParti(liste) {
+    const viste = [];
+    const unici = [];
+    for (const l of liste) {
+      const k = piatto(l);
+      if (k && !viste.includes(k)) { viste.push(k); unici.push(l); }
+    }
+    const restano = unici.length - MAX_DETTAGLI;
+    return pulite([...unici.slice(0, MAX_DETTAGLI).flatMap((l, i) => (i ? [', ', ...l] : l)), restano > 0 ? ` +${restano}` : '']);
+  }
+  // Una frase quando è tutta di Filo, i pezzi quando porta un riquadro.
+  const titolo = (p) => (p.some(riquadro) ? p : piatto(p));
+
+  // `voci`: [{ tipo, testo, esito: 'ok' | 'fallita' | 'chiesta', dettaglio?, parti? }]. Una fallita o in attesa di
+  // conferma ha già la sua frase (la riga del diario dice cosa non è successo): il titolo non promette il contrario.
   function titoloNodo(voci) {
     const v = (Array.isArray(voci) ? voci : []).filter(Boolean);
     if (!v.length) return '';
     if (v.length === 1) {
       const x = v[0];
       const t = TITOLI[String(x.tipo || '').toUpperCase()];
-      if (x.esito !== 'ok' || !t) return pulisci(x.testo) || (t ? t[0] : 'Azione');
-      const d = pulisci(x.dettaglio) || dettaglioDi(x.testo);
-      return d ? `${t[0]} · ${d}` : t[0];
+      if (x.esito !== 'ok' || !t) {
+        const r = pulite(aPezzi(x) ? x.parti : [String(x.testo == null ? '' : x.testo)]);
+        return titolo(r.length ? r : [t ? t[0] : 'Azione']);
+      }
+      const d = dettaglio(x);
+      return titolo(d.length ? [`${t[0]} · `, ...d] : [t[0]]);
     }
     const tipo = String(v[0].tipo || '').toUpperCase();
     const t = TITOLI[tipo];
     const stesso = !!t && v.every((x) => String(x.tipo || '').toUpperCase() === tipo && x.esito === 'ok');
     if (stesso) {
-      const d = elenco(v.map((x) => primoPezzo(pulisci(x.dettaglio) || dettaglioDi(x.testo))));
-      return d ? `${t[1](v.length)} · ${d}` : t[1](v.length);
+      const d = elencoParti(v.map((x) => primoPezzoParti(dettaglio(x))));
+      return titolo(d.length ? [`${t[1](v.length)} · `, ...d] : [t[1](v.length)]);
     }
     const nomi = v.map((x) => {
       const tt = TITOLI[String(x.tipo || '').toUpperCase()];
