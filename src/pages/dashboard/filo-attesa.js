@@ -122,6 +122,7 @@
   const aPezzi = (x) => Array.isArray(x.parti) && x.parti.some(riquadro);
   // Il separatore lo cerca solo fra le parole di Filo prima del primo riquadro.
   function dettaglio(x) {
+    if (Array.isArray(x.dettaglio)) return pulite(x.dettaglio);
     const d = pulisci(x.dettaglio);
     if (d) return [d];
     if (!aPezzi(x)) { const s = dettaglioDi(x.testo); return s ? [s] : []; }
