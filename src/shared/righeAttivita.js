@@ -201,37 +201,24 @@
       return { icon: '🔎', text: o.numero ? `Cercata con Google Lens l'immagine ${o.numero}` : 'Cercata con Google Lens l\'immagine della pagina' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
-    LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
+    LEGGI_PAGINA: (a) => aPezzi('🌐', pezziLetturaPagina(a), { title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
-    ELIMINA_FILE: (a) => ({ icon: '🗑', text: testoEliminati(a._output) }),
+    ELIMINA_FILE: (a) => aPezzi('🗑', pezziEliminati(a._output)),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
-      const dove = String(a.contesto || a.context || a.argomento || '').trim();
-      return { icon: '📝', text: `Appunto salvato${dove ? ` · ${dove}` : ''}` };
+      const dove = suo(a.contesto || a.context || a.argomento);
+      return aPezzi('📝', ['Appunto salvato', ...(dove ? [' · ', dove] : [])]);
     },
-    SALVA_LEZIONE: (a) => {
-      const t = String(a.testo || a.text || a.lezione || '').trim();
-      return { icon: '🧠', text: `Memorizzato · ${t.length > 60 ? `${t.slice(0, 57)}…` : t}` };
-    },
+    SALVA_LEZIONE: (a) => aPezzi('🧠', ['Memorizzato · ', suo(corto(a.testo || a.text || a.lezione, 60))]),
     DIMENTICA: (a) => {
       const tolte = (a._output && Array.isArray(a._output.dimenticate)) ? a._output.dimenticate : [];
-      const t = tolte.join(', ') || String(a.testo || '').trim();
-      return { icon: '🧠', text: `Dimenticato · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
+      return aPezzi('🧠', ['Dimenticato · ', suo(corto(tolte.join(', ') || a.testo, 80))]);
     },
     // #1295 — una conversazione nascosta o cancellata a parole: la riga dice quale, e se si rimette.
-    TOGLI_CHAT: (a) => {
-      const t = pulito(a._titolo) || 'una conversazione';
-      return { icon: '💬', text: `${a.per_sempre === true ? 'Cancellata per sempre' : 'Nascosta'} · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
-    },
-    RIMETTI_CHAT: (a) => {
-      const t = pulito(a._titolo) || 'una conversazione';
-      return { icon: '💬', text: `Rimessa nel filo · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
-    },
-    CORREGGI_MEMORIA: (a) => {
-      const t = String((a._output && a._output.corretta) || a.nuovo || '').trim();
-      return { icon: '🧠', text: `Corretto · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
-    },
+    TOGLI_CHAT: (a) => aPezzi('💬', [`${a.per_sempre === true ? 'Cancellata per sempre' : 'Nascosta'} · `, suo(corto(a._titolo, 80)) || 'una conversazione']),
+    RIMETTI_CHAT: (a) => aPezzi('💬', ['Rimessa nel filo · ', suo(corto(a._titolo, 80)) || 'una conversazione']),
+    CORREGGI_MEMORIA: (a) => aPezzi('🧠', ['Corretto · ', suo(corto((a._output && a._output.corretta) || a.nuovo, 80))]),
     // Le due azioni che l'utente conferma nel popup e poi non ritrova da
     // nessuna parte: proprio quelle che non si disfano più.
     CANCELLA_MEMORIA: () => ({ icon: '🧠', text: 'Memoria cancellata' }),
