@@ -507,5 +507,5 @@
     };
   }
 
-  global.SN_FILO_ATTESA = { titoloNodo, dettaglioDi, TITOLI, crea, raggioGomitolo, puntoSpirale, SPIRALE_MAX, ms };
+  global.SN_FILO_ATTESA = { titoloNodo, dettaglioDi, scriviAPezzi, TITOLI, crea, raggioGomitolo, puntoSpirale, SPIRALE_MAX, ms };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
