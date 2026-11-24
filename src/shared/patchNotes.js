@@ -11,7 +11,7 @@
     {
       version: '0.2.302', date: '2026-11-24',
       fixes: [
-        { testo: 'Alt+T senza niente di selezionato traduce la pagina anche dopo un clic in un video che viene da un sito dove hai spento Filo: nel video Filo resta spento.', segnalazione: 504 },
+        { testo: 'Alt+T senza niente di selezionato traduce la pagina anche dopo un clic in un video che viene da un sito dove hai spento Filo.', segnalazione: 504 },
       ],
     },
     {
