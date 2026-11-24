@@ -73,11 +73,11 @@
     EVENTO_CALENDARIO: (a) => {
       const ev = (a._output && a._output.evento) || null;
       const quando = ev && ev.quando ? ` · ${ev.quando}` : '';
-      const nome = `${(ev && ev.titolo) || a.titolo || a.title || ''}${quando}`;
+      const nome = [suo((ev && ev.titolo) || a.titolo || a.title), quando];
       const fatto = a._output && a._output.fatto;
       // Nessun programma ha aperto il file: l'evento c'è, ma nel calendario non ancora.
-      if (fatto && a._output.nonAperto) return { icon: '📅', text: `Evento salvato in un file, il calendario non si è aperto · ${nome}` };
-      return { icon: '📅', text: `${fatto ? 'Evento aggiunto al calendario' : 'Evento proposto'} · ${nome}` };
+      if (fatto && a._output.nonAperto) return aPezzi('📅', ['Evento salvato in un file, il calendario non si è aperto · ', ...nome]);
+      return aPezzi('📅', [`${fatto ? 'Evento aggiunto al calendario' : 'Evento proposto'} · `, ...nome]);
     },
     // Impostazione applicata subito (livello 1, es. il tema): prima non
     // lasciava traccia in chat, come se non fosse successo niente.
