@@ -51,8 +51,24 @@
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
   }
   function frasiCambi(a) {
+    return piatto(pezziCambi(a));
+  }
+  // Le frasi dei cambi coi valori non di Filo nel riquadro (`parti`, del registro dei cambi); pezzi che non dicono la
+  // loro frase non valgono, e resta la frase (#2648.1).
+  function pezziCambi(a) {
     const l = Array.isArray(a && a._cambi) ? a._cambi : [];
-    return l.map((c) => pulito(c && c.frase)).filter(Boolean).join('; ');
+    const una = (c) => {
+      const f = pulito(c && c.frase);
+      const p = f && pezziDellaFrase(c.parti);
+      return p && piatto(p).trim() === f ? p : [f];
+    };
+    return unisci(l.map(una).filter((p) => p[0] !== ''), '; ').flat();
+  }
+  function pezziDellaFrase(p) {
+    if (!Array.isArray(p) || p.length > 60) return null;
+    const out = p.map((x) => (typeof x === 'string' ? x : x && typeof x === 'object' && typeof x.citazione === 'string'
+      ? (x.nuda === true ? suo(x.citazione) : fra(x.citazione)) : null));
+    return out.some((x) => x == null) ? null : out.filter((x) => x !== '');
   }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
