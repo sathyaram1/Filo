@@ -456,8 +456,7 @@ test('Alt+T senza selezione con la risposta di una traduzione aperta traduce la 
   await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 15_000 }).toBe(1);
   expect(await app.evaluate(() => globalThis.__filoChiamate)).toBe(0);
 
-  // La tastiera nella casella della risposta, e niente scelto da nessuna parte.
-  await clicca(app, page, '.sn-popup-input');
+  // La tastiera nella risposta, e niente scelto da nessuna parte.
   await page.evaluate(() => getSelection().removeAllRanges());
   const strato = await tastieraDi(app, page);
   await strato.evaluate(() => getSelection().removeAllRanges());
