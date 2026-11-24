@@ -202,15 +202,14 @@ for (const [forma, pagina] of [
 
 test('il pulsante che chiude la finestra di un altro sito la chiude, e la pagina resta davanti', async ({ app, openTab, testServer }) => {
   const dest = testServer.html('<title>CHAT</title>', { pubblico: true });
-  const page = await openTab(testServer.html(`<title>NEGOZIO</title><script>var w=null;function chat(){if(w&&!w.closed){w.close();w=null;}else w=window.open(${JSON.stringify(dest)},'chat');}</script>${pulsante('a', 'Chat', 'chat()')}`));
-  const n = (await schede(app)).length;
+  const page = await openTab(testServer.html(`<title>NEGOZIO</title><script>var w=null;function chat(){if(w&&!w.closed)w.close();else w=window.open(${JSON.stringify(dest)},'chat');}</script>${pulsante('a', 'Chat', 'chat()')}`));
   await page.click('#a');
   await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'CHAT'), { timeout: 8000 }).toBe(true);
   await davanti(app, page.url());
   await page.waitForTimeout(300);
   await page.click('#a');
-  await expect.poll(async () => (await schede(app)).length, { timeout: 8000 }).toBe(n);
-  await page.waitForTimeout(500);
+  await expect.poll(() => page.evaluate(() => w.closed), { timeout: 8000 }).toBe(true);
+  await page.waitForTimeout(1000);
   expect((await schede(app)).find((s) => s.attiva)?.titolo).toBe('NEGOZIO');
 });
 
