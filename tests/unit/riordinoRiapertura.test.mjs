@@ -259,6 +259,7 @@ test('fin dove era arrivata la lettura va nella sessione, e lo 0 no', () => {
 
 test('la lettura salvata arriva al giudizio finché l’utente non tocca la scheda', async () => {
   const tm = gestore();
+  delete tm._gatherTriageInput;
   Object.assign(tm.tabs[1], { scrollPct: 0, _scrollIgnoto: true, _letturaSalvata: 62 });
   Object.assign(tm.tabs[2], { scrollPct: 0, _scrollIgnoto: true, _letturaSalvata: null });
   let [verde, rosso] = await tm._gatherTriageInput([tm.tabs[1], tm.tabs[2]]);
