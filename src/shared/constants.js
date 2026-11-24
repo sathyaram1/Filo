@@ -1179,7 +1179,18 @@
     const u = FINE_URL.exec(resto);
     return u && INDIRIZZO_VERO.test(u[1]) ? null : el;
   }
+  const HOST_IN_CODA = /^(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+)(:\d{1,5})?\/?$/i;
   const decodifica = (x) => { try { return decodeURIComponent(x); } catch (_) { return x; } };
+  // Una riga che Filo non sa leggere si custodisce intera (#2646.3), ma non il suo host: le finestre del confronto
+  // fermerebbero una visita al fornitore. L'host è dopo l'ultima @, se lì ce n'è uno, se no in testa fino ai primi due
+  // punti; la password presunta è l'ultimo pezzo dopo i due punti, come nelle due forme che Filo legge.
+  function senzaHost(resto) {
+    const at = resto.lastIndexOf('@');
+    const c = resto.indexOf(':');
+    const parte = at > 0 && HOST_IN_CODA.test(resto.slice(at + 1)) ? resto.slice(0, at) : c > 0 ? resto.slice(c + 1) : resto;
+    const coda = parte.slice(parte.lastIndexOf(':') + 1);
+    return { credenziali: parte, password: /^\d*$/.test(coda) ? '' : coda, senza: '', intera: true };
+  }
   function leggiProxy(v) {
     if (!pieno(v)) return null;
     const t = v.trim();
