@@ -2389,7 +2389,7 @@ class TabManager {
           voce,
           riserva: {
             url: tab.url,
-            scroll: typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null,
+            scroll: letturaNota(tab),
             proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
             colore: tab.identityColor || null,
           },
