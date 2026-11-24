@@ -319,6 +319,8 @@
     const parti = v.riga ? partiDellaRiga(v.parti, v.riga) : null;
     if (parti) out.parti = parti;
     if (v.motivo) out.motivo = v.motivo;
+    const motivoParti = v.motivo ? partiDellaRiga(v.motivoParti, v.motivo) : null;
+    if (motivoParti) out.motivoParti = motivoParti;
     if (v.file) out.file = v.file;
     if (v.link) out.link = v.link;
     if (v.salvate) out.salvate = v.salvate;
