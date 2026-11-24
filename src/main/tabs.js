@@ -2735,6 +2735,8 @@ class TabManager {
       tab._letturaSalvata = null;
     }
     if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
+    const visto = letturaValida(activity.mediaPct);
+    if (visto != null) { tab.mediaPct = visto; tab._mediaPer = tab.url; }
     if (typeof activity.formDirty === 'boolean') {
       // Una voce per frame: il «niente» della pagina non cancella il testo di un riquadro.
       if (!tab._moduli) tab._moduli = new Set();
