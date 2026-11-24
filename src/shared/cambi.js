@@ -830,6 +830,7 @@
     valore: (chiave, x) => valoreDi(voce(chiave), x),
     frasi,
     frase,
+    fraseAPezzi,
     provenienza,
     fondibile,
     fondi,
