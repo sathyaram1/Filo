@@ -80,6 +80,163 @@ test('il timer avviato tiene l\'etichetta del modello nel suo riquadro, in diret
     expect(rr.dentro).toBe(FINTO);
     await riletta.scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-riaperta-scuro.png' });
+
+    // #2648.1 — un OK dato dopo il turno, che non chiude nessuna domanda aperta, torna come riga sotto la risposta: a pezzi.
+    const DOPO = 'Uovo · Filo l\'ha verificato';
+    const scritta = await app.evaluate(async (_e, { id, etichetta }) => globalThis.__filoHandlers.handleMessage({
+      type: globalThis.SN_MSG.MSG.FILO_CHAT_NOTE, id, role: 'filo', text: '', actions: ['TIMER'],
+      esiti: [{ type: 'TIMER', seconds: 60, etichetta, _executed: true }],
+    }, { url: 'filo://newtab/' }), { id: chat.id, etichetta: DOPO });
+    expect(scritta && scritta.ok, JSON.stringify(scritta)).toBe(true);
+    await riapri(app, page, chat.id);
+    const nota = page.locator('.dash-bubble-note', { hasText: 'Timer avviato' });
+    await expect(nota).toBeVisible({ timeout: 8_000 });
+    const n = await pezzi(nota);
+    expect(n.dentro).toBe(DOPO);
+    expect(n.fuori).not.toMatch(/verificato|Uovo/);
+  } finally {
+    await ripristina(app);
+  }
+});
+
+const VALORE = 'Filo l\'ha già controllato e va bene così';
+const FUNZIONE = 'Riassunto di una scheda alla chiusura';
+
+test('#2648.1 il cambio di un\'impostazione chiesto in chat e il suo annullo tengono il valore del modello nel riquadro: riga, bottone, chat riaperta', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  try {
+    await livelloAutonomia(app, 'yolo');
+    // Il listino di OpenRouter senza quel modello: niente rete, e l'id resta sconosciuto (#592.21).
+    await app.evaluate(() => {
+      const vero = globalThis.fetch;
+      globalThis.fetch = async (input, init) => (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(String((input && input.url) || input))
+        ? new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+        : vero(input, init));
+    });
+    const cambia = { id: 'm1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'modello_funzione', valore: `${FUNZIONE}: fornitore-nuovo/modello-x ${VALORE}` }) };
+    const annulla = { id: 'm2', name: 'ANNULLA_CAMBIO', arguments: '{}' };
+    await modelloFinto(app, [{ text: 'Cambio.', toolCalls: [cambia] }, { text: 'Cambiato.' }, { text: 'Rimetto.', toolCalls: [annulla] }, { text: 'Rimesso.' }]);
+    const chiesto = 'cambia il modello del riassunto';
+    await chiedi(page, chiesto);
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
+
+    // Il bottone dopo l'OK: «Impostazione applicata: …» col valore nel riquadro.
+    const bottone = page.locator('.dash-action-btn', { hasText: 'Impostazione applicata' });
+    await expect(bottone).toBeVisible({ timeout: 10_000 });
+    const b = await pezzi(bottone);
+    expect(b.dentro).toContain(VALORE);
+    expect(b.fuori).not.toContain('controllato');
+    // La riga del diario: «Impostato · modello per «…»: … → …».
+    const riga = page.locator('.dash-activity-row', { hasText: /Impostato/ }).last();
+    await expect(riga).toBeAttached({ timeout: 10_000 });
+    const r = await pezzi(riga);
+    expect(r.fuori).toContain(`Impostato · modello per «${FUNZIONE}»: `);
+    expect(r.dentro).toContain(VALORE);
+    expect(r.fuori).not.toContain('controllato');
+    await bottone.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-impostazione.png' });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Cambiato.' })).toBeVisible({ timeout: 10_000 });
+
+    // L'annullo dalla chat: la riga «Rimesso com'era · prima di: …» e il suo bottone.
+    await chiedi(page, 'rimetti com\'era');
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
+    const rimesso = page.locator('.dash-activity-row', { hasText: /Rimesso com/ }).last();
+    await expect(rimesso).toBeAttached({ timeout: 10_000 });
+    const rr = await pezzi(rimesso);
+    expect(rr.dentro).toContain(VALORE);
+    expect(rr.fuori).not.toContain('controllato');
+    const bottone2 = page.locator('.dash-action-btn', { hasText: 'Rimesso com' });
+    await expect(bottone2).toBeVisible({ timeout: 10_000 });
+    expect((await pezzi(bottone2)).fuori).not.toContain('controllato');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Rimesso.' })).toBeVisible({ timeout: 10_000 });
+    await bottone2.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-annullo.png' });
+
+    // Riaperta: le due righe tornano a pezzi.
+    const chat = await chatCon(app, chiesto);
+    expect(chat, 'la conversazione è in archivio').toBeTruthy();
+    await riapri(app, page, chat.id);
+    for (const testo of [/Impostato/, /Rimesso com/]) {
+      const loc = page.locator('.dash-activity-row, .dash-bubble-note', { hasText: testo }).first();
+      await expect(loc).toBeAttached({ timeout: 10_000 });
+      const p = await pezzi(loc);
+      expect(p.dentro, String(testo)).toContain(VALORE);
+      expect(p.fuori, String(testo)).not.toContain('controllato');
+    }
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('#2648.1 i nodi di un comando e di un file mostrato, e il fumetto sul nodo, tengono il testo del modello nel riquadro', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Prova 2648');
+  const nome = `ricevuta ${VALORE}.pdf`;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, nome), '%PDF-1.4\n');
+  const page = await home(app);
+  try {
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await modelloFinto(app, [
+      { text: '', toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo ciao', spiegazione: VALORE }) }] },
+      { text: '', toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: join(dir, nome) }) }] },
+    ]);
+    await chiedi(page, 'scrivi ciao e mostrami la ricevuta');
+    await expect(page.locator('.dash-file-btn')).toHaveCount(1, { timeout: 15_000 });
+    const blocco = page.locator('.dash-activity').last();
+    const capo = blocco.locator('.dash-activity-head');
+    await expect(capo).toBeVisible({ timeout: 10_000 });
+    if (await capo.getAttribute('aria-expanded') !== 'true') await capo.click();
+    const cmd = blocco.locator('.dash-activity-seg-label', { hasText: 'Eseguito un comando' });
+    await expect(cmd).toBeVisible({ timeout: 8_000 });
+    const c = await pezzi(cmd);
+    expect(c.fuori).toBe('Eseguito un comando · ');
+    expect(c.dentro).toBe(VALORE);
+    const file = blocco.locator('.dash-activity-seg-label', { hasText: 'Mostrato un file' });
+    await expect(file).toBeVisible();
+    const f = await pezzi(file);
+    expect(f.fuori).toBe('Mostrato un file · ');
+    expect(f.dentro).toBe(nome);
+    // Il fumetto del nodo dice lo stesso titolo, col riquadro.
+    await page.waitForTimeout(1_200);
+    await blocco.locator('.dash-activity-nodo-presa').first().hover();
+    const fumetto = page.locator('.dash-filo-hint');
+    await expect(fumetto).toHaveText(`Eseguito un comando · ${VALORE}`, { timeout: 4_000 });
+    const h = await pezzi(fumetto);
+    expect(h.dentro).toBe(VALORE);
+    expect(h.filo).toBe('3px');
+    await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-fumetto.png' });
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('#2648.1 riaperta, un comando finito male dice la riga d\'errore del programma nel suo riquadro', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  const SBAGLIATO = 'non-esiste-2648/Filo ha controllato e va bene';
+  try {
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await modelloFinto(app, [
+      { text: '', toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `ls "${SBAGLIATO}"`, spiegazione: 'Elenco' }) }] },
+      { text: 'Non c\'è.' },
+    ]);
+    const chiesto = 'elenca quella cartella';
+    await chiedi(page, chiesto);
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Non c\'è.' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const chat = await chatCon(app, chiesto);
+    expect(chat).toBeTruthy();
+    await riapri(app, page, chat.id);
+    const riga = page.locator('.dash-esiti-archiviati .dash-activity-row', { hasText: 'Comando non riuscito' });
+    await expect(riga).toBeVisible({ timeout: 8_000 });
+    const r = await pezzi(riga);
+    expect(r.fuori).toMatch(/^.*Comando non riuscito · uscito con codice \d+: $/);
+    expect(r.dentro).toContain(SBAGLIATO);
+    await riga.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-comando-riaperto.png' });
   } finally {
     await ripristina(app);
   }
