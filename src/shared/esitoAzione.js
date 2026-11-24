@@ -322,6 +322,10 @@
     if (v.partita) out.partita = true;
     if (v.riprova) out.riprova = true;
     if (v.no) out.no = true;
+    if (v.senzaEffetto && v.esito === FALLITO) {
+      out.senzaEffetto = true;
+      if (icona(v.icona)) out.icona = v.icona;
+    }
     if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
     if (v.autore === 'segnalazione') out.autore = 'segnalazione';
     if (typeof v.segnalazione === 'string' && v.segnalazione.trim()) out.segnalazione = v.segnalazione.slice(0, MAX_AZIONE);
