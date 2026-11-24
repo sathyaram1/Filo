@@ -5,7 +5,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { paginaDellAiuto, conta } from './helpers/riquadri.mjs';
+import { paginaDellAiuto, conta, clicca, tastieraDi } from './helpers/riquadri.mjs';
 import { copertura } from './helpers/avvisoSito.mjs';
 
 const ARTICOLO = `<!doctype html><html lang="en"><head><title>An English article</title></head>
