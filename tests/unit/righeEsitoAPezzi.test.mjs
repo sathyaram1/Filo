@@ -74,7 +74,7 @@ test('la riga in diretta: il timer e la sveglia hanno l\'etichetta nel riquadro,
   assert.equal(t.text, `Timer avviato · ${F} · 5 min`);
   assert.deepEqual(t.parti, ['Timer avviato · ', { citazione: F, nuda: true }, ' · 5 min']);
   const s = RA.riga({ type: 'SVEGLIA', _executed: true, orario: '07:30', etichetta: F });
-  assert.deepEqual(s.parti, ['Sveglia impostata', ' · ', { citazione: '07:30', nuda: true }, ' · ', { citazione: F, nuda: true }]);
+  assert.deepEqual(s.parti, ['Sveglia impostata · ', { citazione: '07:30', nuda: true }, ' · ', { citazione: F, nuda: true }]);
   // Un titolo che la riga diceva fra «» resta fra «» nel testo piatto.
   const r = RA.riga({ type: 'RIAPRI_SCHEDA', _executed: true, _output: { titolo: F } });
   assert.equal(r.text, `Riaperta «${F}»`);
