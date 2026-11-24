@@ -433,7 +433,19 @@ test('Alt+T senza selezione con la risposta di una traduzione aperta traduce la 
     globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta('Un feed che cresce.'); return { text: 'Un feed che cresce.', usage: {} }; } };
   });
   const page = await testServer.openReady(openTab, ARTICOLO);
-  await page.locator('#r0').dblclick();
+  // Il doppio clic vero, come lo manda il sistema.
+  await page.waitForTimeout(500);
+  const box = await page.locator('#r0').boundingBox();
+  await app.evaluate(({ BrowserWindow }, { x, y }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'mouseMove', x, y });
+    for (const c of [1, 2]) {
+      wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: c });
+      wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: c });
+    }
+  }, { x: Math.round(box.x + 8), y: Math.round(box.y + box.height / 2) });
+  await expect.poll(() => page.evaluate(() => String(getSelection()).trim())).not.toBe('');
   await premiAltT(app);
   await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 15_000 }).toBe(1);
   expect(await app.evaluate(() => globalThis.__filoChiamate)).toBe(0);
