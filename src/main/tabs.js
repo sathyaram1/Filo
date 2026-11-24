@@ -1888,7 +1888,7 @@ class TabManager {
       ? ProxyTab.normalizeCountry(country)
       : (ProxyTab.normalizeCountry(p.lastCountry) || ProxyTab.normalizeCountry(p.defaultCountry) || 'us');
     if (!code) return { ok: false, error: 'bad_country' };
-    const resolved = ProxyTab.resolve(code, { tier, settings });
+    const resolved = await ProxyTab.resolveSentito(code, { tier, settings });
     // Ogni instradamento, da qualunque strada (blocco per paese, proposta, menu, chat, regola del sito): riuscito o no (#1469).
     const conta = (ok) => this._contaNavigazione((N) => N.proxy(code, resolved ? resolved.tier : tier, ok));
     if (!resolved) { conta(false); return { ok: false, error: 'not_configured' }; }
