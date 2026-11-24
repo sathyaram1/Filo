@@ -4996,6 +4996,7 @@ class TabManager {
     const usate = [];
     const audio = [];
     const ids = [];
+    const letture = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
