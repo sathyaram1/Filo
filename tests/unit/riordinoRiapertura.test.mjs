@@ -275,6 +275,7 @@ test('la lettura salvata arriva al giudizio finché l’utente non tocca la sche
 
 test('la sessione riaperta rimette a ogni scheda la sua lettura, e la pagina riparte da lì', async () => {
   const tm = gestore();
+  delete tm._gatherTriageInput;
   const viste = [];
   const salvata = { tabs: ['https://a.example/', 'https://b.example/', 'https://c.example/'], letture: [55, 'molto', 140], activeIndex: 0 };
   const prima = globalThis.SN_STORAGE;
