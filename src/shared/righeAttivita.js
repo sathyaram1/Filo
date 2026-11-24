@@ -137,67 +137,64 @@
     LEGGI_MEMORIA: () => ({ icon: '🧠', text: 'Rileggo la memoria' }),
     LEGGI_IMPOSTAZIONI: (a) => {
       const c = String(a.cerca || '').trim();
-      return { icon: '⚙', text: c ? `Leggo come è impostato: ${c}` : 'Leggo le impostazioni' };
+      return c ? aPezzi('⚙', ['Leggo come è impostato: ', suo(c)]) : { icon: '⚙', text: 'Leggo le impostazioni' };
     },
     TOGLI_PERMESSO_SITO: (a) => {
       const tolte = (a._output && Array.isArray(a._output.tolte)) ? a._output.tolte.map(pulito).filter(Boolean) : [];
-      return { icon: '⚙', text: `Permesso tolto · ${tolte.length ? tolte.join('; ') : String(a.sito || '')}` };
+      return aPezzi('⚙', ['Permesso tolto · ', tolte.length ? tolte.join('; ') : suo(a.sito)]);
     },
     LEGGI_FILE: (a) => {
       const title = (a._output && a._output.title) || '';
-      return { icon: '📄', text: title ? `Leggo: ${title}` : 'Leggo un file' };
+      return title ? aPezzi('📄', ['Leggo: ', suo(title)]) : { icon: '📄', text: 'Leggo un file' };
     },
     LEGGI_DOCUMENTO: (a) => {
       const nome = (a._output && a._output.name) || '';
-      return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
+      return nome ? aPezzi('📄', ['Leggo il documento: ', suo(nome)]) : { icon: '📄', text: 'Leggo il documento' };
     },
     // #778 — quale finestra ha guardato; quello che c'era sta nella risposta, non nel diario.
     VEDI_SCHERMO: (a) => {
       const o = a._output || {};
-      if (Array.isArray(o.ambigue)) return { icon: '🖥', text: `Più finestre per «${pulito(o.richiesta)}»` };
+      if (Array.isArray(o.ambigue)) return aPezzi('🖥', ['Più finestre per ', fra(o.richiesta)]);
       if (Array.isArray(o.elenco) && !o.testo) return { icon: '🖥', text: 'Guardato quali finestre sono aperte' };
       const nome = pulito(o.finestra);
-      return { icon: '🖥', text: nome ? `Ho guardato «${nome}»` : 'Ho guardato lo schermo' };
+      return nome ? aPezzi('🖥', ['Ho guardato ', fra(nome)]) : { icon: '🖥', text: 'Ho guardato lo schermo' };
     },
-    CERCA_DOCUMENTI: (a) => ({ icon: '🔎', text: testoRicercaDocumenti(a) }),
-    CERCA_SALVATE: (a) => ({ icon: '🔖', text: testoRicercaSalvate(a) }),
+    CERCA_DOCUMENTI: (a) => aPezzi('🔎', pezziRicercaDocumenti(a)),
+    CERCA_SALVATE: (a) => aPezzi('🔖', pezziRicercaSalvate(a)),
     APRI_SALVATA: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo) || 'una pagina salvata';
-      return { icon: '↗', text: `Aperta «${t}»${o.tolta ? ' · tolta da «Aperti per dopo»' : ' · resta in «Aperti per dopo»'}` };
+      return aPezzi('↗', ['Aperta ', fra(o.titolo) || '«una pagina salvata»', o.tolta ? ' · tolta da «Aperti per dopo»' : ' · resta in «Aperti per dopo»']);
     },
     SCHEDE_CHIUSE: (a) => {
       const o = a._output || {};
       const n = Array.isArray(o.schede) ? o.schede.length : 0;
-      const q = pulito(a.cerca || '');
-      const cosa = q ? ` · «${q}»` : '';
-      return { icon: '🗂', text: n ? `${n === 1 ? 'Trovata una scheda chiusa' : `Trovate ${n} schede chiuse`}${cosa}` : `Nessuna scheda chiusa trovata${cosa}` };
+      const q = fra(a.cerca);
+      const cosa = q ? [' · ', q] : [];
+      return aPezzi('🗂', [n ? (n === 1 ? 'Trovata una scheda chiusa' : `Trovate ${n} schede chiuse`) : 'Nessuna scheda chiusa trovata', ...cosa]);
     },
     RIAPRI_SCHEDA: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo || a._titolo) || 'la scheda';
-      return { icon: '↺', text: o.nonRaggiungibile ? `«${t}» non risponde più · sotto c'è il riassunto` : `Riaperta «${t}»` };
+      const t = fra(o.titolo || a._titolo) || '«la scheda»';
+      return aPezzi('↺', o.nonRaggiungibile ? [t, ' non risponde più · sotto c\'è il riassunto'] : ['Riaperta ', t]);
     },
     RIPRENDI_AUDIO: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo) || 'la musica';
-      if (o.nonPartita) return { icon: '🎵', text: `${o.riaperta ? 'Riaperta' : 'Trovata'} «${t}» · non è ripartita da sola` };
-      return { icon: '🎵', text: `${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'} «${t}»` };
+      const t = fra(o.titolo) || '«la musica»';
+      if (o.nonPartita) return aPezzi('🎵', [`${o.riaperta ? 'Riaperta' : 'Trovata'} `, t, ' · non è ripartita da sola']);
+      return aPezzi('🎵', [`${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'} `, t]);
     },
     PAUSA_AUDIO: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo || a._titolo);
-      return { icon: '⏸', text: t ? `In pausa «${t}»` : 'Musica in pausa' };
+      const t = fra(o.titolo || a._titolo);
+      return t ? aPezzi('⏸', ['In pausa ', t]) : { icon: '⏸', text: 'Musica in pausa' };
     },
     MOSTRA_SCHEDA: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo || a._titolo) || 'la scheda';
-      return { icon: '↗', text: `Ti ho portato su «${t}»` };
+      return aPezzi('↗', ['Ti ho portato su ', fra(o.titolo || a._titolo) || '«la scheda»']);
     },
     SALVA_PER_DOPO: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo || a._titolo) || 'la pagina';
-      return { icon: '🔖', text: `Salvata per dopo «${t}»` };
+      return aPezzi('🔖', ['Salvata per dopo ', fra(o.titolo || a._titolo) || '«la pagina»']);
     },
     CERCA_IMMAGINE: (a) => {
       const o = a._output || {};
