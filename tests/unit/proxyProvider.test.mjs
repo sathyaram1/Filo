@@ -168,6 +168,29 @@ test('resolveSentito: un fornitore solo socks5 scritto senza schema si usa in so
   } finally { await f.close(); }
 });
 
+test('resolveSentito: un elenco con la password su una porta http e socks5 apre le schede in http, senza password resta socks5', async () => {
+  const f = await fornitore('misto');
+  try {
+    const conPassword = { proxy: { datacenter: `127.0.0.1:${f.port}:mario-{country}:passwordsegreta` } };
+    const r = await P.resolveSentito('de', { settings: conPassword, env: {} });
+    assert.equal(r.proxyRules, `http://127.0.0.1:${f.port}`, 'in socks5 Chromium non manda la password');
+    assert.deepEqual(r.auth, { username: 'mario-de', password: 'passwordsegreta' });
+    const senza = await P.resolveSentito('de', { settings: { proxy: { datacenter: `127.0.0.1:${f.port}` } }, env: {} });
+    assert.equal(senza.proxyRules, `socks5://127.0.0.1:${f.port}`, 'la risposta con la password non vale per la riga senza');
+  } finally { await f.close(); }
+});
+
+test('resolveSentito: un socks5 che tace davanti all\'http si riconosce lo stesso, entro il tempo della domanda', async () => {
+  const f = await fornitore('socks5-muto');
+  try {
+    const t0 = Date.now();
+    const r = await P.resolveSentito('us', { settings: { proxy: { datacenter: `u:p@127.0.0.1:${f.port}` } }, env: {} },
+      { sonda: (ind, o) => P.sondaSchema(ind, { ...o, ms: 600 }) });
+    assert.equal(r.proxyRules, `socks5://127.0.0.1:${f.port}`);
+    assert.ok(Date.now() - t0 < 1500);
+  } finally { await f.close(); }
+});
+
 test('resolveSentito: un proxy http senza credenziali né schema si usa in http', async () => {
   const f = await fornitore('http');
   try {
