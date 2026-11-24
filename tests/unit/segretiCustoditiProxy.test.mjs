@@ -119,3 +119,22 @@ test('il cancello dei modelli oscura la password corta del proxy (porta il segno
   assert.equal(visti.length, 1);
   assert.ok(!JSON.stringify(visti[0]).includes(corta), JSON.stringify(visti[0]));
 });
+
+// #2646.3: una riga che Filo non sa leggere si custodisce intera, host escluso, e la password presunta da sola.
+test('un proxy che Filo non sa leggere non esce e non arriva al modello; il sito del fornitore resta visitabile', () => {
+  const HOST = 'residenziale.fornitoreproxy.example';
+  for (const riga of [
+    `2001:db8::1:8080:mario:${PASSWORD}`, `${HOST}:8080:ma/rio:${PASSWORD}`, `${HOST}:8080:ma#rio:${PASSWORD}`,
+    `${HOST}:8080:ma?rio:${PASSWORD}`, `${HOST}:8080:ma@rio:${PASSWORD}`, `ma/rio:${PASSWORD}@${HOST}:8080`,
+  ]) {
+    const lista = conProxy({ datacenter: riga });
+    for (const testo of [riga, PASSWORD]) {
+      assert.equal(X.valutaUscita({ type: 'NAVIGA', url: `https://raccolta.example/?p=${encodeURIComponent(testo)}` }, { segreti: lista }).blocca,
+        true, `${riga}: «${testo}» esce`);
+      assert.ok(!G.oscuraSegreti(`il proxy è ${testo}`, valori(lista)).includes(PASSWORD), `${riga}: «${testo}» arriva al modello`);
+    }
+    assert.equal(X.valutaUscita({ type: 'NAVIGA', url: `https://${HOST}/dashboard` }, { segreti: lista }).blocca, false,
+      `${riga}: la visita al fornitore si ferma`);
+  }
+  assert.equal(C.leggiProxy(`mario:12/ss@${HOST}`).uso, null, 'una riga che non si legge non si usa per collegarsi');
+});
