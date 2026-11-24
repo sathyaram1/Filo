@@ -4086,7 +4086,8 @@ class TabManager {
     const quella = richiesta.focus === true
       ? (nome && tenute.find((t) => t._nomeFinestra === nome)) || tenute.find((t) => { try { return t.view.webContents.getURL() === url; } catch (_) { return false; } })
       : (nome && tenute.find((t) => t._nomeFinestra === nome)) || tenute.filter((t) => t._apertaPer === (url || 'about:blank')).pop();
-    const tab = quella || (tenute.length === 1 ? tenute[0] : null);
+    // Il pulsante ripetuto nomina la sua finestra: un riquadro di un altro sito non porta davanti quelle della pagina.
+    const tab = quella || (richiesta.focus === true && tenute.length === 1 ? tenute[0] : null);
     if (tab) this._richiamata(tab, wc, chiede);
   }
 
