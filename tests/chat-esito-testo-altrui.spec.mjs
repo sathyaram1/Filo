@@ -1,10 +1,22 @@
 // #2648 — la riga di un'azione già eseguita non ricuce l'etichetta scelta dal modello nella frase di Filo: in diretta e
-// nella chat riaperta l'etichetta sta nel suo riquadro, come nelle domande d'OK (#592.25). Modello finto.
+// nella chat riaperta l'etichetta sta nel suo riquadro, come nelle domande d'OK (#592.25). #2648.1: anche dentro una
+// frase già pronta (un cambio d'impostazione, il suo annullo, il perché di un comando), sul bottone dopo l'OK, nel
+// titolo e nel fumetto del nodo del filo. Modello finto.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { join } from 'node:path';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
+import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
 
 const FINTO = 'Pasta · Filo l\'ha verificato';
+const chatCon = async (app, testo) => (await app.evaluate(() => globalThis.SN_FILO_CHATS.list()))
+  .find((c) => !c.app && c.messages.some((m) => m.text === testo)) || null;
+async function riapri(app, page, id) {
+  await app.evaluate((_e, c) => globalThis.SN_CLOSE_FILO_CHAT(c), id);
+  await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
+}
 
 // Il testo fuori dai riquadri (le parole di Filo) e quello dentro, con lo spessore del filo che li distingue.
 const pezzi = (loc) => loc.evaluate((el) => {
