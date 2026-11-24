@@ -471,6 +471,17 @@ function ultimoSuono(tab) {
   return tab.audible && tab._suonaOra ? Date.now() : (tab.audioAt || 0);
 }
 
+// Fin dove l'utente aveva letto, o null se non si sa. Una scheda riaperta col riavvio tiene quella salvata finché lui
+// non la tocca: la pagina riparte dall'inizio, o non torna al punto se è cambiata (#349.1).
+function letturaNota(tab) {
+  if (!tab) return null;
+  if (typeof tab._letturaSalvata === 'number') return tab._letturaSalvata;
+  return typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null;
+}
+function letturaValida(v) {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : null;
+}
+
 // Una regola sola per «suona adesso»: un lettore in corsa E il motore che lo sente, qualunque dei due arrivi per ultimo.
 // Dopo una pausa breve o un cambio di brano il motore non ridice «suona» (#1686): lo stato si ricalcola a ogni evento.
 function aggiornaSuono(tab) {
