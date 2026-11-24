@@ -527,7 +527,7 @@
     }
     if (k.startsWith('zoom:')) {
       const p = (x) => (Number.isFinite(Number(x)) ? `${Math.round(Number(x))}%` : '?');
-      return `zoom di ${k.slice(5)}: ${p(c.prima)} → ${p(c.dopo)}`;
+      return [`zoom di ${k.slice(5)}: ${p(c.prima)} → ${p(c.dopo)}`];
     }
     if (k.startsWith('icona:')) {
       const D = global.SN_DISPOSIZIONE_ICONE;
