@@ -565,34 +565,38 @@
       const N = global.SN_NOMI_SITO;
       const leggi = v.leggibile || (N && N.leggibile ? (x) => N.leggibile(x) : null);
       const leggibili = (l) => elencoDi(leggi ? l.map(leggi) : l);
-      if (piu.length) parti.push(`aggiunt${piu.length > 1 ? 'i' : 'o'} ${leggibili(piu)}`);
-      if (meno.length) parti.push(`tolt${meno.length > 1 ? 'i' : 'o'} ${leggibili(meno)}`);
-      return `${nome}: ${parti.join(', ') || 'riordinati'}`;
+      if (piu.length) parti.push([`aggiunt${piu.length > 1 ? 'i' : 'o'} `, ...leggibili(piu)]);
+      if (meno.length) parti.push([`tolt${meno.length > 1 ? 'i' : 'o'} `, ...leggibili(meno)]);
+      return [`${nome}: `, ...(parti.length ? unisci(parti, ', ').flat() : ['riordinati'])];
     }
     if (v && v.testo) {
       const dopo = String(c.dopo || '').trim();
-      return dopo ? `${nome}: «${breve(dopo, 50)}»` : `${nome}: tolto`;
+      return dopo ? [`${nome}: `, fra(breve(dopo, 50))] : [`${nome}: tolto`];
     }
-    return `${nome}: ${valoreDi(v, c.prima)} → ${valoreDi(v, c.dopo)}`;
+    return [`${nome}: `, pezzoValore(v, c.prima), ' → ', pezzoValore(v, c.dopo)];
   }
 
-  // Le frasi di un evento, una per cambio: chi le mostra sceglie quante.
-  function frasi(evento) {
+  // Le frasi di un evento, una per cambio (a pezzi in `partiFrasi`): chi le mostra sceglie quante.
+  function partiFrasi(evento) {
     const cambi = evento && Array.isArray(evento.cambi) ? evento.cambi : [];
-    const out = cambi.filter((c) => !(c && c.coperto)).map(fraseCambio);
+    const out = cambi.filter((c) => !(c && c.coperto)).map(partiCambio);
     const coperti = cambi.filter((c) => c && c.coperto);
     if (coperti.length) {
       const tolti = coperti.every((c) => !c.dopo);
       const quanti = coperti.length === 1 ? 'una funzione' : `${coperti.length} funzioni`;
-      out.push(`modelli scelti a mano per ${quanti}: ${tolti ? 'tolti' : 'cambiati'}, valgono quelli predefiniti di Filo`);
+      out.push([`modelli scelti a mano per ${quanti}: ${tolti ? 'tolti' : 'cambiati'}, valgono quelli predefiniti di Filo`]);
     }
     return out;
   }
-  function frase(evento, max = 3) {
-    const f = frasi(evento);
-    if (f.length <= max) return f.join('; ');
-    return `${f.slice(0, max).join('; ')} e altri ${f.length - max} cambi`;
+  const frasi = (evento) => partiFrasi(evento).map(piatto);
+  function fraseParti(evento, max = 3) {
+    const f = partiFrasi(evento);
+    const dette = unisci(f.slice(0, max), '; ').flat();
+    return f.length <= max ? dette : [...dette, ` e altri ${f.length - max} cambi`];
   }
+  const frase = (evento, max = 3) => piatto(fraseParti(evento, max));
+  // I pezzi della frase solo quando c'è un riquadro: tutta di Filo, resta la frase.
+  const fraseAPezzi = (evento, max = 3) => { const p = fraseParti(evento, max).filter((x) => x !== ''); return p.some((x) => typeof x !== 'string') ? p : null; };
 
   const DOVE = {
     preferences: 'dalle Preferenze',
