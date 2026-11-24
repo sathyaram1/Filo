@@ -125,6 +125,7 @@ function resolve(country, { tier, settings, env } = {}) {
     proxyRules: ep.proxyRules,
     bypassRules: cfg.bypass || '',
     auth: ep.auth,
+    ...(ep.daSentire ? { daSentire: ep.daSentire } : {}),
   };
 }
 
