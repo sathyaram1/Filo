@@ -593,9 +593,10 @@
     try { sito = new URL(o.url || a.url || '').hostname.replace(/^www\./, ''); } catch (_) { sito = ''; }
     const seguito = Number(o.da || a.da || 0) > 0;
     const verbo = seguito ? 'Leggo il seguito della pagina' : 'Leggo la pagina';
-    const parti = [titolo, sito !== titolo ? sito : '', o.fonte === 'scheda' ? 'dalla tua scheda' : ''].filter(Boolean);
-    return parti.length ? `${verbo}: ${parti.join(' · ')}` : verbo;
+    const dopo = [suo(titolo), sito !== titolo ? sito : '', o.fonte === 'scheda' ? 'dalla tua scheda' : ''].filter(Boolean);
+    return dopo.length ? [`${verbo}: `, ...unisci(dopo, ' · ')] : [verbo];
   }
+  const rigaLetturaPagina = (a) => global.SN_ESITO.piatto(pezziLetturaPagina(a));
   function indirizzoLetto(a) {
     const o = (a && a._output) || {};
     return String(o.url || (a && a.url) || '').slice(0, 300);
