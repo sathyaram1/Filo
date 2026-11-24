@@ -233,7 +233,7 @@ const paeseDi = (p) => (p && normalizeCountry(p.country) ? { country: normalizeC
 // scelto per quel lavoro (`paese`, per «Riprova») o dalla regola del sito. Se uno di questi vale ma non si può usare,
 // `{ rifiuto }`: mai la connessione vera al suo posto. `paese` torna solo se non viene dalla regola, che si rilegge.
 async function uscitaPerProgramma({ ses = null, url = '', paese = null, regole = leggiRegole,
-  impostazioni = async () => globalThis.SN_STORAGE?.getSettings?.() } = {}) {
+  impostazioni = async () => globalThis.SN_STORAGE?.getSettings?.(), sonda = sondaSchema } = {}) {
   const voce = voceDellaSessione(ses);
   if (voce && voce.rete) {
     const proxy = indirizzoPerProgramma(voce.rete.proxyRules, voce.auth);
