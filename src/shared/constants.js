@@ -1210,8 +1210,8 @@
     let letta = false;
     try {
       const u = new URL(el ? `${schema}://${el[1]}:${el[2]}` : `${schema}://${resto}`);
-      // Senza schema un percorso non è di un proxy: «mario:12/ss@host» si leggerebbe host «mario», porta 12.
-      letta = !!u.hostname && (!!el || !!sm || (['', '/'].includes(u.pathname) && !u.search && !u.hash));
+      // Senza schema una @ dopo l'host è di credenziali lette male: «mario:12/ss@host» sarebbe host «mario», porta 12.
+      letta = !!u.hostname && (!!el || !!sm || !`${u.pathname}${u.search}${u.hash}`.includes('@'));
       if (u.hostname) {
         const auth = el ? { username: el[3], password: el[4] }
           : u.username ? { username: decodifica(u.username), password: decodifica(u.password || '') } : null;
