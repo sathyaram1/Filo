@@ -230,7 +230,7 @@ test('ogni password con cui il proxy si collega è fra i suoi segreti', () => {
     'http://mario:S3gr%40ta@gate.esempio.com:8080', 'socks5://mario:pw-socks@gate.esempio.com:1080',
     'mario:pass word@gate.esempio.com:8080', 'mario:pass\tword-tab@gate.esempio.com:8080', 'mario:pa@ss@gate.esempio.com:8080',
     'gate.esempio.com:8080:mario:passwordsegreta', 'http://gate.esempio.com:8080:mario:pass word', 'mario:pa%zz@gate.esempio.com:8080',
-    'HTTP://Mario:Pw-Maiuscole@Gate.Esempio.com:8080',
+    'HTTP://Mario:Pw-Maiuscole@Gate.Esempio.com:8080', 'mario:123:x@gate.esempio.com:8080',
   ];
   for (const forma of forme) {
     const ep = P.endpointFor(forma, 'it');
