@@ -463,7 +463,9 @@
         const o = a._output || {};
         let dettaglio = '';
         try { if (tipo === 'NAVIGA') dettaglio = new URL(String(a.url || o.url || '')).hostname.replace(/^www\./, ''); } catch (_) {}
-        if (tipo === 'APRI_FILE') dettaglio = String(a.percorso || a.path || '').split(/[\\/]/).pop();
+        // Il nome del file viene dal percorso dato dal modello: nel titolo sta nel suo riquadro (#2648).
+        const nome = tipo === 'APRI_FILE' ? String(a.percorso || a.path || '').split(/[\\/]/).pop().trim() : '';
+        if (nome) dettaglio = [{ citazione: nome, nuda: true }];
         const testo = fallita ? (FAILED_LABELS[tipo] || 'Azione non riuscita') : '';
         registra({ tipo, testo, dettaglio, esito: a._confirm ? 'chiesta' : (fallita ? 'fallita' : 'ok') }, a);
       },
