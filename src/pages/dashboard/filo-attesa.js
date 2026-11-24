@@ -89,24 +89,11 @@
   const MAX_DETTAGLI = 3;
 
   const pulisci = (t) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
-  // «Timer avviato · Pasta · 5 min» → «Pasta · 5 min»; «Cerco sul web: orari» → «orari». Senza separatore, niente.
-  function dettaglioDi(testo) {
-    const t = pulisci(testo);
-    const m = t.match(/^[^·:]*?(?:\s·\s|:\s)(.+)$/);
-    return m ? m[1].trim() : '';
-  }
-  const primoPezzo = (d) => pulisci(d).split(' · ')[0];
-  function elenco(pezzi) {
-    const unici = [];
-    for (const p of pezzi) if (p && !unici.includes(p)) unici.push(p);
-    const mostrati = unici.slice(0, MAX_DETTAGLI);
-    const restano = unici.length - mostrati.length;
-    return mostrati.length ? `${mostrati.join(', ')}${restano > 0 ? ` +${restano}` : ''}` : '';
-  }
 
-  // La riga a pezzi (#2648): un testo non di Filo resta un pezzo suo anche nel titolo, mai cucito nelle sue parole.
+  // Ogni voce è una riga a pezzi (#2648): una frase tutta di Filo è un pezzo solo, un testo non suo resta un pezzo suo
+  // anche nel titolo, mai cucito nelle sue parole. Una strada sola per i due casi; la frase piatta la ricompone SN_ESITO.
   const riquadro = (p) => !!p && typeof p === 'object' && typeof p.citazione === 'string';
-  const piatto = (p) => (global.SN_ESITO ? global.SN_ESITO.piatto(p) : p.join(''));
+  const piatto = (p) => global.SN_ESITO.piatto(p);
   function pulite(parti) {
     const out = [];
     for (const p of parti) {
