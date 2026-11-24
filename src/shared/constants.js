@@ -1218,13 +1218,15 @@
         uso = { proxyRules: `${u.protocol.replace(/:$/, '')}://${u.port ? `${u.hostname}:${u.port}` : u.hostname}`, auth };
       }
     } catch (_) {}
-    if (!scritte && uso && uso.auth) {
+    if (!letta) scritte = senzaHost(resto);
+    else if (!scritte && uso && uso.auth) {
       scritte = { credenziali: `${uso.auth.username}:${uso.auth.password}`, password: uso.auth.password, senza: uso.proxyRules };
     }
     return { uso, scritte, senzaSchema: !sm };
   }
 
-  // Utente e password di un proxy come sono scritti: { credenziali, password, senza }, null se non ce ne sono. PURA.
+  // Utente e password di un proxy come sono scritti: { credenziali, password, senza }, null se non ce ne sono. Di una
+  // riga che non si legge, `intera`: `senza` è vuoto, e l'esportazione toglie il campo come una chiave. PURA.
   function credenzialiProxy(v) {
     const p = leggiProxy(v);
     return p && p.scritte;
