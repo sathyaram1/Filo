@@ -50,12 +50,12 @@
       // #323 — durata umana fedele all'intento: "30 sec", "2 h", "1 h 30 min".
       const dur = (global.SN_TIME ? global.SN_TIME.fmtDurationLabel(sec) : `${Math.round(sec / 60)} min`);
       const name = pulito(a.label || a.etichetta);
-      return { icon: '⏱', text: `Timer avviato · ${name ? `${name} · ` : ''}${dur}` };
+      return aPezzi('⏱', ['Timer avviato · ', ...(name ? [suo(name), ' · '] : []), dur]);
     },
     SVEGLIA: (a) => {
       const when = pulito(a.time || a.orario);
       const name = pulito(a.label || a.etichetta);
-      return { icon: '⏰', text: `Sveglia impostata${when ? ` · ${when}` : ''}${name ? ` · ${name}` : ''}` };
+      return aPezzi('⏰', ['Sveglia impostata', ...(when ? [' · ', suo(when)] : []), ...(name ? [' · ', suo(name)] : [])]);
     },
     // Il main descrive cosa ha tolto o spostato («Sveglia “lezione” 07:55»):
     // se si può aggiungere una sveglia dalla chat, si deve vedere anche
