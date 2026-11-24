@@ -31,8 +31,13 @@
       if (typeof p === 'string' && typeof parti[parti.length - 1] === 'string') parti[parti.length - 1] += p;
       else parti.push(p);
     }
-    const r = { icon, text: global.SN_ESITO.piatto(parti), ...resto };
+    const r = { icon, text: piatto(parti), ...resto };
     return parti.some((p) => typeof p !== 'string') ? { ...r, parti } : r;
+  }
+  // La regola del testo piatto sta in SN_ESITO; chi carica solo questo modulo (il main, una prova) lo trova lo stesso.
+  function piatto(parti) {
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
+    return global.SN_ESITO.piatto(parti);
   }
   const restanoAperte = (o) => global.SN_ESITO.restanoAperte(o);
   // Titolo e testo di una segnalazione li sceglie src/shared/allegatiSegnalazione.js, come l'invio e il riquadro.
