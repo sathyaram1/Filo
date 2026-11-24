@@ -91,6 +91,25 @@ test('col portachiavi un proxy «host:porta:utente:password» non resta in chiar
   }
 });
 
+// #2646.3: una riga che Filo non sa leggere si cifra intera, qualunque sia la grafia.
+test('col portachiavi un proxy che Filo non sa leggere non resta in chiaro nel file', async () => {
+  for (const riga of [`2001:db8::1:8080:mario:${PASSWORD}`, `gate.esempio.com:8080:ma/rio:${PASSWORD}`]) {
+    const userData = cartellaTemporanea('filo-segreti-illeggibile-');
+    try {
+      cifraturaAccesa = true;
+      const S = avvia(userData);
+      const settings = { theme: 'dark', proxy: { datacenter: riga } };
+      await S.set({ settings });
+      await S.whenSettled();
+      const testo = readFileSync(join(userData, 'storage.json'), 'utf8');
+      assert.equal(testo.includes(PASSWORD), false, `${riga}: la password del proxy è sul disco in chiaro`);
+      assert.deepEqual((await avvia(userData).get('settings')).settings, settings, 'alla riapertura il proxy torna intero');
+    } finally {
+      togliCartella(userData);
+    }
+  }
+});
+
 test('un file con la chiave di Safe Browsing e il proxy in chiaro si riscrive cifrato appena Filo lo legge', async () => {
   const userData = cartellaTemporanea('filo-segreti-migra-');
   try {
