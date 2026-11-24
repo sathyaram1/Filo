@@ -735,16 +735,9 @@
 
   // Una riga a pezzi (SN_ESITO.primaRigaParti): le parole di Filo come testo, quello che non è suo nel suo riquadro,
   // riempito con textContent. Ricucito nella frase, il nome scelto dal modello si leggeva come parola di Filo (#592.25).
+  // Il disegno sta col filo dell'attesa, che lo usa per i titoli dei nodi: uno solo.
   function conRiquadri(el, parti) {
-    el.replaceChildren();
-    for (const p of parti) {
-      if (typeof p === 'string') { el.append(p); continue; }
-      if (!p || typeof p.citazione !== 'string') continue;
-      const q = document.createElement('span');
-      q.className = 'dash-altrui';
-      q.textContent = p.citazione;
-      el.append(q);
-    }
+    global.SN_FILO_ATTESA.scriviAPezzi(el, parti);
   }
 
   // Le parole del diario stanno in src/shared/righeAttivita.js: la chat riaperta le legge uguali (#1294).
