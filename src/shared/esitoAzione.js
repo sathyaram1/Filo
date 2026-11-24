@@ -308,6 +308,8 @@
     }
     return ev.data && ev.titolo ? ev : null;
   }
+  // L'icona della riga in diretta (🏠, 📌): un simbolo, mai parole o un testo che passi per un'icona.
+  const icona = (s) => typeof s === 'string' && /^[^\p{L}\p{N}\p{Z}\p{C}]{1,3}$/u.test(s);
   function senzaVuoti(v) {
     const out = { type: v.type, esito: v.esito };
     if (v.riga) out.riga = v.riga;
