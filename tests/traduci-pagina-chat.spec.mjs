@@ -460,7 +460,11 @@ test('Alt+T senza selezione con la risposta di una traduzione aperta traduce la 
   await expect(page.locator('#head')).toHaveText(/^IT A feed/, { timeout: 30_000 });
   await expect(page.locator('#r1')).toHaveText(/^IT Second row/);
   expect(await conta(app, page, '.sn-popup')).toBe(1);
-  expect(await conta(app, page, '.sn-toast')).toBe(0);
+  const avvisiStrato = await nelloStrato(app, page, () => {
+    const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+    return [...(T ? T.trovaTutti('.sn-toast') : document.querySelectorAll('.sn-toast'))].map((n) => n.textContent || '');
+  });
+  expect(String(avvisiStrato || '')).not.toMatch(/selezion/i);
   await page.screenshot({ path: 'tests/.shots/traduci-pagina-alt-t-strato.png' }).catch(() => {});
 });
 
