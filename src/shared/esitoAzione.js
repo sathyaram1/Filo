@@ -431,8 +431,10 @@
     const vuota = esito === FALLITO && senzaEffetto(x) ? rigaDelDiario(x) : null;
     if (vuota && vuota.text) {
       const d = vuota.parti ? rigaDellaDomanda({ text: vuota.text, parti: vuota.parti }) : { riga: primaRiga(vuota.text), parti: null };
+      const perche = motivo(x);
       return senzaVuoti({
         type, esito, riga: breve(d.riga || vuota.text, MAX_RIGA), parti: d.parti, senzaEffetto: true, icona: vuota.icon,
+        motivo: perche && pulito(perche) !== pulito(vuota.text) ? breve(perche, MAX_MOTIVO) : '',
         ...segnalazioneDi(type, x),
       });
     }
