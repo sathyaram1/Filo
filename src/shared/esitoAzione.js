@@ -506,7 +506,7 @@
       return { icona: '⚠', testo, fallita: true, ...(aPezzi ? { parti: aPezzi } : {}) };
     }
     if (!riga) return null;
-    return { icona: '✓', testo: riga, fallita: false };
+    return { icona: '✓', testo: riga, fallita: false, ...(parti ? { parti } : {}) };
   }
 
   // Il testo di una segnalazione partita o proposta a nome dell'utente, come lo legge il modello (#2371): intero fino a un
