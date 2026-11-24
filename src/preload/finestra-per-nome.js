@@ -57,7 +57,7 @@ const leggi = (e) => {
   } catch (_) { return null; }
 };
 
-function installa({ ipcRenderer, webFrame }) {
+function installa({ ipcRenderer, webFrame, sottoriquadro }) {
   const chiedi = (richiesta) => { try { ipcRenderer.send(CANALE, richiesta); } catch (_) {} };
   // Una richiesta della pagina è sua se arriva mentre un evento vero dell'utente sta ancora viaggiando nel suo frame:
   // un evento finito ha la fase a zero, e né la pagina né un'altra finestra possono fingerne uno.
