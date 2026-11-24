@@ -536,12 +536,12 @@
       const zona = (p) => (D && D.nomeZona ? D.nomeZona(p && p.zona) : { nome: 'barra laterale', in: 'nella' });
       const posto = (p) => `${Number(p && p.posto) || '?'}° posto`;
       if (c.prima && c.dopo && c.prima.zona === c.dopo.zona) {
-        return `${nome} ${zona(c.dopo).in} ${zona(c.dopo).nome}: ${posto(c.prima)} → ${posto(c.dopo)}`;
+        return [`${nome} ${zona(c.dopo).in} ${zona(c.dopo).nome}: ${posto(c.prima)} → ${posto(c.dopo)}`];
       }
-      return `${nome}: ${zona(c.prima).nome} → ${zona(c.dopo).nome}`;
+      return [`${nome}: ${zona(c.prima).nome} → ${zona(c.dopo).nome}`];
     }
     if (k === 'desktop') {
-      if (c.come) return `icone del desktop ${fraseOrdineDesktop(c.come)}`;
+      if (c.come) return [`icone del desktop ${fraseOrdineDesktop(c.come)}`];
       const n = spostateSulDesktop(c);
       const auto = !!(c.prima && c.prima.auto) !== !!(c.dopo && c.dopo.auto);
       const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
