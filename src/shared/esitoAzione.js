@@ -139,8 +139,8 @@
     // Un comando partito e finito male: il perché è il suo codice d'uscita e la prima riga d'errore, come nel riquadro.
     if (partita(a)) {
       if (o.timedOut) return 'interrotto: ci metteva troppo';
-      const prima = String(o.stderr || o.stdout || '').split('\n').map((s) => s.trim()).find(Boolean) || '';
-      return `uscito con codice ${o.code}${prima ? `: ${pulito(prima)}` : ''}`;
+      const prima = pulito(String(o.stderr || o.stdout || '').split('\n').map((s) => s.trim()).find(Boolean) || '');
+      return prima ? [`uscito con codice ${o.code}: `, { citazione: prima, nuda: true }] : `uscito con codice ${o.code}`;
     }
     if (o.restyle === 'no-page' || o.traduzione === 'no-page') return 'nessuna pagina web aperta';
     if (o.traduzione === 'spento') return 'Filo è spento su questo sito';
