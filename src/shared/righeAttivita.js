@@ -276,8 +276,9 @@
       const T = global.SN_THEME_TOKENS;
       const t = T && T.get && T.get(tok);
       const val = a.valore ?? a.value ?? a.val ?? a.colore;
-      const f = frasiCambi(a);
-      if (f) return { icon: '🎨', text: `Aspetto · ${f.replace(/^aspetto, /, '')}` };
+      const f = pezziCambi(a);
+      if (typeof f[0] === 'string') f[0] = f[0].replace(/^aspetto, /, '');
+      if (f.length) return aPezzi('🎨', ['Aspetto · ', ...f]);
       // Senza evento il valore era già quello: si dice come per le preferenze, mai «token = valore» (#557).
       return aPezzi('🎨', [`Aspetto già così · ${(t && t.label) || 'un dettaglio'}`, ...(val ? [': ', suo(val)] : [])]);
     },
