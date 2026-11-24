@@ -1613,7 +1613,7 @@ class TabManager {
       indice: this.tabs.indexOf(tab),
       storia,
       zoom,
-      scroll: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
+      scroll: letturaNota(tab),
       proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
       colore: tab.identityColor || null,
       ...(ultimoSuono(tab) > 0 ? { audioAt: ultimoSuono(tab), titolo: tab.title || '' } : {}),
