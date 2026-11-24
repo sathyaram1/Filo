@@ -30,6 +30,14 @@ test('il timer avviato tiene l\'etichetta del modello nel suo riquadro, in diret
     await modelloFinto(app, [{ text: 'Avvio il timer.', toolCalls: [timer] }, { text: 'Fatto.' }]);
     await chiedi(page, 'timer di cinque minuti per la pasta');
 
+    // Il titolo del nodo nel filo, quello che si legge a diario chiuso.
+    const testa = page.locator('.dash-activity-seg-label', { hasText: 'Avviato un timer' }).first();
+    await expect(testa).toBeVisible({ timeout: 10_000 });
+    const t = await pezzi(testa);
+    expect(t.fuori).toBe('Avviato un timer ·  · 5 min');
+    expect(t.dentro).toBe(FINTO);
+    await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-nodo.png' });
+
     const riga = page.locator('.dash-activity-row', { hasText: 'Timer avviato' }).first();
     await expect(riga).toBeAttached({ timeout: 10_000 });
     const r = await pezzi(riga);
