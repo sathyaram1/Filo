@@ -80,7 +80,8 @@ function salva(evento, incognito) {
 }
 
 function raccogli(ctx, evento) {
-  const voce = { id: evento.id, frase: K().frase(evento), tipo: evento.tipo };
+  // `parti`: la stessa frase coi valori non di Filo nel loro riquadro, per la riga della chat (#2648.1).
+  const voce = { id: evento.id, frase: K().frase(evento), tipo: evento.tipo, ...aPezzi(evento) };
   for (let c = ctx; c; c = c.padre) if (Array.isArray(c.raccolti)) c.raccolti.push(voce);
 }
 
