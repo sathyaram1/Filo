@@ -151,7 +151,7 @@ test('#2648.1 il cambio di un\'impostazione chiesto in chat e il suo annullo ten
     const bottone2 = page.locator('.dash-action-btn', { hasText: 'Rimesso com' });
     await expect(bottone2).toBeVisible({ timeout: 10_000 });
     expect((await pezzi(bottone2)).fuori).not.toContain('controllato');
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'Rimesso.' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Rimesso.' }).first()).toBeVisible({ timeout: 10_000 });
     await bottone2.scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-annullo.png' });
 
