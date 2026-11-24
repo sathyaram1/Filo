@@ -264,6 +264,8 @@ module.exports = {
   providerHost,
   endpointFor,
   resolve,
+  resolveSentito,
+  sondaSchema,
   registraRete,
   clearPartitionAuth,
   credenzialiDellaSessione,
