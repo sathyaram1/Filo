@@ -345,14 +345,15 @@ function gestoSullaScheda(wc) {
 }
 
 // Un gesto apre una finestra sola, come in Chrome: la seconda della stessa raffica nessuno l'ha chiesta (#737.1).
-// Chi chiede si riconosce dal referrer: un frame di un sito che il gesto non ha toccato non lo usa. Chi lo nasconde
-// resta riconoscibile solo come «la scheda», come prima.
-function gestoPerUnaFinestra(wc, referrer) {
+// Chi chiede si riconosce dal referrer o dall'indirizzo del suo frame: un frame di un sito che il gesto non ha toccato
+// non lo usa. Chi lo nasconde resta riconoscibile solo come «la scheda», come prima. Riportare davanti una finestra
+// che la pagina tiene già vuole lo stesso clic, senza spenderlo (`spendi: false`, #737.8): una regola sola (#737.13).
+function gestoPerUnaFinestra(wc, chiede, { spendi = true } = {}) {
   const t = gestoSullaScheda(wc);
   if (!t || t <= (wc._filoGestoUsatoAlle || 0)) return false;
-  const chi = origineDelReferrer(referrer);
+  const chi = origineDelReferrer(chiede);
   if (chi && wc._filoGestoOrigini && wc._filoGestoOrigini.size && !wc._filoGestoOrigini.has(chi)) return false;
-  wc._filoGestoUsatoAlle = t;
+  if (spendi) wc._filoGestoUsatoAlle = t;
   return true;
 }
 
