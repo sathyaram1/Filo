@@ -117,12 +117,21 @@
           viste.add(k);
           return true;
         });
-        const quali = [...new Set(una.map((x) => pulito(x.title) || quandoBreve(x.date)).filter(Boolean))];
-        return { icon: '💬', text: `Ricordato dal filo${quali.length ? ` · ${quali.join('; ')}` : ''}`, tipo: 'RICORDO_FILO' };
+        // Il titolo l'ha scritto qualcun altro, il giorno lo dice Filo.
+        const dette = new Set();
+        const quali = [];
+        for (const x of una) {
+          const t = pulito(x.title);
+          const q = t || quandoBreve(x.date);
+          if (!q || dette.has(q)) continue;
+          dette.add(q);
+          quali.push(t ? suo(t) : q);
+        }
+        return aPezzi('💬', ['Ricordato dal filo', ...(quali.length ? [' · ', ...unisci(quali, '; ')] : [])], { tipo: 'RICORDO_FILO' });
       }
       const q = String(a.query || a.testo || '').trim();
       if (a.id && !q) return { icon: '💬', text: 'Rileggo una conversazione di prima' };
-      return { icon: '💬', text: `Cerco nel filo: ${q}` };
+      return aPezzi('💬', ['Cerco nel filo: ', suo(q)]);
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
     LEGGI_MEMORIA: () => ({ icon: '🧠', text: 'Rileggo la memoria' }),
