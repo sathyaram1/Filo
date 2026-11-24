@@ -488,14 +488,21 @@
     const icon = radio === 'Wi-Fi' ? '📶' : '🎧';
     if (Array.isArray(o.elenco)) return { icon, text: radio === 'Wi-Fi' ? 'Letto le reti conosciute' : 'Letto i dispositivi abbinati' };
     if (typeof o.acceso === 'boolean') return { icon, text: `${radio} ${o.acceso ? 'acceso' : 'spento'}` };
-    const nome = o.dispositivo || o.rete || '';
-    if (o.dimenticato || o.dimenticata) return { icon, text: `${o.dimenticata ? 'Rete dimenticata' : 'Dimenticato'} · ${nome}` };
-    if (typeof o.preferito === 'boolean') return { icon, text: `${o.preferito ? 'Fra i preferiti' : 'Tolto dai preferiti'} · ${nome}` };
-    if (o.gia) return { icon, text: `Già così · ${nome}` };
+    // Il nome di un dispositivo o di una rete lo sceglie chi l'ha configurato.
+    const nome = suo(o.dispositivo || o.rete);
+    const con = (cosa) => aPezzi(icon, [`${cosa} · `, nome]);
+    if (o.dimenticato || o.dimenticata) return con(o.dimenticata ? 'Rete dimenticata' : 'Dimenticato');
+    if (typeof o.preferito === 'boolean') return con(o.preferito ? 'Fra i preferiti' : 'Tolto dai preferiti');
+    if (o.gia) return con('Già così');
     // Il sistema ha preso la richiesta ma non ha ancora confermato: la riga non promette di più.
-    if (radio === 'Wi-Fi') return { icon, text: `${o.confermato === false ? 'Collegamento chiesto' : 'Collegato al Wi-Fi'} · ${nome}` };
-    if (o.collegato === null) return { icon, text: `Collegamento chiesto · ${nome}` };
-    return { icon, text: `${o.collegato === false ? 'Scollegato' : 'Collegato'} · ${nome}` };
+    if (radio === 'Wi-Fi') return con(o.confermato === false ? 'Collegamento chiesto' : 'Collegato al Wi-Fi');
+    if (o.collegato === null) return con('Collegamento chiesto');
+    return con(o.collegato === false ? 'Scollegato' : 'Collegato');
+  }
+  // I nomi delle sveglie toccate li scrive il main con dentro l'etichetta del modello: ognuno nel suo riquadro.
+  function nomiSveglie(list, a) {
+    const l = list.map(suo).filter(Boolean);
+    return l.length ? unisci(l, ', ') : [suo(a.etichetta || a.label)];
   }
   // Si raccontano SOLO col bottone: la riga ripeterebbe ciò che l'utente ha già
   // davanti. Ogni azione sta qui o in ACTIVITY_ROWS: lo pretende una sentinella.
