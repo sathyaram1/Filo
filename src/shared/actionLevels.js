@@ -1467,15 +1467,14 @@
       difesa: (a) => !(a && a._livelloCambio === 1) && !(a && a._allentaCambio === false),
       dove: (a) => (a && typeof a._doveCambio === 'string' ? a._doveCambio : ''),
       describe: (a) => {
-        // La frase del cambio riporta testi salvati (uno stile, un'etichetta, una cartella): sta tutta nel riquadro.
-        const f = String((a && a._fraseCambio) || '').trim();
-        const base = f ? ['Filo vuole rimettere com\'era prima di:\n', cit(f, true)] : ['Filo vuole rimettere com\'era l\'ultimo cambio.'];
+        const f = fraseDelCambio(a);
+        const base = f ? ['Filo vuole rimettere com\'era prima di:\n', ...f] : ['Filo vuole rimettere com\'era l\'ultimo cambio.'];
         if (a && a._livelloCambio === 1) return base;
         return [...base, '\n\nTocca un\'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l\'hai chiesto tu.'];
       },
       describeDone: (a) => {
-        const f = String((a && a._fraseCambio) || '').trim();
-        return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
+        const f = fraseDelCambio(a);
+        return f ? ['Rimesso com\'era prima di: ', ...f] : 'Cambio annullato';
       },
     },
     // ── i pulsanti della pagina Preferenze chiesti in chat (#1619) ───────────
