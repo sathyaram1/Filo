@@ -598,9 +598,10 @@
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
-      const perche = global.SN_ESITO.motivo(a);
+      const m = global.SN_ESITO.motivoAPezzi(a);
+      const perche = Array.isArray(m) ? m : (m ? [m] : []);
       const cosa = etichettaNonFatta(type, { no: rifiutataDallaRegola(a), partita: global.SN_ESITO.partita(a) }) || 'Azione non riuscita';
-      return { icon: '⚠', text: `${cosa}${perche ? ` · ${perche}` : ''}`, failed: true };
+      return aPezzi('⚠', [cosa, ...(perche.length ? [' · ', ...perche] : [])], { failed: true });
     }
     const fn = ACTIVITY_ROWS[type];
     if (fn) return fn(a);
