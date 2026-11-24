@@ -231,9 +231,21 @@
     return Number.isFinite(x) ? Math.min(10000, Math.max(0, x)) : base;
   }
 
+  // Un titolo a pezzi: le parole di Filo come testo, il testo altrui nel suo riquadro (lo stile sta in dashboard.css).
+  function scriviAPezzi(el, parti) {
+    el.replaceChildren();
+    for (const p of parti) {
+      if (typeof p === 'string') { el.append(p); continue; }
+      if (!riquadro(p)) continue;
+      const q = document.createElement('span');
+      q.className = 'dash-altrui';
+      q.textContent = p.citazione;
+      el.append(q);
+    }
+  }
   let hint = null;
   function mostraHint(el, testo) {
-    if (!testo) return;
+    if (!testo || (Array.isArray(testo) && !testo.length)) return;
     if (!hint) {
       hint = document.createElement('div');
       hint.className = 'dash-filo-hint';
