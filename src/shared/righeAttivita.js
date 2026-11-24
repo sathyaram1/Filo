@@ -584,7 +584,8 @@
   // «Leggo la pagina: <titolo>». Il titolo lo scrive il sito: una riga sola e corta, e senza titolo si nomina il sito.
   // Il titolo se lo scrive il sito, quindi da solo non dice dove è andato Filo: accanto il sito, e se la pagina era
   // la scheda dell'utente (dentro il suo accesso) lo si dice. L'indirizzo intero sta sotto il puntatore.
-  function rigaLetturaPagina(a) {
+  // Il sito lo dice Filo, che sa dove è andato: nel riquadro va solo il titolo.
+  function pezziLetturaPagina(a) {
     const o = (a && a._output) || {};
     let titolo = String(o.titolo || '').replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
     if (titolo.length > 60) titolo = `${titolo.slice(0, 57)}…`;
