@@ -1186,7 +1186,7 @@
     const sm = SCHEMA_PROXY.exec(t);
     const resto = sm ? t.slice(sm[0].length) : t;
     const davanti = sm ? sm[0] : '';
-    const el = FORMA_ELENCO.exec(resto);
+    const el = elencoVero(FORMA_ELENCO.exec(resto), resto);
     let scritte = null;
     if (el) scritte = { credenziali: `${el[3]}:${el[4]}`, password: el[4], senza: `${davanti}${el[1]}:${el[2]}` };
     else {
