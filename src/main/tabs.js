@@ -5019,6 +5019,7 @@ class TabManager {
             usate.push(aperturaValida(savedUsate[i]));
             audio.push(aperturaValida(savedAudio[i]));
             ids.push(idRimettibile(savedIds[i]));
+            letture.push(letturaValida(savedLetture[i]));
           }
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
