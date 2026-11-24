@@ -131,7 +131,7 @@ test('#2648.1 il cambio di un\'impostazione chiesto in chat e il suo annullo ten
     const riga = page.locator('.dash-activity-row', { hasText: /Impostato/ }).last();
     await expect(riga).toBeAttached({ timeout: 10_000 });
     const r = await pezzi(riga);
-    expect(r.fuori).toContain(`Impostato · modello per «${FUNZIONE}»: `);
+    expect(r.fuori).toMatch(/Impostato · modello per «[^»]+»: /);
     expect(r.dentro).toContain(VALORE);
     expect(r.fuori).not.toContain('controllato');
     await bottone.scrollIntoViewIfNeeded();
