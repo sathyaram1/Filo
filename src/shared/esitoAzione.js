@@ -30,6 +30,14 @@
     return FATTO;
   }
 
+  // Le azioni che l'archivio nomina in `actions`, quelle successe: chi legge solo i nomi le dà per fatte, quindi una mossa
+  // senza effetto non ci entra (#553.14). Una fermata per un segreto sì: il nome FERMATA la racconta (#810).
+  function successa(a) {
+    if (!a) return false;
+    if (a._output && a._output.blocked === 'segreto') return true;
+    return !!a._executed && !a._confirm && esitoAzione(a) !== FALLITO;
+  }
+
   // Partita e finita male (un comando uscito con errore): non si racconta come «non eseguita».
   function partita(a) {
     const o = a && a._output;
@@ -114,9 +122,9 @@
     if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
-    if (o.already) return 'era già così';
-    // Una mossa senza effetto (la barra dei siti già così): riaperta, la chat ripete la riga detta in diretta.
-    if (o.invariata) { const d = rigaDelDiario(a); return d && d.text ? pulito(d.text) : 'era già così'; }
+    // Una mossa senza effetto (la home chiesta dalla home, la barra dei siti già così): riaperta, la chat ripete la riga
+    // detta in diretta («Sei già nella home»), e il modello legge quella.
+    if (o.already || o.invariata) { const d = rigaDelDiario(a); return d && d.text ? pulito(d.text) : 'era già così'; }
     if (o.ok === false && o.errore && o.frase) return String(o.frase);
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.ok === false && o.dettaglio) return String(o.dettaglio);
@@ -555,7 +563,7 @@
 
   global.SN_ESITO = {
     daRaccontare,
-    esitoAzione, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
+    esitoAzione, successa, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
     perTrascrizione, testoSegnalazione,
     unisciDopo, primaRigaConferma: primaRiga, primaRigaParti, rigaDellaDomanda, rigaDiParti, piatto, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };

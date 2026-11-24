@@ -1066,7 +1066,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Turno finito prima del suo ultimo giro (fermato, o un guasto): nell'archivio restano le azioni successe davvero e la
   // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
   const archiviaGiaFatto = async () => {
-    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
+    const successe = renderedActions.filter(globalThis.SN_ESITO.successa);
     // Anche la parte già scritta porta le sue fonti e immagini controllate, mai i marcatori grezzi (#2383, #2272).
     const citate = globalThis.SN_IMMAGINI_RISPOSTA.controllaConFonti(unisciTesti(risposta), renderedActions);
     const giaScritta = citate.text;
@@ -1471,7 +1471,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (chatId && !mutoDopoOk) {
     // `actions`: ciò che è successo, più le azioni fermate (#810). `esiti`: com'è andata ognuna, anche la fallita e quella
     // ferma sulla conferma (#1294, #1130.2). Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
-    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
+    const successe = renderedActions.filter(globalThis.SN_ESITO.successa);
     const cambi = renderedActions.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const classeLetta = await classeLettaDelCompito(sender, { contesto: azioniViste, fontiLette });
     const dopo = await appendToChatArchive(

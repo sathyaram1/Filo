@@ -519,6 +519,45 @@ test('F2 — la conversazione chiusa col bottone resta chiusa nella scheda nuova
   await restore(app, '__fakeF2b');
 });
 
+// #553.14 — ridisegnato da una scheda nuova o dalla home ricaricata, lo scambio dice quello che diceva dal vivo: la home
+// era già aperta. Prima l'archivio teneva il comando fra le azioni fatte, e sotto la risposta si leggeva «Ha azionato un
+// comando della finestra».
+test('F6 — la home chiesta dalla home, riletta da una scheda nuova o dalla home ricaricata, non diventa un comando fatto', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'f1', name: 'COMANDO_FINESTRA', arguments: '{"comando":"home"}' }] },
+    { text: 'Sei già qui, nella home.' },
+  ], '__fakeF6');
+  await page.locator('#input').fill('portami alla home');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Sei già qui' })).toBeVisible({ timeout: 10_000 });
+
+  const risposta = () => app.evaluate(async () => (await globalThis.SN_IL_FILO.chats())
+    .flatMap((c) => c.messages).find((m) => m.role === 'filo' && /Sei già qui/.test(m.text)) || null);
+  await expect.poll(risposta).not.toBeNull();
+  const archiviata = await risposta();
+  expect(archiviata.actions || [], 'fra le azioni fatte il comando che non ha mosso niente non c\'è').not.toContain('COMANDO_FINESTRA');
+  expect(archiviata.esiti.map((v) => [v.type, v.esito])).toEqual([['COMANDO_FINESTRA', 'fallito']]);
+
+  const rilette = [await openTab('filo://newtab/')];
+  await page.reload();
+  rilette.push(page);
+  for (const p of rilette) {
+    await expect(p.locator('#input')).toBeVisible();
+    const bolla = p.locator('#bubbles .dash-bubble-filo', { hasText: 'Sei già qui' });
+    await expect(bolla).toBeVisible({ timeout: 10_000 });
+    await expect(bolla.locator('.dash-esiti-archiviati .dash-activity-row', { hasText: 'Sei già nella home' })).toHaveCount(1);
+    await expect(p.locator('#bubbles')).not.toContainText(/azionato un comando/i);
+  }
+  await rilette[0].screenshot({ path: 'tests/.shots/diario-home-gia-qui-riletta.png' });
+
+  await restore(app, '__fakeF6');
+});
+
 // La spunta sotto un appunto salvato chiude la conversazione come il bottone della home, e lo dice.
 test('F3 — la spunta dopo un appunto salvato chiude la conversazione', async ({ app, shell }) => {
   test.setTimeout(60_000);
