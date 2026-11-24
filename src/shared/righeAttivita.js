@@ -665,7 +665,7 @@
       : [`${per ? 'Cancellati per sempre' : 'Nel cestino'} ${fatti.length} elementi`];
     return no ? [...quanti, ` · ${no} non riusciti`] : quanti;
   }
-  const testoEliminati = (o) => global.SN_ESITO.piatto(pezziEliminati(o));
+  const testoEliminati = (o) => piatto(pezziEliminati(o));
 
   // Le azioni che in diretta sono solo il loro bottone: nella chat riaperta (#1294) una riga al passato con la cosa vera.
   const DOPO_IL_BOTTONE = {
