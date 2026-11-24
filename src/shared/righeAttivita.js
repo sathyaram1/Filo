@@ -17,6 +17,18 @@
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
+  // Un valore che non è parola di Filo (scelto dal modello, scritto da un sito, letto dal disco) entra nella riga come
+  // pezzo suo, che la home e la chat riaperta chiudono nel riquadro (#2648). Il testo piatto resta quello di sempre:
+  // `fra` è un valore che la riga dice fra «», `suo` uno che dice nudo. Sentinella: tests/unit/righeEsitoAPezzi.test.mjs.
+  const suo = (v) => { const t = pulito(v); return t ? { citazione: t, nuda: true } : ''; };
+  const fra = (v) => { const t = pulito(v); return t ? { citazione: t } : ''; };
+  const corto = (v, max) => { const t = pulito(v); return t.length > max ? `${t.slice(0, max - 3)}…` : t; };
+  const unisci = (pezzi, sep) => pezzi.filter(Boolean).flatMap((p, i) => (i ? [sep, p] : [p]));
+  function aPezzi(icon, pezzi, resto) {
+    const parti = pezzi.filter((p) => p !== '' && p != null);
+    const r = { icon, text: global.SN_ESITO.piatto(parti), ...resto };
+    return parti.some((p) => typeof p !== 'string') ? { ...r, parti } : r;
+  }
   const restanoAperte = (o) => global.SN_ESITO.restanoAperte(o);
   // Titolo e testo di una segnalazione li sceglie src/shared/allegatiSegnalazione.js, come l'invio e il riquadro.
   function segnalazione() {
