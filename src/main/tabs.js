@@ -2732,6 +2732,7 @@ class TabManager {
       tab.lastInteractionAt = Math.min(activity.lastInteractionAt, adesso);
       this._lastAppInteractionAt = adesso;
       tab._scrollIgnoto = false;
+      tab._letturaSalvata = null;
     }
     if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
     if (typeof activity.formDirty === 'boolean') {
