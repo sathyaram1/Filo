@@ -595,8 +595,15 @@
     return f.length <= max ? dette : [...dette, ` e altri ${f.length - max} cambi`];
   }
   const frase = (evento, max = 3) => piatto(fraseParti(evento, max));
-  // I pezzi della frase solo quando c'è un riquadro: tutta di Filo, resta la frase.
-  const fraseAPezzi = (evento, max = 3) => { const p = fraseParti(evento, max).filter((x) => x !== ''); return p.some((x) => typeof x !== 'string') ? p : null; };
+  // I pezzi della frase, solo quando c'è un riquadro: tutta di Filo, resta la frase.
+  function fraseAPezzi(evento, max = 3) {
+    const p = [];
+    for (const x of fraseParti(evento, max)) {
+      if (x === '') continue;
+      if (typeof x === 'string' && typeof p[p.length - 1] === 'string') p[p.length - 1] += x; else p.push(x);
+    }
+    return p.some((x) => typeof x !== 'string') ? p : null;
+  }
 
   const DOVE = {
     preferences: 'dalle Preferenze',
