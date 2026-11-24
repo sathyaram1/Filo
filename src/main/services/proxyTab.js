@@ -62,7 +62,51 @@ function endpointFor(template, country) {
     .replace(/\{COUNTRY\}/g, country.toUpperCase());
   if (!globalThis.SN_CONST) require('../../shared/constants.js');
   const p = globalThis.SN_CONST.leggiProxy(filled);
-  return (p && p.uso) || null;
+  if (!p || !p.uso) return null;
+  if (!p.senzaSchema) return p.uso;
+  const indirizzo = p.uso.proxyRules.replace(/^[^:]+:\/\//, '');
+  const sentito = schemaSentito.get(indirizzo);
+  return sentito ? { ...p.uso, proxyRules: `${sentito}://${indirizzo}` } : { ...p.uso, daSentire: indirizzo };
+}
+
+// Uno schema non scritto è un'ipotesi (SN_CONST.leggiProxy): chi parla solo socks5 si perderebbe in http, e viceversa
+// (#2646.1). Lo si chiede al fornitore la prima volta, con un saluto socks5 seguito da una riga vuota: un socks5
+// risponde 0x05, un proxy http «HTTP/». Restano solo le risposte certe; senza, vale l'ipotesi.
+const schemaSentito = new Map(); // 'host:porta' → 'socks5' | 'http'
+const SONDA_MS = 2500;
+const SALUTO = Buffer.from([0x05, 0x01, 0x00, 0x0d, 0x0a, 0x0d, 0x0a]);
+function sondaSchema(indirizzo, { ms = SONDA_MS } = {}) {
+  let u;
+  try { u = new URL(`http://${indirizzo}`); } catch (_) { return Promise.resolve(null); }
+  if (!u.port) return Promise.resolve(null);
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  return new Promise((fine) => {
+    let s = null;
+    let finito = false;
+    const chiudi = (x) => {
+      if (finito) return;
+      finito = true;
+      clearTimeout(t);
+      try { s.destroy(); } catch (_) {}
+      fine(x);
+    };
+    const t = setTimeout(() => chiudi(null), ms);
+    try { s = require('net').connect({ host, port: Number(u.port) }); } catch (_) { chiudi(null); return; }
+    s.on('error', () => chiudi(null));
+    s.on('close', () => chiudi(null));
+    s.once('connect', () => s.write(SALUTO));
+    s.once('data', (b) => chiudi(b[0] === 0x05 ? 'socks5' : b.toString('latin1', 0, 5) === 'HTTP/' ? 'http' : null));
+  });
+}
+
+// resolve, con lo schema non scritto chiesto al fornitore la prima volta: lo usano la scheda e i programmi che
+// scaricano per lei, così escono dalla stessa porta.
+async function resolveSentito(country, opzioni = {}, { sonda = sondaSchema } = {}) {
+  const r = resolve(country, opzioni);
+  if (!r || !r.daSentire) return r;
+  const schema = await sonda(r.daSentire);
+  if (schema === 'socks5' || schema === 'http') schemaSentito.set(r.daSentire, schema);
+  return resolve(country, opzioni);
 }
 
 // Niente fallback fra tier: la scelta è del chiamante. null se il tier non è configurato.
