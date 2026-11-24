@@ -1179,7 +1179,7 @@
     const u = FINE_URL.exec(resto);
     return u && INDIRIZZO_VERO.test(u[1]) ? null : el;
   }
-  const HOST_IN_CODA = /^(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+)(:\d{1,5})?\/?$/i;
+  const HOST_IN_CODA = /^(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+)(:\d{1,5})?([/?#].*)?$/i;
   const decodifica = (x) => { try { return decodeURIComponent(x); } catch (_) { return x; } };
   // Una riga che Filo non sa leggere si custodisce intera (#2646.3), ma non il suo host: le finestre del confronto
   // fermerebbero una visita al fornitore. L'host è dopo l'ultima @, se lì ce n'è uno, se no in testa fino ai primi due
