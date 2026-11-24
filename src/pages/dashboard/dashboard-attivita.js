@@ -196,11 +196,15 @@
         statoSeg(seg, 'agisce');
       }
       if (testo) scrivi(seg, testo);
-      if (!seg.nodo) seg.nodo = filo.nodo(seg.el, seg.eti.textContent);
+      if (!seg.nodo) seg.nodo = filo.nodo(seg.el, seg.titolo || seg.eti.textContent);
     }
+    // `t`: una frase, o i pezzi di un titolo che porta un testo altrui (#2648).
     function scrivi(seg, t) {
-      if (seg.eti.textContent === t) return;
-      seg.eti.textContent = t;
+      const chiave = Array.isArray(t) ? JSON.stringify(t) : t;
+      if (seg.chiave === chiave || (!Array.isArray(t) && seg.chiave == null && seg.eti.textContent === t)) return;
+      seg.chiave = chiave;
+      seg.titolo = t;
+      if (Array.isArray(t)) conRiquadri(seg.eti, t); else seg.eti.textContent = t;
       if (seg.nodo) seg.nodo.titolo(t);
     }
     const completa = (seg) => seg.voci.length > 0 && seg.voci.length >= seg.attese.size;
@@ -426,7 +430,7 @@
       addRow(type, rowIcon, text, failed = false, cambi = null, a = null, title = '', parti = null) {
         closeTurnReasoning();
         const gia = contaAzione(type, a, failed);
-        const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
+        const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type), ...(parti ? { parti } : {}) }, a);
         const riga = makeActivityRow(rowIcon, parti || text, cambi, title);
         segnaSistema(riga, a);
         // La proposta finita col bottone diventa il suo esito nella stessa riga: due frasi che si contraddicono no.
@@ -439,7 +443,12 @@
       addCommand(out, spiegazione = '', a = null) {
         closeTurnReasoning();
         contaAzione('ESEGUI_COMANDO', a, false);
-        const seg = registra({ tipo: 'ESEGUI_COMANDO', testo: `Eseguito · ${spiegazione || (out && out.command) || 'comando'}`, esito: 'ok' }, a);
+        // Spiegazione e comando li ha scritti il modello: nel titolo del nodo stanno nel loro riquadro (#2648).
+        const cosa = String(spiegazione || (out && out.command) || '').replace(/\s+/g, ' ').trim();
+        const seg = registra({
+          tipo: 'ESEGUI_COMANDO', testo: `Eseguito · ${cosa || 'comando'}`, esito: 'ok',
+          ...(cosa ? { parti: ['Eseguito · ', { citazione: cosa, nuda: true }] } : {}),
+        }, a);
         const el = renderCommandResult(out, spiegazione);
         el.classList.add('dash-activity-cmd');
         aggiungiEsito(seg, el);
@@ -454,7 +463,9 @@
         const o = a._output || {};
         let dettaglio = '';
         try { if (tipo === 'NAVIGA') dettaglio = new URL(String(a.url || o.url || '')).hostname.replace(/^www\./, ''); } catch (_) {}
-        if (tipo === 'APRI_FILE') dettaglio = String(a.percorso || a.path || '').split(/[\\/]/).pop();
+        // Il nome del file viene dal percorso dato dal modello: nel titolo sta nel suo riquadro (#2648).
+        const nome = tipo === 'APRI_FILE' ? String(a.percorso || a.path || '').split(/[\\/]/).pop().trim() : '';
+        if (nome) dettaglio = [{ citazione: nome, nuda: true }];
         const testo = fallita ? (FAILED_LABELS[tipo] || 'Azione non riuscita') : '';
         registra({ tipo, testo, dettaglio, esito: a._confirm ? 'chiesta' : (fallita ? 'fallita' : 'ok') }, a);
       },
@@ -735,16 +746,9 @@
 
   // Una riga a pezzi (SN_ESITO.primaRigaParti): le parole di Filo come testo, quello che non è suo nel suo riquadro,
   // riempito con textContent. Ricucito nella frase, il nome scelto dal modello si leggeva come parola di Filo (#592.25).
+  // Il disegno sta col filo dell'attesa, che lo usa per i titoli dei nodi: uno solo.
   function conRiquadri(el, parti) {
-    el.replaceChildren();
-    for (const p of parti) {
-      if (typeof p === 'string') { el.append(p); continue; }
-      if (!p || typeof p.citazione !== 'string') continue;
-      const q = document.createElement('span');
-      q.className = 'dash-altrui';
-      q.textContent = p.citazione;
-      el.append(q);
-    }
+    global.SN_FILO_ATTESA.scriviAPezzi(el, parti);
   }
 
   // Le parole del diario stanno in src/shared/righeAttivita.js: la chat riaperta le legge uguali (#1294).
@@ -2372,6 +2376,7 @@
     // Il contratto: un blocco di attività appeso a `container`.
     create: createActivity,
     esitiArchiviati,
+    conRiquadri,
     renderActions,
     aperturaFermata,
     tellActionInActivity,

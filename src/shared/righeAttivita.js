@@ -17,6 +17,28 @@
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
+  // Un valore che non è parola di Filo (scelto dal modello, scritto da un sito, letto dal disco) entra nella riga come
+  // pezzo suo, che la home e la chat riaperta chiudono nel riquadro (#2648). Il testo piatto resta quello di sempre:
+  // `fra` è un valore che la riga dice fra «», `suo` uno che dice nudo. Sentinella: tests/unit/righeEsitoAPezzi.test.mjs.
+  const suo = (v) => { const t = pulito(v); return t ? { citazione: t, nuda: true } : ''; };
+  const fra = (v) => { const t = pulito(v); return t ? { citazione: t } : ''; };
+  const corto = (v, max) => { const t = pulito(v); return t.length > max ? `${t.slice(0, max - 3)}…` : t; };
+  const unisci = (pezzi, sep) => pezzi.filter(Boolean).flatMap((p, i) => (i ? [sep, p] : [p]));
+  function aPezzi(icon, pezzi, resto) {
+    const parti = [];
+    for (const p of pezzi) {
+      if (p === '' || p == null) continue;
+      if (typeof p === 'string' && typeof parti[parti.length - 1] === 'string') parti[parti.length - 1] += p;
+      else parti.push(p);
+    }
+    const r = { icon, text: piatto(parti), ...resto };
+    return parti.some((p) => typeof p !== 'string') ? { ...r, parti } : r;
+  }
+  // La regola del testo piatto sta in SN_ESITO; chi carica solo questo modulo (il main, una prova) lo trova lo stesso.
+  function piatto(parti) {
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
+    return global.SN_ESITO.piatto(parti);
+  }
   const restanoAperte = (o) => global.SN_ESITO.restanoAperte(o);
   // Titolo e testo di una segnalazione li sceglie src/shared/allegatiSegnalazione.js, come l'invio e il riquadro.
   function segnalazione() {
@@ -38,34 +60,34 @@
       // #323 — durata umana fedele all'intento: "30 sec", "2 h", "1 h 30 min".
       const dur = (global.SN_TIME ? global.SN_TIME.fmtDurationLabel(sec) : `${Math.round(sec / 60)} min`);
       const name = pulito(a.label || a.etichetta);
-      return { icon: '⏱', text: `Timer avviato · ${name ? `${name} · ` : ''}${dur}` };
+      return aPezzi('⏱', ['Timer avviato · ', ...(name ? [suo(name), ' · '] : []), dur]);
     },
     SVEGLIA: (a) => {
       const when = pulito(a.time || a.orario);
       const name = pulito(a.label || a.etichetta);
-      return { icon: '⏰', text: `Sveglia impostata${when ? ` · ${when}` : ''}${name ? ` · ${name}` : ''}` };
+      return aPezzi('⏰', ['Sveglia impostata', ...(when ? [' · ', suo(when)] : []), ...(name ? [' · ', suo(name)] : [])]);
     },
     // Il main descrive cosa ha tolto o spostato («Sveglia “lezione” 07:55»):
     // se si può aggiungere una sveglia dalla chat, si deve vedere anche
     // quando la si toglie.
     CANCELLA_SVEGLIA: (a) => {
       const list = (a._output && Array.isArray(a._output.removed)) ? a._output.removed : [];
-      return { icon: '⏰', text: `Cancellata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
+      return aPezzi('⏰', ['Cancellata · ', ...nomiSveglie(list, a)]);
     },
     MODIFICA_SVEGLIA: (a) => {
       const list = (a._output && Array.isArray(a._output.updated)) ? a._output.updated : [];
-      return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
+      return aPezzi('⏰', ['Spostata · ', ...nomiSveglie(list, a)]);
     },
     // Nel calendario l'evento ci entra col bottone: qui si racconta la
     // proposta, e chiamarla «creata» era una promessa che nessuno manteneva.
     EVENTO_CALENDARIO: (a) => {
       const ev = (a._output && a._output.evento) || null;
       const quando = ev && ev.quando ? ` · ${ev.quando}` : '';
-      const nome = `${(ev && ev.titolo) || a.titolo || a.title || ''}${quando}`;
+      const nome = [suo((ev && ev.titolo) || a.titolo || a.title), quando];
       const fatto = a._output && a._output.fatto;
       // Nessun programma ha aperto il file: l'evento c'è, ma nel calendario non ancora.
-      if (fatto && a._output.nonAperto) return { icon: '📅', text: `Evento salvato in un file, il calendario non si è aperto · ${nome}` };
-      return { icon: '📅', text: `${fatto ? 'Evento aggiunto al calendario' : 'Evento proposto'} · ${nome}` };
+      if (fatto && a._output.nonAperto) return aPezzi('📅', ['Evento salvato in un file, il calendario non si è aperto · ', ...nome]);
+      return aPezzi('📅', [`${fatto ? 'Evento aggiunto al calendario' : 'Evento proposto'} · `, ...nome]);
     },
     // Impostazione applicata subito (livello 1, es. il tema): prima non
     // lasciava traccia in chat, come se non fosse successo niente.
@@ -85,8 +107,8 @@
     },
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
-    CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
-    IMMAGINI_WEB: (a) => ({ icon: '🖼', text: `Cerco immagini: ${a.query || ''}` }),
+    CERCA_WEB: (a) => aPezzi('🔎', ['Cerco sul web: ', suo(a.query)]),
+    IMMAGINI_WEB: (a) => aPezzi('🖼', ['Cerco immagini: ', suo(a.query)]),
     GENERA_IMMAGINE: () => ({ icon: '🖌', text: 'Disegno un’immagine' }),
     ESPANDI_FILO: (a) => {
       const o = a._output || {};
@@ -105,122 +127,115 @@
           viste.add(k);
           return true;
         });
-        const quali = [...new Set(una.map((x) => pulito(x.title) || quandoBreve(x.date)).filter(Boolean))];
-        return { icon: '💬', text: `Ricordato dal filo${quali.length ? ` · ${quali.join('; ')}` : ''}`, tipo: 'RICORDO_FILO' };
+        // Il titolo l'ha scritto qualcun altro, il giorno lo dice Filo.
+        const dette = new Set();
+        const quali = [];
+        for (const x of una) {
+          const t = pulito(x.title);
+          const q = t || quandoBreve(x.date);
+          if (!q || dette.has(q)) continue;
+          dette.add(q);
+          quali.push(t ? suo(t) : q);
+        }
+        return aPezzi('💬', ['Ricordato dal filo', ...(quali.length ? [' · ', ...unisci(quali, '; ')] : [])], { tipo: 'RICORDO_FILO' });
       }
       const q = String(a.query || a.testo || '').trim();
       if (a.id && !q) return { icon: '💬', text: 'Rileggo una conversazione di prima' };
-      return { icon: '💬', text: `Cerco nel filo: ${q}` };
+      return aPezzi('💬', ['Cerco nel filo: ', suo(q)]);
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
     LEGGI_MEMORIA: () => ({ icon: '🧠', text: 'Rileggo la memoria' }),
     LEGGI_IMPOSTAZIONI: (a) => {
       const c = String(a.cerca || '').trim();
-      return { icon: '⚙', text: c ? `Leggo come è impostato: ${c}` : 'Leggo le impostazioni' };
+      return c ? aPezzi('⚙', ['Leggo come è impostato: ', suo(c)]) : { icon: '⚙', text: 'Leggo le impostazioni' };
     },
     TOGLI_PERMESSO_SITO: (a) => {
       const tolte = (a._output && Array.isArray(a._output.tolte)) ? a._output.tolte.map(pulito).filter(Boolean) : [];
-      return { icon: '⚙', text: `Permesso tolto · ${tolte.length ? tolte.join('; ') : String(a.sito || '')}` };
+      return aPezzi('⚙', ['Permesso tolto · ', tolte.length ? tolte.join('; ') : suo(a.sito)]);
     },
     LEGGI_FILE: (a) => {
       const title = (a._output && a._output.title) || '';
-      return { icon: '📄', text: title ? `Leggo: ${title}` : 'Leggo un file' };
+      return title ? aPezzi('📄', ['Leggo: ', suo(title)]) : { icon: '📄', text: 'Leggo un file' };
     },
     LEGGI_DOCUMENTO: (a) => {
       const nome = (a._output && a._output.name) || '';
-      return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
+      return nome ? aPezzi('📄', ['Leggo il documento: ', suo(nome)]) : { icon: '📄', text: 'Leggo il documento' };
     },
     // #778 — quale finestra ha guardato; quello che c'era sta nella risposta, non nel diario.
     VEDI_SCHERMO: (a) => {
       const o = a._output || {};
-      if (Array.isArray(o.ambigue)) return { icon: '🖥', text: `Più finestre per «${pulito(o.richiesta)}»` };
+      if (Array.isArray(o.ambigue)) return aPezzi('🖥', ['Più finestre per ', fra(o.richiesta)]);
       if (Array.isArray(o.elenco) && !o.testo) return { icon: '🖥', text: 'Guardato quali finestre sono aperte' };
       const nome = pulito(o.finestra);
-      return { icon: '🖥', text: nome ? `Ho guardato «${nome}»` : 'Ho guardato lo schermo' };
+      return nome ? aPezzi('🖥', ['Ho guardato ', fra(nome)]) : { icon: '🖥', text: 'Ho guardato lo schermo' };
     },
-    CERCA_DOCUMENTI: (a) => ({ icon: '🔎', text: testoRicercaDocumenti(a) }),
-    CERCA_SALVATE: (a) => ({ icon: '🔖', text: testoRicercaSalvate(a) }),
+    CERCA_DOCUMENTI: (a) => aPezzi('🔎', pezziRicercaDocumenti(a)),
+    CERCA_SALVATE: (a) => aPezzi('🔖', pezziRicercaSalvate(a)),
     APRI_SALVATA: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo) || 'una pagina salvata';
-      return { icon: '↗', text: `Aperta «${t}»${o.tolta ? ' · tolta da «Aperti per dopo»' : ' · resta in «Aperti per dopo»'}` };
+      return aPezzi('↗', ['Aperta ', fra(o.titolo) || '«una pagina salvata»', o.tolta ? ' · tolta da «Aperti per dopo»' : ' · resta in «Aperti per dopo»']);
     },
     SCHEDE_CHIUSE: (a) => {
       const o = a._output || {};
       const n = Array.isArray(o.schede) ? o.schede.length : 0;
-      const q = pulito(a.cerca || '');
-      const cosa = q ? ` · «${q}»` : '';
-      return { icon: '🗂', text: n ? `${n === 1 ? 'Trovata una scheda chiusa' : `Trovate ${n} schede chiuse`}${cosa}` : `Nessuna scheda chiusa trovata${cosa}` };
+      const q = fra(a.cerca);
+      const cosa = q ? [' · ', q] : [];
+      return aPezzi('🗂', [n ? (n === 1 ? 'Trovata una scheda chiusa' : `Trovate ${n} schede chiuse`) : 'Nessuna scheda chiusa trovata', ...cosa]);
     },
     RIAPRI_SCHEDA: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo || a._titolo) || 'la scheda';
-      return { icon: '↺', text: o.nonRaggiungibile ? `«${t}» non risponde più · sotto c'è il riassunto` : `Riaperta «${t}»` };
+      const t = fra(o.titolo || a._titolo) || '«la scheda»';
+      return aPezzi('↺', o.nonRaggiungibile ? [t, ' non risponde più · sotto c\'è il riassunto'] : ['Riaperta ', t]);
     },
     RIPRENDI_AUDIO: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo) || 'la musica';
-      if (o.nonPartita) return { icon: '🎵', text: `${o.riaperta ? 'Riaperta' : 'Trovata'} «${t}» · non è ripartita da sola` };
-      return { icon: '🎵', text: `${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'} «${t}»` };
+      const t = fra(o.titolo) || '«la musica»';
+      if (o.nonPartita) return aPezzi('🎵', [`${o.riaperta ? 'Riaperta' : 'Trovata'} `, t, ' · non è ripartita da sola']);
+      return aPezzi('🎵', [`${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'} `, t]);
     },
     PAUSA_AUDIO: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo || a._titolo);
-      return { icon: '⏸', text: t ? `In pausa «${t}»` : 'Musica in pausa' };
+      const t = fra(o.titolo || a._titolo);
+      return t ? aPezzi('⏸', ['In pausa ', t]) : { icon: '⏸', text: 'Musica in pausa' };
     },
     MOSTRA_SCHEDA: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo || a._titolo) || 'la scheda';
-      return { icon: '↗', text: `Ti ho portato su «${t}»` };
+      return aPezzi('↗', ['Ti ho portato su ', fra(o.titolo || a._titolo) || '«la scheda»']);
     },
     SALVA_PER_DOPO: (a) => {
       const o = a._output || {};
-      const t = pulito(o.titolo || a._titolo) || 'la pagina';
-      return { icon: '🔖', text: `Salvata per dopo «${t}»` };
+      return aPezzi('🔖', ['Salvata per dopo ', fra(o.titolo || a._titolo) || '«la pagina»']);
     },
     CERCA_IMMAGINE: (a) => {
       const o = a._output || {};
       return { icon: '🔎', text: o.numero ? `Cercata con Google Lens l'immagine ${o.numero}` : 'Cercata con Google Lens l\'immagine della pagina' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
-    LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
+    LEGGI_PAGINA: (a) => aPezzi('🌐', pezziLetturaPagina(a), { title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
-    ELIMINA_FILE: (a) => ({ icon: '🗑', text: testoEliminati(a._output) }),
+    ELIMINA_FILE: (a) => aPezzi('🗑', pezziEliminati(a._output)),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
-      const dove = String(a.contesto || a.context || a.argomento || '').trim();
-      return { icon: '📝', text: `Appunto salvato${dove ? ` · ${dove}` : ''}` };
+      const dove = suo(a.contesto || a.context || a.argomento);
+      return aPezzi('📝', ['Appunto salvato', ...(dove ? [' · ', dove] : [])]);
     },
-    SALVA_LEZIONE: (a) => {
-      const t = String(a.testo || a.text || a.lezione || '').trim();
-      return { icon: '🧠', text: `Memorizzato · ${t.length > 60 ? `${t.slice(0, 57)}…` : t}` };
-    },
+    SALVA_LEZIONE: (a) => aPezzi('🧠', ['Memorizzato · ', suo(corto(a.testo || a.text || a.lezione, 60))]),
     DIMENTICA: (a) => {
       const tolte = (a._output && Array.isArray(a._output.dimenticate)) ? a._output.dimenticate : [];
-      const t = tolte.join(', ') || String(a.testo || '').trim();
-      return { icon: '🧠', text: `Dimenticato · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
+      return aPezzi('🧠', ['Dimenticato · ', suo(corto(tolte.join(', ') || a.testo, 80))]);
     },
     // #1295 — una conversazione nascosta o cancellata a parole: la riga dice quale, e se si rimette.
-    TOGLI_CHAT: (a) => {
-      const t = pulito(a._titolo) || 'una conversazione';
-      return { icon: '💬', text: `${a.per_sempre === true ? 'Cancellata per sempre' : 'Nascosta'} · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
-    },
-    RIMETTI_CHAT: (a) => {
-      const t = pulito(a._titolo) || 'una conversazione';
-      return { icon: '💬', text: `Rimessa nel filo · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
-    },
-    CORREGGI_MEMORIA: (a) => {
-      const t = String((a._output && a._output.corretta) || a.nuovo || '').trim();
-      return { icon: '🧠', text: `Corretto · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
-    },
+    TOGLI_CHAT: (a) => aPezzi('💬', [`${a.per_sempre === true ? 'Cancellata per sempre' : 'Nascosta'} · `, suo(corto(a._titolo, 80)) || 'una conversazione']),
+    RIMETTI_CHAT: (a) => aPezzi('💬', ['Rimessa nel filo · ', suo(corto(a._titolo, 80)) || 'una conversazione']),
+    CORREGGI_MEMORIA: (a) => aPezzi('🧠', ['Corretto · ', suo(corto((a._output && a._output.corretta) || a.nuovo, 80))]),
     // Le due azioni che l'utente conferma nel popup e poi non ritrova da
     // nessuna parte: proprio quelle che non si disfano più.
     CANCELLA_MEMORIA: () => ({ icon: '🧠', text: 'Memoria cancellata' }),
     INVIA_FEEDBACK: (a) => {
       const S = segnalazione();
-      const t = pulito(S ? S.campi(a).titolo : '');
-      return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t}` : ''}` };
+      const t = suo(S ? S.campi(a).titolo : '');
+      return aPezzi('📨', ['Segnalazione inviata', ...(t ? [' · ', t] : [])]);
     },
     ONBOARDING: (a) => {
       if (sceltaAutonomia(a)) {
@@ -231,7 +246,7 @@
       if (sceltaContatori(a)) return { icon: '👋', text: 'Accoglienza · scelta dei contatori' };
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
-      return { icon: '👋', text: `Accoglienza · ${ids.join(', ') || 'passo fatto'}` };
+      return aPezzi('👋', ['Accoglienza · ', suo(ids.join(', ')) || 'passo fatto']);
     },
     IMPOSTA_ESTETICA: (a) => {
       const tok = a.token || a.nome || a.name || a.chiave || a.elemento || '';
@@ -243,22 +258,19 @@
       const f = frasiCambi(a);
       if (f) return { icon: '🎨', text: `Aspetto · ${f.replace(/^aspetto, /, '')}` };
       // Senza evento il valore era già quello: si dice come per le preferenze, mai «token = valore» (#557).
-      return { icon: '🎨', text: `Aspetto già così · ${(t && t.label) || 'un dettaglio'}${val ? `: ${pulito(val)}` : ''}` };
+      return aPezzi('🎨', [`Aspetto già così · ${(t && t.label) || 'un dettaglio'}`, ...(val ? [': ', suo(val)] : [])]);
     },
-    PROXY_TAB: (a) => ({ icon: '🌍', text: `Scheda aperta da · ${String(a.country || a.paese || '').toUpperCase()}` }),
+    PROXY_TAB: (a) => aPezzi('🌍', ['Scheda aperta da · ', suo(String(a.country || a.paese || '').toUpperCase())]),
     RIMUOVI_PROXY: () => ({ icon: '🌍', text: 'Scheda riportata in Italia' }),
     RIMUOVI_PROXY_TUTTE: () => ({ icon: '🌍', text: 'Tutte le schede riportate in Italia' }),
-    REGOLA_PROXY_DOMINIO: (a) => ({ icon: '🌍', text: `Regola · ${a.dominio || a.domain || a.sito || 'questo sito'} sempre da ${String(a.country || a.paese || '').toUpperCase()}` }),
-    RIMUOVI_REGOLA_PROXY: (a) => ({ icon: '🌍', text: `Regola tolta · ${a.dominio || a.domain || a.sito || 'questo sito'}` }),
-    TIENI_APERTA: (a) => ({ icon: '📌', text: `Sempre aperto · ${(a._output && a._output.sito) || a.dominio || a.sito || 'questo sito'}` }),
+    REGOLA_PROXY_DOMINIO: (a) => aPezzi('🌍', ['Regola · ', suo(a.dominio || a.domain || a.sito) || 'questo sito', ' sempre da ', suo(String(a.country || a.paese || '').toUpperCase())]),
+    RIMUOVI_REGOLA_PROXY: (a) => aPezzi('🌍', ['Regola tolta · ', suo(a.dominio || a.domain || a.sito) || 'questo sito']),
+    TIENI_APERTA: (a) => aPezzi('📌', ['Sempre aperto · ', suo((a._output && a._output.sito) || a.dominio || a.sito) || 'questo sito']),
     NON_TENERE_APERTA: (a) => {
       const siti = a._output && Array.isArray(a._output.siti) ? a._output.siti.join(', ') : '';
-      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || a.sito || 'questo sito'}` };
+      return aPezzi('📌', ['Non più tenuto aperto · ', suo(siti || a.dominio || a.sito) || 'questo sito']);
     },
-    STILE_PAGINA: (a) => {
-      const d = String(a.descrizione || a.description || '').trim();
-      return { icon: '🖌', text: `Aspetto della pagina · ${d || 'modificato'}` };
-    },
+    STILE_PAGINA: (a) => aPezzi('🖌', ['Aspetto della pagina · ', suo(a.descrizione || a.description) || 'modificato']),
     RIPRISTINA_STILE_PAGINA: () => ({ icon: '🖌', text: 'Aspetto della pagina ripristinato' }),
     PULISCI_TAB: (a) => {
       const n = Number(a._output && a._output.archived) || 0;
@@ -313,7 +325,7 @@
       // Una mossa che ha lasciato la barra com'era non si racconta come fatta: come «Sei già nella home», non conta.
       const gia = global.SN_BARRA_SITI ? global.SN_BARRA_SITI.giaCosi(op, o) : '';
       const cosa = gia || { aggiungi: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
-      return { icon: '📌', text: `${cosa || 'Barra dei siti'}${nome ? ` · ${nome}` : ''}`, ...(gia ? { failed: true } : {}) };
+      return aPezzi('📌', [cosa || 'Barra dei siti', ...(nome ? [' · ', suo(nome)] : [])], gia ? { failed: true } : {});
     },
     CANCELLA_PAGINE: (a) => {
       const n = Number(a._output && a._output.cancellate) || 0;
@@ -415,10 +427,11 @@
     SPOSTA_ICONA: (a) => {
       const D = global.SN_DISPOSIZIONE_ICONE;
       const id = String(a.icona || a.id || '');
-      const nome = D && D.esiste && D.esiste(id) ? D.nome(id) : id;
+      // Un'icona che Filo non conosce ha il nome che le ha dato il modello.
+      const nome = D && D.esiste && D.esiste(id) ? D.nome(id) : suo(id);
       const zona = D && D.zonaDellAzione ? D.zonaDellAzione(a) : '';
       const dove = zona ? `${D.nomeZona(zona).in} ${D.nomeZona(zona).nome}` : '';
-      return { icon: '📌', text: `Icona spostata · ${nome}${dove ? ` ${dove}` : ''}` };
+      return aPezzi('📌', ['Icona spostata · ', nome, dove ? ` ${dove}` : '']);
     },
     PANNELLO_APP: (a) => {
       const P = global.SN_PANNELLI_APP;
@@ -485,14 +498,21 @@
     const icon = radio === 'Wi-Fi' ? '📶' : '🎧';
     if (Array.isArray(o.elenco)) return { icon, text: radio === 'Wi-Fi' ? 'Letto le reti conosciute' : 'Letto i dispositivi abbinati' };
     if (typeof o.acceso === 'boolean') return { icon, text: `${radio} ${o.acceso ? 'acceso' : 'spento'}` };
-    const nome = o.dispositivo || o.rete || '';
-    if (o.dimenticato || o.dimenticata) return { icon, text: `${o.dimenticata ? 'Rete dimenticata' : 'Dimenticato'} · ${nome}` };
-    if (typeof o.preferito === 'boolean') return { icon, text: `${o.preferito ? 'Fra i preferiti' : 'Tolto dai preferiti'} · ${nome}` };
-    if (o.gia) return { icon, text: `Già così · ${nome}` };
+    // Il nome di un dispositivo o di una rete lo sceglie chi l'ha configurato.
+    const nome = suo(o.dispositivo || o.rete);
+    const con = (cosa) => aPezzi(icon, [`${cosa} · `, nome]);
+    if (o.dimenticato || o.dimenticata) return con(o.dimenticata ? 'Rete dimenticata' : 'Dimenticato');
+    if (typeof o.preferito === 'boolean') return con(o.preferito ? 'Fra i preferiti' : 'Tolto dai preferiti');
+    if (o.gia) return con('Già così');
     // Il sistema ha preso la richiesta ma non ha ancora confermato: la riga non promette di più.
-    if (radio === 'Wi-Fi') return { icon, text: `${o.confermato === false ? 'Collegamento chiesto' : 'Collegato al Wi-Fi'} · ${nome}` };
-    if (o.collegato === null) return { icon, text: `Collegamento chiesto · ${nome}` };
-    return { icon, text: `${o.collegato === false ? 'Scollegato' : 'Collegato'} · ${nome}` };
+    if (radio === 'Wi-Fi') return con(o.confermato === false ? 'Collegamento chiesto' : 'Collegato al Wi-Fi');
+    if (o.collegato === null) return con('Collegamento chiesto');
+    return con(o.collegato === false ? 'Scollegato' : 'Collegato');
+  }
+  // I nomi delle sveglie toccate li scrive il main con dentro l'etichetta del modello: ognuno nel suo riquadro.
+  function nomiSveglie(list, a) {
+    const l = list.map(suo).filter(Boolean);
+    return l.length ? unisci(l, ', ') : [suo(a.etichetta || a.label)];
   }
   // Si raccontano SOLO col bottone: la riga ripeterebbe ciò che l'utente ha già
   // davanti. Ogni azione sta qui o in ACTIVITY_ROWS: lo pretende una sentinella.
@@ -574,7 +594,8 @@
   // «Leggo la pagina: <titolo>». Il titolo lo scrive il sito: una riga sola e corta, e senza titolo si nomina il sito.
   // Il titolo se lo scrive il sito, quindi da solo non dice dove è andato Filo: accanto il sito, e se la pagina era
   // la scheda dell'utente (dentro il suo accesso) lo si dice. L'indirizzo intero sta sotto il puntatore.
-  function rigaLetturaPagina(a) {
+  // Il sito lo dice Filo, che sa dove è andato: nel riquadro va solo il titolo.
+  function pezziLetturaPagina(a) {
     const o = (a && a._output) || {};
     let titolo = String(o.titolo || '').replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
     if (titolo.length > 60) titolo = `${titolo.slice(0, 57)}…`;
@@ -582,9 +603,10 @@
     try { sito = new URL(o.url || a.url || '').hostname.replace(/^www\./, ''); } catch (_) { sito = ''; }
     const seguito = Number(o.da || a.da || 0) > 0;
     const verbo = seguito ? 'Leggo il seguito della pagina' : 'Leggo la pagina';
-    const parti = [titolo, sito !== titolo ? sito : '', o.fonte === 'scheda' ? 'dalla tua scheda' : ''].filter(Boolean);
-    return parti.length ? `${verbo}: ${parti.join(' · ')}` : verbo;
+    const dopo = [suo(titolo), sito !== titolo ? sito : '', o.fonte === 'scheda' ? 'dalla tua scheda' : ''].filter(Boolean);
+    return dopo.length ? [`${verbo}: `, ...unisci(dopo, ' · ')] : [verbo];
   }
+  const rigaLetturaPagina = (a) => piatto(pezziLetturaPagina(a));
   function indirizzoLetto(a) {
     const o = (a && a._output) || {};
     return String(o.url || (a && a.url) || '').slice(0, 300);
@@ -605,25 +627,27 @@
   }
 
   // «Cercato fra i documenti · bolletta luce marzo · 8 trovati»: dice anche quando la ricerca è stata fermata.
-  function testoRicercaDocumenti(a) {
+  function pezziRicercaDocumenti(a) {
     const o = (a && a._output) || {};
     const q = String((a && (a.cosa || a.query)) || o.cercato || '').trim();
-    const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
-    if (o.cartellaMancante) return `Cartella non trovata · ${o.cartellaMancante}`;
-    if (o.cartellaDiRete) return `Cartella su un altro computer · ${o.cartellaDiRete}`;
+    const breve = suo(q.length > 60 ? `${q.slice(0, 59)}…` : q);
+    if (o.cartellaMancante) return ['Cartella non trovata · ', suo(o.cartellaMancante)];
+    if (o.cartellaDiRete) return ['Cartella su un altro computer · ', suo(o.cartellaDiRete)];
     const n = Array.isArray(o.risultati) ? o.risultati.length : null;
     const quanti = n == null ? '' : (n ? ` · ${n === 1 ? 'uno trovato' : `${n} trovati`}` : ' · nessuno trovato');
-    return `Cercato fra i documenti${breve ? ` · ${breve}` : ''}${quanti}${o.fermata ? ' · fermata da te' : ''}`;
+    return ['Cercato fra i documenti', ...(breve ? [' · ', breve] : []), `${quanti}${o.fermata ? ' · fermata da te' : ''}`];
   }
+  const testoRicercaDocumenti = (a) => piatto(pezziRicercaDocumenti(a));
 
-  function testoRicercaSalvate(a) {
+  function pezziRicercaSalvate(a) {
     const o = (a && a._output) || {};
     const q = pulito(a && (a.cerca || a.query)) || pulito(o.cercato);
-    const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
+    const breve = suo(q.length > 60 ? `${q.slice(0, 59)}…` : q);
     const n = Number.isInteger(o.trovate) ? o.trovate : (Array.isArray(o.pagine) ? o.pagine.length : null);
     const quante = n == null ? '' : (n ? ` · ${n === 1 ? 'una trovata' : `${n} trovate`}` : ' · nessuna trovata');
-    return `Cercato fra le pagine salvate${breve ? ` · ${breve}` : ''}${quante}`;
+    return ['Cercato fra le pagine salvate', ...(breve ? [' · ', breve] : []), quante];
   }
+  const testoRicercaSalvate = (a) => piatto(pezziRicercaSalvate(a));
 
   function testoRinominati(o) {
     const n = o && Array.isArray(o.rinominati) ? o.rinominati.length : 0;
@@ -632,29 +656,30 @@
     return no ? `${quanti} · ${no} non riusciti` : quanti;
   }
   // #1909 — i nomi vengono dal disco: entrano solo come testo.
-  function testoEliminati(o) {
+  function pezziEliminati(o) {
     const fatti = o && Array.isArray(o.eliminati) ? o.eliminati.map(pulito) : [];
     const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
     const per = !!(o && o.perSempre);
     const quanti = fatti.length === 1
-      ? `${per ? 'Cancellato per sempre' : 'Nel cestino'} «${fatti[0]}»`
-      : `${per ? 'Cancellati per sempre' : 'Nel cestino'} ${fatti.length} elementi`;
-    return no ? `${quanti} · ${no} non riusciti` : quanti;
+      ? [`${per ? 'Cancellato per sempre' : 'Nel cestino'} `, fra(fatti[0]) || '«»']
+      : [`${per ? 'Cancellati per sempre' : 'Nel cestino'} ${fatti.length} elementi`];
+    return no ? [...quanti, ` · ${no} non riusciti`] : quanti;
   }
+  const testoEliminati = (o) => piatto(pezziEliminati(o));
 
   // Le azioni che in diretta sono solo il loro bottone: nella chat riaperta (#1294) una riga al passato con la cosa vera.
   const DOPO_IL_BOTTONE = {
     NAVIGA: (a) => {
-      const u = pulito(a.url || a.href || a.link || a.indirizzo);
-      return { icon: '🌐', text: u ? `Aperta · ${u}` : 'Pagina aperta' };
+      const u = suo(a.url || a.href || a.link || a.indirizzo);
+      return u ? aPezzi('🌐', ['Aperta · ', u]) : { icon: '🌐', text: 'Pagina aperta' };
     },
     APRI_FILE: (a) => {
-      const f = pulito(a.percorso || a.path).split(/[\\/]/).pop();
-      return { icon: '📄', text: f ? `File mostrato · ${f}` : 'File mostrato' };
+      const f = suo(pulito(a.percorso || a.path).split(/[\\/]/).pop());
+      return f ? aPezzi('📄', ['File mostrato · ', f]) : { icon: '📄', text: 'File mostrato' };
     },
     ESEGUI_COMANDO: (a) => {
       const c = pulito(a.comando ?? a.command ?? a.cmd);
-      return { icon: '⌨', text: `Comando eseguito${c ? ` · ${c.length > 80 ? `${c.slice(0, 79)}…` : c}` : ''}` };
+      return aPezzi('⌨', ['Comando eseguito', ...(c ? [' · ', suo(c.length > 80 ? `${c.slice(0, 79)}…` : c)] : [])]);
     },
   };
   function rigaArchivio(a) {
