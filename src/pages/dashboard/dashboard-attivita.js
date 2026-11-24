@@ -196,11 +196,15 @@
         statoSeg(seg, 'agisce');
       }
       if (testo) scrivi(seg, testo);
-      if (!seg.nodo) seg.nodo = filo.nodo(seg.el, seg.eti.textContent);
+      if (!seg.nodo) seg.nodo = filo.nodo(seg.el, seg.titolo || seg.eti.textContent);
     }
+    // `t`: una frase, o i pezzi di un titolo che porta un testo altrui (#2648).
     function scrivi(seg, t) {
-      if (seg.eti.textContent === t) return;
-      seg.eti.textContent = t;
+      const chiave = Array.isArray(t) ? JSON.stringify(t) : t;
+      if (seg.chiave === chiave || (!Array.isArray(t) && seg.chiave == null && seg.eti.textContent === t)) return;
+      seg.chiave = chiave;
+      seg.titolo = t;
+      if (Array.isArray(t)) conRiquadri(seg.eti, t); else seg.eti.textContent = t;
       if (seg.nodo) seg.nodo.titolo(t);
     }
     const completa = (seg) => seg.voci.length > 0 && seg.voci.length >= seg.attese.size;
