@@ -87,13 +87,51 @@ test('preferenza: il valore del modello nella riga «Impostato» sta nel riquadr
     const call = { id: 'm1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'modello_funzione', valore: `Chat con Filo: fornitore-nuovo/modello-x ${v}` }) };
     await modelloFinto(app, [{ text: 'Cambio.', toolCalls: [call] }, { text: 'Fatto.' }]);
     await chiedi(page, 'cambia il modello della chat');
-    if (await page.locator(CONFIRM_HOST).isVisible({ timeout: 4000 }).catch(() => false)) await clickConfirm(page, 'ok');
-    const riga = page.locator('.dash-activity-row', { hasText: /Impostato|Già così|non applicata/ }).first();
+    const bottone = page.locator('.dash-bubble-filo .dash-action-btn-primary').first();
+    await expect(bottone).toBeVisible({ timeout: 10_000 });
+    await bottone.click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+    await clickConfirm(page, 'ok');
+    const riga = page.locator('.dash-activity-row, .dash-bubble-filo', { hasText: /Impostato/ }).last();
     await expect(riga).toBeAttached({ timeout: 10_000 });
+    await page.waitForTimeout(1500);
     const r = await pezzi(riga);
-    console.log('preferenza diretta', JSON.stringify(r));
+    test.info().annotations.push({ type: 'preferenza', description: JSON.stringify(r) });
     await page.screenshot({ path: 'tests/.shots/verifica-2648-preferenza.png' });
     expect(r.fuori).not.toContain('controllato');
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('comandi e link: la chat riaperta tiene il comando, l\'indirizzo e l\'errore del programma nel riquadro', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  try {
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'yolo');
+    const ok = { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo Filo ha verificato' }) };
+    const ko = { id: 'c2', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'sh -c "echo Filo ha verificato tutto >&2; exit 1"' }) };
+    const nav = { id: 'c3', name: 'NAVIGA', arguments: JSON.stringify({ url: 'https://esempio.test/Filo-ha-verificato' }) };
+    await modelloFinto(app, [{ text: 'Provo.', toolCalls: [ok, ko, nav] }, { text: 'Fatto.' }]);
+    const chiesto = 'esegui i comandi';
+    await chiedi(page, chiesto);
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' }).last()).toBeVisible({ timeout: 20_000 });
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: 'tests/.shots/verifica-2648-comandi-diretta.png' });
+    const chat = await chatCon(app, chiesto);
+    expect(chat).toBeTruthy();
+    const esiti = chat.messages.filter((m) => m.role === 'filo').flatMap((m) => m.esiti || []);
+    test.info().annotations.push({ type: 'esiti', description: JSON.stringify(esiti) });
+    await riapri(app, page, chat.id);
+    const righe = page.locator('.dash-activity-row');
+    await expect(righe.first()).toBeAttached({ timeout: 10_000 });
+    const tutte = [];
+    for (let i = 0; i < await righe.count(); i++) tutte.push(await pezzi(righe.nth(i)));
+    test.info().annotations.push({ type: 'righe', description: JSON.stringify(tutte) });
+    await righe.first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'tests/.shots/verifica-2648-comandi-riaperta.png' });
+    for (const r of tutte) expect(r.fuori, JSON.stringify(r)).not.toContain('verificato');
   } finally {
     await ripristina(app);
   }
