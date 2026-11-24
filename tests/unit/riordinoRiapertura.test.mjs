@@ -247,6 +247,59 @@ test('l’ultimo uso di ogni scheda va nella sessione, al minuto', () => {
   assert.deepEqual(s.usate, ['2026-10-20T10:37:00.000Z', null, null]);
 });
 
+// #349.1 — senza, alla riapertura l'articolo lasciato a metà arrivava al giudizio come una pagina mai letta.
+test('fin dove era arrivata la lettura va nella sessione, e lo 0 no', () => {
+  const tm = gestore();
+  tm.tabs[0].scrollPct = 47;
+  // Riaperta e non ancora toccata: la pagina ricaricata sta in cima, la lettura è quella salvata.
+  Object.assign(tm.tabs[1], { scrollPct: 0, _scrollIgnoto: true, _letturaSalvata: 62 });
+  tm.tabs[2].scrollPct = 0;
+  assert.deepEqual(tm.sessionState().letture, [47, 62, null]);
+});
+
+test('la lettura salvata arriva al giudizio finché l’utente non tocca la scheda', async () => {
+  const tm = gestore();
+  Object.assign(tm.tabs[1], { scrollPct: 0, _scrollIgnoto: true, _letturaSalvata: 62 });
+  Object.assign(tm.tabs[2], { scrollPct: 0, _scrollIgnoto: true, _letturaSalvata: null });
+  let [verde, rosso] = await tm._gatherTriageInput([tm.tabs[1], tm.tabs[2]]);
+  assert.equal(verde.scrollPct, 62);
+  assert.equal(rosso.scrollPct, null);
+  tm.setTabActivity('verde', { scrollPct: 3 });
+  [verde] = await tm._gatherTriageInput([tm.tabs[1]]);
+  assert.equal(verde.scrollPct, 62, 'lo scroll della pagina ricaricata non è un gesto');
+  tm.setTabActivity('verde', { lastInteractionAt: Date.now(), scrollPct: 8 });
+  [verde] = await tm._gatherTriageInput([tm.tabs[1]]);
+  assert.equal(verde.scrollPct, 8);
+});
+
+test('la sessione riaperta rimette a ogni scheda la sua lettura, e la pagina riparte da lì', async () => {
+  const tm = gestore();
+  const viste = [];
+  const salvata = { tabs: ['https://a.example/', 'https://b.example/', 'https://c.example/'], letture: [55, 'molto', 140], activeIndex: 0 };
+  const prima = globalThis.SN_STORAGE;
+  globalThis.SN_STORAGE = { getRaw: async () => salvata, setRaw: async () => {} };
+  try {
+    Object.assign(tm, {
+      tabs: [], _sessioneDaLeggere: true, visite: { giaVista() {} },
+      codaRiapertura: { accoda() {}, avanti() {}, finita: () => new Promise(() => {}) },
+      activate() {}, _persistSession() {}, _maybeTriageOnReopen() {},
+      openTab(url, opz) {
+        const t = { id: `t${viste.length}`, url, view: { webContents: {} }, scrollPct: 0, restoreScrollPct: opz.restoreScrollPct ?? null };
+        viste.push(opz.restoreScrollPct ?? null);
+        tm.tabs.push(t);
+        return t.id;
+      },
+    });
+    assert.equal(await tm.restoreSession(), true);
+  } finally {
+    globalThis.SN_STORAGE = prima;
+  }
+  assert.deepEqual(viste, [55, null, null]);
+  assert.deepEqual(tm.tabs.map((t) => t._letturaSalvata), [55, null, null]);
+  const giudizio = await tm._gatherTriageInput(tm.tabs);
+  assert.deepEqual(giudizio.map((g) => g.scrollPct), [55, null, null]);
+});
+
 test('un’ora d’uso nel futuro mandata dalla pagina non resta sulla scheda', () => {
   const tm = gestore();
   tm._lastAppInteractionAt = 0;
