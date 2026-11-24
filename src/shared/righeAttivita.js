@@ -615,25 +615,27 @@
   }
 
   // «Cercato fra i documenti · bolletta luce marzo · 8 trovati»: dice anche quando la ricerca è stata fermata.
-  function testoRicercaDocumenti(a) {
+  function pezziRicercaDocumenti(a) {
     const o = (a && a._output) || {};
     const q = String((a && (a.cosa || a.query)) || o.cercato || '').trim();
-    const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
-    if (o.cartellaMancante) return `Cartella non trovata · ${o.cartellaMancante}`;
-    if (o.cartellaDiRete) return `Cartella su un altro computer · ${o.cartellaDiRete}`;
+    const breve = suo(q.length > 60 ? `${q.slice(0, 59)}…` : q);
+    if (o.cartellaMancante) return ['Cartella non trovata · ', suo(o.cartellaMancante)];
+    if (o.cartellaDiRete) return ['Cartella su un altro computer · ', suo(o.cartellaDiRete)];
     const n = Array.isArray(o.risultati) ? o.risultati.length : null;
     const quanti = n == null ? '' : (n ? ` · ${n === 1 ? 'uno trovato' : `${n} trovati`}` : ' · nessuno trovato');
-    return `Cercato fra i documenti${breve ? ` · ${breve}` : ''}${quanti}${o.fermata ? ' · fermata da te' : ''}`;
+    return ['Cercato fra i documenti', ...(breve ? [' · ', breve] : []), `${quanti}${o.fermata ? ' · fermata da te' : ''}`];
   }
+  const testoRicercaDocumenti = (a) => global.SN_ESITO.piatto(pezziRicercaDocumenti(a));
 
-  function testoRicercaSalvate(a) {
+  function pezziRicercaSalvate(a) {
     const o = (a && a._output) || {};
     const q = pulito(a && (a.cerca || a.query)) || pulito(o.cercato);
-    const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
+    const breve = suo(q.length > 60 ? `${q.slice(0, 59)}…` : q);
     const n = Number.isInteger(o.trovate) ? o.trovate : (Array.isArray(o.pagine) ? o.pagine.length : null);
     const quante = n == null ? '' : (n ? ` · ${n === 1 ? 'una trovata' : `${n} trovate`}` : ' · nessuna trovata');
-    return `Cercato fra le pagine salvate${breve ? ` · ${breve}` : ''}${quante}`;
+    return ['Cercato fra le pagine salvate', ...(breve ? [' · ', breve] : []), quante];
   }
+  const testoRicercaSalvate = (a) => global.SN_ESITO.piatto(pezziRicercaSalvate(a));
 
   function testoRinominati(o) {
     const n = o && Array.isArray(o.rinominati) ? o.rinominati.length : 0;
