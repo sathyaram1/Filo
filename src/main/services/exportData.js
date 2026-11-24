@@ -180,9 +180,11 @@ function togliSegreti(dati, filo) {
     const v = o[k].trim();
     segna({ valore: v });
     const m = isPlainObject(s) && o === s.proxy ? credenzialiProxy(v) : null;
-    if (!m || !m.senza) { delete o[k]; continue; }
+    if (!m) { delete o[k]; continue; }
     // Gli stessi valori che i segreti custoditi tengono lontani da uscite e modelli.
     for (const x of costanti().segretiDelProxy(v)) segna(x);
+    // Una riga che non si legge non ha un indirizzo da tenere: va via intera, come una chiave.
+    if (!m.senza) { delete o[k]; continue; }
     o[k] = m.senza;
     proxy.push(k);
   }
