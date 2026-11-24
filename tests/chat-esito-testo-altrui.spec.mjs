@@ -181,9 +181,11 @@ test('#2648.1 i nodi di un comando e di un file mostrato, e il fumetto sul nodo,
     await modelloFinto(app, [
       { text: '', toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo ciao', spiegazione: VALORE }) }] },
       { text: '', toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: join(dir, nome) }) }] },
+      { text: 'Ecco la ricevuta.' },
     ]);
     await chiedi(page, 'scrivi ciao e mostrami la ricevuta');
-    await expect(page.locator('.dash-file-btn')).toHaveCount(1, { timeout: 15_000 });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la ricevuta.' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.dash-file-btn')).toHaveCount(1);
     const blocco = page.locator('.dash-activity').last();
     const capo = blocco.locator('.dash-activity-head');
     await expect(capo).toBeVisible({ timeout: 10_000 });
