@@ -647,7 +647,7 @@
     const quante = n == null ? '' : (n ? ` · ${n === 1 ? 'una trovata' : `${n} trovate`}` : ' · nessuna trovata');
     return ['Cercato fra le pagine salvate', ...(breve ? [' · ', breve] : []), quante];
   }
-  const testoRicercaSalvate = (a) => global.SN_ESITO.piatto(pezziRicercaSalvate(a));
+  const testoRicercaSalvate = (a) => piatto(pezziRicercaSalvate(a));
 
   function testoRinominati(o) {
     const n = o && Array.isArray(o.rinominati) ? o.rinominati.length : 0;
