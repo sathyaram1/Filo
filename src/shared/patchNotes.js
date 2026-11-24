@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.302', date: '2026-11-24',
+      fixes: [
+        { testo: 'Un proxy degli elenchi con un indirizzo email come utente, o con un indirizzo IPv6 fra quadre, ora si collega e la sua password resta protetta. Scritto senza http:// o socks5:// davanti, Filo chiede al fornitore che tipo di proxy è e lo usa nel modo giusto, anche per scaricare i video.', segnalazione: 2646 },
+      ],
+    },
+    {
       version: '0.2.301', date: '2026-11-23',
       fixes: [
         { testo: 'Filo si collega anche ai proxy scritti come «indirizzo:porta:utente:password», la forma degli elenchi di molti fornitori, e a quelli con utente e password ma senza http:// davanti; la loro password è protetta come una chiave API. Un backup con un proxy senza utente e password ora prende il posto di quello di questo computer.', segnalazione: [905, 2134] },
