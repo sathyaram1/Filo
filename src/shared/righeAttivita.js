@@ -644,29 +644,30 @@
     return no ? `${quanti} · ${no} non riusciti` : quanti;
   }
   // #1909 — i nomi vengono dal disco: entrano solo come testo.
-  function testoEliminati(o) {
+  function pezziEliminati(o) {
     const fatti = o && Array.isArray(o.eliminati) ? o.eliminati.map(pulito) : [];
     const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
     const per = !!(o && o.perSempre);
     const quanti = fatti.length === 1
-      ? `${per ? 'Cancellato per sempre' : 'Nel cestino'} «${fatti[0]}»`
-      : `${per ? 'Cancellati per sempre' : 'Nel cestino'} ${fatti.length} elementi`;
-    return no ? `${quanti} · ${no} non riusciti` : quanti;
+      ? [`${per ? 'Cancellato per sempre' : 'Nel cestino'} `, fra(fatti[0]) || '«»']
+      : [`${per ? 'Cancellati per sempre' : 'Nel cestino'} ${fatti.length} elementi`];
+    return no ? [...quanti, ` · ${no} non riusciti`] : quanti;
   }
+  const testoEliminati = (o) => global.SN_ESITO.piatto(pezziEliminati(o));
 
   // Le azioni che in diretta sono solo il loro bottone: nella chat riaperta (#1294) una riga al passato con la cosa vera.
   const DOPO_IL_BOTTONE = {
     NAVIGA: (a) => {
-      const u = pulito(a.url || a.href || a.link || a.indirizzo);
-      return { icon: '🌐', text: u ? `Aperta · ${u}` : 'Pagina aperta' };
+      const u = suo(a.url || a.href || a.link || a.indirizzo);
+      return u ? aPezzi('🌐', ['Aperta · ', u]) : { icon: '🌐', text: 'Pagina aperta' };
     },
     APRI_FILE: (a) => {
-      const f = pulito(a.percorso || a.path).split(/[\\/]/).pop();
-      return { icon: '📄', text: f ? `File mostrato · ${f}` : 'File mostrato' };
+      const f = suo(pulito(a.percorso || a.path).split(/[\\/]/).pop());
+      return f ? aPezzi('📄', ['File mostrato · ', f]) : { icon: '📄', text: 'File mostrato' };
     },
     ESEGUI_COMANDO: (a) => {
       const c = pulito(a.comando ?? a.command ?? a.cmd);
-      return { icon: '⌨', text: `Comando eseguito${c ? ` · ${c.length > 80 ? `${c.slice(0, 79)}…` : c}` : ''}` };
+      return aPezzi('⌨', ['Comando eseguito', ...(c ? [' · ', suo(c.length > 80 ? `${c.slice(0, 79)}…` : c)] : [])]);
     },
   };
   function rigaArchivio(a) {
