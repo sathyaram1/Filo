@@ -418,23 +418,47 @@ test('richiamare una finestra vuole il clic segnalato dalla pagina, come aprirla
     wc.mainFrame = { parent: null };
     Permessi.seguiGesti(wc);
     wc.emetti('input-event', {}, { type: 'mouseDown' });
-    assert.equal(Permessi.gestoPerRichiamare(wc), 0, 'l\'input visto dal main non sa ancora se è caduto su Filo');
+    const richiama = (chiede = '') => Permessi.gestoPerUnaFinestra(wc, chiede, { spendi: false });
+    assert.equal(richiama(), false, 'l\'input visto dal main non sa ancora se è caduto su Filo');
     Permessi.gestoDellaPagina(wc, wc.mainFrame);
-    const t = ora;
     ora += 50;
-    assert.equal(Permessi.gestoPerRichiamare(wc), t);
-    assert.equal(Permessi.gestoPerRichiamare(wc), t, 'non si spende');
+    assert.equal(richiama(), true);
+    assert.equal(richiama(), true, 'non si spende');
     assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'la finestra nuova dello stesso clic passa ancora');
-    assert.equal(Permessi.gestoPerRichiamare(wc), 0, 'speso da una finestra nuova non richiama');
+    assert.equal(richiama(), false, 'speso da una finestra nuova non richiama');
     ora += 300;
     Permessi.gestoDellaPagina(wc, wc.mainFrame);
     Permessi.gestoDiFilo(wc);
-    assert.equal(Permessi.gestoPerRichiamare(wc), 0, 'il clic sull\'interfaccia di Filo sopra la pagina non vale');
+    assert.equal(richiama(), false, 'il clic sull\'interfaccia di Filo sopra la pagina non vale');
     ora += 300;
     Permessi.gestoDellaPagina(wc, wc.mainFrame);
-    ora += 1600;
-    assert.equal(Permessi.gestoPerRichiamare(wc, '', 1500), 0, 'oltre il tempo chiesto');
-    assert.ok(Permessi.gestoPerRichiamare(wc), 'entro i cinque secondi');
+    ora += 4000;
+    assert.equal(richiama(), true, 'entro i cinque secondi');
+    ora += 1100;
+    assert.equal(richiama(), false, 'oltre i cinque secondi');
+  } finally { orologio.mock.restore(); }
+});
+
+// #737.13 — aprire e riportare davanti chiedono la stessa regola: stretta per una, è stretta anche per l'altra.
+test('il clic vale per riportare davanti una finestra negli stessi casi in cui ne aprirebbe una', () => {
+  let ora = 2_500_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://notizie.example/');
+    wc.mainFrame = { parent: null, origin: 'https://notizie.example', url: 'https://notizie.example/' };
+    Permessi.seguiGesti(wc);
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    ora += 50;
+    for (const [chiede, atteso, perche] of [
+      ['https://pubblicita.example/riquadro', false, 'un sito che il clic non ha toccato'],
+      [{ url: 'https://pubblicita.example/' }, false, 'lo stesso sito scritto come referrer'],
+      ['https://notizie.example/articolo', true, 'il sito cliccato'],
+      ['', true, 'chi non dice da dove chiede resta «la scheda»'],
+    ]) {
+      assert.equal(Permessi.gestoPerUnaFinestra(wc, chiede, { spendi: false }), atteso, `riportare davanti: ${perche}`);
+    }
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, 'https://pubblicita.example/riquadro'), false, 'aprire: un sito che il clic non ha toccato');
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, 'https://notizie.example/articolo'), true, 'aprire: il sito cliccato');
   } finally { orologio.mock.restore(); }
 });
 
