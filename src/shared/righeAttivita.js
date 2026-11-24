@@ -50,9 +50,6 @@
     const d = new Date(ts);
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
   }
-  function frasiCambi(a) {
-    return piatto(pezziCambi(a));
-  }
   // Le frasi dei cambi coi valori non di Filo nel riquadro (`parti`, del registro dei cambi); pezzi che non dicono la
   // loro frase non valgono, e resta la frase (#2648.1).
   function pezziCambi(a) {
