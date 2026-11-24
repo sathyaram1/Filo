@@ -427,6 +427,15 @@
     }
     // Un pannello che aspetta il clic dell'utente (il riordino, l'elenco da eliminare) non è un'azione fallita.
     let esito = x._domanda && x._executed === false && !x._confirm ? CHIESTO : esitoAzione(x);
+    // Riaperta, la mossa senza effetto si dice come in diretta, con la sua icona e senza avviso: non si è rotto niente.
+    const vuota = esito === FALLITO && senzaEffetto(x) ? rigaDelDiario(x) : null;
+    if (vuota && vuota.text) {
+      const d = vuota.parti ? rigaDellaDomanda({ text: vuota.text, parti: vuota.parti }) : { riga: primaRiga(vuota.text), parti: null };
+      return senzaVuoti({
+        type, esito, riga: breve(d.riga || vuota.text, MAX_RIGA), parti: d.parti, senzaEffetto: true, icona: vuota.icon,
+        ...segnalazioneDi(type, x),
+      });
+    }
     // La riga del diario in diretta, coi suoi numeri: riaperta, la chat e il modello leggono la stessa frase.
     const diretta = esito === CHIESTO || esito === FALLITO ? null : rigaDelDiario(x);
     if (diretta && diretta.failed) esito = FALLITO;
