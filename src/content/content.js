@@ -3069,6 +3069,12 @@
       // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
       if (isBlocked()) {
+        // Alt+T senza selezione è della pagina (#504.7): un riquadro dove Filo è spento la passa a chi lo ospita, che decide.
+        if (IS_SUBFRAME && msg.command === 'translate-selection' && !Extract.getSelectionWithSentence()) {
+          openSurface('traduci', () => {});
+          sendResponse({ ok: true });
+          return;
+        }
         // La scorciatoia che qui tace, e perché (#1468): Filo spento sul sito, o una pagina dove Filo non c'è.
         Popup.conta({ misura: 'a-vuoto', comando: String(msg.command || ''), motivo: motivoBlocco() === 'sito' ? 'filo_spento_sul_sito' : 'pagina_interna' });
         return;

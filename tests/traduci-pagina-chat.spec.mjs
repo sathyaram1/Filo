@@ -5,7 +5,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { paginaDellAiuto, conta } from './helpers/riquadri.mjs';
+import { paginaDellAiuto, conta, tastieraDi, nelloStrato } from './helpers/riquadri.mjs';
 import { copertura } from './helpers/avvisoSito.mjs';
 
 const ARTICOLO = `<!doctype html><html lang="en"><head><title>An English article</title></head>
@@ -403,6 +403,84 @@ test('Alt+T senza selezione dopo un clic in un riquadro di un altro sito (il vid
   await expect(page.locator('#head')).toHaveText(/^IT The end of an era/, { timeout: 30_000 });
   await expect(page.locator('#p1')).toHaveText(/^IT First paragraph/);
   expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
+});
+
+// #504.7 — il video viene da un sito dove l'utente ha spento Filo: lì Filo tace, ma la pagina che lo ospita è accesa.
+test('Alt+T senza selezione dopo un clic nel video di un sito dove Filo è spento traduce la pagina che lo ospita', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await fornitoreFinto(app);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['sito-pubblico.test'] }); });
+  const page = await testServer.openReady(openTab, conRiquadro(testServer.html(RIQUADRO, { pubblico: true })));
+  await guardaAvvisi(page);
+  const riquadro = page.frameLocator('#embed');
+  await riquadro.locator('#play').click();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText(/^IT The end of an era/, { timeout: 30_000 });
+  await expect(page.locator('#p1')).toHaveText(/^IT First paragraph/);
+  expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
+});
+
+// #504.7 — con la risposta di una traduzione aperta la tastiera sta nei riquadri di Filo sopra il sito: senza selezione
+// il tasto arriva alla pagina passando dallo strato, e la risposta resta aperta.
+test('Alt+T senza selezione con la risposta di una traduzione aperta traduce la pagina sotto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await fornitoreFinto(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ models: { [globalThis.SN_CONST.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash', [globalThis.SN_CONST.ACTIONS.TRANSLATE_SELECTION]: 'deepseek-flash' } });
+    const orig = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta('Un feed che cresce.'); return { text: 'Un feed che cresce.', usage: {} }; } };
+  });
+  const page = await testServer.openReady(openTab, ARTICOLO);
+  // Finestra davanti: la risposta che si apre prende la tastiera solo da lì.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.show(); w.focus();
+    w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.focus();
+  });
+  // Il doppio clic vero, come lo manda il sistema.
+  await page.waitForTimeout(500);
+  const box = await page.locator('#r0').boundingBox();
+  await app.evaluate(({ BrowserWindow }, { x, y }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'mouseMove', x, y });
+    for (const c of [1, 2]) {
+      wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: c });
+      wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: c });
+    }
+  }, { x: Math.round(box.x + 8), y: Math.round(box.y + box.height / 2) });
+  await expect.poll(() => page.evaluate(() => String(getSelection()).trim())).not.toBe('');
+  await premiAltT(app);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 15_000 }).toBe(1);
+  expect(await app.evaluate(() => globalThis.__filoChiamate)).toBe(0);
+
+  // La tastiera nella risposta, e niente scelto da nessuna parte.
+  await page.evaluate(() => getSelection().removeAllRanges());
+  const strato = await tastieraDi(app, page);
+  await strato.evaluate(() => getSelection().removeAllRanges());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    return !!tm.riquadri.conTastiera(tm.tabs.find((t) => t.id === tm.activeId).view.webContents);
+  }), { message: 'la tastiera non è nei riquadri sopra il sito' }).toBe(true);
+
+  // Il tasto vero, dove sta la tastiera: nello strato.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const wc = tm.riquadri.conTastiera(tm.tabs.find((t) => t.id === tm.activeId).view.webContents);
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['alt'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'T', modifiers: ['alt'] });
+  });
+  await expect(page.locator('#head')).toHaveText(/^IT A feed/, { timeout: 30_000 });
+  await expect(page.locator('#r1')).toHaveText(/^IT Second row/);
+  expect(await conta(app, page, '.sn-popup')).toBe(1);
+  const avvisiStrato = await nelloStrato(app, page, () => {
+    const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+    return [...(T ? T.trovaTutti('.sn-toast') : document.querySelectorAll('.sn-toast'))].map((n) => n.textContent || '');
+  });
+  expect(String(avvisiStrato || '')).not.toMatch(/selezion/i);
+  await page.screenshot({ path: 'tests/.shots/traduci-pagina-alt-t-strato.png' }).catch(() => {});
 });
 
 // #504.2 — «apri … e traducilo» in una frase: la chat apre la scheda e chiede subito la traduzione, mentre il sito sta
