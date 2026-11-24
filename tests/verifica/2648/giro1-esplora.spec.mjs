@@ -51,6 +51,10 @@ for (const caso of [
       expect(r.fuori).not.toContain('verificato');
       const titoli = await page.locator('.dash-filo-titolo, .dash-filo-nodo, [class*="filo-nodo"]').evaluateAll((l) => l.map((e) => e.outerHTML.slice(0, 400)));
       console.log(caso.nome, 'nodi', JSON.stringify(titoli));
+      await page.waitForTimeout(2000);
+      const testa = page.getByText(/Ha avviato|Ha impostato|Ha messo/).first();
+      if (await testa.count()) await testa.click().catch(() => {});
+      await page.waitForTimeout(800);
       await page.screenshot({ path: `tests/.shots/verifica-2648-${caso.nome}-diretta.png` });
 
       const chat = await chatCon(app, chiesto);
