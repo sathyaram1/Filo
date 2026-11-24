@@ -2372,6 +2372,7 @@
     // Il contratto: un blocco di attività appeso a `container`.
     create: createActivity,
     esitiArchiviati,
+    conRiquadri,
     renderActions,
     aperturaFermata,
     tellActionInActivity,
