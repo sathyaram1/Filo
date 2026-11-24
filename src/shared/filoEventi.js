@@ -491,7 +491,10 @@
   // `dispositivi`: per la home (#869), il dispositivo da cui è arrivato ogni messaggio, allineato a `messages`.
   function copiaChat(c, { dispositivi = false, ids = false } = {}) {
     if (!c) return null;
-    const out = { ...c, messages: c.messages.map((m) => ({ ...m })) };
+    // Ogni lettura passa da qui: un nome fra le azioni fatte che l'esito salvato dà per non riuscito non arriva (#553.15).
+    const E = global.SN_ESITO;
+    const copia = (m) => (E && m && Array.isArray(m.actions) && Array.isArray(m.esiti) ? { ...m, actions: E.nomiFatti(m.actions, m.esiti) } : { ...m });
+    const out = { ...c, messages: c.messages.map(copia) };
     if (Array.isArray(c.fonti)) out.fonti = c.fonti.map((f) => ({ ...f }));
     delete out._pos;
     delete out._disp;
