@@ -457,9 +457,26 @@
     if (typeof x === 'boolean') return x ? 'sì' : 'no';
     return breve(typeof x === 'object' ? JSON.stringify(x) : String(x), 40);
   }
+  // Un valore che Filo non ha scritto (un nome, un testo, un id di modello) è un pezzo suo: chi mostra la frase lo
+  // chiude nel riquadro, la frase piatta lo dice com'era (#2648.1). `fra` lo dice fra «», `suo` nudo.
+  const suo = (t) => (t ? { citazione: t, nuda: true } : '');
+  const fra = (t) => (t ? { citazione: t } : '');
+  const unisci = (pezzi, sep) => pezzi.filter(Boolean).flatMap((p, i) => (i ? [sep, p] : [p]));
   function elencoDi(lista, n = 3) {
-    const l = lista.map((x) => breve(x, 40));
-    return l.length > n ? `${l.slice(0, n).join(', ')} e altri ${l.length - n}` : l.join(', ');
+    const l = lista.map((x) => suo(breve(x, 40)));
+    return [...unisci(l.slice(0, n), ', '), l.length > n ? ` e altri ${l.length - n}` : ''];
+  }
+  // Il valore tale e quale com'è stato scritto è del modello o dell'utente; uno tradotto in parole è di Filo.
+  function pezzoValore(v, x) {
+    const t = valoreDi(v, x);
+    const grezzo = typeof x === 'string' && !(v && v.valori && Object.prototype.hasOwnProperty.call(v.valori, x)) ? x : '';
+    const tale = !!grezzo.trim() && (t === grezzo || t === breve(grezzo, 40)) && !/^-?\d+(?:[.,]\d+)?$/.test(t);
+    return tale ? suo(t) : t;
+  }
+  // La regola del testo piatto sta in SN_ESITO; il main e le prove che caricano solo questo modulo la trovano lo stesso.
+  function piatto(parti) {
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
+    return global.SN_ESITO.piatto(parti.filter((p) => p !== ''));
   }
   function oraDi(iso) {
     const d = new Date(iso);
