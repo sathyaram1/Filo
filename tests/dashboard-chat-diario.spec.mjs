@@ -535,6 +535,13 @@ test('F6 — la home chiesta dalla home, riletta da una scheda nuova o dalla hom
   await page.locator('#input').fill('portami alla home');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Sei già qui' })).toBeVisible({ timeout: 10_000 });
+  // #553.15 — la riga in diretta, con cui confrontare quella riletta.
+  await page.locator('.dash-activity .dash-activity-head').click();
+  const dalVivo = page.locator('.dash-activity .dash-activity-row', { hasText: 'Sei già nella home' });
+  await expect(dalVivo).toHaveCount(1);
+  const icona = (r) => r.locator('.dash-activity-row-icon').textContent();
+  const iconaDalVivo = await icona(dalVivo);
+  expect(iconaDalVivo).toBe('🏠');
 
   const risposta = () => app.evaluate(async () => (await globalThis.SN_IL_FILO.chats())
     .flatMap((c) => c.messages).find((m) => m.role === 'filo' && /Sei già qui/.test(m.text)) || null);
