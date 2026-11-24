@@ -1732,8 +1732,7 @@
         if (type === 'ELIMINA_FILE') {
           btn.textContent = (r && r.executed) ? `✓ ${testoEliminati(r.output)}` : `✗ ${motivoNessunaEliminazione(r && r.output)}`;
           // Il nome del file viene dal disco: nel suo riquadro, come nella riga del diario.
-          const p = r && r.executed && RA().rigaArchivio({ ...a, _output: r.output });
-          if (p && p.parti) conRiquadri(btn, ['✓ ', ...p.parti]);
+          if (r && r.executed && row && row.parti) conRiquadri(btn, ['✓ ', ...row.parti]);
         }
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
