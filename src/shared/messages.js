@@ -567,7 +567,7 @@
     PERMESSI_SITI_CAMBIATI: 'permessi_siti_cambiati', // main → pagine di Filo: le risposte ricordate sono cambiate, da qualunque strada
 
     // §2.1 — segnali di attività della tab riportati dal content script, per la
-    // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty?, impronte? }
+    // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, mediaPct?, formDirty?, impronte? }
     TAB_ACTIVITY: 'tab_activity',
     // Main → ogni frame: «rimanda adesso se hai testo da inviare» (la pulizia sta
     // per decidere, #824). { impronte: del documento di prima } → TAB_ACTIVITY con formDirty.
