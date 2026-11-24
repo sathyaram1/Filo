@@ -1170,6 +1170,15 @@
   // L'utente non comincia con @: «utente:1234@host:porta» resta un indirizzo con le credenziali, non un elenco.
   const FORMA_ELENCO = /^(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+):(\d{1,5}):([^:/?#@\s][^:/?#]*):(.+)$/i;
   const CREDENZIALI_URL = /^([^/?#]+)@/;
+  // Una riga che si legge nei due modi («mario:123:x@gate.it:8080») vale nel modo in cui il fornitore ha un indirizzo
+  // vero: con un punto, fra quadre o localhost.
+  const INDIRIZZO_VERO = /^(\[[0-9a-f:.]+\]|localhost|[^\s:/?#@[\]]*\.[^\s:/?#@[\]]*)$/i;
+  const FINE_URL = /@(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+):\d{1,5}$/i;
+  function elencoVero(el, resto) {
+    if (!el || INDIRIZZO_VERO.test(el[1])) return el;
+    const u = FINE_URL.exec(resto);
+    return u && INDIRIZZO_VERO.test(u[1]) ? null : el;
+  }
   const decodifica = (x) => { try { return decodeURIComponent(x); } catch (_) { return x; } };
   function leggiProxy(v) {
     if (!pieno(v)) return null;
