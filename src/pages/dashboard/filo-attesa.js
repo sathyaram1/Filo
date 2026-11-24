@@ -462,7 +462,7 @@
         sveglia();
         const quando = (f) => { if (nd.stretta >= 1 && !nd.riaperto) f(); else if (!nd.riaperto) nd.dopo = f; };
         return {
-          titolo(t) { nd.titolo = String(t || ''); },
+          titolo(t) { nd.titolo = Array.isArray(t) ? t : String(t || ''); },
           // L'esito è arrivato: un ultimo strappo, il raggio cresce di un terzo e torna.
           tiene() { quando(() => { nd.strappo = Date.now(); sveglia(); }); },
           cede() { quando(() => { nd.riaperto = Date.now(); sveglia(); }); },
