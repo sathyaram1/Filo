@@ -1198,7 +1198,7 @@
     if (!scritte && uso && uso.auth) {
       scritte = { credenziali: `${uso.auth.username}:${uso.auth.password}`, password: uso.auth.password, senza: uso.proxyRules };
     }
-    return { uso, scritte };
+    return { uso, scritte, senzaSchema: !sm };
   }
 
   // Utente e password di un proxy come sono scritti: { credenziali, password, senza }, null se non ce ne sono. PURA.
