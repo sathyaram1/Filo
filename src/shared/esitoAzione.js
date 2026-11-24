@@ -107,7 +107,10 @@
   }
 
   // Il perché di un'azione non riuscita, quando Filo lo sa: lo dicono il diario in diretta e la chat riaperta.
-  function motivo(a) {
+  const motivo = (a) => { const m = motivoAPezzi(a); return Array.isArray(m) ? piatto(m) : m; };
+  // Lo stesso perché a pezzi quando porta un testo non di Filo (la riga d'errore di un programma, il nome di una
+  // finestra): chi lo mostra lo chiude nel riquadro (#2648.1). Altrimenti la frase.
+  function motivoAPezzi(a) {
     const o = a && a._output;
     if (!o) return '';
     const tipo = String((a && a.type) || '').toUpperCase();
@@ -117,8 +120,8 @@
     if (tipo === 'VEDI_SCHERMO') {
       if (o.spenta) return 'è spento in Preferenze';
       if (o.permesso === 'mac') return 'serve il permesso «Registrazione schermo»';
-      if (o.nessuna) return `nessuna finestra «${pulito(o.richiesta)}»`;
-      if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
+      if (o.nessuna) return ['nessuna finestra ', { citazione: pulito(o.richiesta) }];
+      if (o.errore) return [...(o.finestra ? [{ citazione: pulito(o.finestra) }, ': '] : []), pulito(o.errore)];
     }
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     if (o.blocked === 'file') {
