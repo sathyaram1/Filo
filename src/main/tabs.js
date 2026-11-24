@@ -5057,8 +5057,9 @@ class TabManager {
         if (aperte[i]) nata.openedAt = aperte[i];
         if (usate[i]) nata.lastInteractionAt = Date.parse(usate[i]);
         if (audio[i]) nata.audioAt = Date.parse(audio[i]);
-        // Riaperta parte dall'inizio della pagina: «scroll 0%» direbbe al riordino «letta a metà», e la terrebbe.
+        // Lo scroll che la pagina ricaricata manda prima di tornare al punto non è la lettura: vale quella salvata.
         nata._scrollIgnoto = true;
+        nata._letturaSalvata = letture[i];
         nata._dallaSessione = true;
         nata.paginaDal = pagine[i] || null;
         nate.push(nata);
