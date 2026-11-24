@@ -45,7 +45,8 @@ test('un\'azione fatta si archivia con la riga del diario in diretta, e una non 
   const sveglia = E.voceArchivio({ type: 'SVEGLIA', ora: '07:30', _executed: false, _output: {} });
   assert.equal(E.rigaDellaVoce(sveglia).testo, 'Sveglia non impostata');
   const vuota = E.voceArchivio({ type: 'CHIUDI_SCHEDE', _executed: true, _output: { chiuse: 0, nessuna: 'niente' } });
-  assert.equal(E.rigaDellaVoce(vuota).testo, 'Nessuna scheda chiusa · c\'è solo questa', 'niente chiuso non si racconta come fatto');
+  assert.deepEqual(E.rigaDellaVoce(vuota), { icona: '✕', testo: 'Nessuna scheda chiusa', fallita: true }, 'niente chiuso non si racconta come fatto, né come un guasto');
+  assert.match(E.perModello([vuota]), /- NON fatta, non ha cambiato niente: Nessuna scheda chiusa \(perché: c'è solo questa\)/);
 });
 const CA = globalThis.SN_CHAT_ARCHIVE;
 const FC = globalThis.SN_FILO_CONTESTO;
