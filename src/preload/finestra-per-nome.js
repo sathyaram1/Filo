@@ -14,7 +14,8 @@ const SPECIALE = /^(?:_blank|_self|_parent|_top|_unfencedtop)?$/i;
 // Gli eventi dell'utente dentro cui una richiesta della pagina è sua (#737.13).
 const GESTI = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'keydown', 'keypress', 'keyup', 'touchend'];
 const AZIONABILE = 'a[href],area[href],button,input,select,summary,label,[role=button],[role=link],[role=menuitem],[onclick]';
-// Il pulsante premuto di nuovo chiede la finestra solo se intanto la pagina non ne apre, né chiude, un'altra.
+// Il pulsante premuto di nuovo chiede la finestra solo se intanto la pagina non ne apre un'altra; l'attesa lascia
+// chiudere quella che la pagina chiude con lo stesso clic, invece di portarla davanti mentre se ne va.
 const RIPETUTO_MS = 200;
 
 function sorgente(principale) {
