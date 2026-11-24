@@ -109,7 +109,11 @@ test('«aprila» al turno dopo: la pagina trovata si apre e lascia la lista; con
     const chiamate = await chiamateAlModello(app);
     expect(JSON.stringify(chiamate[2])).toContain('[p2] Campeggio sul lago di Bolsena');
     expect(esitoDelloStrumento(chiamate[3])).toContain('tolta da «Aperti per dopo»');
-    await expect(page.locator('.dash-activity-row', { hasText: 'Aperta «Campeggio sul lago di Bolsena: le piazzole» · tolta da «Aperti per dopo»' })).toHaveCount(1, { timeout: 10_000 });
+    // Il titolo l'ha scritto il sito: sta nel suo riquadro, non fra le parole di Filo (#2648).
+    const aperta = page.locator('.dash-activity-row', { hasText: 'tolta da «Aperti per dopo»' });
+    await expect(aperta).toHaveCount(1, { timeout: 10_000 });
+    await expect(aperta).toContainText(/^\s*\S*\s*Aperta Campeggio sul lago di Bolsena: le piazzole · tolta da «Aperti per dopo»/);
+    await expect(aperta.locator('.dash-altrui')).toHaveText('Campeggio sul lago di Bolsena: le piazzole');
     await shell.evaluate((id) => window.filoShell.tabs.activate(id), await idDi('filo://home/home.html'));
     await expect(lista.locator('.sn-card')).toHaveCount(2, { timeout: 10_000 });
     await expect(lista.locator('.sn-card', { hasText: 'Bolsena' })).toHaveCount(0);
