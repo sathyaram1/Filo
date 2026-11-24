@@ -224,8 +224,8 @@
     CANCELLA_MEMORIA: () => ({ icon: '🧠', text: 'Memoria cancellata' }),
     INVIA_FEEDBACK: (a) => {
       const S = segnalazione();
-      const t = pulito(S ? S.campi(a).titolo : '');
-      return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t}` : ''}` };
+      const t = suo(S ? S.campi(a).titolo : '');
+      return aPezzi('📨', ['Segnalazione inviata', ...(t ? [' · ', t] : [])]);
     },
     ONBOARDING: (a) => {
       if (sceltaAutonomia(a)) {
