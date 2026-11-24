@@ -162,13 +162,16 @@
       const d = elencoParti(v.map((x) => primoPezzoParti(dettaglio(x))));
       return titolo(d.length ? [`${t[1](v.length)} · `, ...d] : [t[1](v.length)]);
     }
+    // Tipi diversi: il nome breve di ciascuno, o le prime parole di Filo della sua riga.
     const nomi = v.map((x) => {
       const tt = TITOLI[String(x.tipo || '').toUpperCase()];
-      return tt ? tt[2] : primoPezzo(pulisci(x.testo).split(/:\s/)[0]).toLowerCase();
+      if (tt) return [tt[2]];
+      const p0 = parti(x)[0];
+      return primoPezzoParti([typeof p0 === 'string' ? p0.split(/:\s/)[0].toLowerCase() : '']);
     });
-    const d = elenco(nomi);
+    const d = elencoParti(nomi);
     const testa = v.every((x) => x.esito === 'fallita') ? `${v.length} azioni non riuscite` : `${v.length} azioni`;
-    return d ? `${testa} · ${d}` : testa;
+    return titolo(d.length ? [`${testa} · `, ...d] : [testa]);
   }
 
   // ===== Il disegno =====
