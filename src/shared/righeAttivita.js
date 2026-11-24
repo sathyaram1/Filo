@@ -25,7 +25,12 @@
   const corto = (v, max) => { const t = pulito(v); return t.length > max ? `${t.slice(0, max - 3)}…` : t; };
   const unisci = (pezzi, sep) => pezzi.filter(Boolean).flatMap((p, i) => (i ? [sep, p] : [p]));
   function aPezzi(icon, pezzi, resto) {
-    const parti = pezzi.filter((p) => p !== '' && p != null);
+    const parti = [];
+    for (const p of pezzi) {
+      if (p === '' || p == null) continue;
+      if (typeof p === 'string' && typeof parti[parti.length - 1] === 'string') parti[parti.length - 1] += p;
+      else parti.push(p);
+    }
     const r = { icon, text: global.SN_ESITO.piatto(parti), ...resto };
     return parti.some((p) => typeof p !== 'string') ? { ...r, parti } : r;
   }
