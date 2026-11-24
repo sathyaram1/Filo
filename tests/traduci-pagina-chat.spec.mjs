@@ -405,6 +405,65 @@ test('Alt+T senza selezione dopo un clic in un riquadro di un altro sito (il vid
   expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
 });
 
+// #504.7 — il video viene da un sito dove l'utente ha spento Filo: lì Filo tace, ma la pagina che lo ospita è accesa.
+test('Alt+T senza selezione dopo un clic nel video di un sito dove Filo è spento traduce la pagina che lo ospita', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await fornitoreFinto(app);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['sito-pubblico.test'] }); });
+  const page = await testServer.openReady(openTab, conRiquadro(testServer.html(RIQUADRO, { pubblico: true })));
+  await guardaAvvisi(page);
+  const riquadro = page.frameLocator('#embed');
+  await riquadro.locator('#play').click();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText(/^IT The end of an era/, { timeout: 30_000 });
+  await expect(page.locator('#p1')).toHaveText(/^IT First paragraph/);
+  // Nel video Filo resta spento: niente tradotto lì dentro.
+  await expect(riquadro.locator('#w')).toHaveText('Comments are closed');
+  expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
+});
+
+// #504.7 — con la risposta di una traduzione aperta la tastiera sta nei riquadri di Filo sopra il sito: senza selezione
+// il tasto arriva alla pagina passando dallo strato, e la risposta resta aperta.
+test('Alt+T senza selezione con la risposta di una traduzione aperta traduce la pagina sotto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await fornitoreFinto(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ models: { [globalThis.SN_CONST.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash', [globalThis.SN_CONST.ACTIONS.TRANSLATE_SELECTION]: 'deepseek-flash' } });
+    const orig = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta('Un feed che cresce.'); return { text: 'Un feed che cresce.', usage: {} }; } };
+  });
+  const page = await testServer.openReady(openTab, ARTICOLO);
+  await page.locator('#r0').dblclick();
+  await premiAltT(app);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 15_000 }).toBe(1);
+  expect(await app.evaluate(() => globalThis.__filoChiamate)).toBe(0);
+
+  // La tastiera nella casella della risposta, e niente scelto da nessuna parte.
+  await clicca(app, page, '.sn-popup-input');
+  await page.evaluate(() => getSelection().removeAllRanges());
+  const strato = await tastieraDi(app, page);
+  await strato.evaluate(() => getSelection().removeAllRanges());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    return !!tm.riquadri.conTastiera(tm.tabs.find((t) => t.id === tm.activeId).view.webContents);
+  }), { message: 'la tastiera non è nei riquadri sopra il sito' }).toBe(true);
+
+  // Il tasto vero, dove sta la tastiera: nello strato.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const wc = tm.riquadri.conTastiera(tm.tabs.find((t) => t.id === tm.activeId).view.webContents);
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['alt'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'T', modifiers: ['alt'] });
+  });
+  await expect(page.locator('#head')).toHaveText(/^IT A feed/, { timeout: 30_000 });
+  await expect(page.locator('#r1')).toHaveText(/^IT Second row/);
+  expect(await conta(app, page, '.sn-popup')).toBe(1);
+  expect(await conta(app, page, '.sn-toast')).toBe(0);
+  await page.screenshot({ path: 'tests/.shots/traduci-pagina-alt-t-strato.png' }).catch(() => {});
+});
+
 // #504.2 — «apri … e traducilo» in una frase: la chat apre la scheda e chiede subito la traduzione, mentre il sito sta
 // ancora arrivando. Un sito lento a rispondere, o a finire di mandare la pagina, non è una pagina che «non risponde».
 async function sitoLento(use) {
