@@ -1162,10 +1162,13 @@
 
   // L'unica lettura di un proxy (#2134.2), di chi si collega e di chi ne custodisce i segreti: una password usata è
   // sempre custodita. Forme: «[utente[:password]@]host[:porta]» e quella degli elenchi «host:porta:utente:password»
-  // (#905.4). Senza schema socks5 (i nomi li risolve il proxy), http con le credenziali, che Chromium coi socks non
-  // manda. `uso`: { proxyRules, auth }; `scritte`: le credenziali come sono nel testo e l'indirizzo `senza`. PURA.
+  // (#905.4), dove l'utente può essere un indirizzo email e l'host un IPv6 fra quadre (#2646.1). Senza schema socks5 (i
+  // nomi li risolve il proxy), http con le credenziali, che Chromium coi socks non manda: è un'ipotesi, `senzaSchema`
+  // la segnala a chi può chiederlo al fornitore (proxyTab.resolveSentito). `uso`: { proxyRules, auth }; `scritte`: le
+  // credenziali come sono nel testo e l'indirizzo `senza`. PURA.
   const SCHEMA_PROXY = /^([a-z][a-z0-9+.-]*):\/\//i;
-  const FORMA_ELENCO = /^([^\s:/?#@[\]]+):(\d{1,5}):([^:@/?#]+):(.+)$/;
+  // L'utente non comincia con @: «utente:1234@host:porta» resta un indirizzo con le credenziali, non un elenco.
+  const FORMA_ELENCO = /^(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+):(\d{1,5}):([^:/?#@\s][^:/?#]*):(.+)$/i;
   const CREDENZIALI_URL = /^([^/?#]+)@/;
   const decodifica = (x) => { try { return decodeURIComponent(x); } catch (_) { return x; } };
   function leggiProxy(v) {
