@@ -1193,7 +1193,9 @@
         const stile = stileDellAccoglienza(a);
         if (stile) return `Userò questo stile: «${stile}»`;
         const built = prefBuilt(a);
-        return built && !built.rifiuto ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
+        if (!built || built.rifiuto) return 'Preferenza modificata';
+        // Il valore scritto dal modello resta nel riquadro, come nella domanda a cui l'utente ha detto sì.
+        return built.valore ? [`Impostazione applicata: ${built.campo} → `, cit(built.valore, true)] : `Impostazione applicata: ${built.label}`;
       },
     },
     IMPOSTA_ESTETICA: {
