@@ -1930,11 +1930,18 @@
 
   // A fatto compiuto, per l'esito che torna al modello; senza voce propria vale `describe`.
   function describeDone(action) {
-    if (!action || typeof action !== 'object') return '';
+    return piatto(describeDoneParts(action));
+  }
+  // La stessa a pezzi, come `describeParts`: il bottone dopo l'OK la disegna coi riquadri (#2648.1).
+  function describeDoneParts(action) {
+    if (!action || typeof action !== 'object') return [];
     const entry = REGISTRY[String(action.type || '').toUpperCase()];
-    if (!entry) return '';
-    if (!entry.describeDone) return describe(action);
-    try { return entry.describeDone(action) || ''; } catch (_) { return ''; }
+    if (!entry) return [];
+    if (!entry.describeDone) return describeParts(action);
+    let d;
+    try { d = entry.describeDone(action); } catch (_) { return []; }
+    if (!Array.isArray(d)) return d ? [String(d)] : [];
+    return d.filter((p) => (typeof p === 'string' ? p : riquadro(p)));
   }
 
   // L'indirizzo di un'azione che esce in rete, preso da tutti i campi che l'esecuzione accetta: il freno contro
