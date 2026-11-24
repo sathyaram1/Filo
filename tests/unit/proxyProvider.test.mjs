@@ -159,7 +159,7 @@ test('resolveSentito: un fornitore solo socks5 scritto senza schema si usa in so
     const r = await P.resolveSentito('us', { settings, env: {} });
     assert.equal(r.proxyRules, `socks5://127.0.0.1:${f.port}`);
     assert.deepEqual(r.auth, { username: 'utente-us', password: 'pw-socks' });
-    assert.equal(f.visti[0][0], 0x05, 'la domanda è un saluto socks5');
+    assert.equal(f.visti.at(-1)[0], 0x05, 'dopo l\'http non risposto, un saluto socks5');
     const u = await P.uscitaPerProgramma({ paese: { country: 'fr' }, impostazioni: async () => settings });
     assert.equal(u.proxy, `socks5h://utente-fr:pw-socks@127.0.0.1:${f.port}`, 'il download del video esce dal socks con la password');
     const domande = f.visti.length;
