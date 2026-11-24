@@ -3132,8 +3132,7 @@
       else Popup.toastErrore('err_no_selection');
     } else if (command === 'translate-selection') {
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
-      // Senza selezione il tasto fa l'icona Traduci (#504), che è della pagina: da un riquadro o dallo strato la fa lei.
-      else if (IS_SUBFRAME) openSurface('traduci', () => {});
+      // Senza selezione il tasto fa l'icona Traduci (#504); da un riquadro non arriva qui, lo passa prima alla pagina.
       else traduciDalTasto();
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
