@@ -14,8 +14,14 @@ test('sonda chiusura', async ({ app, openTab, testServer }) => {
   await app.evaluate(({ BrowserWindow }, u) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     tm.activate(tm.tabs.find((x) => x.view.webContents.getURL() === u).id);
+    globalThis.__log = [];
+    const p = tm.tabs.find((x) => x.view.webContents.getURL().includes('sito-pubblico')).view.webContents;
+    globalThis.__p = p;
+    const e0 = p.emit;
+    p.emit = function (ev, ...a) { globalThis.__log.push(ev); return e0.call(this, ev, ...a); };
   }, page.url());
   await page.click('#c');
   await page.waitForTimeout(3000);
   console.log('schede', n, await schede(app), await page.evaluate(() => window.__w.closed));
+  console.log(await app.evaluate(() => { const p = globalThis.__p; let st = {}; try { st = { d: p.isDestroyed(), url: p.getURL(), crashed: p.isCrashed(), mf: !!p.mainFrame, det: p.mainFrame && p.mainFrame.detached, opener: !!p.opener }; } catch (e) { st = { err: e.message }; } return JSON.stringify({ log: globalThis.__log, st }); }));
 });
