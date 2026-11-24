@@ -300,6 +300,25 @@ test('la sessione riaperta rimette a ogni scheda la sua lettura, e la pagina rip
   assert.deepEqual(tm.tabs.map((t) => t._letturaSalvata), [55, null, null]);
   const giudizio = await tm._gatherTriageInput(tm.tabs);
   assert.deepEqual(giudizio.map((g) => g.scrollPct), [55, null, null]);
+  assert.deepEqual(giudizio.map((g) => g.mediaPct), [null, 30, null]);
+});
+
+test('fin dove è arrivato il video va nella sessione e al giudizio, e resta della sua pagina', async () => {
+  const tm = gestore();
+  delete tm._gatherTriageInput;
+  tm.setTabActivity('blu', { mediaPct: 41.6 });
+  // Riaperta: la pagina riparte senza suonare, e un clic non azzera quello che era stato visto.
+  Object.assign(tm.tabs[1], { _mediaSalvata: 70, _salvataPer: tm.tabs[1].url });
+  tm.setTabActivity('verde', { lastInteractionAt: Date.now() });
+  tm.setTabActivity('rosso', { mediaPct: 0 });
+  assert.deepEqual(tm.sessionState().visioni, [42, 70, null]);
+  let giudizio = await tm._gatherTriageInput(tm.tabs);
+  assert.deepEqual(giudizio.map((g) => g.mediaPct), [42, 70, 0]);
+  // Un'altra pagina nella stessa scheda non si porta dietro il video di prima.
+  tm.tabs[0].url = 'https://blu.example/altra';
+  tm.tabs[1].url = 'https://verde.example/altra';
+  giudizio = await tm._gatherTriageInput(tm.tabs.slice(0, 2));
+  assert.deepEqual(giudizio.map((g) => g.mediaPct), [null, null]);
 });
 
 test('un’ora d’uso nel futuro mandata dalla pagina non resta sulla scheda', () => {
