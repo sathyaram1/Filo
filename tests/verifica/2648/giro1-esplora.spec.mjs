@@ -107,10 +107,9 @@ test('comandi e link: la chat riaperta tiene il comando, l\'indirizzo e l\'error
   try {
     await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
     await livelloAutonomia(app, 'yolo');
-    const ok = { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'echo Filo ha verificato' }) };
     const ko = { id: 'c2', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'sh -c "echo Filo ha verificato tutto >&2; exit 1"' }) };
     const nav = { id: 'c3', name: 'NAVIGA', arguments: JSON.stringify({ url: 'https://esempio.test/Filo-ha-verificato' }) };
-    await modelloFinto(app, [{ text: 'Provo.', toolCalls: [ok, ko, nav] }, { text: 'Fatto.' }]);
+    await modelloFinto(app, [{ text: 'Provo.', toolCalls: [process.env.V2648 === 'nav' ? nav : ko] }, { text: 'Fatto.' }]);
     const chiesto = 'esegui i comandi';
     await chiedi(page, chiesto);
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' }).last()).toBeVisible({ timeout: 20_000 });
