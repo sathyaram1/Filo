@@ -315,7 +315,7 @@
       // Una mossa che ha lasciato la barra com'era non si racconta come fatta: come «Sei già nella home», non conta.
       const gia = global.SN_BARRA_SITI ? global.SN_BARRA_SITI.giaCosi(op, o) : '';
       const cosa = gia || { aggiungi: 'Messo nella barra dei siti', togli: 'Tolto dalla barra dei siti', rinomina: 'Rinominato nella barra dei siti', sposta: 'Spostato nella barra dei siti' }[op];
-      return { icon: '📌', text: `${cosa || 'Barra dei siti'}${nome ? ` · ${nome}` : ''}`, ...(gia ? { failed: true } : {}) };
+      return aPezzi('📌', [cosa || 'Barra dei siti', ...(nome ? [' · ', suo(nome)] : [])], gia ? { failed: true } : {});
     },
     CANCELLA_PAGINE: (a) => {
       const n = Number(a._output && a._output.cancellate) || 0;
