@@ -603,7 +603,8 @@
           const nota = document.createElement('div');
           nota.className = 'dash-bubble-note';
           nota.dataset.replay = '1';
-          nota.textContent = `${riga.icona} ${riga.testo}`;
+          if (riga.parti) Att.conRiquadri(nota, [`${riga.icona} `, ...riga.parti]);
+          else nota.textContent = `${riga.icona} ${riga.testo}`;
           if (riga.fumetto) nota.title = riga.fumetto;
           metti(nota);
         }
