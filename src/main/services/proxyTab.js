@@ -107,10 +107,10 @@ function chiediSchema(host, port, domanda, ms) {
       fine(x);
     };
     const t = setTimeout(() => chiudi(null), ms);
-    try { s = require('net').connect({ host, port: Number(u.port) }); } catch (_) { chiudi(null); return; }
+    try { s = require('net').connect({ host, port }); } catch (_) { chiudi(null); return; }
     s.on('error', () => chiudi(null));
     s.on('close', () => chiudi(null));
-    s.once('connect', () => s.write(SALUTO));
+    s.once('connect', () => s.write(domanda));
     s.once('data', (b) => chiudi(b[0] === 0x05 ? 'socks5' : b.toString('latin1', 0, 5) === 'HTTP/' ? 'http' : null));
   });
 }
