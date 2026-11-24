@@ -2220,6 +2220,7 @@ class TabManager {
         // Mai toccata da quando c'è: inattiva da quando è arrivata la sua pagina (#1618).
         idleMin: minutiDa(t.lastInteractionAt || Date.parse(t.paginaDal) || Date.parse(t.openedAt)),
         scrollPct: letturaNota(t),
+        mediaPct: visioneNota(t),
         formDirty: !!t.formDirty,
         audible: !!t.audible,
         coOpenUrls: this.tabs
