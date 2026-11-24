@@ -5044,7 +5044,7 @@ class TabManager {
         // Una scheda su un sito della lista torna sulla pagina «Sito bloccato»:
         // non sparisce dalla sessione e il sito non si riapre da solo (#590).
         // Un file del computer nella sessione salvata l'aveva aperto l'utente: torna com'era.
-        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i], fileDelComputer: true });
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i], fileDelComputer: true, restoreScrollPct: letture[i] > 0 ? letture[i] : null });
         const nata = id ? this.tabs.find((t) => t.id === id) : null;
         if (!nata) return null;
         Strade.misura('pagina', url, 'sessione_ripristinata', { incognito: this.incognito });
