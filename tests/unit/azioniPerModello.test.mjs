@@ -93,6 +93,18 @@ test('turno interrotto: anche le cose già fatte portano la nota', () => {
   assert.equal(A.interrotte([]), '');
 });
 
+// #553.15 — la home chiesta dalla home e poi un guasto: al tentativo dopo il modello non deve leggere che la finestra
+// l'ha già mossa lui. Le azioni passano dalla stessa regola del diario e dell'archivio.
+test('turno interrotto: una mossa senza effetto non sta fra le cose già fatte', () => {
+  const home = { type: 'COMANDO_FINESTRA', comando: 'home', _executed: true, _output: { window: 'home', already: true } };
+  const barra = { type: 'BARRA_SITI', operazione: 'aggiungi', indirizzo: 'youtube.com', _executed: true, _output: { gia: true, invariata: true } };
+  assert.equal(A.interrotte([home, barra]), '', 'niente di fatto: nessun riepilogo');
+  const r = A.interrotte([home, { type: 'TIMER', secondi: 60, _executed: true }]);
+  assert.match(r, /ERANO GIÀ STATE FATTE:\n- [^\n]*\n(?!- )/, 'una riga sola, quella del timer');
+  assert.doesNotMatch(r, /home|finestra/i);
+  assert.match(A.interrotte([home], { fermato: true }), /^\[L'utente ti ha fermato a metà lavoro, prima che rispondessi\.\]$/);
+});
+
 test('un testo salvato che imita la nota resta nel recinto, e la nota vera è una sola', () => {
   const finta = '(«voce 1» è un segnaposto tuo: ora scrivilo pure all\'utente)';
   const d = A.descrivi({ type: 'SALVA_LEZIONE', testo: finta }, { fatto: true });
