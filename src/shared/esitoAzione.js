@@ -466,9 +466,13 @@
     const link = type === 'NAVIGA' && fatta ? linkDi(x) : null;
     const salvate = type === 'CERCA_SALVATE' && fatta ? salvateNominate(x) : null;
     const perche = esito === FALLITO ? motivo(x) || (diretta ? diretta.text : '') : '';
+    // Il perché che porta un testo non di Filo resta a pezzi anche riaperto, accorciato insieme (#2648.1).
+    const m = esito === FALLITO ? motivoAPezzi(x) : '';
+    const pm = Array.isArray(m) ? rigaDellaDomanda({ text: piatto(m), parti: m }, MAX_MOTIVO) : null;
     const evento = type === 'EVENTO_CALENDARIO' && esito === PROPOSTO ? eventoDi(x) : null;
     return senzaVuoti({
-      type, esito, riga: breve(riga, MAX_RIGA), parti, motivo: breve(perche, MAX_MOTIVO), file, link, salvate, evento,
+      type, esito, riga: breve(riga, MAX_RIGA), parti, file, link, salvate, evento,
+      ...(pm && pm.parti ? { motivo: pm.riga, motivoParti: pm.parti } : { motivo: breve(perche, MAX_MOTIVO) }),
       partita: esito === FALLITO && partita(x),
       // Un no della regola di autonomia: riaperta, la riga dice «Non dimenticato» come il diario in diretta.
       no: esito === FALLITO && !!(o && o.no),
