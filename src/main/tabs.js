@@ -2577,9 +2577,9 @@ class TabManager {
     let zoomLevel = null;
     try { zoomLevel = tab.view.webContents.getZoomLevel(); } catch (_) {}
     // Si chiede la posizione ESATTA alla pagina: il valore già tracciato è
-    // arrotondato, e serve solo come ripiego se non risponde.
-    let scrollPct = typeof tab.scrollPct === 'number' ? tab.scrollPct : null;
-    try {
+    // arrotondato, e serve solo come ripiego se non risponde. Una scheda della sessione non ancora caricata non ha pagina.
+    let scrollPct = letturaNota(tab);
+    if (!tab._rinviata) try {
       const exact = await tab.view.webContents.executeJavaScript(
         '(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;return max>0?Math.max(0,Math.min(100,(window.scrollY||d.scrollTop||0)/max*100)):0;}catch(e){return null;}})()',
         false,
