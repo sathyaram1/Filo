@@ -2038,7 +2038,7 @@
       if (activity && activity.el && global.SN_DASH_CAMBI) global.SN_DASH_CAMBI.segna(activity.el, ids);
     }
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '', row.parti || null);
     // Il turno l'aveva archiviata come chiesta: adesso è successa.
     archiviaEsito(a, { chat, fatto, cambi: ids.map((c) => c.id) });
   }
