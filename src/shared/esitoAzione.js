@@ -535,6 +535,9 @@
       const testo = `Conferma chiesta${riga ? ` · ${riga}` : ''}`;
       return { icona: '❔', testo, fallita: true, ...(parti ? { parti: ['Conferma chiesta · ', ...parti] } : {}) };
     }
+    if (v.esito === FALLITO && v.senzaEffetto === true) {
+      return { icona: icona(v.icona) ? v.icona : '•', testo: riga || 'Era già così', fallita: true, ...(parti ? { parti } : {}) };
+    }
     if (v.esito === FALLITO) {
       const perche = pulito(v.motivo);
       // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
