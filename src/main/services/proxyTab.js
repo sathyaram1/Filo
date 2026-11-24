@@ -247,7 +247,7 @@ async function uscitaPerProgramma({ ses = null, url = '', paese = null, regole =
   if (!scelta) return { proxy: '', paese: null };
   let settings = null;
   try { settings = await impostazioni(); } catch (_) {}
-  const resolved = resolve(scelta.country, { tier: scelta.tier, settings });
+  const resolved = await resolveSentito(scelta.country, { tier: scelta.tier, settings }, { sonda });
   const proxy = resolved ? indirizzoPerProgramma(resolved.proxyRules, resolved.auth) : '';
   return proxy ? { proxy, paese: tieni } : { rifiuto: true, paese: tieni };
 }
