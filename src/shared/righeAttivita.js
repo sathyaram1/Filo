@@ -236,7 +236,7 @@
       if (sceltaContatori(a)) return { icon: '👋', text: 'Accoglienza · scelta dei contatori' };
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
-      return { icon: '👋', text: `Accoglienza · ${ids.join(', ') || 'passo fatto'}` };
+      return aPezzi('👋', ['Accoglienza · ', suo(ids.join(', ')) || 'passo fatto']);
     },
     IMPOSTA_ESTETICA: (a) => {
       const tok = a.token || a.nome || a.name || a.chiave || a.elemento || '';
