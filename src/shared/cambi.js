@@ -547,13 +547,13 @@
       const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
       const mac = !!((c.prima && c.prima.finder) || (c.dopo && c.dopo.finder));
       if (auto) parti.push(`${mac ? '«Ordina per» del Finder' : '«Disponi automaticamente»'} ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
-      return `icone del desktop: ${parti.join(', ')}`;
+      return [`icone del desktop: ${parti.join(', ')}`];
     }
     const v = voce(k);
     const nome = v ? v.nome : 'un\'impostazione di Filo';
     if (c.segreto) {
       const cosa = c.vuotoPrima && !c.vuotoDopo ? 'inserita' : (!c.vuotoPrima && c.vuotoDopo ? 'tolta' : 'cambiata');
-      return `${nome}: ${cosa}`;
+      return [`${nome}: ${cosa}`];
     }
     if (v && v.elenco) {
       const a = Array.isArray(c.prima) ? c.prima.map(String) : [];
