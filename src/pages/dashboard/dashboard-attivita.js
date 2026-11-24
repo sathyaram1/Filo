@@ -443,7 +443,12 @@
       addCommand(out, spiegazione = '', a = null) {
         closeTurnReasoning();
         contaAzione('ESEGUI_COMANDO', a, false);
-        const seg = registra({ tipo: 'ESEGUI_COMANDO', testo: `Eseguito · ${spiegazione || (out && out.command) || 'comando'}`, esito: 'ok' }, a);
+        // Spiegazione e comando li ha scritti il modello: nel titolo del nodo stanno nel loro riquadro (#2648).
+        const cosa = String(spiegazione || (out && out.command) || '').replace(/\s+/g, ' ').trim();
+        const seg = registra({
+          tipo: 'ESEGUI_COMANDO', testo: `Eseguito · ${cosa || 'comando'}`, esito: 'ok',
+          ...(cosa ? { parti: ['Eseguito · ', { citazione: cosa, nuda: true }] } : {}),
+        }, a);
         const el = renderCommandResult(out, spiegazione);
         el.classList.add('dash-activity-cmd');
         aggiungiEsito(seg, el);
