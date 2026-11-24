@@ -1575,7 +1575,7 @@ class TabManager {
           ...(giro ? { giro } : {}),
           ...(ultimoSuono(tab) > 0 ? { audioAt: new Date(ultimoSuono(tab)).toISOString() } : {}),
           coOpenUrls,
-          scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
+          scrollPosition: letturaNota(tab),
           // La location si salva, o riaprendo dall'archivio la scheda
           // rinascerebbe diretta invece che dal paese scelto.
           proxy: tab.proxy && tab.proxy.country
