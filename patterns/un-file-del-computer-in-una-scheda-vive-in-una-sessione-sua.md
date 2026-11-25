@@ -55,8 +55,8 @@ in Filo diventerebbe un ladro di file. In più un `file://server/...` su Windows
 sua quella richiesta non parte nemmeno.
 
 Il confine è la cartella, non il file, perché una pagina locale vera (un report, un sito salvato) si porta dietro
-immagini, stili e script accanto a sé. Fetch e XHR non li leggono come dati, e quello che la pagina ne ricava per
-altre strade (una tela) non esce, perché la rete non c'è (controllo di sicurezza di #1905). La CSP va su tutto perché anche un `.xml` nel namespace XHTML, o un file senza estensione
+immagini, stili e script accanto a sé. Fetch e XHR non li leggono come dati, la tela non li legge (#1905.1), e la
+rete non c'è comunque (controllo di sicurezza di #1905). La CSP va su tutto perché anche un `.xml` nel namespace XHTML, o un file senza estensione
 che Chromium riconosce come HTML, esegue script (controllo di sicurezza di #1905).
 
 ## Chi decide se si apre
