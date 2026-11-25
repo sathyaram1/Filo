@@ -13,6 +13,7 @@
       fixes: [
         { testo: 'Un proxy degli elenchi con un indirizzo email come utente, o con un indirizzo IPv6 fra quadre, ora si collega e la sua password resta protetta. Scritto senza http:// o socks5:// davanti, Filo chiede al fornitore che tipo di proxy è e lo usa nel modo giusto, anche per scaricare i video.', segnalazione: 2646 },
         { testo: 'Un proxy scritto in una forma che Filo non sa leggere, come un indirizzo IPv6 senza parentesi quadre, è protetto intero come una chiave API: si salva cifrato, l\'assistente non lo passa ai modelli e l\'archivio esportato non lo porta se non spunti «Includi le chiavi».', segnalazione: 2646 },
+        { testo: 'Se Filo risponde coi suoi crediti perché OpenRouter ha rifiutato la tua chiave, e la risposta arriva in una scheda che non stai guardando, un avviso te lo dice nella pagina che hai davanti. Se torni prima sulla scheda della risposta, basta la riga sotto la risposta e l\'avviso non si ripete.', segnalazione: 662 },
       ],
     },
     {
