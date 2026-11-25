@@ -2140,9 +2140,11 @@
       Object.assign(overlay.style, {
         position: 'fixed', inset: '0', zIndex: '2147483647', cursor: CURSORE_MIRINO, userSelect: 'none', outline: 'none',
       });
-      // La foto ferma copre la pagina: si sceglie su quello che si vede, anche se sotto un video va avanti.
+      // La foto ferma copre la pagina: si sceglie su quello che si vede, anche se sotto un video va avanti. Sta in uno
+      // strato chiuso: ha anche i pixel dei riquadri d'altra origine, che lo script del sito non deve poter leggere.
+      const strato = global.SN_FILO_UI ? global.SN_FILO_UI.ombra(overlay, { riquadro: false }) : overlay.attachShadow({ mode: 'closed' });
       Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', cursor: CURSORE_MIRINO });
-      overlay.appendChild(canvas);
+      strato.appendChild(canvas);
 
       const lente = document.createElement('div');
       Object.assign(lente.style, {
