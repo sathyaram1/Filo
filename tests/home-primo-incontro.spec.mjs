@@ -7,9 +7,10 @@ import { test, expect } from './fixtures/electron.mjs';
 test.use({ accoglienzaFatta: false });
 
 async function home(app, tranne = null) {
+  const escluse = [].concat(tranne || []);
   const scadenza = Date.now() + 15_000;
   while (Date.now() < scadenza) {
-    const w = app.windows().find((x) => { try { return x !== tranne && x.url().startsWith('filo://newtab'); } catch (_) { return false; } });
+    const w = app.windows().find((x) => { try { return !escluse.includes(x) && x.url().startsWith('filo://newtab'); } catch (_) { return false; } });
     if (w) { await w.waitForLoadState('domcontentloaded'); return w; }
     await new Promise((r) => setTimeout(r, 100));
   }
