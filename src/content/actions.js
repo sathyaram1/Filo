@@ -2234,6 +2234,8 @@
         chiudi(hex);
       });
       overlay.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); rinuncia(); });
+      overlay._snRinuncia = rinuncia;
+      contagocceSotto = overlay;
       window.addEventListener('keydown', suTasto, true);
       window.addEventListener('resize', rinuncia, true);
       document.addEventListener('visibilitychange', suVisibilita, true);
