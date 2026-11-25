@@ -175,9 +175,8 @@ module.exports = function register(on, ctx) {
     }
   }
 
-  // Gli avvisi fuori politica in coda (#1478.1) li prende solo la pagina davanti agli occhi: il frame principale della
-  // scheda attiva. Un riquadro, una scheda dietro o la home pronta in riserva li toglierebbero a chi li deve vedere.
-  // Davanti agli occhi vuol dire la finestra davanti: il fuoco può stare sulla barra delle schede, non sulla pagina.
+  // Gli avvisi fuori politica in coda (#1478.1) li prende solo la pagina davanti agli occhi, nel suo frame principale:
+  // un riquadro, una scheda dietro o la home pronta in riserva li toglierebbero a chi li deve vedere.
   on(MSG.AVVISI_IN_CODA, async (msg, sender) => {
     const principale = !(sender && sender.frame && sender.frame.parent);
     const davanti = !!sender && !sender.strato && principale && mittenteDavanti(sender, msg && msg.fuoco);
