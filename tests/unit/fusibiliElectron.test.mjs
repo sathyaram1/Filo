@@ -96,6 +96,24 @@ function progetto(dir, { collegato = false } = {}) {
   return { radice, binarioOriginale: join(electron, 'dist', 'electron') };
 }
 
+test('la copia sta nella cache dell\'utente, mai in un node_modules: uno nuovo farebbe reinstallare tutti i pacchetti', () => {
+  const casa = join('/casa', 'u');
+  assert.equal(F.cartellaDelleCopie({ piattaforma: 'linux', env: {}, casa }), join(casa, '.cache', 'filo', 'motori'));
+  assert.equal(F.cartellaDelleCopie({ piattaforma: 'linux', env: { XDG_CACHE_HOME: '/c' }, casa }), join('/c', 'filo', 'motori'));
+  assert.equal(F.cartellaDelleCopie({ piattaforma: 'darwin', env: {}, casa }), join(casa, 'Library', 'Caches', 'Filo', 'motori'));
+  assert.equal(F.cartellaDelleCopie({ piattaforma: 'win32', env: { LOCALAPPDATA: '/l' }, casa }), join('/l', 'Filo', 'motori'));
+  // La cartella staccata dei controlli: i moduli stanno più su, e il checkout non ne ha.
+  const dir = cartellaTemporanea('fusibili-');
+  try {
+    const { radice } = progetto(dir, { collegato: true });
+    const staccata = join(radice, 'staccata');
+    mkdirSync(staccata);
+    const m = F.motoreSenzaPrivilegi({ radice: staccata, cache: F.cartellaDelleCopie({ piattaforma: 'linux', env: {}, casa: join(dir, 'casa') }) });
+    assert.equal(m.copia, true, m.errore);
+    assert.equal(existsSync(join(staccata, 'node_modules')), false, 'nel checkout è nato un node_modules');
+  } finally { togliCartella(dir); }
+});
+
 test('il motore di questo checkout si spegne sul posto', () => {
   const dir = cartellaTemporanea('fusibili-');
   try {
