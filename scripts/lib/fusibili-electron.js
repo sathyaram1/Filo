@@ -90,9 +90,12 @@ function eseguibileDelPacchetto(context) {
   }
 }
 
-// Per after-pack: su ogni sistema e ogni copia (anche le due intermedie del Mac universale), prima della firma del
-// Mac e del lanciatore di Linux, che sposta l'eseguibile. Un pacchetto col fusibile acceso non esce: lancia.
+// Per after-pack: su ogni sistema, prima della firma del Mac e del lanciatore di Linux, che sposta l'eseguibile. Del
+// Mac universale si tocca solo il risultato fuso, che porta i fili delle due copie intermedie. Un pacchetto col
+// fusibile acceso non esce: lancia.
 async function afterPack(context) {
+  const mac = context.electronPlatformName === 'darwin' || context.electronPlatformName === 'mas';
+  if (mac && require('../after-pack-mac').COPIA_INTERMEDIA.test(context.appOutDir)) return;
   const eseguibile = eseguibileDelPacchetto(context);
   const cambiato = spegniPrivilegiFile(eseguibile);
   console.log(`[after-pack-fusibili] privilegi delle pagine file:// ${cambiato ? 'spenti' : 'già spenti'} in ${eseguibile}`);
