@@ -4,6 +4,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { premiNellaBarra } from './helpers/barra.mjs';
 import { home } from './helpers/chatFinta.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Due metà di colori noti: a sinistra di x=200 verde, a destra arancio.
 const PAGINA = `<!doctype html><html><head><title>Colori</title></head><body style="margin:0">
