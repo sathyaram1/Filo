@@ -40,7 +40,7 @@ for (const [nome, chiave, valore, dice] of CASI) {
     try {
       await livelloAutonomia(app, 'yolo');
       await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'x1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave, valore }) }] }, { text: 'Non è andata.' }]);
-      const chiesto = `prova ${chiave}`;
+      const chiesto = `prova ${chiave.replace(/\s+/g, ' ')}`;
       await chiedi(page, chiesto);
       await expect(page.locator('.dash-bubble-filo', { hasText: 'Non è andata.' })).toBeVisible({ timeout: 15_000 });
       await expect(page.locator('.dash-activity-row', { hasText: dice }).last()).toBeAttached({ timeout: 8_000 });
