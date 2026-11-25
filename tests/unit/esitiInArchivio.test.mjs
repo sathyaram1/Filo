@@ -176,6 +176,67 @@ test('una voce salvata non porta un\'icona che non sia un simbolo', () => {
   assert.equal(E.voceArchivio({ type: 'TIMER', esito: 'fatto', riga: 'Timer', senzaEffetto: true, icona: '🏠' }).senzaEffetto, undefined, 'solo su una non fatta');
 });
 
+// #553.16 — la 0.2.302 e la 0.2.303 salvavano la mossa senza effetto come non riuscita, col perché che ripete la frase
+// della diretta: riaperta, si legge come la salva adesso, con la sua icona e senza l'avviso. Voci copiate da quelle uscite.
+test('una mossa senza effetto salvata dalla 0.2.302, riaperta, si legge come la salva adesso', () => {
+  const casi = [
+    [{ type: 'COMANDO_FINESTRA', esito: 'fallito', riga: 'Aprire la home di Filo', motivo: 'Sei già nella home' },
+      { type: 'COMANDO_FINESTRA', comando: 'home', _executed: true, _output: { window: 'home', already: true } }],
+    [{ type: 'BARRA_SITI', esito: 'fallito', riga: 'Mettere nella barra dei siti «youtube.com»', parti: ['Mettere nella barra dei siti ', { citazione: 'youtube.com' }], motivo: 'È già nella barra dei siti · YouTube' },
+      { type: 'BARRA_SITI', operazione: 'aggiungi', indirizzo: 'youtube.com', _executed: true, _output: { gia: true, invariata: true, voce: 'YouTube' } }],
+    [{ type: 'BARRA_SITI', esito: 'fallito', riga: 'Spostare nella barra dei siti «YouTube»', parti: ['Spostare nella barra dei siti ', { citazione: 'YouTube' }], motivo: 'È già a quel posto nella barra dei siti · YouTube' },
+      { type: 'BARRA_SITI', operazione: 'sposta', elemento: 'YouTube', _executed: true, _output: { invariata: true, voce: 'YouTube' } }],
+    [{ type: 'BARRA_SITI', esito: 'fallito', riga: 'Rinominare nella barra dei siti «YouTube» in «YouTube»', motivo: 'Ha già quel nome nella barra dei siti · YouTube' },
+      { type: 'BARRA_SITI', operazione: 'rinomina', elemento: 'YouTube', nome: 'YouTube', _executed: true, _output: { invariata: true, voce: 'YouTube' } }],
+    [{ type: 'BARRA_SITI', esito: 'fallito', riga: 'Togliere dalla barra dei siti «YouTube»', motivo: 'Barra dei siti già così · YouTube' },
+      { type: 'BARRA_SITI', operazione: 'togli', elemento: 'YouTube', _executed: true, _output: { invariata: true } }],
+    [{ type: 'ACCOUNT', esito: 'fallito', riga: 'Usare il menu dell\'account di Filo', motivo: 'Eri già dentro Filo' },
+      { type: 'ACCOUNT', voce: 'accedi', _executed: true, _output: { gia: 'dentro' } }],
+    [{ type: 'ACCOUNT', esito: 'fallito', riga: 'Usare il menu dell\'account di Filo', motivo: 'YouTube, Gmail e Drive erano già collegati' },
+      { type: 'ACCOUNT', voce: 'collega_google', _executed: true, _output: { gia: 'collegato' } }],
+    [{ type: 'ACCOUNT', esito: 'fallito', riga: 'Usare il menu dell\'account di Filo', motivo: 'Non eri dentro nessun account' },
+      { type: 'ACCOUNT', voce: 'esci', _executed: true, _output: { gia: 'fuori' } }],
+    [{ type: 'CHIUDI_SCHEDE', esito: 'fallito', riga: 'Chiudere delle schede', motivo: 'c\'è solo questa' },
+      { type: 'CHIUDI_SCHEDE', _executed: true, _output: { chiuse: 0, nessuna: 'niente' } }],
+    [{ type: 'CHIUDI_SCHEDE', esito: 'fallito', riga: 'Chiudere le schede di x.com', motivo: 'nessuna di quel sito' },
+      { type: 'CHIUDI_SCHEDE', sito: 'x.com', _executed: true, _output: { chiuse: 0, nessuna: 'sito' } }],
+  ];
+  for (const [vecchia, a] of casi) {
+    const [nuova] = CA.toStoredMessage({ role: 'filo', text: 'ok', esiti: [a] }).esiti;
+    const nome = `${a.type} «${vecchia.motivo}»`;
+    assert.deepEqual(E.rigaDellaVoce(vecchia), E.rigaDellaVoce(nuova), `${nome}: la riga riaperta`);
+    assert.doesNotMatch(E.rigaDellaVoce(vecchia).testo, /non eseguit|non cambiat|non riuscit/i, nome);
+    assert.notEqual(E.rigaDellaVoce(vecchia).icona, '⚠', nome);
+    assert.equal(E.perModello([vecchia]), E.perModello([nuova]), `${nome}: quello che legge il modello`);
+    assert.equal(E.perTrascrizione([vecchia]), E.perTrascrizione([nuova]), `${nome}: la conversazione riletta`);
+    assert.deepEqual(E.voceArchivio(vecchia), nuova, `${nome}: risalvata, prende la forma di adesso`);
+  }
+  // Un no vero, o un perché diverso dalla frase della diretta, resta l'avviso di prima.
+  const restano = [
+    { type: 'COMANDO_FINESTRA', esito: 'fallito', riga: 'Aprire la home di Filo', motivo: 'la finestra non risponde' },
+    { type: 'COMANDO_FINESTRA', esito: 'fallito', riga: 'Aprire la home di Filo', motivo: 'Sei già nella home', no: true },
+    { type: 'CHIUDI_SCHEDE', esito: 'fallito', riga: 'Chiudere delle schede', motivo: 'schede non riconosciute' },
+    { type: 'TIMER', esito: 'fallito', riga: 'Avviare un timer', motivo: 'Sei già nella home' },
+    { type: 'ACCOUNT', esito: 'fatto', riga: 'Eri già dentro Filo' },
+  ];
+  for (const v of restano) assert.deepEqual(E.voceArchivio(v), E.voceArchivio({ ...v }), JSON.stringify(v));
+  for (const v of restano.slice(0, 4)) assert.equal(E.rigaDellaVoce(v).icona, '⚠', JSON.stringify(v));
+  assert.equal(E.voceArchivio(restano[0]).senzaEffetto, undefined);
+});
+
+test('ogni prova di mossa senza effetto lo è davvero, in diretta e per l\'esito comune', () => {
+  for (const type of ['COMANDO_FINESTRA', 'ACCOUNT', 'BARRA_SITI', 'CHIUDI_SCHEDE']) {
+    const prove = RA.proveSenzaEffetto(type);
+    assert.ok(prove.length, type);
+    for (const p of prove) {
+      assert.equal(RA.riga(p).failed, true, JSON.stringify(p));
+      assert.equal(E.senzaEffetto(p), true, JSON.stringify(p));
+    }
+  }
+  assert.deepEqual(RA.proveSenzaEffetto('TIMER'), []);
+  assert.deepEqual(RA.proveSenzaEffetto('constructor'), []);
+});
+
 // #553.15 — le chat salvate prima di #553.14 tengono la mossa senza effetto fra i nomi delle fatte, mentre il loro
 // esito dice che non è riuscita: riaperte, quel nome non arriva più a chi legge.
 test('riletta, una chat vecchia non conta fra le fatte il nome che il suo esito dà per non riuscito', () => {
