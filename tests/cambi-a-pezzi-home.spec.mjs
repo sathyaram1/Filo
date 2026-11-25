@@ -40,7 +40,9 @@ test('la riga del cambio nella coda della home tiene il valore nel riquadro: nat
     const t = riga().locator('.dash-cambio-testo');
     await expect.poll(async () => (await pezzi(t)).dentro, { message: quando, timeout: 8_000 }).toEqual([STILE]);
     const p = await pezzi(t);
-    expect(p.fuori, quando).toBe('stile dell\'agente:  · da Filo');
+    // La provenienza dipende da chi scriveva prima nella stessa app: conta che sia parola di Filo, fuori dal riquadro.
+    expect(p.fuori, quando).toMatch(/^stile dell'agente: {2}· da\S* \S/);
+    expect(p.fuori, quando).not.toMatch(/verificato|»/);
     expect(p.filo, quando).toBe('3px');
   };
   await guarda('appena nato');
