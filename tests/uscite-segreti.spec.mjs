@@ -10,7 +10,10 @@ import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs
 import { _electron as electron } from '@playwright/test';
 import { cartellaInCasa, cartellaTemporanea } from './helpers/percorsi.mjs';
 import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
-import { writeFileSync, rmSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { paginaDellaScheda } from './helpers/schede.mjs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuDi } from './helpers/menuContestuale.mjs';
