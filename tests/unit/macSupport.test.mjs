@@ -101,11 +101,13 @@ test('la firma NON tocca le due copie intermedie della build universale', () => 
   return Promise.all([
     afterPack(contesto('/tmp/filo-non-esiste/mac-universal--x64-temp')),
     afterPack(contesto('/tmp/filo-non-esiste/mac-universal--arm64-temp')),
-    // Un sistema che non è Mac non passa mai di qui.
-    afterPack({ ...contesto('/tmp/filo-non-esiste/win-unpacked'), electronPlatformName: 'win32' }),
+    // Un sistema che non è Mac non passa mai dalla firma. Questa e la prossima
+    // chiamano il passo della firma da solo: dallo smistatore, su una cartella
+    // che non c'è, si fermerebbe prima il fusibile (lib/fusibili-electron.js).
+    firma({ ...contesto('/tmp/filo-non-esiste/win-unpacked'), electronPlatformName: 'win32' }),
     // Il pacchetto finale invece la firma la prova davvero: qui fallisce (non
     // c'è né codesign né l'app), ed è proprio la prova che ci ha provato.
-    assert.rejects(() => afterPack(contesto('/tmp/filo-non-esiste/mac-universal')),
+    assert.rejects(() => firma(contesto('/tmp/filo-non-esiste/mac-universal')),
       'il pacchetto finale deve essere firmato'),
   ]);
 });
