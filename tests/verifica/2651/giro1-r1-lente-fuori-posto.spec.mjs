@@ -31,7 +31,7 @@ async function apri(app, page) {
 
 test('r1 con la barra di scorrimento, la riga sottile si prende cliccando dove si vede', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;background:#ffffff">
-    <div style="position:fixed;left:1150px;top:0;width:3px;height:100vh;background:#ff0000"></div>
+    <div style="position:fixed;left:88%;top:0;width:3px;height:100vh;background:#ff0000"></div>
     <div style="height:3000px"></div></body></html>`);
   await scrivi(app, 'prima');
   await apri(app, page);
