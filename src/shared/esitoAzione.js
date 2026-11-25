@@ -169,17 +169,18 @@
     }
     return ripulite(out);
   }
-  // Spazi e caratteri di controllo come nella riga piatta (`pulito`), stringhe vicine unite, i due punti finali via.
+  // Le stesse pulizie della riga piatta: stringhe vicine unite PRIMA, se no fra due pezzi restano due spazi.
   function ripulite(parti) {
-    const out = [];
+    const unite = [];
     for (const p of parti) {
       if (typeof p === 'string') {
-        if (typeof out[out.length - 1] === 'string') out[out.length - 1] += spazi(p);
-        else out.push(spazi(p));
-      } else if (p && typeof p.citazione === 'string' && p.citazione.trim()) {
-        out.push({ citazione: spazi(p.citazione).trim(), ...(p.nuda === true ? { nuda: true } : {}) });
+        if (typeof unite[unite.length - 1] === 'string') unite[unite.length - 1] += p;
+        else unite.push(p);
+      } else if (p && typeof p.citazione === 'string' && pulito(p.citazione)) {
+        unite.push({ citazione: pulito(p.citazione), ...(p.nuda === true ? { nuda: true } : {}) });
       }
     }
+    const out = unite.map((p) => (typeof p === 'string' ? inUnaRiga(p) : p));
     if (typeof out[0] === 'string') out[0] = out[0].replace(/^\s+/, '');
     const u = out.length - 1;
     if (typeof out[u] === 'string') out[u] = out[u].replace(/\s*:?\s*$/, '');
