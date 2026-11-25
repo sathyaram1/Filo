@@ -2090,6 +2090,16 @@
   // Il contagocce di sistema (EyeDropper) in Electron non c'è: risponde subito «annullato» (#2651). Si sceglie sulla foto
   // della pagina, ferma sotto il puntatore, con una lente sui pixel. Esc o il tasto destro rinunciano senza dire niente.
   let contagocceAperto = false;
+  let contagocceSotto = null;
+  // Il tasto destro sul contagocce rinuncia e basta: sulle pagine web il menu di Filo lo vede per primo (#2651).
+  function tastoDestroSulContagocce(e) {
+    const o = contagocceSotto;
+    if (!o || !e || !(e.target === o || (e.composedPath?.() || []).includes(o))) return false;
+    e.preventDefault();
+    o._snRinuncia?.();
+    return true;
+  }
+
   async function pickColor() {
     if (contagocceAperto) return;
     contagocceAperto = true;
