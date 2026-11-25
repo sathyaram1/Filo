@@ -9,9 +9,8 @@ const ATTESA_MS = 8000;
 const CACHE_MAX = 30;
 const CACHE_MS = 10 * 60 * 1000;
 
-function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = () => false, log = console, adesso = () => Date.now() } = {}) {
+function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = () => false, log = console, adesso = () => Date.now(), statico = Statico } = {}) {
   const L = () => globalThis.SN_FEEDBACK_L0;
-  const G = () => globalThis.SN_GUARDIANO_STATICO;
   const cache = new Map(); // testo -> { promessa, at }
 
   async function acceso() {
