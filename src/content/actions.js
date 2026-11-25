@@ -2195,7 +2195,6 @@
         vctx.strokeRect(meta * CELLA - 1, meta * CELLA - 1, CELLA + 2, CELLA + 2);
         vctx.lineWidth = 1; vctx.strokeStyle = '#fff';
         vctx.strokeRect(meta * CELLA + 0.5, meta * CELLA + 0.5, CELLA - 1, CELLA - 1);
-        campione.style.background = hex;
         codice.textContent = hex;
         // In basso a destra del punto; dove non ci sta, dall'altra parte.
         const x = px / sx, y = py / sy, w = lente.offsetWidth || LATO * CELLA, h = lente.offsetHeight || LATO * CELLA + 30;
