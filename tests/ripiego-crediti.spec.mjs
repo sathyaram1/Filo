@@ -1217,6 +1217,8 @@ test('(Z3) fuori da Filo con la home davanti: l’avviso aspetta; tornati sulla 
   await home.locator('#input').fill('ciao ripiego');
   await home.locator('#sendBtn').click();
   await expect(home.locator('.dash-bubble-note')).toContainText('ho usato i crediti di Filo', { timeout: 30_000 });
+  await home.waitForTimeout(12000);
+  console.log('DBG', await globalThis.__dbg(), await home.evaluate(() => document.hasFocus()));
   await expect.poll(() => avvisiInAttesa(app), { timeout: 20_000 }).toContain(RIGA_402);
 
   const avvisiHome = await osservaAvvisi(home);
