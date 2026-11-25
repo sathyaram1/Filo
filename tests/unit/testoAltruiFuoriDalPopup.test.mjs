@@ -103,6 +103,8 @@ test('pezzi con spazi, caratteri di controllo e riquadri vuoti tornano a pezzi d
       const v = E.voceArchivio(JSON.parse(JSON.stringify(E.voceArchivio(x))));
       assert.ok(v.parti, `${JSON.stringify(parti)} → ${JSON.stringify(v)}`);
       assert.equal(E.rigaDiParti(v.parti), v.riga);
+      // Il no del timer si dice con la sua etichetta, senza la domanda.
+      if (x._rifiutata) continue;
       const riga = E.rigaDellaVoce(v);
       assert.ok(riga.parti, JSON.stringify(riga));
       assert.doesNotMatch(E.rigaDiParti(riga.parti), / {2}/);
