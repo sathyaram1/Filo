@@ -49,9 +49,11 @@ nella pagina, in uno Shadow DOM chiuso.
   nascondeva «Accedi con Google» dove l'utente lavorava, senza dire perché (giro 8). Quelle di un'altra finestra
   di Filo (lo stesso sito aperto anche in incognito) si nascondono se toccano l'area della domanda e l'utente è
   nella finestra della domanda: quella che ha avuto per ultima un suo tasto, clic o rotella, non il fuoco, che il
-  sito sposta aprendo una finestrella (#592.17). Si riguarda a ogni spostamento, ridimensionamento o ricomparsa;
-  una finestrella nascosta mentre copriva una domanda già a schermo la ridisegna, e il mezzo secondo prima di OK
-  riparte.
+  sito sposta aprendo una finestrella (#592.17). Chi ha dato l'input lo decide la regola dei gesti delle pagine
+  (`inputDellUtente`): il clic che Filo dà da sé su un «Salta» o un modificatore da solo non portano l'utente in
+  quella finestra (#2647.1). Si riguarda a ogni spostamento, ridimensionamento o ricomparsa; una finestrella
+  nascosta mentre copriva una domanda già a schermo la ridisegna, e il mezzo secondo prima di OK riparte, una
+  volta sola per finestrella e per domanda: una che va e torna non tiene OK spento per sempre.
 - **Segue la sua scheda.** Una domanda si vede solo sopra la scheda che l'ha fatta, quando è davanti;
   le altre aspettano. Tornando davanti si ridisegna da capo, e il mezzo secondo riparte. Scheda chiusa,
   pagina nuova, frame che naviga, renderer morto: la domanda vale un Annulla. Da un popup di accesso
