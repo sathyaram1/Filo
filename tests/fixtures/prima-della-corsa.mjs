@@ -2,7 +2,6 @@
 // (tests/helpers/motoreDelleProve.mjs), lo vuole senza privilegi file:// come il pacchetto (lib/fusibili-electron.js), su
 // Linux senza schermo accende Xvfb (#739) e dà alla corsa una temporanea sua che se ne va con lei (#717, helpers/percorsi.mjs).
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
 import { accendiSchermi } from '../../scripts/lib/schermo-virtuale.mjs';
