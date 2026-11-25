@@ -460,6 +460,8 @@
     if (!TIPO.test(type)) return null;
     const giaFatta = valido(x.esito) && !Object.keys(x).some((k) => k.startsWith('_'));
     if (giaFatta) {
+      const salvata = comeInDiretta({ ...x, type });
+      if (salvata.senzaEffetto === true && x.senzaEffetto !== true) return salvata;
       const f = type === 'APRI_FILE' && x.file ? fileDi(x.file) : null;
       const generica = SENZA_TITOLO[type] ? SENZA_TITOLO[type][x.esito === CHIESTO ? 0 : 1] : '';
       return senzaVuoti({
