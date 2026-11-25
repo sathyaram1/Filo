@@ -105,6 +105,14 @@ async function afterPack(context) {
   console.log(`[after-pack-fusibili] privilegi delle pagine file:// ${cambiato ? 'spenti' : 'già spenti'} in ${eseguibile}`);
 }
 
+// Dove sta la copia spenta: la cache dell'utente, fuori da ogni checkout e dalla temporanea della corsa, che se ne va
+// con lei. Un node_modules creato apposta per la copia fa credere ai controlli dei pacchetti che manchino tutti.
+function cartellaDelleCopie({ piattaforma = process.platform, env = process.env, casa = os.homedir() } = {}) {
+  if (piattaforma === 'win32') return path.join(env.LOCALAPPDATA || casa, 'Filo', 'motori');
+  if (piattaforma === 'darwin') return path.join(casa, 'Library', 'Caches', 'Filo', 'motori');
+  return path.join(env.XDG_CACHE_HOME || path.join(casa, '.cache'), 'filo', 'motori');
+}
+
 // Il motore di sviluppo (node_modules/electron) senza privilegi: spento sul posto se il pacchetto è di questo
 // checkout; se non lo è (un clone che usa i moduli di un'altra cartella) o non si può scrivere, una copia spenta in
 // `cache`, che chi lancia usa con ELECTRON_OVERRIDE_DIST_PATH. { dist, copia } o { errore }.
