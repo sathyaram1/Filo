@@ -29,7 +29,7 @@ test('le frasi di tutti i cambi di un evento, unite come le dice il segno sulla 
   ] };
   const tutte = K.fraseAPezzi(ev, Infinity);
   // Il segno unisce `frasi` con «; »: i pezzi dicono proprio quella riga, anche oltre la terza.
-  assert.equal(E.partiDellaRiga(tutte, K.frasi(ev).join('; ')), tutte);
+  assert.deepEqual(E.partiDellaRiga(tutte, K.frasi(ev).join('; ')), tutte);
   assert.deepEqual(dentro(tutte).filter((t) => t.includes(F)).length, 2);
   assert.doesNotMatch(paroleDiFilo(tutte), /controllato/);
   // Una frase tutta di Filo non ha pezzi: resta la frase.
