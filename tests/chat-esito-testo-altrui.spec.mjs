@@ -142,12 +142,11 @@ test('#2648.1 il cambio di un\'impostazione chiesto in chat e il suo annullo ten
     await chiedi(page, 'rimetti com\'era');
     // L'annullo chiede l'OK dal suo bottone in chat; la domanda dice la frase del cambio col valore nel suo riquadro.
     await page.locator('.dash-action-btn', { hasText: 'Filo vuole rimettere' }).click({ timeout: 10_000 });
-    const domanda = page.locator(`${CONFIRM_HOST} .sn-confirm-quote`, { hasText: 'controllato' });
-    await expect(domanda).toBeVisible({ timeout: 10_000 });
-    expect(await domanda.textContent()).toContain(VALORE);
-    const paroleDomanda = (await page.locator(`${CONFIRM_HOST} .sn-confirm-filo`).allTextContents()).join(' ');
-    expect(paroleDomanda).toContain('modello per');
-    expect(paroleDomanda).not.toContain('controllato');
+    await expect.poll(async () => ((await confirmState(page)) || {}).citazioni || [], { timeout: 10_000 })
+      .toEqual(expect.arrayContaining([expect.stringContaining(VALORE)]));
+    const domanda = await confirmState(page);
+    expect(domanda.fuori).toContain('modello per');
+    expect(domanda.fuori).not.toContain('controllato');
     await clickConfirm(page, 'ok', { timeout: 10_000 });
     const rimesso = page.locator('.dash-activity-row', { hasText: /Rimesso com/ }).last();
     await expect(rimesso).toBeAttached({ timeout: 10_000 });
