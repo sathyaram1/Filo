@@ -295,8 +295,11 @@ test('#2648.1 dopo un OK finito male il bottone dice il perché col testo del mo
     await clickConfirm(page, 'ok', { timeout: 10_000 });
     const bottone = page.locator('.dash-action-btn', { hasText: '✗' });
     await expect(bottone).toBeVisible({ timeout: 10_000 });
-    await expect(bottone.locator('.dash-altrui', { hasText: 'controllato' })).toBeVisible();
-    await soloNelRiquadro(bottone, 'bottone');
+    // Il bottone accorcia il perché: resta l'inizio del valore, sempre nel suo riquadro.
+    await expect(bottone.locator('.dash-altrui', { hasText: FUNZIONE })).toBeVisible();
+    const b = await pezzi(bottone);
+    expect(b.fuori).toBe('✗ Impostazione non applicata · ');
+    expect(b.filo).toBe('3px');
     await bottone.scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-bottone-fallito.png' });
   } finally {
