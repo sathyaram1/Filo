@@ -15,6 +15,7 @@ module.exports = function register(on, ctx) {
   const ContatoriSicurezza = require('../contatoriSicurezza');
   const ContatoriServizio = require('../contatoriServizio');
   const { daPaginaNonDiFilo } = require('./origine');
+  const { mittenteDavanti } = require('../davantiAgliOcchi');
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = ContatoriSicurezza.contaUscite(portaUscite);
 
