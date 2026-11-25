@@ -130,12 +130,20 @@ function carica() {
   caricato = true;
   if (deposito === undefined) {
     deposito = depositoDiSistema();
-    if (deposito) process.once('exit', () => { if (inAttesa) salvaOra(); });
+    if (deposito) process.once('exit', () => { ricordaSuoi(); if (inAttesa) salvaOra(); });
   }
   if (!deposito) return;
   let lista = null;
   try { lista = JSON.parse(deposito.leggi() || 'null'); } catch (_) { lista = null; }
-  if (Array.isArray(lista)) letti.ripristina(lista);
+  if (!Array.isArray(lista)) return;
+  letti.ripristina(lista.filter((x) => x && typeof x.regola === 'string'));
+  const s = lista.find((x) => x && typeof x.sale === 'string' && x.sale);
+  if (!s) return;
+  sale = s.sale;
+  const limite = Date.now() - GIORNI_RICORDO * 24 * 3600 * 1000;
+  for (const x of lista) {
+    if (x && typeof x.suo === 'string' && Number(x.at) >= limite && !suoi.has(x.suo)) suoi.set(x.suo, Number(x.at));
+  }
 }
 
 function ricorda(testo, fonte) {
