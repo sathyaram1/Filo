@@ -85,8 +85,12 @@ function eseguibileDelPacchetto(context) {
       return path.join(context.appOutDir, `${nome}.app`);
     case 'win32':
       return path.join(context.appOutDir, `${nome}.exe`);
-    default:
-      return path.join(context.appOutDir, context.packager.executableName || nome);
+    default: {
+      // Su Linux, dopo il lanciatore (una seconda passata sulla stessa cartella), il programma vero ha il suffisso.
+      const p = path.join(context.appOutDir, context.packager.executableName || nome);
+      const vero = p + require('../after-pack-linux').SUFFISSO;
+      return fs.existsSync(vero) ? vero : p;
+    }
   }
 }
 
