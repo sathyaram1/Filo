@@ -91,3 +91,15 @@ test('i segreti riconosciuti senza modello si segnano a ogni comparsa', () => {
   const r = L.daValori('chiave sk-abc e ancora sk-abc', ['sk-abc', '']);
   assert.deepEqual(r.map((x) => [x.inizio, x.fine]), [[7, 13], [23, 29]]);
 });
+
+// #2645.1: il filtro dei confermati ritrova i valori come li ritrova l'evidenziatura, anche normalizzati.
+test('un segreto confermato si toglie dove l\'evidenziatura lo ritrova, anche scritto a gruppi', () => {
+  const testo = 'il codice è 4539 1488 0343 6467 e la chiave sk-abc, poi 4539148803436467 di nuovo';
+  const valori = ['4539148803436467', 'sk-abc'];
+  const trovati = L.daValori(testo, valori);
+  assert.equal(trovati.length, 3, 'i tre punti dell\'evidenziatura');
+  const tutti = trovati.map((x) => ({ ...x, tipo: 'segreto' }));
+  const altro = { tipo: 'segreto', dove: 'testo', inizio: 0, fine: 9, pezzo: 'il codice' };
+  assert.deepEqual(L.senzaConfermati([...tutti, altro], testo, valori), [altro]);
+  assert.deepEqual(L.senzaConfermati(tutti, testo, []), tutti, 'senza conferme resta tutto');
+});
