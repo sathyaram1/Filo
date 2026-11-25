@@ -179,6 +179,7 @@ async function servi(partizione, req) {
   }
   const h = new Headers(r.headers);
   h.set('Content-Security-Policy', CSP_DOCUMENTO);
+  h.set('X-Content-Type-Options', 'nosniff');
   return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
 }
 
