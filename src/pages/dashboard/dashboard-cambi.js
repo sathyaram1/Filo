@@ -206,7 +206,7 @@
   }
 
   // `daQui`: la bolla dell'utente, o un elemento che le sta sotto (il blocco di attività del turno).
-  // `cambi`: gli id, o le voci { id, frase } che il main manda con l'azione.
+  // `cambi`: gli id, o le voci { id, frase, parti } che il main manda con l'azione.
   function segna(daQui, cambi) {
     const bolla = bollaUtenteDi(daQui);
     const voci = (Array.isArray(cambi) ? cambi : []).map((c) => (typeof c === 'string' ? { id: c } : c)).filter((c) => c && c.id);
