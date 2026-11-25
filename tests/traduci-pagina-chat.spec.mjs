@@ -422,6 +422,67 @@ test('Alt+T senza selezione dopo un clic nel video di un sito dove Filo è spent
   expect((await avvisi(page)).join(' | ')).not.toMatch(/selezion/i);
 });
 
+// #2656 — il riquadro di un sito dove l'utente ha spento Filo resta com'è, con quello che lui stesso incorpora, e l'avviso
+// dice quale sito; riacceso, la traduzione dopo ci entra.
+const FIGLIO = `<!doctype html><html lang="en"><body style="margin:0;padding:8px;font:16px sans-serif">
+  <span id="g">Reply from a guest</span>
+</body></html>`;
+const spentoConFiglio = (src) => `<!doctype html><html lang="en"><body style="margin:0;padding:16px;font:16px sans-serif">
+  <button id="play">Play video</button> <span id="w">Comments are closed</span>
+  <iframe id="figlio" src="${src}" width="300" height="70" style="border:0"></iframe>
+</body></html>`;
+const ospite = (src, testo = true) => `<!doctype html><html lang="en"><head><title>Football era</title></head>
+<body style="font:16px sans-serif;padding:20px">
+  ${testo ? '<h1 id="head">The end of an era in European football</h1><p id="p1">First paragraph of the body text, long enough to be picked up.</p>' : ''}
+  <iframe id="embed" src="${src}" width="460" height="180" style="border:1px solid #333"></iframe>
+</body></html>`;
+const spenti = (app, elenco) => app.evaluate(async (_electron, elenco) => {
+  await globalThis.SN_STORAGE.updateSettings({ blocklist: elenco });
+}, elenco);
+
+test('traduci la pagina con dentro un riquadro di un sito dove Filo è spento: il riquadro resta com\'è e l\'avviso lo nomina; riacceso, si traduce', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await fornitoreFinto(app);
+  await spenti(app, ['sito-pubblico.test']);
+  const figlio = testServer.html(FIGLIO);
+  const page = await testServer.openReady(openTab, ospite(testServer.html(spentoConFiglio(figlio), { pubblico: true })));
+  await guardaAvvisi(page);
+  const riquadro = page.frameLocator('#embed');
+  await expect(riquadro.frameLocator('#figlio').locator('#g')).toBeVisible();
+
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText(/^IT The end of an era/, { timeout: 30_000 });
+  await expect.poll(() => avvisi(page).then((a) => a.join(' | ')), { timeout: 15_000 })
+    .toMatch(/Pagina tradotta, tranne quello che viene da sito-pubblico\.test, dove hai spento Filo/);
+  await expect(riquadro.locator('#w')).toHaveText('Comments are closed');
+  await expect(riquadro.frameLocator('#figlio').locator('#g')).toHaveText('Reply from a guest');
+  await page.screenshot({ path: 'tests/.shots/traduci-pagina-riquadro-spento.png' }).catch(() => {});
+
+  // Di nuovo il tasto: la pagina torna com'era. Riacceso Filo sul sito, il giro dopo entra nel riquadro e in chi ci sta dentro.
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText('The end of an era in European football', { timeout: 15_000 });
+  await spenti(app, []);
+  await premiAltT(app);
+  await expect(page.locator('#head')).toHaveText(/^IT The end of an era/, { timeout: 30_000 });
+  await expect(riquadro.locator('#w')).toHaveText(/^IT Comments are closed/, { timeout: 30_000 });
+  await expect(riquadro.frameLocator('#figlio').locator('#g')).toHaveText(/^IT Reply from a guest/, { timeout: 30_000 });
+});
+
+test('chiesta in chat, una pagina il cui unico testo viene da un sito dove Filo è spento: niente da tradurre, e Filo dice perché', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await fornitoreFinto(app);
+  await spenti(app, ['sito-pubblico.test']);
+  const page = await testServer.openReady(openTab, ospite(testServer.html(RIQUADRO, { pubblico: true }), false));
+  await guardaAvvisi(page);
+  await expect(page.frameLocator('#embed').locator('#w')).toBeVisible();
+  expect((await traduci(app)).stato).toBe('partita');
+  await expect.poll(() => avvisi(page).then((a) => a.join(' | ')), { timeout: 15_000 })
+    .toMatch(/Il testo di questa pagina viene da sito-pubblico\.test, dove hai spento Filo/);
+  expect((await avvisi(page)).join(' | ')).not.toMatch(/Non ho trovato testo/);
+  await expect(page.frameLocator('#embed').locator('#w')).toHaveText('Comments are closed');
+  expect(await app.evaluate(() => globalThis.__filoChiamate)).toBe(0);
+});
+
 // #504.7 — con la risposta di una traduzione aperta la tastiera sta nei riquadri di Filo sopra il sito: senza selezione
 // il tasto arriva alla pagina passando dallo strato, e la risposta resta aperta.
 test('Alt+T senza selezione con la risposta di una traduzione aperta traduce la pagina sotto', async ({ app, openTab, testServer }) => {
