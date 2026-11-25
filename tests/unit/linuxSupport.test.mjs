@@ -129,7 +129,7 @@ test('il doppio clic sul pacchetto Linux avvia Filo senza la gabbia di sicurezza
 
   // Una finta cartella impacchettata: dentro c'è solo il "programma".
   const dove = cartellaTemporanea('filo-linux-lanciatore-');
-  writeFileSync(join(dove, 'filo'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  writeFileSync(join(dove, 'filo'), programmaFinto('#!/bin/sh\nexit 0\n'), { mode: 0o755 });
 
   await afterPack({
     electronPlatformName: 'linux',
