@@ -60,7 +60,7 @@ function crea({ manda, ora = Date.now, nuovoId = () => crypto.randomUUID() } = {
 
   // Tornati su Filo da una parte che non dà il fuoco alla pagina (la barra delle schede): si offrono di nuovo.
   function riproponi() {
-    for (const voce of inCoda.values()) { try { manda(voce.messaggio); } catch (_) {} }
+    for (const [k, voce] of [...inCoda]) offri(k, voce);
   }
 
   // Detto altrove, o non più vero: esce dalla coda senza contare come visto, e la sua pausa la tiene chi lo ritira.
