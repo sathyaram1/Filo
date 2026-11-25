@@ -541,7 +541,7 @@ async function raccoglitore() {
   };
 }
 
-test('una pagina del computer ostile che disegna una foto della cartella su una tela non la spedisce a nessun indirizzo', async ({ app, avvisi }) => {
+test('una pagina del computer ostile che disegna una foto della cartella su una tela non la legge, e non spedisce niente a nessun indirizzo', async ({ app, avvisi }) => {
   test.setTimeout(60_000);
   const { dir } = preparaReport();
   const r = await raccoglitore();
