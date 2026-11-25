@@ -184,7 +184,7 @@ async function tutti() {
   const lista = await leggiLista();
   const chiusi = K().annullati(lista);
   return lista.map((e) => ({
-    id: e.id, ts: e.ts, ...(e.agg && e.agg !== e.ts ? { agg: e.agg } : {}), tipo: e.tipo, via: e.via || 'filo', frase: K().frase(e), provenienza: K().provenienza(e),
+    id: e.id, ts: e.ts, ...(e.agg && e.agg !== e.ts ? { agg: e.agg } : {}), tipo: e.tipo, via: e.via || 'filo', frase: K().frase(e), ...aPezzi(e), provenienza: K().provenienza(e),
     annulla: e.annulla || null, annullatoDa: chiusi.get(e.id) || null, annullabile: K().annullabile(daRimettere(e, lista)),
   }));
 }
