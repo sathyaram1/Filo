@@ -103,9 +103,8 @@
     };
   }
 
-  // Premuta nella barra: passa un id del registro e, per il contagocce, il colore che la barra ha già preso (pickColor
-  // lo accetta solo nella forma #rrggbb).
-  function runIconAction(iconId, colore) {
+  // Premuta nella barra: passa un id del registro.
+  function runIconAction(iconId) {
     if (IS_SUBFRAME) return;
     // Il testo comparso senza toccare la pagina (una fisarmonica che si apre da sé) si ricontrolla qui: dal menu lo
     // faceva il menu stesso, entrando nella pagina.
