@@ -98,7 +98,7 @@ test('ritirato (detto altrove, o non più vero): esce dalla coda senza contare c
 test('il ripiego sui crediti di Filo passa dalla coda: nessuna spinta che la salti, contato quando si mostra', () => {
   const wallet = readFileSync(new URL('../../src/main/services/handlers/wallet.js', import.meta.url), 'utf8');
   const manda = /function mandaAvvisoSospeso\(\) \{([\s\S]*?)\n {2}\}/.exec(wallet)[1];
-  assert.match(manda, /CODA\.avvisa\(AVVISO_RIPIEGO, \(\) => \(\{ messaggio, alMostrare: ripiegoMostrato \}\)\)/);
+  assert.match(manda, /CODA\.avvisa\(AVVISO_RIPIEGO, \(\) => \(\{ messaggio, alMostrare: ripiegoMostrato, dettoAltrove: rigaDavanti \}\)\)/);
   assert.doesNotMatch(manda, /broadcastToTabs|ultimoAvvisoRipiego =/, 'spedito non vuol dire visto');
   const mostrato = /function ripiegoMostrato\(\) \{([\s\S]*?)\n {2}\}/.exec(wallet)[1];
   assert.match(mostrato, /CODA\.ritira\(AVVISO_RIPIEGO\)/, 'detto dalla riga, l’avviso in coda non lo ripete');
