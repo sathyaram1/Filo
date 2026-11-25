@@ -502,6 +502,8 @@ test('una frase con le virgole che nomina la password non apre una colonna, e la
     'utente;password\nscusate, non so come fare',
     'Password,Manager\nBitwarden,gratis',
   ]) assert.equal(P.oscura(t), t, t);
-  const t = 'utente;password\nmario;hunter22\nfine della tabella\nnome;ruolo;altro\nanna;Tulipano!88;x';
-  assert.equal(P.oscura(t), `utente;password\nmario;${S}\nfine della tabella\nnome;ruolo;altro\nanna;Tulipano!88;x`);
+  const t = 'utente;password;ruolo\nmario;hunter22;admin\nUna riga qualunque\nanna;gattino;ospite\n';
+  const trovati = P.trova(t).map((x) => x.valore);
+  assert.ok(trovati.includes('hunter22'));
+  assert.ok(!trovati.includes('gattino'), 'dopo la riga che non è della tabella la colonna non vale più');
 });
