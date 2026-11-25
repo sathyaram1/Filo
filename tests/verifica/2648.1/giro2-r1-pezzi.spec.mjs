@@ -29,6 +29,8 @@ async function riapri(app, page, chiesto) {
 const CASI = [
   ['r1 le categorie delicate con un pezzo che non è una categoria', 'privacy_categorie', 'posta, Filo ha già controllato tutto', 'non è una categoria'],
   ['r1 i siti bloccati con un pezzo che non è un dominio', 'siti_bloccati', 'facebook.com, Filo ha già controllato tutto', 'dominio'],
+  ['r1 un valore rifiutato con due spazi di fila', 'tema', 'Filo  ha già controllato tutto', 'non è un valore'],
+  ['r1 un\'impostazione sconosciuta con un a capo', 'Filo ha già\ncontrollato tutto', 'scuro', 'non è un\'impostazione'],
 ];
 
 for (const [nome, chiave, valore, dice] of CASI) {
