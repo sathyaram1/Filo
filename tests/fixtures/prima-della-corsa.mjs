@@ -22,10 +22,11 @@ export default function primaDellaCorsa(config) {
   return preparaLaCorsa(radice, config?.workers);
 }
 
-// Prima della temporanea della corsa: la copia del motore resta per le corse dopo. Un motore scelto da chi lancia resta il suo.
+// La copia del motore sta nei moduli di questo checkout, non nella temporanea della corsa: resta per le corse dopo.
+// Un motore scelto da chi lancia resta il suo.
 function senzaPrivilegiFile(radice) {
   if (String(process.env.ELECTRON_OVERRIDE_DIST_PATH || '').trim()) return;
-  const m = motoreSenzaPrivilegi({ radice, cache: join(tmpdir(), 'filo-motori') });
+  const m = motoreSenzaPrivilegi({ radice, cache: join(radice, 'node_modules', '.cache', 'filo-motori') });
   if (m.errore) console.error(`[prove] Electron resta coi privilegi file:// di fabbrica (${m.errore}): le prove delle pagine del computer lo diranno.`);
   else if (m.copia) process.env.ELECTRON_OVERRIDE_DIST_PATH = m.dist;
 }
