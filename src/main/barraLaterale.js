@@ -836,11 +836,10 @@ class BarraLaterale {
 
   // ── azioni ──────────────────────────────────────────────────────────────
 
-  // `colore`: quello che la barra ha già preso col contagocce (#1246), da passare alla pagina.
   // `daAltro`: scelta dentro «Altro…», per i contatori (#1471).
   // `via` 'fila': premuta nella fila del tasto destro della scheda davanti, dove sta un'icona della finestra (#1434.2);
   // lì è spenta come nella barra, e non conta come una scelta fatta nella barra.
-  esegui(id, { colore = '', daAltro = false, via = 'barra' } = {}) {
+  esegui(id, { daAltro = false, via = 'barra' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     const dallaFila = via === 'fila';
@@ -860,7 +859,7 @@ class BarraLaterale {
     const attiva = this._attiva();
     const incognito = this._incognito();
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
-    if (d.tipo === 'pagina') { this.eseguiSullaPagina(id, { colore }); return; }
+    if (d.tipo === 'pagina') { this.eseguiSullaPagina(id); return; }
     const daTastiera = !dallaFila && this.motivo === 'tasto';
     const fai = () => {
       switch (id) {
@@ -896,7 +895,7 @@ class BarraLaterale {
 
   // Un'icona della pagina (cattura, trascrivi…), dalla barra o da una lettera del doppio Ctrl (#2377), che non chiede
   // all'icona di stare nella barra. `via`: la strada contata.
-  eseguiSullaPagina(id, { colore = '', via = 'barra' } = {}) {
+  eseguiSullaPagina(id, { via = 'barra' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     const attiva = this._attiva();
@@ -905,8 +904,7 @@ class BarraLaterale {
     Strade.misura('azione', id, via, { incognito: this._incognito() });
     this.chiudi();
     this._restituisciTastiera();
-    const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
-    this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...(scelto ? { colore: scelto } : {}), scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
+    this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
     this._consegnaInAttesa();
     return true;
   }
@@ -925,7 +923,7 @@ class BarraLaterale {
     // Un gesto sull'interfaccia di Filo, come la voce di un menu: vale per gli appunti di Filo, non apre niente alla pagina.
     try { require('./services/permessiPagine').gestoDiFilo(t.view.webContents); } catch (_) {}
     const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
-    try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: c.iconId, daBarra: true, ...(c.colore ? { colore: c.colore } : {}) }); } catch (_) {}
+    try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: c.iconId, daBarra: true }); } catch (_) {}
   }
 
   // Col mouse la barra resta aperta: il secondo clic, senza spostarsi, detta. La pagina decide dal suo stato vero, e
@@ -1277,7 +1275,7 @@ class BarraLaterale {
         this._nascondiSuggerimento();
         if (this.aperta && (this.motivo !== 'tasto' || !this._haFuoco())) this._programmaUscita();
         break;
-      case 'barra:azione': this.esegui(testo(d.id), { colore: testo(d.colore), daAltro: d.daAltro === true }); break;
+      case 'barra:azione': this.esegui(testo(d.id), { daAltro: d.daAltro === true }); break;
       case 'barra:altro': if (this.aperta) this._contaGesto('altro_del_menu', { aperto: true }); break;
       case 'barra:sistema': this.sistema(testo(d.comando), d); break;
       case 'barra:menu': this._menu(d); break;

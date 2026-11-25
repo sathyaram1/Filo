@@ -1283,6 +1283,7 @@
 
   // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
   async function onContextMenu(e, opzioni) {
+    if (Actions.tastoDestroSulContagocce?.(e)) return;
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch); Shift+F10 è la tastiera che chiede il nostro.
     if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) {
       if (e.isTrusted) Popup.conta({ misura: 'menu-nativo', voce: 'shift_tasto_destro' });
@@ -3054,7 +3055,7 @@
         else if (msg.surface === 'help') openHelpSidebar();
         else if (msg.surface === 'valuta') valutaDalRiquadro();
         else if (msg.surface === 'traduci') traduciDalTasto();
-        else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId, msg.colore);
+        else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
       if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);

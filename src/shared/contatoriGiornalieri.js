@@ -316,7 +316,7 @@
   // Gli avvisi d'errore dei content script, per chiave del testo: mai il testo (tests/unit/contatoriAgganci.test.mjs).
   const AVVISI_ERRORE = Object.freeze(['toast_paste_failed', 'err_no_selection', 'toast_save_failed', 'toast_image_save_failed',
     'toast_video_save_failed', 'toast_audio_save_failed', 'toast_file_save_failed', 'toast_pip_failed', 'err_provider_failed',
-    'err_color_picker_unsupported', 'qr_error', 'toast_page_translate_failed', 'tts_model_fallback_reason',
+    'err_color_picker_failed', 'err_color_not_copied', 'qr_error', 'toast_page_translate_failed', 'tts_model_fallback_reason',
     'toast_cannot_paste_image', 'toast_not_an_address', 'toast_media_stream_only', 'streaming_non_riuscito', 'tts_not_supported',
     'menu_dictate_not_supported', 'toast_transcribe_empty', 'download_failed',
     // Quelli che Filo manda a tutte le schede dal main, e quelli delle sue pagine (la barra delle schede, i Mazzi).

@@ -1846,6 +1846,15 @@
     } catch (_) {}
   }
 
+  // Mirino disegnato da noi: quello di sistema su sfondo variabile può risultare invisibile. Hotspot al centro (16,16).
+  const CURSORE_MIRINO = `url("data:image/svg+xml;utf8,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">' +
+    '<line x1="16" y1="2" x2="16" y2="30" stroke="black" stroke-width="3"/>' +
+    '<line x1="2" y1="16" x2="30" y2="16" stroke="black" stroke-width="3"/>' +
+    '<line x1="16" y1="2" x2="16" y2="30" stroke="white" stroke-width="1.5"/>' +
+    '<line x1="2" y1="16" x2="30" y2="16" stroke="white" stroke-width="1.5"/>' +
+    '</svg>')}") 16 16, crosshair`;
+
   // Risolve con { dataUrl, rect } — ritaglio PNG e rettangolo in pixel CSS — o null se
   // l'utente annulla. Gli errori escono come reject, non loggati.
   async function selectScreenRegion() {
@@ -1865,17 +1874,7 @@
     });
 
     return new Promise((resolve) => {
-      // Crosshair disegnato da noi: quello di sistema su sfondo variabile può risultare
-      // invisibile sopra la maschera semitrasparente. Hotspot al centro (16,16).
-      const crosshairSvg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">` +
-        `<line x1="16" y1="2" x2="16" y2="30" stroke="black" stroke-width="3"/>` +
-        `<line x1="2" y1="16" x2="30" y2="16" stroke="black" stroke-width="3"/>` +
-        `<line x1="16" y1="2" x2="16" y2="30" stroke="white" stroke-width="1.5"/>` +
-        `<line x1="2" y1="16" x2="30" y2="16" stroke="white" stroke-width="1.5"/>` +
-        `</svg>`;
-      const cursorRule = `url("data:image/svg+xml;utf8,${encodeURIComponent(crosshairSvg)}") 16 16, crosshair`;
-
+      const cursorRule = CURSORE_MIRINO;
       const overlay = document.createElement('div');
       overlay.className = 'sn-region-overlay';
       global.SN_FILO_UI?.mark(overlay);
@@ -2088,34 +2087,168 @@
   // ------------------------------------------------------------
   // Color picker + QR code
   // ------------------------------------------------------------
-  // Color picker stile PowerToys: usa la EyeDropper API nativa di Chrome. Al
-  // click sull'icona il cursore cambia (gestito dal browser/SO) e la prossima
-  // pressione del tasto sinistro su un pixel qualsiasi della pagina copia il
-  // colore in formato hex nella clipboard. Esc annulla.
-  // `scelto`: il colore l'ha già preso la barra laterale, che ha il gesto dell'utente e la pagina no (#1246).
-  async function pickColor(scelto) {
-    const giaScelto = typeof scelto === 'string' && /^#[0-9a-f]{6}$/i.test(scelto);
-    if (!giaScelto && typeof window.EyeDropper !== 'function') {
-      Popup.toastErrore('err_color_picker_unsupported', { duration: 3000 });
-      return;
-    }
+  // Il contagocce di sistema (EyeDropper) in Electron non c'è: risponde subito «annullato» (#2651). Si sceglie sulla foto
+  // della pagina, ferma sotto il puntatore, con una lente sui pixel. Esc o il tasto destro rinunciano senza dire niente.
+  let contagocceAperto = false;
+  let contagocceSotto = null;
+  // Il tasto destro sul contagocce rinuncia e basta: sulle pagine web il menu di Filo lo vede per primo (#2651).
+  function tastoDestroSulContagocce(e) {
+    const o = contagocceSotto;
+    if (!o || !e || !(e.target === o || (e.composedPath?.() || []).includes(o))) return false;
+    e.preventDefault();
+    o._snRinuncia?.();
+    return true;
+  }
+
+  async function pickColor() {
+    if (contagocceAperto) return;
+    contagocceAperto = true;
     try {
-      const result = giaScelto ? { sRGBHex: scelto } : await new window.EyeDropper().open();
-      const hex = (result?.sRGBHex || '').toUpperCase();
+      const foto = await fotoDaCampionare();
+      if (!foto) { Popup.toastErrore('err_color_picker_failed', { duration: 3000 }); return; }
+      const hex = await scegliColore(foto);
       if (!hex) return;
-      try {
-        await navigator.clipboard.writeText(hex);
-      } catch (_) {
-        const ta = document.createElement('textarea');
-        ta.value = hex;
-        ta.style.position = 'fixed'; ta.style.left = '-9999px';
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); } catch (_) {}
-        ta.remove();
-      }
-      Popup.showToast(I18n.t('toast_color_copied') + hex, { duration: 2500 });
-    } catch (_) {
+      if (await scriviNegliAppunti(hex)) Popup.showToast(I18n.t('toast_color_copied') + hex, { duration: 2500 });
+      else Popup.toastErrore('err_color_not_copied', { duration: 4000 }, hex);
+    } finally {
+      contagocceAperto = false;
     }
+  }
+
+  // La foto piena della pagina in un canvas a pixel del dispositivo, o null. Decodificata qui e non come <img>: la
+  // politica dei contenuti del sito può vietare le immagini data:.
+  async function fotoDaCampionare() {
+    try {
+      await attendiCompositor();
+      const cap = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+      const dataUrl = cap && cap.ok ? String(cap.dataUrl || '') : '';
+      if (!dataUrl.startsWith('data:image/')) return null;
+      const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+      const bmp = await createImageBitmap(new Blob([byte], { type: 'image/png' }));
+      if (!bmp.width || !bmp.height) return null;
+      const canvas = document.createElement('canvas');
+      canvas.width = bmp.width; canvas.height = bmp.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(bmp, 0, 0);
+      bmp.close?.();
+      return { canvas, ctx };
+    } catch (_) { return null; }
+  }
+
+  const esa = (n) => n.toString(16).padStart(2, '0');
+
+  // Risolve con il colore '#RRGGBB' scelto, o '' se l'utente rinuncia. Le frecce spostano di un pixel (Maiusc: dieci),
+  // Invio prende quello sotto la lente.
+  function scegliColore({ canvas, ctx }) {
+    const LATO = 11, CELLA = 11;
+    const sx = canvas.width / Math.max(1, window.innerWidth), sy = canvas.height / Math.max(1, window.innerHeight);
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'sn-color-overlay';
+      global.SN_FILO_UI?.mark(overlay);
+      overlay.tabIndex = -1;
+      Object.assign(overlay.style, {
+        position: 'fixed', inset: '0', zIndex: '2147483647', cursor: CURSORE_MIRINO, userSelect: 'none', outline: 'none',
+      });
+      // La foto ferma copre la pagina: si sceglie su quello che si vede, anche se sotto un video va avanti. Sta in uno
+      // strato chiuso: ha anche i pixel dei riquadri d'altra origine, che lo script del sito non deve poter leggere.
+      const strato = global.SN_FILO_UI ? global.SN_FILO_UI.ombra(overlay, { riquadro: false }) : overlay.attachShadow({ mode: 'closed' });
+      Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', cursor: CURSORE_MIRINO });
+      strato.appendChild(canvas);
+
+      const lente = document.createElement('div');
+      Object.assign(lente.style, {
+        position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+        pointerEvents: 'none', left: '0', top: '0',
+      });
+      const vetro = document.createElement('canvas');
+      vetro.width = vetro.height = LATO * CELLA;
+      Object.assign(vetro.style, {
+        width: LATO * CELLA + 'px', height: LATO * CELLA + 'px', borderRadius: '50%',
+        border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.5), 0 4px 14px rgba(0,0,0,0.35)', imageRendering: 'pixelated',
+      });
+      const vctx = vetro.getContext('2d');
+      vctx.imageSmoothingEnabled = false;
+      const codice = document.createElement('div');
+      Object.assign(codice.style, {
+        background: 'rgba(0,0,0,0.75)', color: '#fff', font: '12px/1.4 ui-monospace, Consolas, monospace',
+        padding: '4px 8px', borderRadius: '6px',
+      });
+      lente.append(vetro, codice);
+      strato.appendChild(lente);
+
+      const ultimo = deps.getLastMouseEvent?.() || {};
+      let px = Math.floor((Number(ultimo.clientX) || window.innerWidth / 2) * sx);
+      let py = Math.floor((Number(ultimo.clientY) || window.innerHeight / 2) * sy);
+      let hex = '';
+
+      function ridisegna() {
+        px = Math.min(canvas.width - 1, Math.max(0, px));
+        py = Math.min(canvas.height - 1, Math.max(0, py));
+        const [r, g, b] = ctx.getImageData(px, py, 1, 1).data;
+        hex = ('#' + esa(r) + esa(g) + esa(b)).toUpperCase();
+        const meta = (LATO - 1) / 2;
+        vctx.fillStyle = '#000';
+        vctx.fillRect(0, 0, vetro.width, vetro.height);
+        vctx.drawImage(canvas, px - meta, py - meta, LATO, LATO, 0, 0, LATO * CELLA, LATO * CELLA);
+        vctx.lineWidth = 2; vctx.strokeStyle = '#000';
+        vctx.strokeRect(meta * CELLA - 1, meta * CELLA - 1, CELLA + 2, CELLA + 2);
+        vctx.lineWidth = 1; vctx.strokeStyle = '#fff';
+        vctx.strokeRect(meta * CELLA + 0.5, meta * CELLA + 0.5, CELLA - 1, CELLA - 1);
+        codice.textContent = hex;
+        // In basso a destra del punto; dove non ci sta, dall'altra parte.
+        const x = px / sx, y = py / sy, w = lente.offsetWidth || LATO * CELLA, h = lente.offsetHeight || LATO * CELLA + 30;
+        const left = x + 20 + w > window.innerWidth ? x - 20 - w : x + 20;
+        const top = y + 20 + h > window.innerHeight ? y - 20 - h : y + 20;
+        lente.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, top)}px)`;
+      }
+
+      function chiudi(scelto) {
+        overlay.remove();
+        window.removeEventListener('keydown', suTasto, true);
+        window.removeEventListener('resize', rinuncia, true);
+        document.removeEventListener('visibilitychange', suVisibilita, true);
+        if (contagocceSotto === overlay) contagocceSotto = null;
+        resolve(scelto);
+      }
+      const rinuncia = () => chiudi('');
+      const suVisibilita = () => { if (document.visibilityState !== 'visible') rinuncia(); };
+      const FRECCE = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      function suTasto(e) {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); rinuncia(); return; }
+        if (e.key === 'Enter' && gestoVero(e)) { e.preventDefault(); e.stopPropagation(); ridisegna(); chiudi(hex); return; }
+        const f = FRECCE[e.key];
+        if (!f || !gestoVero(e)) return;
+        e.preventDefault(); e.stopPropagation();
+        const passo = e.shiftKey ? 10 : 1;
+        px += f[0] * passo; py += f[1] * passo;
+        ridisegna();
+      }
+
+      overlay.addEventListener('pointermove', (e) => {
+        if (!gestoVero(e)) return;
+        px = Math.floor(e.clientX * sx); py = Math.floor(e.clientY * sy);
+        ridisegna();
+      });
+      // Il colore va negli appunti: lo sceglie solo il mouse dell'utente.
+      overlay.addEventListener('mousedown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (e.button !== 0 || !gestoVero(e)) return;
+        px = Math.floor(e.clientX * sx); py = Math.floor(e.clientY * sy);
+        ridisegna();
+        chiudi(hex);
+      });
+      overlay.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); rinuncia(); });
+      overlay._snRinuncia = rinuncia;
+      contagocceSotto = overlay;
+      window.addEventListener('keydown', suTasto, true);
+      window.addEventListener('resize', rinuncia, true);
+      document.addEventListener('visibilitychange', suVisibilita, true);
+
+      document.documentElement.appendChild(overlay);
+      ridisegna();
+      try { overlay.focus({ preventScroll: true }); } catch (_) {}
+    });
   }
 
   // La codifica del QR è locale (src/shared/qr.js): l'URL non va mai a servizi esterni.
@@ -2381,6 +2514,7 @@
     transcribeRegion,
     transcribeImage,
     pickColor,
+    tastoDestroSulContagocce,
     showPageQrCode,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -169,17 +169,6 @@
     }
   }
 
-  // Il contagocce vuole il gesto dell'utente, e la pagina non l'ha avuto: lo apre la barra, dove il clic c'è stato, e alla
-  // pagina va solo il colore. Rinunciare (Esc) non fa niente; senza contagocce decide la pagina, che lo dice.
-  function contagocce(id, daAltro) {
-    let aperto;
-    try { aperto = new window.EyeDropper().open(); } catch (_) { api.azione({ id, daAltro }); return; }
-    aperto.then((r) => {
-      const colore = String((r && r.sRGBHex) || '');
-      if (/^#[0-9a-f]{6}$/i.test(colore)) api.azione({ id, colore, daAltro });
-    }, (err) => { if (!err || err.name !== 'AbortError') api.azione({ id, daAltro }); });
-  }
-
   function bottoneIcona(it, animaNuove, prima) {
     const b = bottone(it.riserva ? 'ico riserva' : 'ico');
     aggiornaIcona(b, it);
@@ -187,9 +176,7 @@
     b.addEventListener('click', (e) => {
       if (!e.isTrusted || b.getAttribute('aria-disabled') === 'true') return;
       // Scelta dentro «Altro…»: i contatori la tengono a parte (#1471).
-      const daAltro = b.classList.contains('riserva');
-      if (it.id === 'colorPicker' && typeof window.EyeDropper === 'function') contagocce(it.id, daAltro);
-      else api.azione({ id: it.id, daAltro });
+      api.azione({ id: it.id, daAltro: b.classList.contains('riserva') });
     });
     b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
