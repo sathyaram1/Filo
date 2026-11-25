@@ -1254,6 +1254,7 @@
 
   // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
   async function onContextMenu(e, opzioni) {
+    if (Actions.tastoDestroSulContagocce?.(e)) return;
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch); Shift+F10 è la tastiera che chiede il nostro.
     if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) {
       if (e.isTrusted) Popup.conta({ misura: 'menu-nativo', voce: 'shift_tasto_destro' });
