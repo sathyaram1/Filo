@@ -48,11 +48,10 @@ test('le frecce spostano di un pixel o di dieci con Maiusc, Invio prende', async
   await scrivi(app, 'prima');
   await apriContagocce(app, page);
   await page.mouse.move(195, 100, { steps: 3 });
-  const dpr = await page.evaluate(() => window.devicePixelRatio || 1);
-  // Quattro pixel del dispositivo a destra restano nel verde; altri dieci con Maiusc passano nell'arancio.
+  // Quattro pixel del dispositivo a destra restano nel verde (anche al 125%); due passi da dieci passano nell'arancio.
   for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Enter');
-  await expect.poll(() => appunti(app), { timeout: 8000 }).toBe(dpr >= 1.25 ? '#12AB34' : '#12AB34');
+  await expect.poll(() => appunti(app), { timeout: 8000 }).toBe('#12AB34');
 
   await apriContagocce(app, page);
   await page.mouse.move(195, 100, { steps: 3 });
