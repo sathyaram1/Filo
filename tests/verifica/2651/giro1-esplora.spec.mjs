@@ -60,6 +60,9 @@ for (const url of ['filo://options/options.html', 'filo://preferences/preference
     const page = await openTab(url);
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1500);
+    await page.mouse.move(50, 50);
+    await page.waitForTimeout(500);
+    const atteso = await pixelVero(app, url, 50, 50);
     const barra = await barraPage(app);
     await premiNellaBarra(app, 'colorPicker').catch((e) => console.log('premi', url, String(e).slice(0, 200)));
     const ico = barra.locator('#nav .ico[data-id="colorPicker"]');
