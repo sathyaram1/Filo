@@ -6,7 +6,7 @@
 const TETTO = 500;
 
 // Si riaprono le pagine web e i file del computer (#1905: tabs.js le riapre con la loro sessione).
-const web = (url) => /^(?:https?:\/\/|file:)/i.test(String(url || ''));
+const riapribile = (url) => /^(?:https?:\/\/|file:)/i.test(String(url || ''));
 
 // Una home senza niente dietro né davanti, riaperta, non ridà niente: Chrome fa lo stesso con la sua.
 function daRicordare(url, storia) {
