@@ -720,7 +720,7 @@
   }
 
   global.SN_RIGHE_ATTIVITA = {
-    riga: rigaAttivita, rigaArchivio, testoSegnalazione, pulito, FAILED_LABELS, etichettaFallita, etichettaNonFatta, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
+    riga: rigaAttivita, rigaArchivio, proveSenzaEffetto, testoSegnalazione, pulito, FAILED_LABELS, etichettaFallita, etichettaNonFatta, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
     rifiutataDallaRegola, sceltaContatori, sceltaAutonomia, testoRicercaDocumenti, testoRicercaSalvate, testoRinominati, testoEliminati,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
