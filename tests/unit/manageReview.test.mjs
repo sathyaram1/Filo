@@ -1566,6 +1566,20 @@ test('livelli L4: verde passa, rosso boccia (col tasto), ambra saltato, grigio n
   assert.match(niente.pannello.testo, /non ancora fatto/);
 });
 
+// #2627: il salto dell'owner tenuto dal server dopo un riallineamento a modifiche identiche dice su quale punta vale.
+test('livelli L4: il salto che vale dopo il riallineamento mostra la punta nuova accanto al commit letto', () => {
+  const letto = 'ab12'.repeat(10);
+  const nuova = 'cd34'.repeat(10);
+  const vale = (l4) => MR.livelloL4({ livelli: { l4 } }).pannello.righe.find((r) => r.etichetta === 'Vale anche su');
+  assert.deepEqual(vale({ esito: 'saltato', by: 'owner', sha: letto, valeSu: nuova }),
+    { etichetta: 'Vale anche su', valore: 'cd34cd34, stesse modifiche dopo il riallineamento' });
+  assert.equal(vale({ esito: 'saltato', by: 'owner', sha: letto, valeSu: '' }), undefined);
+  assert.equal(vale({ esito: 'saltato', by: 'owner', sha: letto, valeSu: letto }), undefined);
+  assert.equal(vale({ esito: 'saltato', by: 'owner', sha: letto, valeSu: '<b>x</b>' }), undefined);
+  // Un verdetto nuovo non eredita la punta di un salto vecchio.
+  assert.equal(vale({ esito: 'pass', sha: letto, valeSu: nuova }), undefined);
+});
+
 // ── L5: il cancello di fusione ────────────────────────────────────────────
 
 const RICHIESTA = {

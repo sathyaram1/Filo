@@ -1595,6 +1595,9 @@
     // Il commit che l'audit ha letto: il salto lo rimanda al server, che salta solo quello (#1502).
     const sha = /^[0-9a-f]{40}$/.test(String(l.sha || '')) ? String(l.sha) : '';
     if (sha) righe.push(riga('Commit esaminato', sha.slice(0, 8)));
+    // Il salto che il server ha tenuto dopo un riallineamento a modifiche identiche (#2627): la punta su cui vale adesso.
+    const valeSu = esito === 'saltato' && /^[0-9a-f]{40}$/.test(String(l.valeSu || '')) ? String(l.valeSu) : '';
+    if (valeSu && valeSu !== sha) righe.push(riga('Vale anche su', `${valeSu.slice(0, 8)}, stesse modifiche dopo il riallineamento`));
     if (l.by) righe.push(riga('Deciso da', l.by === 'owner' ? 'te' : String(l.by)));
     if (l.at) righe.push(riga('Quando', String(l.at)));
     const testo = String(l.testo || '').trim();
