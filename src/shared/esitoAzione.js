@@ -617,8 +617,9 @@
     const fumetto = S ? S.fumetto({ titolo: v.titoloSegnalazione, testo: v.segnalazione }, { ripiego: false }) : '';
     return fumetto ? { ...r, fumetto } : r;
   }
-  function rigaSenzaFumetto(v) {
-    if (!v || !v.type) return null;
+  function rigaSenzaFumetto(voce) {
+    if (!voce || !voce.type) return null;
+    const v = comeInDiretta(voce);
     const riga = pulito(v.riga);
     if (v.type === 'FERMATA') return { icona: '🔒', testo: riga || 'Fermata: avrebbe portato fuori un segreto', fallita: true };
     // La riga a pezzi, se il testo altrui c'è: chi disegna lo mette nel suo riquadro (#592.25).
