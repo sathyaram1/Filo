@@ -2169,16 +2169,12 @@
       });
       const vctx = vetro.getContext('2d');
       vctx.imageSmoothingEnabled = false;
-      const targa = document.createElement('div');
-      Object.assign(targa.style, {
-        display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', color: '#fff',
-        font: '12px/1.4 ui-monospace, Consolas, monospace', padding: '4px 8px', borderRadius: '6px',
+      const codice = document.createElement('div');
+      Object.assign(codice.style, {
+        background: 'rgba(0,0,0,0.75)', color: '#fff', font: '12px/1.4 ui-monospace, Consolas, monospace',
+        padding: '4px 8px', borderRadius: '6px',
       });
-      const campione = document.createElement('span');
-      Object.assign(campione.style, { width: '12px', height: '12px', borderRadius: '3px', border: '1px solid rgba(255,255,255,0.7)' });
-      const codice = document.createElement('span');
-      targa.append(campione, codice);
-      lente.append(vetro, targa);
+      lente.append(vetro, codice);
       strato.appendChild(lente);
 
       const ultimo = deps.getLastMouseEvent?.() || {};
