@@ -3068,13 +3068,14 @@
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
       // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
+      // Alt+T senza selezione è della pagina (#504): un riquadro lo passa a chi lo ospita, che decide, prima di guardare
+      // se Filo lì è spento (#504.7): il video di un sito spento va come gli altri riquadri.
+      if (IS_SUBFRAME && msg.command === 'translate-selection' && !Extract.getSelectionWithSentence()) {
+        openSurface('traduci', () => {});
+        sendResponse({ ok: true });
+        return;
+      }
       if (isBlocked()) {
-        // Alt+T senza selezione è della pagina (#504.7): un riquadro dove Filo è spento la passa a chi lo ospita, che decide.
-        if (IS_SUBFRAME && msg.command === 'translate-selection' && !Extract.getSelectionWithSentence()) {
-          openSurface('traduci', () => {});
-          sendResponse({ ok: true });
-          return;
-        }
         // La scorciatoia che qui tace, e perché (#1468): Filo spento sul sito, o una pagina dove Filo non c'è.
         Popup.conta({ misura: 'a-vuoto', comando: String(msg.command || ''), motivo: motivoBlocco() === 'sito' ? 'filo_spento_sul_sito' : 'pagina_interna' });
         return;
@@ -3131,8 +3132,7 @@
       else Popup.toastErrore('err_no_selection');
     } else if (command === 'translate-selection') {
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
-      // Senza selezione il tasto fa l'icona Traduci (#504), che è della pagina: da un riquadro o dallo strato la fa lei.
-      else if (IS_SUBFRAME) openSurface('traduci', () => {});
+      // Senza selezione il tasto fa l'icona Traduci (#504); da un riquadro non arriva qui, lo passa prima alla pagina.
       else traduciDalTasto();
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
