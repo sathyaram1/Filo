@@ -28,8 +28,9 @@ const CSP_DOCUMENTO = [
   'connect-src data: blob:',
   "form-action 'none'",
 ].join('; ');
-// Niente `sandbox` per un'origine opaca che sporchi la tela: in un'origine opaca Chromium non mostra le immagini file:
-// (provato in #1905), e la pagina resterebbe vuota. Quello che la tela legge resta qui perché la rete non c'è.
+// Il contenuto dei file accanto resta chiuso come in un browser (tela sporca, regole CSS chiuse, errori senza testo)
+// col fusibile dei privilegi file:// spento (scripts/lib/fusibili-electron.js), non con `sandbox`, che in Chromium non
+// mostra più le immagini file:. `nosniff`: un .txt o un .json non gira come script né si applica come stile.
 const RETE = ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'];
 
 const fileDi = (input) => globalThis.SN_URL_NAV.fileDiQuestoComputer(input);
