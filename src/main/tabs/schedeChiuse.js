@@ -5,7 +5,8 @@
 // Le più vecchie oltre il tetto restano nell'archivio, e la discesa le ritrova nello stesso ordine.
 const TETTO = 500;
 
-const web = (url) => /^https?:\/\//i.test(String(url || ''));
+// Si riaprono le pagine web e i file del computer (#1905: tabs.js le riapre con la loro sessione).
+const web = (url) => /^(?:https?:\/\/|file:)/i.test(String(url || ''));
 
 // Una home senza niente dietro né davanti, riaperta, non ridà niente: Chrome fa lo stesso con la sua.
 function daRicordare(url, storia) {
