@@ -600,7 +600,7 @@ test('F7 — una mossa senza effetto salvata dalla versione di prima, riaperta, 
   // Un guasto vero resta l'avviso.
   expect(viste[3][0]).toBe('⚠');
   // Il nome della voce sta nel suo riquadro, come in diretta.
-  await expect(righe.nth(1).locator('.filo-citazione, [data-citazione], q, .dash-citazione').first()).toHaveText('YouTube');
+  await expect(righe.nth(1).locator('.dash-altrui')).toHaveText('YouTube');
 });
 
 // La spunta sotto un appunto salvato chiude la conversazione come il bottone della home, e lo dice.
