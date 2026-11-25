@@ -471,6 +471,24 @@ function ultimoSuono(tab) {
   return tab.audible && tab._suonaOra ? Date.now() : (tab.audioAt || 0);
 }
 
+// Fin dove l'utente aveva letto, o null se non si sa. Una scheda riaperta col riavvio tiene quella salvata finché lui
+// non la tocca: la pagina riparte dall'inizio, o non torna al punto se è cambiata (#349.1).
+function letturaNota(tab) {
+  if (!tab) return null;
+  if (typeof tab._letturaSalvata === 'number') return tab._letturaSalvata;
+  return typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null;
+}
+// Fin dove è arrivato il video o l'audio lungo della pagina, o null. Vale per la pagina su cui è stato misurato: quella
+// salvata con la sessione anche dopo un gesto, perché toccare la pagina senza far ripartire il video non lo azzera.
+function visioneNota(tab) {
+  if (!tab) return null;
+  if (typeof tab.mediaPct === 'number' && tab._mediaPer === tab.url) return tab.mediaPct;
+  return typeof tab._mediaSalvata === 'number' && tab._salvataPer === tab.url ? tab._mediaSalvata : null;
+}
+function letturaValida(v) {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : null;
+}
+
 // Una regola sola per «suona adesso»: un lettore in corsa E il motore che lo sente, qualunque dei due arrivi per ultimo.
 // Dopo una pausa breve o un cambio di brano il motore non ridice «suona» (#1686): lo stato si ricalcola a ogni evento.
 function aggiornaSuono(tab) {
@@ -1564,7 +1582,7 @@ class TabManager {
           ...(giro ? { giro } : {}),
           ...(ultimoSuono(tab) > 0 ? { audioAt: new Date(ultimoSuono(tab)).toISOString() } : {}),
           coOpenUrls,
-          scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
+          scrollPosition: letturaNota(tab),
           // La location si salva, o riaprendo dall'archivio la scheda
           // rinascerebbe diretta invece che dal paese scelto.
           proxy: tab.proxy && tab.proxy.country
@@ -1602,7 +1620,7 @@ class TabManager {
       indice: this.tabs.indexOf(tab),
       storia,
       zoom,
-      scroll: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
+      scroll: letturaNota(tab),
       proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
       colore: tab.identityColor || null,
       ...(ultimoSuono(tab) > 0 ? { audioAt: ultimoSuono(tab), titolo: tab.title || '' } : {}),
@@ -2201,7 +2219,8 @@ class TabManager {
         ageMin: minutiDa(Date.parse(t.openedAt)),
         // Mai toccata da quando c'è: inattiva da quando è arrivata la sua pagina (#1618).
         idleMin: minutiDa(t.lastInteractionAt || Date.parse(t.paginaDal) || Date.parse(t.openedAt)),
-        scrollPct: typeof t.scrollPct === 'number' && !t._scrollIgnoto ? t.scrollPct : null,
+        scrollPct: letturaNota(t),
+        mediaPct: visioneNota(t),
         formDirty: !!t.formDirty,
         audible: !!t.audible,
         coOpenUrls: this.tabs
@@ -2378,7 +2397,7 @@ class TabManager {
           voce,
           riserva: {
             url: tab.url,
-            scroll: typeof tab.scrollPct === 'number' && !tab._scrollIgnoto ? tab.scrollPct : null,
+            scroll: letturaNota(tab),
             proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
             colore: tab.identityColor || null,
           },
@@ -2558,9 +2577,9 @@ class TabManager {
     let zoomLevel = null;
     try { zoomLevel = tab.view.webContents.getZoomLevel(); } catch (_) {}
     // Si chiede la posizione ESATTA alla pagina: il valore già tracciato è
-    // arrotondato, e serve solo come ripiego se non risponde.
-    let scrollPct = typeof tab.scrollPct === 'number' ? tab.scrollPct : null;
-    try {
+    // arrotondato, e serve solo come ripiego se non risponde. Una scheda della sessione non ancora caricata non ha pagina.
+    let scrollPct = letturaNota(tab);
+    if (!tab._rinviata) try {
       const exact = await tab.view.webContents.executeJavaScript(
         '(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;return max>0?Math.max(0,Math.min(100,(window.scrollY||d.scrollTop||0)/max*100)):0;}catch(e){return null;}})()',
         false,
@@ -2721,8 +2740,11 @@ class TabManager {
       tab.lastInteractionAt = Math.min(activity.lastInteractionAt, adesso);
       this._lastAppInteractionAt = adesso;
       tab._scrollIgnoto = false;
+      tab._letturaSalvata = null;
     }
     if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
+    const visto = letturaValida(activity.mediaPct);
+    if (visto != null) { tab.mediaPct = visto; tab._mediaPer = tab.url; }
     if (typeof activity.formDirty === 'boolean') {
       // Una voce per frame: il «niente» della pagina non cancella il testo di un riquadro.
       if (!tab._moduli) tab._moduli = new Set();
@@ -4913,9 +4935,13 @@ class TabManager {
     const ids = kept.map((t) => t.id);
     // Quando ha suonato l'ultima volta, al minuto come `usate`: dopo un riavvio «rimettimi la musica» la ritrova (#1397).
     const audio = kept.map((t) => (ultimoSuono(t) > 0 ? new Date(Math.floor(ultimoSuono(t) / 60_000) * 60_000).toISOString() : null));
+    // Fin dove era arrivata la lettura: la pulizia alla riapertura distingue l'articolo a metà, e la pagina riparte da lì.
+    // Lo 0 non si scrive: «scroll 0%» direbbe al riordino «letta in parte», e terrebbe la pagina mai cominciata.
+    const letture = kept.map((t) => letturaValida(letturaNota(t)) || null);
+    const visioni = kept.map((t) => letturaValida(visioneNota(t)) || null);
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, aperte, pagine, usate, ids, audio, activeIndex };
+    return { tabs, colors, aperte, pagine, usate, ids, audio, letture, visioni, activeIndex };
   }
 
   _sessionKey() {
@@ -4982,6 +5008,8 @@ class TabManager {
     const usate = [];
     const audio = [];
     const ids = [];
+    const letture = [];
+    const visioni = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
@@ -4994,6 +5022,8 @@ class TabManager {
         const savedUsate = Array.isArray(saved.usate) ? saved.usate : [];
         const savedAudio = Array.isArray(saved.audio) ? saved.audio : [];
         const savedIds = Array.isArray(saved.ids) ? saved.ids : [];
+        const savedLetture = Array.isArray(saved.letture) ? saved.letture : [];
+        const savedVisioni = Array.isArray(saved.visioni) ? saved.visioni : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
             urls.push(u);
@@ -5003,6 +5033,8 @@ class TabManager {
             usate.push(aperturaValida(savedUsate[i]));
             audio.push(aperturaValida(savedAudio[i]));
             ids.push(idRimettibile(savedIds[i]));
+            letture.push(letturaValida(savedLetture[i]) || null);
+            visioni.push(letturaValida(savedVisioni[i]) || null);
           }
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
@@ -5027,7 +5059,7 @@ class TabManager {
         // Una scheda su un sito della lista torna sulla pagina «Sito bloccato»:
         // non sparisce dalla sessione e il sito non si riapre da solo (#590).
         // Un file del computer nella sessione salvata l'aveva aperto l'utente: torna com'era.
-        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i], fileDelComputer: true });
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true, origine: { tipo: 'filo' }, idRimessa: ids[i], fileDelComputer: true, restoreScrollPct: letture[i] });
         const nata = id ? this.tabs.find((t) => t.id === id) : null;
         if (!nata) return null;
         Strade.misura('pagina', url, 'sessione_ripristinata', { incognito: this.incognito });
@@ -5040,8 +5072,11 @@ class TabManager {
         if (aperte[i]) nata.openedAt = aperte[i];
         if (usate[i]) nata.lastInteractionAt = Date.parse(usate[i]);
         if (audio[i]) nata.audioAt = Date.parse(audio[i]);
-        // Riaperta parte dall'inizio della pagina: «scroll 0%» direbbe al riordino «letta a metà», e la terrebbe.
+        // Lo scroll che la pagina ricaricata manda prima di tornare al punto non è la lettura: vale quella salvata.
         nata._scrollIgnoto = true;
+        nata._letturaSalvata = letture[i];
+        nata._mediaSalvata = visioni[i];
+        nata._salvataPer = url;
         nata._dallaSessione = true;
         nata.paginaDal = pagine[i] || null;
         nate.push(nata);

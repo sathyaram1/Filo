@@ -452,6 +452,35 @@
       lastSentScroll = Math.round(scrollPct());
       send({ scrollPct: lastSentScroll }, false);
     }, 600);
+
+    // Fin dove è arrivato il video (o l'audio) più lungo della pagina: lo scroll di una pagina video non dice se è
+    // stato visto a metà (#349.1). Sotto il minuto è un'anteprima o una pubblicità.
+    const MEDIA_MIN_S = 60;
+    const MEDIA_OGNI_MS = 5000;
+    let lastSentMedia = -1;
+    let ultimoMedia = -Infinity;
+    function mediaPct() {
+      let lungo = null;
+      for (const m of document.querySelectorAll('video, audio')) {
+        if (Number.isFinite(m.duration) && m.duration >= MEDIA_MIN_S && (!lungo || m.duration > lungo.duration)) lungo = m;
+      }
+      return lungo && lungo.currentTime > 0 ? Math.max(0, Math.min(100, (lungo.currentTime / lungo.duration) * 100)) : null;
+    }
+    function onMedia(e) {
+      const ora = performance.now();
+      if (e.type === 'timeupdate' && ora - ultimoMedia < MEDIA_OGNI_MS) return;
+      ultimoMedia = ora;
+      const p = mediaPct();
+      if (p == null) return;
+      const pct = Math.round(p);
+      if (pct === lastSentMedia) return;
+      lastSentMedia = pct;
+      send({ mediaPct: pct }, false);
+    }
+    // Gli eventi dei media non risalgono: si prendono in cattura.
+    for (const tipo of ['timeupdate', 'pause', 'seeked', 'ended']) {
+      window.addEventListener(tipo, onMedia, { passive: true, capture: true });
+    }
   }
 
   // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la scheda
