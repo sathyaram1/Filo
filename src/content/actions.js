@@ -2519,6 +2519,7 @@
     transcribeRegion,
     transcribeImage,
     pickColor,
+    tastoDestroSulContagocce,
     showPageQrCode,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
