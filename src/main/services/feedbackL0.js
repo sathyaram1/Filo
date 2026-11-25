@@ -108,13 +108,15 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
       const [st, tx, im] = await Promise.all(parti);
       clearTimeout(timer);
       if (tx === 'scaduto' || im === 'scaduto') log.warn('[Filo L0] nessuna risposta entro', entroMs, 'ms: vale quello che è arrivato');
-      const trovati = L().senzaConfermati([...st, ...(Array.isArray(tx) ? tx : []), ...(Array.isArray(im) ? im : [])], t, confermati);
+      if (!st) log.warn('[Filo L0] il controllo senza modello non ha risposto: gli allegati di testo partono senza');
+      const trovati = L().senzaConfermati([...(st || []), ...(Array.isArray(tx) ? tx : []), ...(Array.isArray(im) ? im : [])], t, confermati);
       if (trovati.length) {
         let rt = false;
         try { rt = !!redTeam(); } catch (_) {}
         return { stato: 'trovato', esito: L().esito(trovati, { redTeam: rt }) };
       }
-      const nienteRiletto = (t.trim() && !Array.isArray(tx)) || (imm.length && !Array.isArray(im));
+      const nienteRiletto = (t.trim() && !Array.isArray(tx)) || (imm.length && !Array.isArray(im))
+        || (!st && testiAllegati.some((a) => a != null));
       return { stato: nienteRiletto ? 'saltato' : 'pulito' };
     } catch (e) {
       log.warn('[Filo L0] guasto, il feedback parte senza:', dettaglio(e));
