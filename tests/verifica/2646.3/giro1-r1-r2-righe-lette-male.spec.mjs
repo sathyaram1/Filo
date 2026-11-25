@@ -45,6 +45,12 @@ for (const [nome, riga] of [
   });
 }
 
-test('r2 elenco utente:password:host:porta: la password da sola è fra i custoditi', () => {
-  expect(controlla(`mario:${PASSWORD}:gate.fornitore.example:7000`)).toEqual(ATTESO);
-});
+for (const [nome, riga] of [
+  ['elenco utente:password:host:porta', `mario:${PASSWORD}:gate.fornitore.example:7000`],
+  ['IPv6 senza quadre dopo la @', `mario:${PASSWORD}@2001:db8::1:8080`],
+  ['elenco separato da spazi', `gate.fornitore.example 7000 mario ${PASSWORD}`],
+]) {
+  test(`r2 ${nome}: la password da sola è fra i custoditi`, () => {
+    expect(controlla(riga)).toEqual(ATTESO);
+  });
+}
