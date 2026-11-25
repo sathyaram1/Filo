@@ -358,11 +358,21 @@ module.exports = function register(on, ctx) {
       mode: String(msg?.mode || 'translate'),
       runId: String(msg?.runId || ''),
     };
+    // #2656 — il riquadro di un sito dove l'utente ha spento Filo non si traduce: lo decide il main dall'indirizzo vero
+    // del riquadro, che il riquadro non sceglie. Riceve lo stesso la parola, per rispondere al conto e dire perché.
+    let elenco = [];
+    if (payload.mode !== 'restore') {
+      try { elenco = ((await globalThis.SN_STORAGE.getSettings()).blocklist || []).filter((x) => typeof x === 'string'); } catch (_) {}
+    }
+    const spento = (f) => {
+      if (!elenco.length) return false;
+      try { return vociCheSpengono(elenco, [f.url]).length > 0; } catch (_) { return false; }
+    };
     let frames = 0;
     try {
       for (const f of mainFrame.framesInSubtree || []) {
         if (f === mainFrame || f.detached) continue;
-        try { f.send('filo:broadcast', payload); frames++; } catch (_) {}
+        try { f.send('filo:broadcast', spento(f) ? { ...payload, spento: true } : payload); frames++; } catch (_) {}
       }
     } catch (e) {
       return { ok: false, error: e.message || String(e) };
