@@ -672,9 +672,9 @@ test('tornato alla finestra della domanda con un clic su OK mentre la finestrell
   expect(await finestrelle(app)).toEqual([true]);
   // Torna con un clic dritto su OK, dopo aver letto il testo finto.
   await mouseClickConfirm(vista, 'ok');
-  await expect.poll(() => finestrelle(app)).toEqual([false]);
   await new Promise((r) => setTimeout(r, 800));
-  expect(await nelMondoDiFilo(app, host, 'globalThis.__e')).toBe('attesa');
+  expect(await nelMondoDiFilo(app, host, 'globalThis.__e'), 'il clic letto sul testo finto non è un sì').toBe('attesa');
+  expect(await finestrelle(app)).toEqual([false]);
   // La domanda vera, adesso scoperta, si conferma come sempre.
   await aspettaConfermaPronta(vista);
   await mouseClickConfirm(vista, 'ok');
