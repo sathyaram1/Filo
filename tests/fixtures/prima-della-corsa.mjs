@@ -9,7 +9,7 @@ import { allineaPerLeProve } from '../../scripts/lib/pacchetti.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { chiudiLaCorsa, temporaneaDellaCorsa } from '../helpers/percorsi.mjs';
 
-const { motoreSenzaPrivilegi } = createRequire(import.meta.url)('../../scripts/lib/fusibili-electron.js');
+const { motoreSenzaPrivilegi, cartellaDelleCopie } = createRequire(import.meta.url)('../../scripts/lib/fusibili-electron.js');
 
 // Il motore si controlla prima di qualunque attesa: sul motore sbagliato si ferma subito, senza aver acceso niente.
 export default function primaDellaCorsa(config) {
