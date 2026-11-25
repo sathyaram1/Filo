@@ -923,7 +923,7 @@ class BarraLaterale {
     // Un gesto sull'interfaccia di Filo, come la voce di un menu: vale per gli appunti di Filo, non apre niente alla pagina.
     try { require('./services/permessiPagine').gestoDiFilo(t.view.webContents); } catch (_) {}
     const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
-    try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: c.iconId, daBarra: true, ...(c.colore ? { colore: c.colore } : {}) }); } catch (_) {}
+    try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: c.iconId, daBarra: true }); } catch (_) {}
   }
 
   // Col mouse la barra resta aperta: il secondo clic, senza spostarsi, detta. La pagina decide dal suo stato vero, e
