@@ -87,6 +87,32 @@ test('un no alla domanda resta nell\'archivio coi suoi pezzi', () => {
   assert.doesNotMatch(paroleDiFilo(v.parti), /confermalo/);
 });
 
+// La chat riaperta disegna i riquadri solo se i pezzi dicono la riga piatta salvata: le due pulizie sono una (#2647.1).
+test('pezzi con spazi, caratteri di controllo e riquadri vuoti tornano a pezzi dalla chat riaperta', () => {
+  const casi = [
+    ['Avviare il timer ', { citazione: '  x\u0000y  ' }, ' adesso:'],
+    ['Avviare ', { citazione: '   ' }, ' il timer ', { citazione: 'a\tb' }],
+    ['  Avviare  ', { citazione: 'b', nuda: true }, '  il ﻿ timer\r ', { citazione: '«c»' }],
+    [{ citazione: '\u0007inizio' }, '  fine\u007f  '],
+    ['Avviare il timer\t', { citazione: 'prima\nseconda' }, ' dopo'],
+  ];
+  for (const parti of casi) {
+    const a = { type: 'TIMER', secondi: 60, _confirm: { level: 2, text: E.piatto(parti), parti }, _executed: false };
+    for (const x of [a, { ...a, _rifiutata: true }]) {
+      const v = E.voceArchivio(JSON.parse(JSON.stringify(E.voceArchivio(x))));
+      assert.ok(v.parti, `${JSON.stringify(parti)} → ${JSON.stringify(v)}`);
+      assert.equal(E.rigaDiParti(v.parti), v.riga);
+      const riga = E.rigaDellaVoce(v);
+      assert.ok(riga.parti, JSON.stringify(riga));
+      assert.doesNotMatch(E.rigaDiParti(riga.parti), / {2}/);
+    }
+  }
+  // Un filtro dei caratteri scritto due volte torna a dividere le due righe: sta in un posto solo.
+  const fonte = readFileSync(join(SRC, 'shared', 'esitoAzione.js'), 'utf8');
+  assert.equal(fonte.match(/\\u0000-\\u001f\\u007f\]\/g/g).length, 1);
+  assert.match(fonte, /function pulito\(v\) \{\s*return inUnaRiga\(v\)\.trim\(\);\s*\}/);
+});
+
 test('l\'avviso del sito pericoloso mette il nome del file scelto dal sito nel suo riquadro', () => {
   const { buildMessage } = require(join(SRC, 'main', 'services', 'safebrowse', 'engine.js'));
   const { normalize } = require(join(SRC, 'main', 'services', 'safebrowse', 'normalize.js'));
