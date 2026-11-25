@@ -632,7 +632,8 @@ test('una finestrella di un’altra finestra spostata sopra il testo della doman
   await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
   const vista = await confermaSopraPagina(app);
   const area = await areaDomanda(app);
-  const accanto = { x: area.x + area.width + 200, y: area.y + 300 };
+  // Dalla parte dello schermo dove la domanda non c'è (le due finestre di Filo stanno affiancate).
+  const accanto = { x: area.x >= 640 ? 100 : area.x + area.width + 100, y: area.y + 300 };
   await finestrellaIn(incognito, finto, accanto, () => tastoSullaDomanda(vista));
   await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
   await new Promise((r) => setTimeout(r, 800));
