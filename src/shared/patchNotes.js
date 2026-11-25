@@ -14,6 +14,7 @@
         { testo: 'Una finestra in incognito non apre più l\'intervista di benvenuto: la chat ti risponde subito, anche se l\'intervista non l\'hai ancora fatta.', segnalazione: 2650 },
         { testo: 'Se Filo risponde coi suoi crediti perché OpenRouter ha rifiutato la tua chiave, e la risposta arriva in una scheda che non stai guardando, un avviso te lo dice nella pagina che hai davanti. Se torni prima sulla scheda della risposta, basta la riga sotto la risposta e l\'avviso non si ripete.', segnalazione: 662 },
         { testo: 'Quando un sito chiude da sé la finestra che aveva aperto su un altro sito, come quella di un pagamento o di una chat, se ne va anche la sua scheda, senza lasciarne una vuota.', segnalazione: 2659 },
+        { testo: 'Traducendo la pagina, il testo dei riquadri che vengono da un sito dove hai spento Filo resta com\'è, come i commenti o un video incorporato, e l\'avviso finale dice quale sito ha lasciato fuori.', segnalazione: 2656 },
       ],
     },
     {
