@@ -289,7 +289,8 @@ test('#2648.1 un\'impostazione chiesta di nuovo uguale dice «Già così» col v
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Cambiato.' }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
     await chiedi(page, 'rimettilo uguale');
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 15_000 });
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' }).first()).toBeVisible({ timeout: 15_000 });
     const gia = page.locator('.dash-activity-row', { hasText: 'Già così' });
     await expect(gia).toBeAttached({ timeout: 8_000 });
     await soloNelRiquadro(gia, 'già così');
