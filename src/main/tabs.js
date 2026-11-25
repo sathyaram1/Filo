@@ -1561,7 +1561,10 @@ class TabManager {
       if (!Archive) return;
       const url = tab.url || '';
       if (!url || tab.isInternal || url.startsWith('filo://')) return;
-      if (!/^https?:\/\//i.test(url)) return;
+      // Un file del computer si archivia per tornare (Ctrl+Shift+T dopo un riavvio, «riaprimi il report»), ma il suo
+      // contenuto non va al modello che arricchisce l'archivio: lo legge solo chi lo chiede.
+      const file = FileDelComputer.inSessioneDiFile(tab.view && tab.view.webContents) && /^file:/i.test(url);
+      if (!file && !/^https?:\/\//i.test(url)) return;
       const coOpenUrls = this.tabs
         .filter((t) => t.id !== tab.id && t.url && /^https?:\/\//i.test(t.url))
         .map((t) => t.url);
