@@ -56,6 +56,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const SUFFISSO = '-bin';
+exports.SUFFISSO = SUFFISSO;
 
 // `exec -a` tiene il nome originale come nome del processo: senza, la finestra
 // si presenterebbe al sistema come «Filo-bin» e non si aggancerebbe più alla
