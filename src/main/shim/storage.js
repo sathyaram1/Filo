@@ -671,6 +671,7 @@ async function get(keysOrNull) {
         const v = dalDiscoInIncognito(k);
         if (v !== undefined) out[k] = v;
       }
+      for (const k of Object.keys(INCOGNITO_SEGNI)) if (!(k in out) && !INCOGNITO.tombstones.has(k)) out[k] = dalDiscoInIncognito(k);
       for (const k of Object.keys(INCOGNITO.data)) out[k] = INCOGNITO.data[k];
     }
     for (const k of STATE.osservate) if (k in out) out[k] = staccata(k, out[k]);
