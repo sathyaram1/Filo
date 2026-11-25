@@ -433,7 +433,7 @@
     ACCOUNT: (a) => {
       const o = a._output || {};
       // Chi era già dove chiedeva non ha avuto niente di nuovo: la riga lo dice e resta fuori dal riassunto.
-      const gia = { dentro: 'Eri già dentro Filo', collegato: 'YouTube, Gmail e Drive erano già collegati', fuori: 'Non eri dentro nessun account' }[o.gia];
+      const gia = Object.hasOwn(GIA_ACCOUNT, o.gia) ? GIA_ACCOUNT[o.gia] : '';
       if (gia) return { icon: '👤', text: gia, failed: true };
       const fatto = { accedi: 'Accesso con Google aperto', collega_google: 'Collegamento di YouTube, Gmail e Drive aperto', esci: 'Uscito dall\'account di Filo' }[o.voce];
       return { icon: '👤', text: fatto || 'Account' };
