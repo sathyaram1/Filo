@@ -396,6 +396,23 @@
     inputForm,
     iconaDelSito: (url) => iconaDelSito(url),
   });
+  // La riga del ripiego conta come detta solo con la home davanti (#662.2): arrivata con la home dietro, si ridice
+  // quando la home torna davanti, e l'avviso in attesa non la ripete più.
+  let rigaRipiegoDietro = null;
+  function diciRigaRipiego(note) {
+    let fuoco = false;
+    try { fuoco = document.hasFocus(); } catch (_) {}
+    send({ type: MSG.KEY_FALLBACK_SHOWN, fuoco }).then((r) => {
+      rigaRipiegoDietro = r && r.detto === false ? note : null;
+    }).catch(() => {});
+  }
+  function ridiciRigaRipiego() {
+    const note = rigaRipiegoDietro;
+    if (note && note.isConnected && document.visibilityState === 'visible') diciRigaRipiego(note);
+  }
+  window.addEventListener('focus', ridiciRigaRipiego);
+  document.addEventListener('visibilitychange', ridiciRigaRipiego);
+
   // ===== Helpers messaggi =====
   function send(msg) {
     return new Promise((resolve) => {
