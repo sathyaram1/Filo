@@ -25,7 +25,7 @@ function wav(secondi = 120, hz = 8000) {
   return b;
 }
 const VIDEO = pagina('Video', `<p>Lezione registrata</p><audio id="a" controls preload="auto" src="/suono.wav"></audio>
-<script>const a=document.getElementById('a');a.addEventListener('loadedmetadata',()=>{if(!sessionStorage.fatto){sessionStorage.fatto='1';a.currentTime=a.duration/2;}});</script>`);
+<script>const a=document.getElementById('a');setTimeout(()=>{if(!sessionStorage.fatto&&a.duration){sessionStorage.fatto='1';a.currentTime=a.duration/2;}},2500);</script>`);
 
 async function ambiente() {
   const pagine = new Map();
