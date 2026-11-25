@@ -300,6 +300,7 @@ test('#2648.1 dopo un OK finito male il bottone dice il perché col testo del mo
     await bottone.scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-bottone-fallito.png' });
   } finally {
+    await app.evaluate(() => globalThis.__ripristinaPref && globalThis.__ripristinaPref());
     await ripristina(app);
   }
 });
