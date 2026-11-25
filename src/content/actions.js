@@ -2200,7 +2200,7 @@
 
       function chiudi(scelto) {
         overlay.remove();
-        document.removeEventListener('keydown', suTasto, true);
+        window.removeEventListener('keydown', suTasto, true);
         window.removeEventListener('resize', rinuncia, true);
         document.removeEventListener('visibilitychange', suVisibilita, true);
         resolve(scelto);
