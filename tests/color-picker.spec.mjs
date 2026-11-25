@@ -81,6 +81,20 @@ test('Esc e il tasto destro rinunciano senza toccare gli appunti', async ({ app,
   expect(await appunti(app)).toBe('prima');
 });
 
+test('dalla fila del tasto destro fa lo stesso della barra', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGINA);
+  await mettiNellaBarra(app, ['colorPicker'], 'fila:pagina');
+  await scrivi(app, 'prima');
+  await page.mouse.click(400, 300, { button: 'right' });
+  const menu = menuDi(page);
+  await menu.locator('.sn-menu-row [data-sn-icon-id="colorPicker"]').click();
+  const strato = page.locator('.sn-color-overlay');
+  await expect(strato).toBeVisible({ timeout: 8000 });
+  // La foto è presa a menu chiuso: sotto il punto dove stava c'è il colore della pagina.
+  await page.mouse.click(410, 310);
+  await expect.poll(() => appunti(app), { timeout: 8000 }).toBe('#E05A2B');
+});
+
 test('lo script del sito non raggiunge la foto della pagina', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
   await apriContagocce(app, page);
