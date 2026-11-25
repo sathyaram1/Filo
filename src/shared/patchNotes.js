@@ -14,6 +14,8 @@
         { testo: 'Una password scritta con un errore di battitura, come «la pasword è …», «la password e …» senza accento o «la password, che era vecchia, è …», non arriva più a nessun modello.', segnalazione: 2678 },
         { testo: 'Una password scritta sotto «Password:» come voce di un elenco, in una citazione o in un blocco di codice, come capita spesso negli appunti in Markdown, non arriva più a nessun modello, come quando sta da sola sulla riga.', segnalazione: 2673 },
         'Una pagina o un testo con lunghe file di spazi o di righe vuote non blocca più Filo per secondi prima di arrivare a un modello.',
+        { testo: 'Una pagina HTML aperta dal computer mostra le foto, gli stili e gli script che ha accanto ma, come in un browser, non ne legge il contenuto: non copia i pixel delle tue foto né il testo di un file di chiavi.', segnalazione: 1905 },
+        { testo: '«Duplica» sulla scheda di un file del computer apre la copia, e la scheda di un file chiusa torna con Ctrl+Shift+T anche dopo aver riaperto Filo.', segnalazione: 1905 },
       ],
     },
     {
