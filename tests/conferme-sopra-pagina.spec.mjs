@@ -636,7 +636,7 @@ test('una finestrella di un’altra finestra spostata sopra il testo della doman
   await finestrellaIn(incognito, finto, accanto, () => tastoSullaDomanda(vista));
   await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
   await new Promise((r) => setTimeout(r, 800));
-  expect(await finestrelle(app), 'accanto alla domanda non la copre').toEqual([true]);
+  expect(await finestrelle(app), `accanto alla domanda non la copre: ${JSON.stringify({ area, b: await posizioneFinestrella(app), schermo: await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea) })}`).toEqual([true]);
   await aspettaConfermaPronta(vista);
   const prima = await numeroDomanda(app);
   await spostaFinestrella(incognito, sulTesto(area));
