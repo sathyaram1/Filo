@@ -106,6 +106,39 @@ test('il ripiego sui crediti di Filo passa dalla coda: nessuna spinta che la sal
   assert.doesNotMatch(traduci, /keyFallback|ripiegoMostrato|diceRipiego/);
 });
 
+// #662.2: la riga del ripiego arrivata in una scheda dietro conta quando quella scheda torna davanti. La coda chiede a
+// chi l'ha composto prima di offrirlo e prima di darlo: detto altrove, esce senza partire e senza contare come visto.
+test('detto altrove dalla scheda davanti: non si offre, non si dà, esce dalla coda; detto da nessuno resta', () => {
+  const { a, mandati, visti } = banco();
+  let righe = new Set(['home']);
+  const davanti = { adesso: null };
+  const chiesto = [];
+  const componi = () => ({
+    messaggio: { type: 'show_toast', text: 'ripiego' },
+    alMostrare: () => visti.push('ripiego'),
+    dettoAltrove: ({ scheda } = {}) => { const s = scheda || davanti.adesso; chiesto.push(s); return righe.has(s); },
+  });
+  assert.ok(a.avvisa('ripiego', componi), 'davanti c’è un’altra scheda: parte');
+  assert.equal(mandati.length, 1);
+  assert.deepEqual(a.prendi('id1', { scheda: 'sito' }), [], 'nessuno l’ha preso: c’è ancora');
+  assert.deepEqual(chiesto.slice(-1), ['sito'], 'chiede con la scheda che lo prende');
+  assert.deepEqual(visti, [], 'dato a nessuno: non visto');
+  a.riproponi();
+  assert.equal(mandati.length, 2, 'nessuna riga davanti: si ripropone');
+  davanti.adesso = 'home';
+  a.riproponi();
+  assert.equal(mandati.length, 2, 'la home con la riga è tornata davanti: non si ripropone');
+  assert.deepEqual(a.inAttesa(), [], 'e non è più in coda');
+  assert.deepEqual(a.prendi('', { scheda: 'sito' }), []);
+  assert.deepEqual(visti, [], 'detto dalla riga, non dall’avviso');
+  davanti.adesso = null;
+  righe = new Set();
+  assert.ok(a.avvisa('ripiego', componi), 'la pausa la tiene chi l’ha detto: la coda non ne mette una sua');
+  righe = new Set(['sito']);
+  assert.deepEqual(a.prendi('id2', { scheda: 'sito' }), [], 'la scheda che lo chiede ha la riga: non lo mostra due volte');
+  assert.deepEqual(a.inAttesa(), []);
+});
+
 test('tornati su Filo dalla barra delle schede: quelli in coda si offrono di nuovo, quelli presi no', () => {
   const { a, mandati, componi } = banco();
   a.avvisa('excluded|deepseek', componi('DeepSeek'));
