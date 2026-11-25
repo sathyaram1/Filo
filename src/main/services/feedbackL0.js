@@ -91,7 +91,7 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
     try {
       if (!(await acceso())) return { stato: 'saltato', motivo: 'spento' };
       const t = String(testo || '');
-      const testiAllegati = (Array.isArray(allegati) ? allegati : []).map(testoDiAllegato);
+      const testiAllegati = (Array.isArray(allegati) ? allegati : []).map((f) => (diTesto(f) ? f.dataUrl : null));
       const imm = (Array.isArray(immagini) ? immagini : []).filter((u) => typeof u === 'string' && /^data:image\//i.test(u));
       const ferma = new AbortController();
       let timer = null;
