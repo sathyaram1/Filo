@@ -620,8 +620,95 @@ test('la domanda lasciata nella finestra da cui l’utente è passato a un’alt
   await new Promise((r) => setTimeout(r, 1500));
   expect(await finestrelle(app)).toEqual([true]);
   // Tornato alla finestra della domanda, la finestrella che la copre si nasconde.
-  await vista.keyboard.press('Shift');
+  await tastoSullaDomanda(vista);
   await expect.poll(() => finestrelle(app)).toEqual([false]);
+});
+
+// #2647.1: aperta accanto alla domanda, il sito la porta sopra il testo solo dopo; poi la fa andare e tornare.
+test('una finestrella di un’altra finestra spostata sopra il testo della domanda si nasconde e la ridisegna, una volta sola', async ({ app, shell, openTab, testServer }) => {
+  const finto = testServer.html('<title>Filo</title><p>Filo chiede conferma. Filo vuole impostare: Tema → Scuro.</p>', { pubblico: true });
+  const { page, incognito } = await dueFinestre(app, shell, openTab, testServer);
+  const host = new URL(page.url()).hostname;
+  await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
+  const vista = await confermaSopraPagina(app);
+  const area = await areaDomanda(app);
+  const accanto = { x: area.x + area.width + 200, y: area.y + 300 };
+  await finestrellaIn(incognito, finto, accanto, () => tastoSullaDomanda(vista));
+  await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
+  await new Promise((r) => setTimeout(r, 800));
+  expect(await finestrelle(app), 'accanto alla domanda non la copre').toEqual([true]);
+  await aspettaConfermaPronta(vista);
+  const prima = await numeroDomanda(app);
+  await spostaFinestrella(incognito, sulTesto(area));
+  await expect.poll(() => finestrelle(app)).toEqual([false]);
+  await expect.poll(() => numeroDomanda(app)).toBeGreaterThan(prima);
+  const ridisegnata = await numeroDomanda(app);
+  // Va e torna: ricompare scoperta, si rinasconde sopra il testo, ma la domanda non riparte un'altra volta.
+  for (let i = 0; i < 2; i++) {
+    await spostaFinestrella(incognito, accanto);
+    await expect.poll(() => posizioneFinestrella(app).then((b) => b && b.x)).toBe(accanto.x);
+    await expect.poll(() => finestrelle(app)).toEqual([true]);
+    await spostaFinestrella(incognito, sulTesto(area));
+    await expect.poll(() => finestrelle(app)).toEqual([false]);
+  }
+  expect(await numeroDomanda(app)).toBe(ridisegnata);
+  await aspettaConfermaPronta(vista);
+  await mouseClickConfirm(vista, 'ok');
+  await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(true);
+});
+
+test('tornato alla finestra della domanda con un clic su OK mentre la finestrella dell’altra la copriva, quel clic non vale un sì', async ({ app, shell, openTab, testServer }) => {
+  const finto = testServer.html('<title>Filo</title><p>Filo chiede conferma. Filo vuole impostare: Tema → Scuro.</p>', { pubblico: true });
+  const { page, incognito } = await dueFinestre(app, shell, openTab, testServer);
+  const host = new URL(page.url()).hostname;
+  await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
+  const vista = await confermaSopraPagina(app);
+  await aspettaConfermaPronta(vista);
+  // L'utente è nell'altra finestra: lì la finestrella sopra la domanda resta (giro 8), col suo testo finto.
+  await finestrellaSopra(incognito, await areaDomanda(app), finto);
+  await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(await finestrelle(app)).toEqual([true]);
+  // Torna con un clic dritto su OK, dopo aver letto il testo finto.
+  await mouseClickConfirm(vista, 'ok');
+  await expect.poll(() => finestrelle(app)).toEqual([false]);
+  await new Promise((r) => setTimeout(r, 800));
+  expect(await nelMondoDiFilo(app, host, 'globalThis.__e')).toBe('attesa');
+  // La domanda vera, adesso scoperta, si conferma come sempre.
+  await aspettaConfermaPronta(vista);
+  await mouseClickConfirm(vista, 'ok');
+  await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(true);
+});
+
+test('il clic che Filo dà da sé nell’altra finestra non ci porta l’utente: la finestrella sopra la domanda resta nascosta', async ({ app, shell, openTab, testServer }) => {
+  const finto = testServer.html('<title>Filo</title><p>Filo chiede conferma. Filo vuole impostare: Tema → Scuro.</p>', { pubblico: true });
+  const { page, incognito, altrove } = await dueFinestre(app, shell, openTab, testServer);
+  const host = new URL(page.url()).hostname;
+  await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
+  const vista = await confermaSopraPagina(app);
+  await finestrellaSopra(incognito, await areaDomanda(app), finto, () => tastoSullaDomanda(vista));
+  await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
+  await expect.poll(() => finestrelle(app)).toEqual([false]);
+  // Il «Salta» di una pubblicità nell'altra finestra, premuto da Filo come fa il salto delle pubblicità; poi un
+  // modificatore da solo, lì. Nessuno dei due è l'utente che passa di là.
+  await app.evaluate(({ BrowserWindow }, altrove) => {
+    const rq = process.mainModule.require;
+    const Permessi = rq(rq('node:path').join(process.cwd(), 'src/main/services/permessiPagine.js'));
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => { try { return new URL(x.view.webContents.getURL()).hostname === altrove; } catch (_) { return false; } });
+    const wc = t.view.webContents;
+    Permessi.clicDiFilo(wc);
+    wc.sendInputEvent({ type: 'mouseMove', x: 20, y: 20 });
+    wc.sendInputEvent({ type: 'mouseDown', x: 20, y: 20, button: 'left', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: 20, y: 20, button: 'left', clickCount: 1 });
+  }, altrove);
+  await incognito.keyboard.press('Shift');
+  await new Promise((r) => setTimeout(r, 1000));
+  expect(await finestrelle(app)).toEqual([false]);
+  // Un clic vero dell'utente di là, invece, ce lo porta (giro 8).
+  await new Promise((r) => setTimeout(r, 1000));
+  await incognito.mouse.click(5, 5);
+  await expect.poll(() => finestrelle(app)).toEqual([true]);
 });
 
 // Una domanda dentro una finestrella di accesso: il sito non la rimpicciolisce fino a togliere il testo (giro 10).
