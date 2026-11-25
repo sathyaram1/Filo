@@ -694,7 +694,7 @@ test('il clic che Filo dà da sé nell’altra finestra non ci porta l’utente:
   await app.evaluate(({ BrowserWindow }, altrove) => {
     const rq = process.mainModule.require;
     const Permessi = rq(rq('node:path').join(process.cwd(), 'src/main/services/permessiPagine.js'));
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
     const t = w._filoTabs.tabs.find((x) => { try { return new URL(x.view.webContents.getURL()).hostname === altrove; } catch (_) { return false; } });
     const wc = t.view.webContents;
     Permessi.clicDiFilo(wc);
