@@ -157,12 +157,35 @@ module.exports = function register(on, ctx) {
     avvisoSospeso = null;
     if (!CODA || Date.now() - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
     const messaggio = { type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 };
-    CODA.avvisa(AVVISO_RIPIEGO, () => ({ messaggio, alMostrare: ripiegoMostrato }));
+    CODA.avvisa(AVVISO_RIPIEGO, () => ({ messaggio, alMostrare: ripiegoMostrato, dettoAltrove: rigaDavanti }));
   }
   function ripiegoMostrato() {
     ultimoAvvisoRipiego = Date.now();
+    righeDietro.clear();
     annullaAvvisoSospeso();
     if (CODA) CODA.ritira(AVVISO_RIPIEGO);
+  }
+  // La riga arrivata in una pagina dietro, se la sua scheda (`scheda`, o quella davanti adesso) è tornata davanti con la
+  // riga ancora lì: allora è detta, e l'avviso non la ripete. Una pagina cambiata, o chiusa, non la mostra più.
+  function rigaDavanti({ scheda } = {}) {
+    const wc = scheda || Davanti.schedaDavanti();
+    const riga = wc ? righeDietro.get(wc) : null;
+    if (!riga) return false;
+    let ancora = false;
+    try { ancora = !wc.isDestroyed() && wc.getURL() === riga.url && !(riga.strato && riga.strato.isDestroyed()); } catch (_) {}
+    if (!ancora) { righeDietro.delete(wc); return false; }
+    ripiegoMostrato();
+    return true;
+  }
+  function rigaArrivata(msg, sender) {
+    if (sender && Davanti.mittenteDavanti(sender, msg && msg.fuoco)) { ripiegoMostrato(); return true; }
+    const wc = sender && sender.wc;
+    if (wc) {
+      let url = '';
+      try { url = wc.getURL(); } catch (_) {}
+      righeDietro.set(wc, { url, strato: sender.strato || null });
+    }
+    return false;
   }
   function avvisaRipiegoMuto(status) {
     const now = Date.now();
