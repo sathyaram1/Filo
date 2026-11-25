@@ -35,6 +35,7 @@ const { execFileSync } = require('node:child_process');
 // interni. Una build per un solo processore non passa di qui e viene firmata
 // normalmente.
 const COPIA_INTERMEDIA = /-(?:x64|arm64)-temp$/;
+exports.COPIA_INTERMEDIA = COPIA_INTERMEDIA;
 
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return;
