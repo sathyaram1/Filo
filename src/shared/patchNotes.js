@@ -16,6 +16,7 @@
         { testo: 'Un proxy scritto in una forma che Filo non sa leggere, come un indirizzo IPv6 senza parentesi quadre, è protetto intero come una chiave API: si salva cifrato, l\'assistente non lo passa ai modelli e l\'archivio esportato non lo porta se non spunti «Includi le chiavi».', segnalazione: 2646 },
         { testo: 'Un articolo lasciato a metà, dopo aver chiuso e riaperto Filo, riparte dal punto in cui eri. La pulizia delle schede alla riapertura sa fin dove eri arrivato negli articoli, nei video e negli audio, e non li tratta come pagine mai aperte.', segnalazione: 349 },
         { testo: 'Se un negozio ha aperto il pagamento in un\'altra scheda, premere di nuovo «paga» ti riporta lì anche quando il pagamento sta su un altro sito. Una finestra aperta da un sito, come una chat, non ti porta più via dalla pagina che stai leggendo.', segnalazione: 737 },
+        { testo: 'Quando un sito chiude da sé la finestra che aveva aperto su un altro sito, come quella di un pagamento o di una chat, se ne va anche la sua scheda, senza lasciarne una vuota.', segnalazione: 2659 },
       ],
     },
     {
