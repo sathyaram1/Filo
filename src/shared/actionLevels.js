@@ -1919,10 +1919,11 @@
   }
 
   // La stessa spiegazione in una riga di testo: la regola sta in SN_ESITO, che disegna anche le righe a pezzi.
-  function piatto(parti) {
+  function esito() {
     if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
-    return global.SN_ESITO.piatto(parti);
+    return global.SN_ESITO;
   }
+  const piatto = (parti) => esito().piatto(parti);
 
   function describe(action) {
     return piatto(describeParts(action));
