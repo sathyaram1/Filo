@@ -367,6 +367,164 @@ test('chiusa, la scheda del file torna con Ctrl+Shift+T', async ({ app }) => {
   await expect.poll(() => schedaFile(app, '2026-10-30-riquadro.html'), { timeout: 10_000 }).toBeTruthy();
 });
 
+// La scheda del file si vede intera: titolo e un'immagine della sua cartella. Senza la sua sessione non si aprirebbe.
+async function siVede(app, fine) {
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, fine)), { timeout: 10_000, message: `la scheda di ${fine} non è tornata` }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+  let pagina = null;
+  await expect.poll(async () => Boolean(pagina = await paginaDellaScheda(app, id, (p) => p.url().endsWith(fine))), { timeout: 10_000 }).toBe(true);
+  await expect(pagina).toHaveTitle('Report locale', { timeout: 10_000 });
+  await expect.poll(() => pagina.evaluate(() => document.getElementById('i').naturalWidth), { message: 'le immagini della sua cartella tornano' }).toBeGreaterThan(0);
+  return id;
+}
+const idInArchivio = (app, fine) => app.evaluate(async (_e, fine) => {
+  const v = (await globalThis.SN_ARCHIVED_TABS.listMeta()).find((x) => String(x.url || '').endsWith(fine));
+  return v ? v.id : null;
+}, fine);
+async function apriEChiudi(app, file) {
+  const r = await execAction(app, { type: 'NAVIGA', url: file }, { parole: `apri ${file}` });
+  expect(r.executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, '2026-10-30-riquadro.html')), { timeout: 10_000 }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.closeTab(id), id);
+  await expect.poll(() => schedeFile(app)).toBe(0);
+  let arch = null;
+  await expect.poll(async () => (arch = await idInArchivio(app, '2026-10-30-riquadro.html')), { message: 'la scheda chiusa è nell\'archivio' }).toBeTruthy();
+  return arch;
+}
+
+test('riaperto Filo, Ctrl+Shift+T riporta la scheda del file dall\'archivio delle schede chiuse', async ({ app }) => {
+  const { file } = preparaReport();
+  await home(app);
+  const arch = await apriEChiudi(app, file);
+  // Riaperto Filo la pila della sessione è vuota: Ctrl+Shift+T scende nell'archivio.
+  await app.evaluate(({ BrowserWindow }, a) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs._pilaChiuse().dimentica([a]), arch);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riapriChiusa({ tasto: 'ctrl_shift_t' }));
+  await siVede(app, '2026-10-30-riquadro.html');
+});
+
+test('«riaprimi il report di prima» in chat riporta la scheda del file chiusa', async ({ app }) => {
+  test.setTimeout(60_000);
+  const { file } = preparaReport();
+  const page = await home(app);
+  const arch = await apriEChiudi(app, file);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'r1', name: 'RIAPRI_SCHEDA', arguments: JSON.stringify({ id: arch }) }] },
+    { text: 'Eccolo.' },
+  ]);
+  await chiedi(page, 'riaprimi il report di prima');
+  await siVede(app, '2026-10-30-riquadro.html');
+  await ripristina(app);
+});
+
+test('la scheda del file che la pulizia mette da parte torna col «Riapri» dell\'avviso', async ({ app }) => {
+  const { file } = preparaReport();
+  await home(app);
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `apri ${file}` })).executed).toBe(true);
+  await expect.poll(() => schedaFile(app, '2026-10-30-riquadro.html'), { timeout: 10_000 }).toBeTruthy();
+  // Oggi il giro della pulizia sceglie solo pagine web: qui gli si consegna il file, come farebbe se un giorno lo scegliesse.
+  const pulizia = await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const t = tm.tabs.find((x) => /^file:/.test(x.url || ''));
+    return tm.applyTriageDecisions([t], [{ i: 0, action: 'archive', reason: 'prova' }]).pulizia;
+  });
+  expect(pulizia).toBeTruthy();
+  await expect.poll(() => schedeFile(app)).toBe(0);
+  const r = await app.evaluate(({ BrowserWindow }, p) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riapriPulizia(p), pulizia);
+  expect(r).toMatchObject({ ok: true, riaperte: 1 });
+  await siVede(app, '2026-10-30-riquadro.html');
+});
+
+test('«Duplica» dal tasto destro sulla linguetta del file apre la copia, con le immagini della sua cartella', async ({ app, shell }) => {
+  const { file } = preparaReport();
+  await home(app);
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `apri ${file}` })).executed).toBe(true);
+  const id = await siVede(app, '2026-10-30-riquadro.html');
+  const indice = await shell.evaluate(async (i) => (await window.filoShell.tabs.snapshot()).tabs.findIndex((t) => t.id === i), id);
+  expect(indice).toBeGreaterThanOrEqual(0);
+  await expect.poll(async () => {
+    if ((await schedeFile(app)) > 1) return true;
+    await shell.evaluate((i) => {
+      const el = document.querySelectorAll('.tab')[i];
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: Math.round(r.left + r.width / 2), clientY: Math.round(r.top + r.height / 2) }));
+    }, indice);
+    for (let k = 0; k < 15; k++) {
+      let fatto = false;
+      for (const w of app.windows()) {
+        try { fatto = await w.evaluate(() => { const b = [...document.querySelectorAll('button.item')].find((x) => x.textContent.trim() === 'Duplica'); if (b) b.click(); return !!b; }); } catch (_) {}
+        if (fatto) break;
+      }
+      if (fatto) break;
+      await shell.waitForTimeout(40);
+    }
+    await shell.waitForTimeout(300);
+    return (await schedeFile(app)) > 1;
+  }, { timeout: 25_000, intervals: [200, 400, 800] }).toBe(true);
+  const copia = await app.evaluate(({ BrowserWindow }, orig) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const t = tm.tabs.find((x) => x.id !== orig && /^file:/.test(x.url || ''));
+    return t ? { id: t.id, attiva: tm.activeId === t.id } : null;
+  }, id);
+  expect(copia, 'la copia è una scheda nuova, davanti').toMatchObject({ attiva: true });
+  const pagina = await paginaDellaScheda(app, copia.id, (p) => p.url().startsWith('file:'));
+  await expect(pagina).toHaveTitle('Report locale', { timeout: 10_000 });
+  await expect.poll(() => pagina.evaluate(() => document.getElementById('i').naturalWidth), { message: 'la copia vede le immagini della sua cartella' }).toBeGreaterThan(0);
+});
+
+test('una pagina scaricata mostra le foto accanto ma non ne legge i pixel, e un file di chiavi caricato come script non dà il suo testo', async ({ app }) => {
+  test.setTimeout(60_000);
+  const radice = cartellaTemporanea('scaricati-');
+  const dir = join(radice, 'Scaricati');
+  mkdirSync(join(dir, 'Foto'), { recursive: true });
+  mkdirSync(join(dir, 'progetto'), { recursive: true });
+  copyFileSync(FOTO, join(dir, 'IMG_0001.png'));
+  copyFileSync(FOTO, join(dir, 'Foto', 'IMG_0002.png'));
+  writeFileSync(join(dir, 'progetto', '.env'), 'TOKEN=chiave-del-punto-env');
+  writeFileSync(join(dir, 'progetto', 'chiavi.js'), 'TOKEN=chiave-dello-script');
+  writeFileSync(join(dir, 'progetto', 'note.txt'), 'NOTA = "chiave-del-testo"');
+  writeFileSync(join(dir, 'stile.css'), '#t{color:rgb(1, 2, 3)}');
+  writeFileSync(join(dir, 'regalo.html'), `<!doctype html><meta charset="utf-8"><title>Regalo</title><link rel="stylesheet" href="stile.css">
+<body><h1 id="t">Auguri</h1><img id="a" src="IMG_0001.png"><img id="b" src="Foto/IMG_0002.png"><script>
+const esito = { errori: [] };
+const segna = () => { document.body.dataset.esito = JSON.stringify(esito); };
+window.addEventListener('error', (e) => { esito.errori.push(String(e.message || '') + ' ' + String((e.error && e.error.message) || '')); segna(); });
+</script><script src="progetto/.env"></script><script src="progetto/chiavi.js"></script><script src="progetto/note.txt"></script><script>
+window.addEventListener('load', () => {
+  for (const id of ['a', 'b']) {
+    const img = document.getElementById(id);
+    const c = document.createElement('canvas'); c.width = 4; c.height = 4;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    try { g.getImageData(0, 0, 1, 1); esito[id] = 'LETTO'; } catch (e) { esito[id] = e.name; }
+    esito['larga_' + id] = img.naturalWidth;
+  }
+  try { esito.regole = document.styleSheets[0].cssRules.length; } catch (e) { esito.regole = e.name; }
+  esito.colore = getComputedStyle(document.getElementById('t')).color;
+  esito.nota = typeof NOTA === 'undefined' ? 'NO' : NOTA;
+  esito.fine = 1;
+  segna();
+});
+</script></body>`);
+  await home(app);
+  const file = join(dir, 'regalo.html');
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'regalo.html')), { timeout: 10_000 }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+  const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+  const esito = async () => JSON.parse((await pagina.locator('body').getAttribute('data-esito')) || '{}');
+  await expect.poll(async () => (await esito()).fine, { timeout: 15_000 }).toBe(1);
+  const e = await esito();
+  expect(e.larga_a, 'la foto accanto alla pagina si vede').toBeGreaterThan(0);
+  expect(e.larga_b, 'la foto della sottocartella si vede').toBeGreaterThan(0);
+  expect(e.colore, 'lo stile accanto si applica').toBe('rgb(1, 2, 3)');
+  expect({ a: e.a, b: e.b, regole: e.regole }, 'i pixel delle foto e le regole dello stile non si leggono').toEqual({ a: 'SecurityError', b: 'SecurityError', regole: 'SecurityError' });
+  expect(e.nota, 'un file di testo non gira come script').toBe('NO');
+  expect(e.errori.length, 'lo script di chiavi è girato e ha dato errore').toBeGreaterThan(0);
+  expect(e.errori.join(' | '), 'l\'errore dello script arriva senza testo').not.toMatch(/chiave-/);
+});
+
 // Il server di chi ruberebbe: conta ogni connessione e ogni pacchetto che gli arriva, da qualunque strada.
 async function raccoglitore() {
   const arrivi = [];
