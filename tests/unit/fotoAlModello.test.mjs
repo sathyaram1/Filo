@@ -65,21 +65,23 @@ test('la foto intera e quella della barra si chiedono solo dal gestore delle ric
 
 // Chi chiede alla pagina la foto senza la copia coperta la riceve intera: lo fa solo chi non la manda a un modello né
 // fuori dal computer. Lo screenshot del feedback va all'owner e chiede `coperta` (#2116).
+// Contate per file: una richiesta intera nuova in un file già qui è un'altra eccezione da scrivere, non una gratis.
 const RICHIESTE_INTERE = {
-  'src/preload/chrome-shim.js': 'chrome.tabs.captureVisibleTab delle pagine di Filo: nessuna la manda a un modello',
+  'src/preload/chrome-shim.js': 1, // chrome.tabs.captureVisibleTab delle pagine di Filo: nessuna la manda a un modello
+  'src/content/actions.js': 1, // il contagocce (#2651) legge i pixel nella pagina e non li manda a nessuno
 };
 test('una richiesta di foto della pagina senza la copia coperta sta solo dove la foto non va a un modello', () => {
-  const fuori = [];
+  const chi = {};
   for (const dir of ['src/content', 'src/preload', 'src/pages', 'src/renderer']) {
     for (const p of sorgenti(join(RADICE, dir))) {
       const rel = relative(RADICE, p).split('\\').join('/');
       const t = readFileSync(p, 'utf8');
       for (const m of t.matchAll(/\{\s*type:\s*(?:MSG\.CAPTURE_VISIBLE_TAB|'capture_visible_tab')([^}]*)\}/g)) {
-        if (!/\b(?:perModello|copiaPerModello|coperta):\s*true/.test(m[1]) && !RICHIESTE_INTERE[rel]) fuori.push(rel);
+        if (!/\b(?:perModello|copiaPerModello|coperta):\s*true/.test(m[1])) chi[rel] = (chi[rel] || 0) + 1;
       }
     }
   }
-  assert.deepEqual(fuori, [], 'per un modello si chiede perModello (foto coperta) o copiaPerModello (intera più copia coperta)');
+  assert.deepEqual(chi, RICHIESTE_INTERE, 'per un modello si chiede perModello (foto coperta) o copiaPerModello (intera più copia coperta)');
 });
 
 // Con copiaPerModello la pagina riceve anche la foto intera: verso un modello parte solo la copia coperta. L'eccezione
