@@ -100,7 +100,7 @@ function crea({ tetto = TETTO } = {}) {
     let scelta = null;
     let quando = -Infinity;
     for (const v of Array.isArray(voci) ? voci : []) {
-      if (!v || typeof v.id !== 'string' || riaperte.has(v.id) || v.urlTagliato || !web(v.url)) continue;
+      if (!v || typeof v.id !== 'string' || riaperte.has(v.id) || v.urlTagliato || !riapribile(v.url)) continue;
       if (suonata && !(Date.parse(v.audioAt) > 0)) continue;
       const t = Date.parse(suonata ? v.audioAt : v.closedAt);
       const c = Number.isFinite(t) ? t : -Infinity;
