@@ -15,6 +15,7 @@ module.exports = function register(on, ctx) {
   const ContatoriSicurezza = require('../contatoriSicurezza');
   const ContatoriServizio = require('../contatoriServizio');
   const { daPaginaNonDiFilo } = require('./origine');
+  const { mittenteDavanti } = require('../davantiAgliOcchi');
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
   const controllaUscita = ContatoriSicurezza.contaUscite(portaUscite);
 
@@ -174,19 +175,15 @@ module.exports = function register(on, ctx) {
     }
   }
 
-  // Gli avvisi fuori politica in coda (#1478.1) li prende solo la pagina davanti agli occhi: il frame principale della
-  // scheda attiva. Un riquadro, una scheda dietro o la home pronta in riserva li toglierebbero a chi li deve vedere.
-  // Davanti agli occhi vuol dire la finestra davanti: il fuoco può stare sulla barra delle schede, non sulla pagina.
+  // Gli avvisi fuori politica in coda (#1478.1) li prende solo la pagina davanti agli occhi, nel suo frame principale:
+  // un riquadro, una scheda dietro o la home pronta in riserva li toglierebbero a chi li deve vedere.
   on(MSG.AVVISI_IN_CODA, async (msg, sender) => {
-    const win = sender && sender.win;
-    const tm = win && win._filoTabs;
     const principale = !(sender && sender.frame && sender.frame.parent);
-    const attiva = !!(tm && sender.tab && !sender.riserva && !sender.strato && tm.activeId === sender.tab.id);
-    let davanti = Boolean(msg && msg.fuoco === true);
-    try { davanti = davanti || Boolean(win && !win.isDestroyed() && win.isFocused()); } catch (_) {}
-    if (!attiva || !principale || !davanti || !avvisiFuoriPolitica) return { ok: true, avvisi: [] };
+    const davanti = !!sender && !sender.strato && principale && mittenteDavanti(sender, msg && msg.fuoco);
+    if (!davanti || !avvisiFuoriPolitica) return { ok: true, avvisi: [] };
     const id = typeof (msg && msg.id) === 'string' ? msg.id : '';
-    return { ok: true, avvisi: avvisiFuoriPolitica.prendi(id) };
+    // La scheda che li chiede è davanti: un avviso che lei dice già in un altro modo (la riga del ripiego) non esce.
+    return { ok: true, avvisi: avvisiFuoriPolitica.prendi(id, { scheda: sender.wc }) };
   });
 
   const tettoAutomatiche = require('../tettoAutomatiche').crea();

@@ -98,12 +98,48 @@ test('ritirato (detto altrove, o non più vero): esce dalla coda senza contare c
 test('il ripiego sui crediti di Filo passa dalla coda: nessuna spinta che la salti, contato quando si mostra', () => {
   const wallet = readFileSync(new URL('../../src/main/services/handlers/wallet.js', import.meta.url), 'utf8');
   const manda = /function mandaAvvisoSospeso\(\) \{([\s\S]*?)\n {2}\}/.exec(wallet)[1];
-  assert.match(manda, /CODA\.avvisa\(AVVISO_RIPIEGO, \(\) => \(\{ messaggio, alMostrare: ripiegoMostrato \}\)\)/);
+  assert.match(manda, /CODA\.avvisa\(AVVISO_RIPIEGO, \(\) => \(\{ messaggio, alMostrare: ripiegoMostrato, dettoAltrove: rigaDavanti \}\)\)/);
   assert.doesNotMatch(manda, /broadcastToTabs|ultimoAvvisoRipiego =/, 'spedito non vuol dire visto');
   const mostrato = /function ripiegoMostrato\(\) \{([\s\S]*?)\n {2}\}/.exec(wallet)[1];
   assert.match(mostrato, /CODA\.ritira\(AVVISO_RIPIEGO\)/, 'detto dalla riga, l’avviso in coda non lo ripete');
   const traduci = readFileSync(new URL('../../src/content/translatePage.js', import.meta.url), 'utf8');
   assert.doesNotMatch(traduci, /keyFallback|ripiegoMostrato|diceRipiego/);
+});
+
+// #662.2: la riga del ripiego arrivata in una scheda dietro conta quando quella scheda torna davanti. La coda chiede a
+// chi l'ha composto prima di offrirlo e prima di darlo: detto altrove, esce senza partire e senza contare come visto.
+test('detto altrove dalla scheda davanti: non si offre, non si dà, esce dalla coda; detto da nessuno resta', () => {
+  const { a, mandati, visti } = banco();
+  let righe = new Set(['home']);
+  const davanti = { adesso: null };
+  const chiesto = [];
+  const componi = () => ({
+    messaggio: { type: 'show_toast', text: 'ripiego' },
+    alMostrare: () => visti.push('ripiego'),
+    dettoAltrove: ({ scheda } = {}) => { const s = scheda || davanti.adesso; chiesto.push(s); return righe.has(s); },
+  });
+  assert.ok(a.avvisa('ripiego', componi), 'davanti c’è un’altra scheda: parte');
+  assert.equal(mandati.length, 1);
+  assert.deepEqual(visti, [], 'spedito non vuol dire visto');
+  a.riproponi();
+  assert.equal(mandati.length, 2, 'nessuna riga davanti: si ripropone');
+  davanti.adesso = 'home';
+  a.riproponi();
+  assert.equal(mandati.length, 2, 'la home con la riga è tornata davanti: non si ripropone');
+  assert.deepEqual(a.inAttesa(), [], 'e non è più in coda');
+  assert.deepEqual(a.prendi('', { scheda: 'sito' }), []);
+  assert.deepEqual(visti, [], 'detto dalla riga, non dall’avviso');
+  davanti.adesso = null;
+  righe = new Set();
+  assert.ok(a.avvisa('ripiego', componi), 'la pausa la tiene chi l’ha detto: la coda non ne mette una sua');
+  righe = new Set(['sito']);
+  assert.deepEqual(a.prendi('id2', { scheda: 'sito' }), [], 'la scheda che lo chiede ha la riga: non lo mostra due volte');
+  assert.deepEqual(chiesto.slice(-1), ['sito'], 'chiede con la scheda che lo prende');
+  assert.deepEqual(a.inAttesa(), []);
+  righe = new Set();
+  a.avvisa('ripiego', componi);
+  assert.deepEqual(a.prendi('id3', { scheda: 'sito' }).map((m) => m.text), ['ripiego'], 'senza riga lo prende e lo mostra');
+  assert.deepEqual(visti, ['ripiego']);
 });
 
 test('tornati su Filo dalla barra delle schede: quelli in coda si offrono di nuovo, quelli presi no', () => {

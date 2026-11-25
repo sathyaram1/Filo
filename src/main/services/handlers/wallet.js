@@ -120,11 +120,14 @@ module.exports = function register(on, ctx) {
   function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
 
   // Ogni risposta pagata col ripiego lo dice: la riga sotto la risposta, o un avviso, uno per
-  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detto solo quando una pagina in vista l'ha
-  // mostrato (#662.1): la riga arrivata a schermo (KEY_FALLBACK_SHOWN), o l'avviso preso dalla coda
-  // degli avvisi da una pagina davanti agli occhi, mai quello solo spedito. Le richieste con la riga
+  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detto solo davanti agli occhi (#662.1, #662.2):
+  // la riga a schermo in una pagina davanti (KEY_FALLBACK_SHOWN), o l'avviso preso dalla coda da una
+  // pagina davanti, mai quello solo spedito. Una riga arrivata in una pagina dietro conta quando la sua
+  // scheda torna davanti, e intanto l'avviso parte per chi guarda altrove. Le richieste con la riga
   // in volo (`conRipiegoDetto`) tengono fermo l'avviso finché la loro riga ha il tempo di comparire.
   const CODA = ctx.avvisiFuoriPolitica || null;
+  const Davanti = require('../davantiAgliOcchi');
+  const righeDietro = new Map(); // webContents della scheda → { url, strato } della riga arrivata lì
   const AVVISO_RIPIEGO = 'ripiego';
   const FINESTRA_RIPIEGO_MS = 10 * 60 * 1000;
   const ATTESA_AVVISO_RIPIEGO_MS = 4000;
@@ -154,12 +157,35 @@ module.exports = function register(on, ctx) {
     avvisoSospeso = null;
     if (!CODA || Date.now() - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
     const messaggio = { type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 };
-    CODA.avvisa(AVVISO_RIPIEGO, () => ({ messaggio, alMostrare: ripiegoMostrato }));
+    CODA.avvisa(AVVISO_RIPIEGO, () => ({ messaggio, alMostrare: ripiegoMostrato, dettoAltrove: rigaDavanti }));
   }
   function ripiegoMostrato() {
     ultimoAvvisoRipiego = Date.now();
+    righeDietro.clear();
     annullaAvvisoSospeso();
     if (CODA) CODA.ritira(AVVISO_RIPIEGO);
+  }
+  // La riga arrivata in una pagina dietro, se la sua scheda (`scheda`, o quella davanti adesso) è tornata davanti con la
+  // riga ancora lì: allora è detta, e l'avviso non la ripete. Una pagina cambiata, o chiusa, non la mostra più.
+  function rigaDavanti({ scheda } = {}) {
+    const wc = scheda || Davanti.schedaDavanti();
+    const riga = wc ? righeDietro.get(wc) : null;
+    if (!riga) return false;
+    let ancora = false;
+    try { ancora = !wc.isDestroyed() && wc.getURL() === riga.url && !(riga.strato && riga.strato.isDestroyed()); } catch (_) {}
+    if (!ancora) { righeDietro.delete(wc); return false; }
+    ripiegoMostrato();
+    return true;
+  }
+  function rigaArrivata(msg, sender) {
+    if (sender && Davanti.mittenteDavanti(sender, msg && msg.fuoco)) { ripiegoMostrato(); return true; }
+    const wc = sender && sender.wc;
+    if (wc) {
+      let url = '';
+      try { url = wc.getURL(); } catch (_) {}
+      righeDietro.set(wc, { url, strato: sender.strato || null });
+    }
+    return false;
   }
   function avvisaRipiegoMuto(status) {
     const now = Date.now();
@@ -204,6 +230,7 @@ module.exports = function register(on, ctx) {
   // quella di prima non dice niente su questa.
   async function ownKeyChanged() {
     ultimoAvvisoRipiego = 0;
+    righeDietro.clear();
     annullaAvvisoSospeso();
     if (CODA) CODA.ritira(AVVISO_RIPIEGO);
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
@@ -362,8 +389,9 @@ module.exports = function register(on, ctx) {
   on(MSG.WALLET_SALDO_PREPARA, filoOnly(async () => { rileggiSaldo(); return { ok: true }; }));
 
   // Anche dai siti: la riga sta nei riquadri sulle pagine web. Il peggio che un mittente può fare è
-  // zittire per dieci minuti un avviso che ripete una frase.
-  on(MSG.KEY_FALLBACK_SHOWN, async () => { ripiegoMostrato(); return { ok: true }; });
+  // zittire per dieci minuti un avviso che ripete una frase, e solo dalla scheda davanti.
+  // `detto: false`: la pagina era dietro, e la riga conterà quando la sua scheda torna davanti.
+  on(MSG.KEY_FALLBACK_SHOWN, async (msg, sender) => ({ ok: true, detto: rigaArrivata(msg, sender) }));
 
   // Nuova chiave: il portafoglio esiste sul server, la chiave non è qui.
   on(MSG.WALLET_REISSUE, filoOnly(async () => {
