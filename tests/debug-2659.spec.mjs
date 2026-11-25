@@ -11,7 +11,7 @@ test('debug', async ({ app, openTab, testServer }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     globalThis.__dbg = [];
     const out = tm.tabs.map((t) => { const wc = t.view.webContents; return { id: t.id, wc: wc.id, url: wc.getURL(), adot: !!t._adottataAlle, dl: wc.listenerCount('destroyed') }; });
-    for (const t of tm.tabs) { const wc = t.view.webContents; const id = wc.id; for (const ev of ['close', 'destroyed', 'render-process-gone']) wc.on(ev, () => globalThis.__dbg.push(ev + ':' + id + ':' + tm.tabs.includes(t) + ':' + (t.view.webContents === wc))); }
+    for (const t of tm.tabs) { const wc = t.view.webContents; const id = wc.id; for (const ev of ['close', 'destroyed', 'render-process-gone']) wc.on(ev, () => globalThis.__dbg.push(ev + ':' + id + ':' + tm.tabs.includes(t) + ':' + (t.view.webContents === wc) + ':' + typeof t.view.webContents)); }
     return { out, all: webContents.getAllWebContents().map((w) => w.id + ' ' + w.getURL()) };
   });
   console.log(JSON.stringify(info, null, 1));
