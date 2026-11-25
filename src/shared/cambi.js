@@ -477,11 +477,7 @@
     const tale = !!grezzo.trim() && (t === grezzo || t === breve(grezzo, 40)) && !/^-?\d+(?:[.,]\d+)?$/.test(t);
     return tale ? suo(t) : t;
   }
-  // La regola del testo piatto sta in SN_ESITO; il main e le prove che caricano solo questo modulo la trovano lo stesso.
-  function piatto(parti) {
-    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
-    return global.SN_ESITO.piatto(parti.filter((p) => p !== ''));
-  }
+  const piatto = (parti) => esito().piatto(parti.filter((p) => p !== ''));
   function oraDi(iso) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
