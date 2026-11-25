@@ -3,6 +3,7 @@
 // Regole: patterns/un-file-del-computer-in-una-scheda-vive-in-una-sessione-sua.md. Prove: tests/unit/fusibiliElectron.test.mjs.
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
