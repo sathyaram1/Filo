@@ -40,7 +40,7 @@ async function ambiente() {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const url = (nome, corpo) => { pagine.set(`/${nome}`, corpo); return `${origin}/${nome}`; };
   const dati = cartellaTemporanea('filo-verifica-349-1-');
-  writeFileSync(join(dati, 'storage.json'), JSON.stringify({ filo_onboarding: { done: true }, settings: { autoArchive: { enabled: true, onClose: true } } }));
+  writeFileSync(join(dati, 'storage.json'), JSON.stringify({ filo_onboarding: { done: true } }));
   const avvia = () => electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env: { ...process.env, FILO_USER_DATA: dati, NODE_ENV: 'test' } });
   const chiudi = async () => {
     try { server.closeAllConnections?.(); } catch (_) {}
