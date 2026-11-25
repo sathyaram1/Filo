@@ -155,7 +155,6 @@
   // la mostra disegna il riquadro; ricomposta in una frase, il testo altrui si legge come parola di Filo. null se la
   // prima riga è tutta di Filo. Il suo testo piatto (`rigaDiParti`) è quello che leggono il modello e l'archivio.
   const riquadro = (p) => !!p && typeof p === 'object' && (Array.isArray(p.elenco) || typeof p.citazione === 'string');
-  const spazi = (s) => String(s).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ');
   function primaRigaParti(parti) {
     if (!Array.isArray(parti) || !parti.some(riquadro)) return null;
     const out = [];
