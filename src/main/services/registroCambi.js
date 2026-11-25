@@ -150,14 +150,18 @@ function daRimettere(e, lista) {
   return { ...e, tipo: originale.tipo, cambi: originale.cambi.map((c) => ({ ...c, prima: c.dopo, dopo: c.prima, vuotoPrima: c.vuotoDopo, vuotoDopo: c.vuotoPrima })) };
 }
 
+// `parti` e `frasiParti`: `frase` e le `frasi` unite da «; », coi valori non di Filo nel riquadro (#2657).
 function vista(e, lista) {
   const chiusi = K().annullati(lista);
+  const tutte = K().fraseAPezzi(e, Infinity);
   return {
     id: e.id,
     ts: e.agg || e.ts,
     tipo: e.tipo,
     frasi: K().frasi(e),
+    ...(tutte ? { frasiParti: tutte } : {}),
     frase: K().frase(e),
+    ...aPezzi(e),
     provenienza: K().provenienza(e),
     annulla: e.annulla || null,
     annullatoDa: chiusi.get(e.id) || null,
