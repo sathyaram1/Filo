@@ -143,8 +143,9 @@ test('in incognito l\'intervista non si apre, a ogni finestra; la finestra norma
       await expect(inc.locator('.dash-bubble-filo', { hasText: 'Ciao, sono Filo' })).toHaveCount(0);
       await inc.screenshot({ path: 'tests/.shots/2650-incognito-senza-intervista.png' });
       // Chiusa l'ultima incognito, la prossima riparte da un incognito vuoto: è lì che l'intervista tornava.
-      await inc.evaluate(() => window.close());
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoIncognito).close());
       await expect.poll(() => app.windows().includes(inc), { timeout: 10_000 }).toBe(false);
+      await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito)), { timeout: 10_000 }).toBe(false);
       aperte.pop();
     }
   }
