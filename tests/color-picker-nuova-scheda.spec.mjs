@@ -4,6 +4,21 @@ import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, premiNellaBarra } from './helpers/barra.mjs';
 import { home } from './helpers/chatFinta.mjs';
 
+test('sonda', async ({ app }) => {
+  const pagina = await home(app);
+  const barra = await barraPage(app);
+  const prova = (p) => p.evaluate(async () => {
+    if (typeof window.EyeDropper !== 'function') return 'manca';
+    const t = new Promise((r) => setTimeout(() => r('pendente dopo 3s'), 3000));
+    try {
+      const r = await Promise.race([new window.EyeDropper().open().then((x) => 'ok ' + JSON.stringify(x), (e) => 'rifiuto ' + e.name + ': ' + e.message), t]);
+      return r;
+    } catch (e) { return 'eccezione ' + e.name + ': ' + e.message; }
+  });
+  console.log('barra', await prova(barra));
+  console.log('newtab', await prova(pagina));
+});
+
 test('Color picker dalla barra sulla nuova scheda copia il colore negli appunti', async ({ app }) => {
   const pagina = await home(app);
   await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
