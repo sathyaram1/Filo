@@ -295,7 +295,7 @@ function aggiungiTutti(lista, fonte) {
 }
 // Come a un riavvio: la memoria si svuota e alla prossima lettura torna quello che era salvato.
 function svuota() { ricordaSuoi(); if (inAttesa) salvaOra(); letti.svuota(); suoi.clear(); sale = ''; caricato = false; }
-// Per gli unit test: un deposito finto (null = nessuno). `riavvio`: anche quello immesso nella sessione se ne va.
+// Per gli unit test, come un avvio nuovo su un deposito finto (null = nessuno).
 function usaDeposito(d) {
   if (ricordoInAttesa) { clearTimeout(ricordoInAttesa); ricordoInAttesa = null; }
   deposito = d; caricato = false; letti.svuota(); immessi.clear(); caratteriImmessi = 0;
