@@ -295,13 +295,18 @@
     return out;
   }
   // Le parti salvate di una riga valgono solo se dicono la riga piatta salvata accanto: una sola frase, due forme.
+  // L'unica regola per ogni frase a pezzi che arriva da fuori (la chat riaperta, i cambi, l'annullo).
   function partiDellaRiga(parti, riga) {
     if (!Array.isArray(parti) || parti.length > 60 || !riga) return null;
     const p = parti.map((x) => (typeof x === 'string' ? x
       : x && typeof x === 'object' && typeof x.citazione === 'string' ? { citazione: x.citazione, ...(x.nuda === true ? { nuda: true } : {}) } : null));
     if (p.some((x) => x == null) || !p.some(riquadro)) return null;
-    return rigaDiParti(p) === riga ? p : null;
+    return rigaDiParti(p).trim() === String(riga).trim() ? p : null;
   }
+  // Un pezzo non di Filo: `fra` la frase piatta lo dice fra «», `suo` nudo.
+  const suo = (t) => (t ? { citazione: t, nuda: true } : '');
+  const fra = (t) => (t ? { citazione: t } : '');
+  const unisci = (pezzi, sep) => pezzi.filter(Boolean).flatMap((p, i) => (i ? [sep, p] : [p]));
   // Riga piatta e riga a pezzi di una domanda, accorciate insieme: `parti` null se la riga è tutta di Filo.
   // Tagliata prima del riquadro, restano le sole parole di Filo: mai il testo piatto, che lo ricucirebbe.
   function rigaDellaDomanda(c, max = MAX_RIGA) {
