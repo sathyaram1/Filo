@@ -25,10 +25,26 @@ Quello che una pagina legge non deve avere dove andare. Tre strati, perché ognu
 Ogni rifiuto lo dice una volta per pagina (`_senzaRete`: la CSP lo riferisce dal preload, i salti dal main). Non c'è
 un «Apri con la rete»: scelta dell'owner, per ora.
 
-Le immagini della cartella NON sporcano la tela come in Chrome: con i privilegi di Electron su `file://` la pagina è
-della stessa origine dei suoi file, e un'origine opaca (CSP `sandbox` senza `allow-same-origin`) non mostra più
-nessuna immagine `file:` (provato in #1905). Quello che la pagina legge dei suoi file resta chiuso dalla rete che
-manca, non dall'origine: per questo nessuno dei tre strati si toglie.
+## Il contenuto dei file accanto resta chiuso, come in un browser
+
+Immagini, stili e script della cartella si vedono e girano, ma la pagina non ne legge il contenuto: la tela si sporca,
+le regole CSS non si leggono, gli errori degli script arrivano come «Script error.» (#1905.1). Lo fa il fusibile
+`GrantFileProtocolExtraPrivileges` spento (`scripts/lib/fusibili-electron.js`): con quello acceso la pagina è della
+stessa origine dei suoi file e legge tutto. Una CSP `sandbox` non basta: in un'origine opaca Chromium non mostra
+più le immagini `file:` (provato in #1905). In più `nosniff` su ogni risposta: un `.txt` o un `.json` non gira come
+script, così le sue righe non diventano variabili della pagina.
+
+Il fusibile è del binario, non della sessione, e va spento dappertutto:
+
+- nel pacchetto, in `scripts/after-pack.js`, su ogni sistema e su ogni copia, prima della firma del Mac e del
+  lanciatore di Linux; un binario senza filo ferma la costruzione;
+- nelle prove, dal globalSetup: sul posto se `node_modules/electron` è di questo checkout, altrimenti (i cloni delle
+  routine usano i moduli della cartella della sessione) una copia spenta nella temporanea del sistema, passata con
+  `ELECTRON_OVERRIDE_DIST_PATH`; sul Mac la copia o il binario modificato si rifirmano in locale;
+- in `npm start`, dal prestart, sul posto.
+
+Un motore rimasto acceso (un `test:shoot` fuori da Playwright) non apre buchi verso fuori: la rete che manca resta, e
+per questo nessuno dei tre strati si toglie.
 
 ## Perché
 
