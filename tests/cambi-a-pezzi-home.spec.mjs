@@ -57,6 +57,8 @@ test('la riga del cambio nella coda della home tiene il valore nel riquadro: nat
   await riga().locator('.dash-cambio-annulla').click();
   await expect(riga()).toHaveClass(/dash-cambi-annullato/, { timeout: 8_000 });
   await guarda('annullato');
+  // Barrata tutta, anche il riquadro.
+  expect(await riga().locator('.dash-altrui').evaluate((q) => getComputedStyle(q).textDecorationLine)).toContain('line-through');
 
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
   await page.reload();
