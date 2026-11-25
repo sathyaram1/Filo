@@ -85,10 +85,12 @@
   // `fermato`: l'ha fermato l'utente col quadrato (#578), non un guasto. Lo si dice anche senza azioni fatte: al turno
   // dopo il modello deve sapere che la risposta di prima non c'è.
   function interrotte(actions, { fermato = false } = {}) {
-    // Una mossa senza effetto non è fatta: il modello crederebbe di aver mosso la finestra (#553.15).
+    // Fatta è quello che l'esito comune conta come riuscito, come per l'archivio e il racconto del turno: una mossa senza
+    // effetto qui farebbe credere al modello di aver già mosso la finestra (#553.15, #553.16).
     if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
     const E = global.SN_ESITO;
-    const righe = righeFatte(Array.isArray(actions) ? actions : [], (a) => a._executed === false || a._confirm || (E && E.senzaEffetto(a)));
+    const nonFatta = E ? (a) => !E.conta(E.esitoAzione(a)) : (a) => a._executed === false || a._confirm;
+    const righe = righeFatte(Array.isArray(actions) ? actions : [], nonFatta);
     if (fermato) {
       return righe.length
         ? `[L'utente ti ha fermato a metà lavoro, prima che rispondessi. Queste cose ERANO GIÀ STATE FATTE:\n${righe.join('\n')}\nNon rifarle.]`
