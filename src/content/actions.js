@@ -2169,7 +2169,7 @@
       const codice = document.createElement('span');
       targa.append(campione, codice);
       lente.append(vetro, targa);
-      overlay.appendChild(lente);
+      strato.appendChild(lente);
 
       const ultimo = deps.getLastMouseEvent?.() || {};
       let px = Math.floor((Number(ultimo.clientX) || window.innerWidth / 2) * sx);
