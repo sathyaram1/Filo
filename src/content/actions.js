@@ -2203,6 +2203,7 @@
         window.removeEventListener('keydown', suTasto, true);
         window.removeEventListener('resize', rinuncia, true);
         document.removeEventListener('visibilitychange', suVisibilita, true);
+        if (contagocceSotto === overlay) contagocceSotto = null;
         resolve(scelto);
       }
       const rinuncia = () => chiudi('');
