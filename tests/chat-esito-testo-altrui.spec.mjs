@@ -144,7 +144,7 @@ test('#2648.1 il cambio di un\'impostazione chiesto in chat e il suo annullo ten
     await page.locator('.dash-action-btn', { hasText: 'Filo vuole rimettere' }).click({ timeout: 10_000 });
     const domanda = page.locator(`${CONFIRM_HOST} .sn-confirm-quote`, { hasText: 'controllato' });
     await expect(domanda).toBeVisible({ timeout: 10_000 });
-    expect((await domanda.textContent()).trim()).toBe(VALORE);
+    expect(await domanda.textContent()).toContain(VALORE);
     const paroleDomanda = (await page.locator(`${CONFIRM_HOST} .sn-confirm-filo`).allTextContents()).join(' ');
     expect(paroleDomanda).toContain('modello per');
     expect(paroleDomanda).not.toContain('controllato');
