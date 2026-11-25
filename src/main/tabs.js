@@ -1594,7 +1594,7 @@ class TabManager {
       ).then((entry) => {
         if (voce && this._pilaChiuse().archiviata(voce, entry) && entry) this._contaTornata(entry);
         // §3.1/§3.2 — in sottofondo: la chiusura non deve aspettare un LLM.
-        if (entry && entry.id) {
+        if (entry && entry.id && !file) {
           try { globalThis.SN_TAB_ENRICH && globalThis.SN_TAB_ENRICH(entry.id, enrichPayload); } catch (_) {}
         }
       }).catch(() => {});
