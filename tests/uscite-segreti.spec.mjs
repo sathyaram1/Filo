@@ -1606,6 +1606,77 @@ for (const [nome, nuova] of [['una chat nuova', true], ['lo scambio che la home 
   });
 }
 
+// #810.24 — la bozza che il sito tiene sul suo server torna nel messaggio dopo un riavvio: la carta che l'utente ci aveva
+// scritto non diventa un segreto letto quando l'assistente legge la pagina, e sul disco non c'è; il codice del sito sì.
+test('dopo un riavvio vero, la carta che l’utente aveva scritto nella bozza non diventa un segreto letto', async () => {
+  test.setTimeout(150_000);
+  let bozza = '';
+  const server = createServer((req, res) => {
+    if (req.method === 'POST') {
+      let corpo = '';
+      req.on('data', (c) => { corpo += c; });
+      req.on('end', () => { bozza = corpo; res.end('ok'); });
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><html><head><title>Posta</title></head><body style="padding:40px;font:16px sans-serif">
+      <h1>Nuovo messaggio</h1>${campoDelSito('264087')}<br><label for="m">Messaggio</label>
+      <textarea id="m" rows="4" cols="60">${bozza.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</textarea>
+      <script>document.getElementById('m').addEventListener('input', (e) => fetch('/bozza', { method: 'POST', body: e.target.value }));</script>
+      </body></html>`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${server.address().port}/posta`;
+  const userData = cartellaTemporanea('filo-bozza-');
+  const fileLetti = join(userData, 'segreti-letti.bin');
+  const carta = CARTA_UTENTE.replace(/ /g, '');
+  const launch = () => electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_TEST_ACCOLTO: '1', NODE_ENV: 'test' },
+  });
+  const apri = async (app) => {
+    const shell = await primaFinestra(app);
+    const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(async () => Boolean(page = await paginaDellaScheda(app, aperta.id, (w) => w.url().startsWith(url))), { timeout: 20_000 }).toBe(true);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+    return { shell, page };
+  };
+  let app = await launch();
+  try {
+    const { page } = await apri(app);
+    await page.locator('#m').pressSequentially(`Ciao Marco, la carta è ${CARTA_UTENTE}.`);
+    await expect.poll(() => bozza, { timeout: 10_000 }).toContain(CARTA_UTENTE);
+    // Quello che resta dell'utente si salva poco dopo che ha smesso di scrivere: chi chiude Filo arriva dopo.
+    await expect.poll(() => existsSync(fileLetti), { timeout: 10_000 }).toBe(true);
+  } finally {
+    await chiudiApp(app);
+  }
+  expect(readFileSync(fileLetti).includes(carta), 'il numero della carta dell’utente è scritto sul disco').toBe(false);
+  app = await launch();
+  try {
+    await preparaModelli(app);
+    await modelloFinto(app, { aiuto: '{"text":"Ho corretto il messaggio.","status":"done"}' });
+    const { shell, page } = await apri(app);
+    await expect(page.locator('#m'), 'il sito non ha rimesso la bozza').toHaveValue(`Ciao Marco, la carta è ${CARTA_UTENTE}.`);
+    const aiuto = await apriAiuto(app, shell, page);
+    await scriviAllAiuto(aiuto, 'correggi il messaggio');
+    await expect(aiuto.locator('.sn-sidebar').getByText('Ho corretto il messaggio.')).toBeVisible({ timeout: 20_000 });
+    await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
+    expect(await lettiSalvati(app), 'la carta della bozza è fra i segreti letti').not.toContain(carta);
+    const dopo = await lettiDopoUnRiavvio(app);
+    expect(dopo).toContain('264087');
+    expect(dopo, 'la carta della bozza è rimasta nel file dei segreti letti').not.toContain(carta);
+    await page.screenshot({ path: 'tests/.shots/uscite-segreti-bozza-dopo-riavvio.png' });
+  } finally {
+    await chiudiApp(app);
+    server.closeAllConnections?.();
+    await new Promise((r) => server.close(r));
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
 // Dentro una pagina web i collegamenti scritti dall'assistente li apre il main, dopo la porta: con ogni gesto quello col
 // codice letto dalla pagina non esce, e la riga lo dice; quello che non porta niente si apre come prima.
 test('i collegamenti nella risposta dell’assistente di pagina col codice letto non si aprono con nessun gesto', async ({ app, shell, openTab, testServer }) => {
