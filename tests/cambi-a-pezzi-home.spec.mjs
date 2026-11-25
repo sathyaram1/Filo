@@ -32,7 +32,9 @@ test('la riga del cambio nella coda della home tiene il valore nel riquadro: nat
   let page = await home(app);
   await app.evaluate((_e, v) => globalThis.SN_STORAGE.updateSettings({ agentStyle: v }), STILE);
 
-  const riga = () => page.locator('.dash-cambio', { hasText: 'stile dell' }).last();
+  // L'annullo fa nascere la sua riga («rimesso com'era · …»): si segue quella del cambio.
+  let id = null;
+  const riga = () => (id ? page.locator(`.dash-cambio[data-id="${id}"]`) : page.locator('.dash-cambio', { hasText: 'stile dell' }).last());
   const guarda = async (quando) => {
     await expect(riga(), quando).toBeVisible({ timeout: 10_000 });
     const t = riga().locator('.dash-cambio-testo');
