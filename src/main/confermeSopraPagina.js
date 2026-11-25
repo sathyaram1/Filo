@@ -88,7 +88,7 @@ function allineaFinestre() {
       nascoste.add(w);
       try { w.hide(); } catch (_) {}
       // Il testo finto è stato a schermo sopra la domanda: un clic partito leggendo quello non vale un sì.
-      for (const c of coperte) c.ridisegna(w);
+      for (const c of coperte) void c;
     } else if (nascoste.has(w)) {
       nascoste.delete(w);
       try { w.showInactive(); } catch (_) {}
