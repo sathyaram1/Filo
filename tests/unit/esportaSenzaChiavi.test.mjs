@@ -261,6 +261,25 @@ test('un proxy «host:porta:utente:password» è un segreto: la casella compare,
   assert.equal(readExportZip(buildExportZip(dati, { chiavi: true })).data.settings.proxy.datacenter, ELENCO);
 });
 
+// #2646.3: una riga che Filo non sa leggere non ha un indirizzo sicuro da tenere: va via intera, come una chiave.
+test('un proxy che Filo non sa leggere è un segreto: senza la spunta l\'archivio non lo porta, nemmeno a pezzi', () => {
+  const PW = 'passwordsegreta-illeggibile';
+  for (const riga of [
+    `2001:db8::1:8080:mario:${PW}`, `gate.esempio.com:8080:ma/rio:${PW}`, `gate.esempio.com:8080:ma#rio:${PW}`,
+    `gate.esempio.com:8080:ma?rio:${PW}`, `ma/rio:${PW}@gate.esempio.com:8080`,
+  ]) {
+    const dati = { settings: { proxy: { datacenter: riga } }, filo_notes: [{ id: 'n', text: `la password è ${PW}` }] };
+    assert.equal(C.haSegreti(dati.settings), true, `${riga}: la casella «Includi le chiavi» deve comparire`);
+    const zip = buildExportZip(dati);
+    assert.equal(zip.includes(Buffer.from(PW)), false, `${riga}: la password è uscita senza la spunta`);
+    const parsed = readExportZip(zip);
+    assert.equal('datacenter' in parsed.data.settings.proxy, false, `${riga}: il campo deve andare via`);
+    const qui = { settings: { proxy: { datacenter: 'http://anna:pw-di-qui-lunga@gate.esempio.com:8080' } } };
+    assert.equal(importa(qui, parsed).merged.settings.proxy.datacenter, qui.settings.proxy.datacenter, 'quello di qui resta');
+    assert.equal(readExportZip(buildExportZip(dati, { chiavi: true })).data.settings.proxy.datacenter, riga);
+  }
+});
+
 // #2134.2: i campi del proxy stanno in un elenco solo, quello di SN_CONST.
 test('l\'esportazione non tiene un suo elenco dei campi del proxy né una sua lettura delle credenziali', () => {
   const testo = readFileSync(join(ROOT, 'src', 'main', 'services', 'exportData.js'), 'utf8');

@@ -1179,7 +1179,18 @@
     const u = FINE_URL.exec(resto);
     return u && INDIRIZZO_VERO.test(u[1]) ? null : el;
   }
+  const HOST_IN_CODA = /^(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+)(:\d{1,5})?([/?#].*)?$/i;
   const decodifica = (x) => { try { return decodeURIComponent(x); } catch (_) { return x; } };
+  // Una riga che Filo non sa leggere si custodisce intera (#2646.3), ma non il suo host: le finestre del confronto
+  // fermerebbero una visita al fornitore. L'host è dopo l'ultima @, se lì ce n'è uno, se no in testa fino ai primi due
+  // punti; la password presunta è l'ultimo pezzo dopo i due punti, come nelle due forme che Filo legge.
+  function senzaHost(resto) {
+    const at = resto.lastIndexOf('@');
+    const c = resto.indexOf(':');
+    const parte = at > 0 && HOST_IN_CODA.test(resto.slice(at + 1)) ? resto.slice(0, at) : c > 0 ? resto.slice(c + 1) : resto;
+    const coda = parte.slice(parte.lastIndexOf(':') + 1);
+    return { credenziali: parte, password: /^\d*$/.test(coda) ? '' : coda, senza: '', intera: true };
+  }
   function leggiProxy(v) {
     if (!pieno(v)) return null;
     const t = v.trim();
@@ -1196,21 +1207,26 @@
     }
     const schema = sm ? sm[1] : (scritte ? 'http' : 'socks5');
     let uso = null;
+    let letta = false;
     try {
       const u = new URL(el ? `${schema}://${el[1]}:${el[2]}` : `${schema}://${resto}`);
+      // Senza schema una @ dopo l'host è di credenziali lette male: «mario:12/ss@host» sarebbe host «mario», porta 12.
+      letta = !!u.hostname && (!!el || !!sm || !`${u.pathname}${u.search}${u.hash}`.includes('@'));
       if (u.hostname) {
         const auth = el ? { username: el[3], password: el[4] }
           : u.username ? { username: decodifica(u.username), password: decodifica(u.password || '') } : null;
         uso = { proxyRules: `${u.protocol.replace(/:$/, '')}://${u.port ? `${u.hostname}:${u.port}` : u.hostname}`, auth };
       }
     } catch (_) {}
+    if (!letta) return { uso: null, scritte: senzaHost(resto) };
     if (!scritte && uso && uso.auth) {
       scritte = { credenziali: `${uso.auth.username}:${uso.auth.password}`, password: uso.auth.password, senza: uso.proxyRules };
     }
     return { uso, scritte, senzaSchema: !sm };
   }
 
-  // Utente e password di un proxy come sono scritti: { credenziali, password, senza }, null se non ce ne sono. PURA.
+  // Utente e password di un proxy come sono scritti: { credenziali, password, senza }, null se non ce ne sono. Di una
+  // riga che non si legge, `intera`: `senza` è vuoto, e l'esportazione toglie il campo come una chiave. PURA.
   function credenzialiProxy(v) {
     const p = leggiProxy(v);
     return p && p.scritte;
