@@ -1208,7 +1208,9 @@ test('(Z3) fuori da Filo con la home davanti: l’avviso aspetta; tornati sulla 
   test.setTimeout(150_000);
   ownKeyStatus = 402;
   const { home } = await homeDavanti(app, shell, openTab);
+  // Il fuoco finto di Playwright va tolto alla home e al suo content script, che prenderebbe l'avviso.
   await home.evaluate(() => { Document.prototype.hasFocus = () => false; });
+  await fuocoSullaPagina(app, home.url(), false);
   await home.locator('#input').fill('ciao ripiego');
   await home.locator('#sendBtn').click();
   await expect(home.locator('.dash-bubble-note')).toContainText('ho usato i crediti di Filo', { timeout: 30_000 });
