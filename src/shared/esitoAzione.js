@@ -67,9 +67,11 @@
       .filter((v) => v.type);
   }
 
-  // Un testo scritto dal modello o da un sito, in una riga: senza caratteri di controllo.
+  // Un testo scritto dal modello o da un sito, in una riga: senza caratteri di controllo. La riga a pezzi (`ripulite`)
+  // deve dire la stessa frase, quindi un filtro nuovo va in `inUnaRiga`, che usa anche lei.
+  const inUnaRiga = (v) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ');
   function pulito(v) {
-    return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+    return inUnaRiga(v).trim();
   }
   const breve = (v, max) => {
     const s = pulito(v);
