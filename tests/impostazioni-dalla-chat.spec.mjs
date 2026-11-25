@@ -345,7 +345,7 @@ test('H — un valore che non si applica non chiede un OK a vuoto, e il perché 
   // Ogni voce che nomina la pubblicità entra nell'elenco: #1974 ha aggiunto quella di YouTube.
   // La parola detta dal modello sta nel suo riquadro (#2648.1), i nomi delle voci sono di Filo.
   await expect(riga).toContainText('Impostazione non applicata · pubblicità può voler dire più impostazioni: «salta le pubblicità dei video», «blocca le pubblicità di YouTube», «blocco di pubblicità e tracker»');
-  await expect(riga.locator('.dash-altrui')).toHaveText(['pubblicità']);
+  await expect(riga.locator('.dash-activity-row .dash-altrui').first()).toHaveText('pubblicità');
   expect(await riga.innerText()).not.toMatch(/salta_pubblicita|blocca_pubblicita_youtube|chiave esatta/);
   const esito = (await app.evaluate(() => globalThis.__imp_tool)).pop();
   expect(esito).toContain('salta_pubblicita, blocca_pubblicita_youtube, blocco_pubblicita');
