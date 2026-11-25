@@ -643,6 +643,7 @@
     // esattamente ciò che l'avviso finale deve confessare. Quelli tradotti in sottofondo hanno un conto a parte.
     frameRuns.set(runId, {
       expected, acked: 0, ended: 0, applied: 0, left: 0, extraExpected: background.length, extraAcked: 0, extraEnded: 0,
+      spenti: new Set(),
     });
     try {
       await chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'translate', runId });
