@@ -72,7 +72,7 @@ test('Esc e il tasto destro rinunciano senza toccare gli appunti', async ({ app,
   strato = await apriContagocce(app, page);
   await page.mouse.click(100, 100, { button: 'right' });
   await expect(strato).toHaveCount(0);
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
   await new Promise((r) => setTimeout(r, 500));
   expect(await appunti(app)).toBe('prima');
 });
