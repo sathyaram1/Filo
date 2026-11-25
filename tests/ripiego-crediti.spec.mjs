@@ -1134,7 +1134,8 @@ const avvisiInAttesa = (app) => app.evaluate(() => globalThis.SN_AVVISI_FUORI_PO
 const attiva = (shell, id) => shell.evaluate((i) => window.filoShell.tabs.activate(i), id);
 const toastAdesso = (page) => page.locator('.sn-toast', { hasText: 'crediti di Filo' }).count();
 
-async function homeDavanti(app, shell, openTab) {
+// `bringToFront` dà il fuoco alla finestra: chi finge Filo dietro un'altra applicazione non lo chiama.
+async function homeDavanti(app, shell, openTab, { finestraDavanti = true } = {}) {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const home = await newtabPage(app);
   await expect(home.locator('#input')).toBeVisible();
@@ -1142,9 +1143,10 @@ async function homeDavanti(app, shell, openTab) {
   await prepare(app);
   const idHome = await idScheda(app, 'filo://newtab');
   await attiva(shell, idHome);
-  await home.bringToFront().catch(() => {});
+  if (finestraDavanti) await home.bringToFront().catch(() => {});
   return { home, idHome };
 }
+const finestraColFuoco = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoTabs && w.isFocused()));
 
 test('(Z1) la risposta della home arriva con un’altra scheda davanti: l’avviso lo dice sulla pagina in vista, e tornati sulla home non si ripete', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(150_000);
