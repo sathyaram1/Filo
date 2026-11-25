@@ -39,6 +39,8 @@ test('sulla nuova scheda il contagocce si apre e copia un colore', async ({ app 
   const page = await home(app);
   await scrivi(app, 'prima');
   const strato = await apriContagocce(app, page);
+  await page.mouse.move(260, 220, { steps: 4 });
+  await page.screenshot({ path: 'tests/.shots/color-picker-nuova-scheda.png' });
   await page.mouse.click(30, 30);
   await expect.poll(() => appunti(app), { timeout: 8000 }).toMatch(/^#[0-9A-F]{6}$/);
   await expect(strato).toHaveCount(0);
