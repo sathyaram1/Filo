@@ -475,3 +475,33 @@ test('la risposta sotto chi chiede la password esce come segnaposto dal paviment
   }
   assert.ok(P.trova(pagina).some((x) => x.valore === 'Brezza7Mare'), 'il valore si toglie com\'è scritto, maiuscole comprese');
 });
+
+// #1403.2 — la colonna «password» di un CSV, a virgole o a punti e virgola, come quella a barre o a tabulazioni.
+test('la colonna password di un CSV non esce: punti e virgola, esportazioni dei browser, virgolette, a capo di Windows', () => {
+  const casi = [
+    ['utente;password\nmario.rossi;hunter22', ['hunter22']],
+    ['utente,password\r\nmario.rossi,hunter22\r\nanna,Mela!Verde77\r\n', ['hunter22', 'Mela!Verde77']],
+    ['name,url,username,password,note\nBanca,https://banca.it,mario,gattino,\nPosta,https://posta.it,mario,Tr7#kq29Lm,lavoro', ['gattino', 'Tr7#kq29Lm']],
+    ['"url","username","password"\n"https://a.it","mario","hunter22"\n"https://b.it","anna","con, virgola 9"', ['hunter22', 'con, virgola 9']],
+    ['folder,favorite,type,name,login_uri,login_username,login_password\n,,login,Banca,https://banca.it,mario,Girasole2024', ['Girasole2024']],
+    ['Utente;Password;Ruolo\n\nmario;Nuvola2023;admin', ['Nuvola2023']],
+  ];
+  for (const [t, segreti] of casi) {
+    const o = P.oscura(t);
+    for (const s of segreti) assert.ok(!o.includes(s), `${s} in ${JSON.stringify(t)}`);
+    assert.ok(o.includes('mario'), 'le altre colonne restano');
+  }
+  // La posizione del valore torna giusta: una parola senza forma si toglie solo dove sta.
+  assert.equal(P.oscura('name,username,password\ngattino,mario,gattino'), `name,username,password\ngattino,mario,${S}`);
+});
+
+test('una frase con le virgole che nomina la password non apre una colonna, e la tabella finisce dove cambiano le celle', () => {
+  for (const t of [
+    'Inserisci utente, password e premi invio\nPoi riprova, hunter22 non va',
+    'Ciao, password\nOk, grazie',
+    'utente;password\nscusate, non so come fare',
+    'Password,Manager\nBitwarden,gratis',
+  ]) assert.equal(P.oscura(t), t, t);
+  const t = 'utente;password\nmario;hunter22\nfine della tabella\nnome;ruolo;altro\nanna;Tulipano!88;x';
+  assert.equal(P.oscura(t), `utente;password\nmario;${S}\nfine della tabella\nnome;ruolo;altro\nanna;Tulipano!88;x`);
+});
