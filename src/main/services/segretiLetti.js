@@ -6,6 +6,7 @@
 const MAX_LETTI = 50000;
 // Quanto un segreto letto resta ricordato fra un avvio e l'altro: ben oltre la vita di un codice e delle azioni recenti.
 const GIORNI_RICORDO = 30;
+const inizioRicordo = (ora = Date.now()) => ora - GIORNI_RICORDO * 24 * 3600 * 1000;
 
 // Pieno, il registro toglie dalla lettura che ha portato più voci: una pagina che nasconde migliaia di codici finti
 // consuma solo il proprio posto, e il codice vero letto altrove resta. Prova: tests/unit/usciteSegreti.test.mjs.
