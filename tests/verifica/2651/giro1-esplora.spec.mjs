@@ -69,7 +69,6 @@ for (const url of ['filo://options/options.html', 'filo://preferences/preference
     console.log(url, 'icona', await ico.getAttribute('class').catch(() => '?'), await ico.getAttribute('title').catch(() => '?'));
     const strato = page.locator('.sn-color-overlay');
     await expect(strato).toBeVisible({ timeout: 8000 });
-    const atteso = await pixelVero(app, url, 50, 50);
     await scrivi(app, 'prima');
     await page.mouse.click(50, 50);
     await expect.poll(() => appunti(app), { timeout: 8000 }).toBe(atteso.hex);
