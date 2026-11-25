@@ -49,9 +49,10 @@ function leggiByte(fd, pos) {
 
 // 'acceso' | 'spento'. Lancia se il file non c'è o non ha il filo.
 function privilegiFile(eseguibile) {
-  const fd = fs.openSync(fileDelFilo(eseguibile), 'r');
+  const file = fileDelFilo(eseguibile);
+  const fd = fs.openSync(file, 'r');
   try {
-    const stati = posizioni(fd).map((p) => leggiByte(fd, p));
+    const stati = posizioni(fd, file).map((p) => leggiByte(fd, p));
     if (stati.some((s) => s !== ACCESO && s !== SPENTO)) throw new Error('GrantFileProtocolExtraPrivileges segnato come tolto');
     return stati.every((s) => s === SPENTO) ? 'spento' : 'acceso';
   } finally { fs.closeSync(fd); }
