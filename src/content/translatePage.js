@@ -431,7 +431,7 @@
           Popup.showToast(I18n.t('toast_page_translated_new_arrived'), { duration: 7000 });
           return;
         }
-        Popup.showToast(...doneToast(result.unreachable, framesLeft));
+        Popup.showToast(...doneToast(result.unreachable, framesLeft, spenti));
         return;
       default:
     }
