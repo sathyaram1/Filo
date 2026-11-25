@@ -110,7 +110,8 @@ let inAttesa = null;
 function salvaOra() {
   if (inAttesa) { clearTimeout(inAttesa); inAttesa = null; }
   if (!deposito) return;
-  try { deposito.scrivi(JSON.stringify(letti.esporta())); } catch (e) { console.warn('[Filo] segreti letti non salvati', e?.message || e); }
+  const voci = [...letti.esporta(), ...(suoi.size ? [{ sale }] : []), ...[...suoi].map(([suo, at]) => ({ suo, at }))];
+  try { deposito.scrivi(JSON.stringify(voci)); } catch (e) { console.warn('[Filo] segreti letti non salvati', e?.message || e); }
 }
 
 function salvaPresto() {
