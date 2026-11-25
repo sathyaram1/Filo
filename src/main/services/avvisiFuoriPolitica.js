@@ -13,7 +13,23 @@ function crea({ manda, ora = Date.now, nuovoId = () => crypto.randomUUID() } = {
   const mostrati = new Map(); // chiave → quando si è visto
   const inCoda = new Map(); // chiave → { messaggio, alMostrare }
 
-  // `componi()` dà { messaggio, alMostrare? }: si scrive solo se l'avviso parte davvero.
+  // `dettoAltrove(davanti)` della voce dice se la scheda davanti (`davanti.scheda`, o quella che sa lui) lo mostra già
+  // in un altro modo: allora esce dalla coda senza partire, e la pausa la tiene lui.
+  function giaDetto(k, voce, davanti) {
+    let detto = false;
+    try { detto = typeof voce.dettoAltrove === 'function' && voce.dettoAltrove(davanti || {}) === true; } catch (_) {}
+    if (detto && inCoda.get(k) === voce) inCoda.delete(k);
+    return detto || inCoda.get(k) !== voce;
+  }
+
+  // Lo stesso oggetto a ogni offerta: entra nel filo una volta sola (accaduti.avviso).
+  function offri(k, voce) {
+    if (giaDetto(k, voce)) return false;
+    try { manda(voce.messaggio); } catch (_) {}
+    return true;
+  }
+
+  // `componi()` dà { messaggio, alMostrare?, dettoAltrove? }: si scrive solo se l'avviso parte davvero.
   function avvisa(chiave, componi) {
     const k = String(chiave || '');
     if (!k || ora() - (mostrati.get(k) || 0) < PAUSA_MS) return null;
@@ -21,19 +37,19 @@ function crea({ manda, ora = Date.now, nuovoId = () => crypto.randomUUID() } = {
     if (!voce) {
       const c = componi() || {};
       if (!c.messaggio) return null;
-      voce = { messaggio: { ...c.messaggio, avviso: nuovoId() }, alMostrare: c.alMostrare };
+      voce = { messaggio: { ...c.messaggio, avviso: nuovoId() }, alMostrare: c.alMostrare, dettoAltrove: c.dettoAltrove };
       inCoda.set(k, voce);
     }
-    // Lo stesso oggetto a ogni offerta: entra nel filo una volta sola (accaduti.avviso).
-    try { manda(voce.messaggio); } catch (_) {}
-    return voce.messaggio;
+    return offri(k, voce) ? voce.messaggio : null;
   }
 
-  // Li prende la pagina che li mostra adesso: da qui parte la pausa. Con `id` solo quello, senza tutti quelli in coda.
-  function prendi(id) {
+  // Li prende la pagina che li mostra adesso (`davanti.scheda`): da qui parte la pausa. Con `id` solo quello, senza
+  // tutti quelli in coda.
+  function prendi(id, davanti) {
     const presi = [];
-    for (const [k, voce] of inCoda) {
+    for (const [k, voce] of [...inCoda]) {
       if (id && voce.messaggio.avviso !== id) continue;
+      if (giaDetto(k, voce, davanti)) continue;
       inCoda.delete(k);
       mostrati.set(k, ora());
       try { if (typeof voce.alMostrare === 'function') voce.alMostrare(); } catch (_) {}
