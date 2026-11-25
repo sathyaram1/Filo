@@ -64,11 +64,27 @@ test('rifatta dalle Preferenze e ancora aperta: in incognito resta accolto', asy
   assert.equal((await Storage.runIncognito(() => FiloMem.getOnboarding())).done, true);
 });
 
-test('chi non è mai stato accolto in incognito non vede niente di quella che ha cominciato', async () => {
-  await disco({ done: false, ticked: [], thread: [{ role: 'user', text: 'faccio il fornaio a Bari' }] });
+// #2650: in incognito l'intervista ripartiva a ogni finestra nuova, perché lì dentro niente di detto resta.
+test('chi non è mai stato accolto in incognito non ha l\'intervista, e non vede quella che ha cominciato', async () => {
+  const cominciata = { done: false, ticked: [], thread: [{ role: 'user', text: 'faccio il fornaio a Bari' }] };
+  await disco(cominciata);
   const dentro = await Storage.runIncognito(() => FiloMem.getOnboarding());
-  assert.equal(dentro.done, false);
+  assert.equal(dentro.done, true, 'in incognito si aprirebbe l\'intervista');
   assert.deepEqual(dentro.thread, []);
+  const tutto = await Storage.runIncognito(() => Storage.get(null));
+  assert.deepEqual(tutto.filo_onboarding, { done: true });
+  assert.doesNotMatch(JSON.stringify(tutto), /fornaio/);
+  const fuori = await FiloMem.getOnboarding();
+  assert.equal(fuori.done, false, 'fuori dall\'incognito l\'intervista resta da fare');
+  assert.equal(fuori.thread[0].text, 'faccio il fornaio a Bari');
+});
+
+test('primo avvio direttamente in incognito: niente intervista, in nessuna lettura', async () => {
+  Storage.resetIncognito();
+  await Storage.remove('filo_onboarding');
+  assert.equal((await Storage.runIncognito(() => FiloMem.getOnboarding())).done, true);
+  assert.deepEqual((await Storage.runIncognito(() => Storage.get(null))).filo_onboarding, { done: true });
+  assert.equal((await FiloMem.getOnboarding()).done, false);
 });
 
 test('il vecchio segno di benvenuto vale anche in incognito', async () => {
