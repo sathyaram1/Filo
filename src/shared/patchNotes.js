@@ -16,6 +16,10 @@
         { testo: 'Un proxy scritto in una forma che Filo non sa leggere, come un indirizzo IPv6 senza parentesi quadre, è protetto intero come una chiave API: si salva cifrato, l\'assistente non lo passa ai modelli e l\'archivio esportato non lo porta se non spunti «Includi le chiavi».', segnalazione: 2646 },
         { testo: 'Un articolo lasciato a metà, dopo aver chiuso e riaperto Filo, riparte dal punto in cui eri. La pulizia delle schede alla riapertura sa fin dove eri arrivato negli articoli, nei video e negli audio, e non li tratta come pagine mai aperte.', segnalazione: 349 },
         { testo: 'Se un negozio ha aperto il pagamento in un\'altra scheda, premere di nuovo «paga» ti riporta lì anche quando il pagamento sta su un altro sito. Una finestra aperta da un sito, come una chat, non ti porta più via dalla pagina che stai leggendo.', segnalazione: 737 },
+        { testo: 'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».', segnalazione: 1337 },
+        { testo: 'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.', segnalazione: 1337 },
+        { testo: 'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.', segnalazione: 1337 },
+        { testo: 'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.', segnalazione: 1337 },
       ],
     },
     {

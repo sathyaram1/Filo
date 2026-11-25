@@ -86,3 +86,13 @@ test('anche un .svg (immagine attiva) trascinato viene rifiutato', async ({ app,
   await expect(page.locator('.sn-fb-file-chip')).toHaveCount(0);
   await expect(page.locator('.sn-fb-status')).toContainText(/non supportato/i);
 });
+
+test('un .xls dichiarato come foglio di Excel resta rifiutato: l\'alias vale solo con l\'estensione della sua voce', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(page.locator('.sn-fb-modal')).toBeVisible();
+  await dropFile(page, { name: 'conti.xls', type: 'application/vnd.ms-excel', content: 'x' });
+  await expect(page.locator('.sn-fb-file-chip')).toHaveCount(0);
+  await expect(page.locator('.sn-fb-status')).toContainText(/non supportato/i);
+});
