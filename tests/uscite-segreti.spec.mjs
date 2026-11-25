@@ -1663,7 +1663,7 @@ test('dopo un riavvio vero, la carta che l’utente aveva scritto nella bozza no
   try {
     await preparaModelli(app);
     await modelloFinto(app, { aiuto: '{"text":"Ho corretto il messaggio.","status":"done"}' });
-    const { shell, page } = await apri(app);
+    const { shell, page } = await apri(app, 2);
     await expect(page.locator('#m'), 'il sito non ha rimesso la bozza').toHaveValue(`Ciao Marco, la carta è ${CARTA_UTENTE}.`);
     const aiuto = await apriAiuto(app, shell, page);
     await scriviAllAiuto(aiuto, 'correggi il messaggio');
