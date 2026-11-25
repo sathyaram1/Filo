@@ -159,10 +159,8 @@
   function fraseDelCambio(a) {
     const f = String((a && a._fraseCambio) || '').trim();
     if (!f) return null;
-    const p = a._fraseCambioParti;
-    const buone = Array.isArray(p) && p.length <= 60
-      && p.every((x) => typeof x === 'string' || (x && typeof x === 'object' && typeof x.citazione === 'string'));
-    return buone && piatto(p).trim() === f ? p.map((x) => (typeof x === 'string' ? x : cit(x.citazione, x.nuda === true))) : [cit(f, true)];
+    const p = esito().partiDellaRiga(a._fraseCambioParti, f);
+    return p ? p.map((x) => (typeof x === 'string' ? x : cit(x.citazione, x.nuda === true))) : [cit(f, true)];
   }
   // Le frasi di cosa cambierebbe il ripristino: un elenco del main, ognuna nel suo riquadro.
   const frasiRipristino = (a) => {
