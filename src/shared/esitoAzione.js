@@ -111,6 +111,58 @@
   // Lo stesso perché a pezzi quando porta un testo non di Filo (la riga d'errore di un programma, il nome di una
   // finestra): chi lo mostra lo chiude nel riquadro (#2648.1). Altrimenti la frase.
   function motivoAPezzi(a) {
+    const m = motivoGrezzo(a);
+    return typeof m === 'string' && m ? conScrittoDalModello(m, a) : m;
+  }
+  // Gli argomenti dell'azione li ha scritti il modello: un perché che li ripete (il valore rifiutato, il sito nominato
+  // male), chiunque l'abbia composto, li tiene nel riquadro (#2648.1). Sentinella: tests/unit/righeEsitoAPezzi.test.mjs.
+  function scrittoDalModello(a) {
+    const out = new Set();
+    const giro = (v, d) => {
+      if (typeof v === 'string') {
+        const t = pulito(v).replace(/\s+/g, ' ');
+        if (/\p{L}/u.test(t)) out.add(t);
+      } else if (v && typeof v === 'object' && d < 3) {
+        for (const [k, x] of Object.entries(v)) if (!k.startsWith('_') && (d || (k !== 'type' && k !== 'id'))) giro(x, d + 1);
+      }
+    };
+    giro(a, 0);
+    return [...out].sort((x, y) => y.length - x.length);
+  }
+  // Fra «» basta l'inizio del testo, accorciato con «…» o tagliato lungo; nudo serve il testo intero e non una parola
+  // corta, che una frase di Filo può contenere da sé.
+  function conScrittoDalModello(testo, a) {
+    const scritti = scrittoDalModello(a);
+    if (!scritti.length) return testo;
+    const fraVirgolette = (x) => {
+      const y = x.replace(/…$/, '').trim();
+      return !!y && scritti.some((s) => s === x || (y !== x && y.length >= 3 && s.startsWith(y)) || (y.length >= 40 && s.startsWith(y)));
+    };
+    const out = [];
+    const nudo = (t) => {
+      while (t) {
+        let best = null;
+        for (const s of scritti) {
+          const j = s.length >= 6 ? t.indexOf(s) : -1;
+          if (j >= 0 && (!best || j < best.j)) best = { j, s };
+        }
+        if (!best) { out.push(t); return; }
+        if (best.j) out.push(t.slice(0, best.j));
+        out.push({ citazione: best.s, nuda: true });
+        t = t.slice(best.j + best.s.length);
+      }
+    };
+    let k = 0;
+    for (const m of testo.matchAll(/«([^«»]+)»/g)) {
+      if (!fraVirgolette(m[1])) continue;
+      nudo(testo.slice(k, m.index));
+      out.push({ citazione: m[1] });
+      k = m.index + m[0].length;
+    }
+    nudo(testo.slice(k));
+    return out.some(riquadro) ? out : testo;
+  }
+  function motivoGrezzo(a) {
     const o = a && a._output;
     if (!o) return '';
     const tipo = String((a && a.type) || '').toUpperCase();
