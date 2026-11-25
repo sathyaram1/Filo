@@ -288,15 +288,19 @@ function ricordaBuste(valore) {
 }
 
 function tutti() { carica(); return letti.tutti(); }
-function aggiungi(x, fonte) { if (dellUtente(x, fonte)) return; carica(); letti.aggiungi(x, fonte); }
+function aggiungi(x, fonte) { carica(); if (dellUtente(x, fonte)) return; letti.aggiungi(x, fonte); }
 function aggiungiTutti(lista, fonte) {
   carica();
-  letti.aggiungiTutti(immessi.size && Array.isArray(lista) ? lista.filter((x) => !dellUtente(x, fonte)) : lista, fonte);
+  letti.aggiungiTutti((immessi.size || suoi.size) && Array.isArray(lista) ? lista.filter((x) => !dellUtente(x, fonte)) : lista, fonte);
 }
 // Come a un riavvio: la memoria si svuota e alla prossima lettura torna quello che era salvato.
-function svuota() { if (inAttesa) salvaOra(); letti.svuota(); caricato = false; }
-// Per gli unit test: un deposito finto (null = nessuno).
-function usaDeposito(d) { deposito = d; caricato = false; letti.svuota(); immessi.clear(); caratteriImmessi = 0; }
+function svuota() { ricordaSuoi(); if (inAttesa) salvaOra(); letti.svuota(); suoi.clear(); sale = ''; caricato = false; }
+// Per gli unit test: un deposito finto (null = nessuno). `riavvio`: anche quello immesso nella sessione se ne va.
+function usaDeposito(d) {
+  if (ricordoInAttesa) { clearTimeout(ricordoInAttesa); ricordoInAttesa = null; }
+  deposito = d; caricato = false; letti.svuota(); immessi.clear(); caratteriImmessi = 0;
+  suoi.clear(); sale = ''; daRicordare.clear();
+}
 
 module.exports = {
   ricorda, ricordaBuste, registro, aggiungi, aggiungiTutti, tutti, svuota, usaDeposito, immessoDallUtente,
