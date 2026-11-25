@@ -1650,7 +1650,7 @@ test('dopo un riavvio vero, la carta che l’utente aveva scritto nella bozza no
   };
   let app = await launch();
   try {
-    const { page } = await apri(app);
+    const { page } = await apri(app, 1);
     await page.locator('#m').pressSequentially(`Ciao Marco, la carta è ${CARTA_UTENTE}.`);
     await expect.poll(() => bozza, { timeout: 10_000 }).toContain(CARTA_UTENTE);
     // Quello che resta dell'utente si salva poco dopo che ha smesso di scrivere: chi chiude Filo arriva dopo.
