@@ -44,6 +44,7 @@ test('la riga del cambio nella coda della home tiene il valore nel riquadro: nat
     expect(p.filo, quando).toBe('3px');
   };
   await guarda('appena nato');
+  id = await riga().getAttribute('data-id');
   await riga().scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/cambi-a-pezzi-home-coda.png' });
 
