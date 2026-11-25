@@ -163,6 +163,18 @@ test('#1686: la musica chiusa si sceglie con la regola di Ctrl+Shift+T, dalla pi
   assert.equal(p.dallArchivio(voci, { suonata: true }).id, 'prima');
 });
 
+test('#1905.1: finita la pila, l\'archivio ridà anche la scheda di un file del computer, e non una pagina interna', () => {
+  const p = SchedeChiuse.crea();
+  const voci = [
+    arch('interna', 'filo://history/', '2026-10-22T12:00:00Z'),
+    arch('report', 'file:///home/u/Scaricati/report.html', '2026-10-22T11:00:00Z'),
+    arch('sito', 'https://a.example/', '2026-10-22T10:00:00Z'),
+  ];
+  assert.equal(p.dallArchivio(voci).id, 'report');
+  p.segnaRiaperta('report');
+  assert.equal(p.dallArchivio(voci).id, 'sito');
+});
+
 test('#1686: una riapertura segnata e non riuscita rende la voce di nuovo riapribile, da ogni porta', () => {
   const p = SchedeChiuse.crea();
   const voci = [arch('a', 'https://a.example/', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T09:59:00Z' })];
