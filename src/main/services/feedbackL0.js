@@ -4,6 +4,8 @@
 
 'use strict';
 
+const Statico = require('./feedbackL0Statico');
+
 const ATTESA_MS = 8000;
 // Una rilettura vale per il testo esatto: si tengono le ultime, per il riquadro che si riapre e si rimanda.
 const CACHE_MAX = 30;
