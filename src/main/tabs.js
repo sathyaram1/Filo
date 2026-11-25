@@ -2597,6 +2597,8 @@ class TabManager {
       apriComunque: this._siteAllowedIn(tab, tab.url),
       permessoRichieste: this._siteAllowedIn(tab, tab.url) && !!tab._permessoRichieste,
       bloccoInPagina: true,
+      // La copia di un file del computer, aperto dall'utente, ha la sua sessione e la stessa cartella.
+      fileDelComputer: FileDelComputer.inSessioneDiFile(tab.view && tab.view.webContents),
     });
   }
 
