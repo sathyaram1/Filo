@@ -100,8 +100,6 @@ const HOVER_INPUT_TYPES = new Set([
 const gestoPerIlFilo = (tab) => Math.max(tab._userInputAt || 0, tab._gestoFiloAt || 0);
 // Il salto dalla pagina d'errore al sito è un «Riprova» premuto se arriva entro questo tempo da un input vero (#1469).
 const RIPROVA_GESTO_MS = 5_000;
-// Il focus chiesto dalla pagina che tiene la finestra arriva subito dopo il suo clic (#737.8, richiamataDallaPagina).
-const RICHIAMO_DA_FOCUS_MS = 1500;
 
 // #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
 // conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
@@ -4048,7 +4046,7 @@ class TabManager {
             const id = this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } });
             daLei(id);
             const tenuta = this.tabs.find((t) => t.id === id);
-            if (tenuta) Object.assign(tenuta, { _nomeFinestra: details.frameName || '', _chiestaDa: wc, _adottataAlle: Date.now() });
+            if (tenuta) Object.assign(tenuta, { _nomeFinestra: details.frameName || '', _apertaPer: url || 'about:blank', _chiestaDa: wc, _adottataAlle: Date.now() });
             return options.webContents;
           },
         };
@@ -4088,30 +4086,42 @@ class TabManager {
     if (da && da !== wc) this._richiamata(tab, da, chiede);
   }
 
-  // Le richieste che non caricano una pagina nuova (un collegamento a un'ancora, window.open senza indirizzo, focus) le
-  // segnala il preload (#737.8): `nome` dalla pagina che chiede, null dalla finestra stessa a cui hanno chiesto focus.
-  richiamataDallaPagina(wc, frame, nome) {
-    if (nome == null) {
-      const tab = this.tabs.find((t) => t.view.webContents === wc);
-      // Il focus non dice chi l'ha chiesto: vale solo a ridosso del clic sulla pagina che la tiene, non quello che la
-      // finestra si dà da sé più tardi (in Chromium serve il gesto di chi chiama).
-      if (tab && tab._chiestaDa && !(frame && frame.parent)) this._richiamata(tab, tab._chiestaDa, '', RICHIAMO_DA_FOCUS_MS);
-      return;
-    }
-    const tab = this.tabs.find((t) => t._chiestaDa === wc && t._nomeFinestra === nome);
+  // Le richieste che non caricano una pagina nuova le segnala il preload della pagina che tiene la finestra, mai la
+  // finestra stessa (#737.13): un nome, il focus di una finestra del suo sito chiesto dentro il clic, o il pulsante che
+  // l'aveva aperta premuto di nuovo, dove il focus di una finestra di un altro sito non si vede.
+  richiamataDallaPagina(wc, frame, richiesta) {
     let chiede = '';
     try { chiede = (frame && frame.url) || ''; } catch (_) {}
+    if (typeof richiesta === 'string') {
+      const tab = this.tabs.find((t) => t._chiestaDa === wc && t._nomeFinestra === richiesta);
+      if (tab) this._richiamata(tab, wc, chiede);
+      return;
+    }
+    if (!richiesta || typeof richiesta !== 'object' || !(richiesta.focus === true || richiesta.ripetuto === true)) return;
+    let sito = '';
+    try { sito = (frame && frame.origin) || ''; } catch (_) {}
+    const origine = (t) => { try { return t.view.webContents.mainFrame.origin || ''; } catch (_) { return ''; } };
+    const nome = typeof richiesta.nome === 'string' ? richiesta.nome : '';
+    const url = typeof richiesta.url === 'string' ? richiesta.url : '';
+    // Una finestra dello stesso sito dice da sé quando le chiedono il focus: lì il pulsante ripetuto non conta.
+    const tenute = this.tabs.filter((t) => t._chiestaDa === wc && Boolean(sito) && (origine(t) === sito) === (richiesta.focus === true));
+    const quella = richiesta.focus === true
+      ? (nome && tenute.find((t) => t._nomeFinestra === nome)) || tenute.find((t) => { try { return t.view.webContents.getURL() === url; } catch (_) { return false; } })
+      : (nome && tenute.find((t) => t._nomeFinestra === nome)) || tenute.filter((t) => t._apertaPer === (url || 'about:blank')).pop();
+    // Il pulsante ripetuto nomina la sua finestra: un riquadro di un altro sito non porta davanti quelle della pagina.
+    const tab = quella || (richiesta.focus === true && tenute.length === 1 ? tenute[0] : null);
     if (tab) this._richiamata(tab, wc, chiede);
   }
 
   // Torna davanti se la chiede, col clic che la pagina ha ricevuto, la scheda che l'utente sta guardando; la finestra
   // nata da quello stesso clic resta dove l'ha messa l'apertura (Ctrl+clic: dietro).
-  _richiamata(tab, da, chiede, entro) {
+  _richiamata(tab, da, chiede) {
     if (this.activeId === tab.id || !this.tabs.includes(tab)) return;
+    try { if (tab.view.webContents.isDestroyed()) return; } catch (_) { return; }
     const attiva = this.tabs.find((t) => t.id === this.activeId);
     if (!attiva || attiva.view.webContents !== da) return;
-    const t = Permessi.gestoPerRichiamare(da, chiede, entro);
-    if (!t || (tab._adottataAlle || 0) >= t) return;
+    if (!Permessi.gestoPerUnaFinestra(da, chiede, { spendi: false })) return;
+    if ((tab._adottataAlle || 0) >= Permessi.gestoSullaScheda(da)) return;
     this.activate(tab.id);
   }
 

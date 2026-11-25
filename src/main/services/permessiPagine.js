@@ -295,16 +295,6 @@ function gestoPer(wc, chiede) {
   return Boolean(chi && wc._filoGestoOrigini && wc._filoGestoOrigini.has(chi));
 }
 
-// Una finestra che la pagina tiene già torna davanti con lo stesso clic che le aprirebbe una finestra nuova (quello
-// segnalato dal preload), senza spenderlo (#737.8). Torna l'istante del clic, o 0.
-function gestoPerRichiamare(wc, chiede, entro = GESTO_MS) {
-  const t = (wc && wc._filoGestoFinestraAlle) || 0;
-  if (!t || Date.now() - t >= entro || t <= (wc._filoGestoUsatoAlle || 0)) return 0;
-  const chi = origineWeb(chiede);
-  if (chi && wc._filoGestoOrigini && wc._filoGestoOrigini.size && !wc._filoGestoOrigini.has(chi)) return 0;
-  return t;
-}
-
 // Il gesto per le finestre lo dice solo il preload del frame toccato, prima della pagina: il main vede
 // l'input prima di sapere se è caduto sull'interfaccia di Filo, e una pagina che chiede di continuo passerebbe in
 // mezzo (#737.1 giro 7). Un tasto che Filo si tiene non arriva al preload; uno riservato che ci arriva non conta.
@@ -355,14 +345,15 @@ function gestoSullaScheda(wc) {
 }
 
 // Un gesto apre una finestra sola, come in Chrome: la seconda della stessa raffica nessuno l'ha chiesta (#737.1).
-// Chi chiede si riconosce dal referrer: un frame di un sito che il gesto non ha toccato non lo usa. Chi lo nasconde
-// resta riconoscibile solo come «la scheda», come prima.
-function gestoPerUnaFinestra(wc, referrer) {
+// Chi chiede si riconosce dal referrer o dall'indirizzo del suo frame: un frame di un sito che il gesto non ha toccato
+// non lo usa. Chi lo nasconde resta riconoscibile solo come «la scheda», come prima. Riportare davanti una finestra
+// che la pagina tiene già vuole lo stesso clic, senza spenderlo (`spendi: false`, #737.8): una regola sola (#737.13).
+function gestoPerUnaFinestra(wc, chiede, { spendi = true } = {}) {
   const t = gestoSullaScheda(wc);
   if (!t || t <= (wc._filoGestoUsatoAlle || 0)) return false;
-  const chi = origineDelReferrer(referrer);
+  const chi = origineDelReferrer(chiede);
   if (chi && wc._filoGestoOrigini && wc._filoGestoOrigini.size && !wc._filoGestoOrigini.has(chi)) return false;
-  wc._filoGestoUsatoAlle = t;
+  if (spendi) wc._filoGestoUsatoAlle = t;
   return true;
 }
 
@@ -1043,7 +1034,7 @@ function siDato(ses, url, parte) {
 
 module.exports = {
   installa, negaTutto, rispondi, scaricamentoSenzaGesto, navigazioneDiFilo, passaScheda, PERMESSI_DA_CHAT, chiediScaricamenti, sitoDegliScaricamenti, SCARICAMENTI_FINESTRA_MS, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoPer, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
-  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerRichiamare, gestoPerLaNavigazione, clicDiFilo,
+  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, gestoSulloStrato, gestoNelloStrato, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },

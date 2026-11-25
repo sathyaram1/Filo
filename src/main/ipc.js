@@ -382,12 +382,12 @@ function registerIpcHandlers() {
     try { MenuDiRiserva.chiesto(event, richiesta); } catch (_) {}
   });
 
-  // Una finestra con nome chiesta di nuovo dalla pagina che la tiene, o riportata davanti (page-preload.js, #737.8).
-  ipcMain.on('filo:finestra-davanti', (event, nome) => {
+  // Una finestra chiesta di nuovo, o riportata davanti, dalla pagina che la tiene (preload/finestra-per-nome.js, #737.8).
+  ipcMain.on('filo:finestra-davanti', (event, richiesta) => {
     try {
       const wc = event.sender;
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
-      if (win) win._filoTabs.richiamataDallaPagina(wc, event.senderFrame, typeof nome === 'string' ? nome : null);
+      if (win) win._filoTabs.richiamataDallaPagina(wc, event.senderFrame, richiesta);
     } catch (_) {}
   });
 

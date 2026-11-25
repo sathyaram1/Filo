@@ -174,6 +174,62 @@ test('la finestra con nome che la pagina riempie da sola, senza clic, resta diet
   expect((await schede(app)).find((s) => s.titolo === 'ELENCO')?.attiva, 'senza un clic la pagina che si legge resta davanti').toBe(true);
 });
 
+// #737.13 — conta la richiesta della pagina che tiene la finestra, di qualunque sito sia la finestra, mai quella che la
+// finestra fa per sé. Il focus di una finestra di un altro sito non si vede: lì vale il pulsante che l'ha aperta.
+const classico = (dest, nome = 'pagamento') => `<script>var w=null;function paga(){if(w&&!w.closed)w.focus();else w=window.open(${JSON.stringify(dest)},'${nome}');}</script>`;
+const testo = '<p id="testo" style="width:300px;height:60px">Il testo dell\'articolo che si sta leggendo.</p>';
+
+for (const [forma, pagina] of [
+  ['il pagamento su un altro sito', (dest) => `${classico(dest)}${pulsante('a', 'Paga', 'paga()')}`],
+  ['l\'aiuto su un altro sito aperto senza nome', (dest) => `<script>var w=null;function aiuto(){if(w&&!w.closed)w.focus();else w=window.open(${JSON.stringify(dest)});}</script>${pulsante('a', 'Aiuto', 'aiuto()')}`],
+]) {
+  test(`«paga» premuto di nuovo riporta davanti ${forma}, e il resto della pagina no`, async ({ app, openTab, testServer }) => {
+    const dest = testServer.html('<title>PAGAMENTO</title><h1>Paga qui</h1>', { pubblico: true });
+    const page = await openTab(testServer.html(`<title>NEGOZIO</title>${pagina(dest)}${testo}`));
+    const n = (await schede(app)).length;
+    await page.click('#a');
+    await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'PAGAMENTO')?.attiva, { timeout: 8000 }).toBe(true);
+    await davanti(app, page.url());
+    await page.waitForTimeout(300);
+    await page.click('#testo');
+    await page.waitForTimeout(1000);
+    expect((await schede(app)).find((s) => s.attiva)?.titolo, 'il clic sul testo resta sulla pagina').toBe('NEGOZIO');
+    await page.click('#a');
+    await expect.poll(async () => (await schede(app)).find((s) => s.attiva)?.titolo, { timeout: 8000 }).toBe('PAGAMENTO');
+    expect((await schede(app)).length, 'la stessa finestra di prima').toBe(n + 1);
+  });
+}
+
+test('il pulsante che chiude la finestra di un altro sito la chiude, e la pagina resta davanti', async ({ app, openTab, testServer }) => {
+  const dest = testServer.html('<title>CHAT</title>', { pubblico: true });
+  const page = await openTab(testServer.html(`<title>NEGOZIO</title><script>var w=null;function chat(){if(w&&!w.closed)w.close();else w=window.open(${JSON.stringify(dest)},'chat');}</script>${pulsante('a', 'Chat', 'chat()')}`));
+  await page.click('#a');
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'CHAT'), { timeout: 8000 }).toBe(true);
+  await davanti(app, page.url());
+  await page.waitForTimeout(300);
+  await page.click('#a');
+  await expect.poll(() => page.evaluate(() => w.closed), { timeout: 8000 }).toBe(true);
+  await page.waitForTimeout(1000);
+  expect((await schede(app)).find((s) => s.attiva)?.titolo).toBe('NEGOZIO');
+});
+
+test('la finestra della pagina che si porta davanti da sola resta dietro quando clicchi sulla pagina', async ({ app, openTab, testServer }) => {
+  // Chiede il primo piano di continuo, e finge anche le richieste che Filo ascolta, verso sé e verso la pagina.
+  const chat = testServer.html(`<title>CHAT</title><script>setInterval(function(){
+    window.focus();
+    try { window.dispatchEvent(new Event('filo:finestra-davanti')); } catch (e) {}
+    try { opener.dispatchEvent(new CustomEvent('filo:finestra-focus', { detail: JSON.stringify({ nome: '', url: location.href }) })); } catch (e) {}
+  }, 100)</script>`);
+  const page = await openTab(testServer.html(`<title>ARTICOLO</title>${pulsante('a', 'Chat', `window.open(${JSON.stringify(chat)})`)}${testo}`));
+  await page.click('#a');
+  await expect.poll(async () => (await schede(app)).find((s) => s.titolo === 'CHAT')?.attiva, { timeout: 8000 }).toBe(true);
+  await davanti(app, page.url());
+  await page.waitForTimeout(300);
+  await page.click('#testo');
+  await page.waitForTimeout(2000);
+  expect((await schede(app)).find((s) => s.attiva)?.titolo, 'il clic sul testo dell\'articolo resta sull\'articolo').toBe('ARTICOLO');
+});
+
 test('la pagina chiude la ricevuta che ha scritto, e Filo resta aperto', async ({ app, openTab, testServer }) => {
   const page = await openTab(testServer.html(`${pulsante('b', 'Stampa', "window.__w=window.open('');window.__w.document.write('<title>RICEVUTA</title>');window.__w.document.close();")}${pulsante('c', 'Chiudi', 'window.__w.close()')}`));
   const prima = (await schede(app)).length;
