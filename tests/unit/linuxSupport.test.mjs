@@ -170,7 +170,7 @@ test('il lanciatore spegne la gabbia solo dove questo sistema la nega', { skip: 
   const { default: afterPack } = require(join(ROOT, pkg.build.afterPack));
   const dove = cartellaTemporanea('filo-linux-avvio-');
   // Il finto programma stampa gli argomenti che gli arrivano.
-  writeFileSync(join(dove, 'filo'), '#!/bin/sh\necho "$@"\n', { mode: 0o755 });
+  writeFileSync(join(dove, 'filo'), programmaFinto('#!/bin/sh\necho "$@"\nexit 0\n'), { mode: 0o755 });
   await afterPack({
     electronPlatformName: 'linux',
     appOutDir: dove,
