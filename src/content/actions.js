@@ -1865,17 +1865,7 @@
     });
 
     return new Promise((resolve) => {
-      // Crosshair disegnato da noi: quello di sistema su sfondo variabile può risultare
-      // invisibile sopra la maschera semitrasparente. Hotspot al centro (16,16).
-      const crosshairSvg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">` +
-        `<line x1="16" y1="2" x2="16" y2="30" stroke="black" stroke-width="3"/>` +
-        `<line x1="2" y1="16" x2="30" y2="16" stroke="black" stroke-width="3"/>` +
-        `<line x1="16" y1="2" x2="16" y2="30" stroke="white" stroke-width="1.5"/>` +
-        `<line x1="2" y1="16" x2="30" y2="16" stroke="white" stroke-width="1.5"/>` +
-        `</svg>`;
-      const cursorRule = `url("data:image/svg+xml;utf8,${encodeURIComponent(crosshairSvg)}") 16 16, crosshair`;
-
+      const cursorRule = CURSORE_MIRINO;
       const overlay = document.createElement('div');
       overlay.className = 'sn-region-overlay';
       global.SN_FILO_UI?.mark(overlay);
