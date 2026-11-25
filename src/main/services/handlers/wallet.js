@@ -120,11 +120,14 @@ module.exports = function register(on, ctx) {
   function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
 
   // Ogni risposta pagata col ripiego lo dice: la riga sotto la risposta, o un avviso, uno per
-  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detto solo quando una pagina in vista l'ha
-  // mostrato (#662.1): la riga arrivata a schermo (KEY_FALLBACK_SHOWN), o l'avviso preso dalla coda
-  // degli avvisi da una pagina davanti agli occhi, mai quello solo spedito. Le richieste con la riga
+  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detto solo davanti agli occhi (#662.1, #662.2):
+  // la riga a schermo in una pagina davanti (KEY_FALLBACK_SHOWN), o l'avviso preso dalla coda da una
+  // pagina davanti, mai quello solo spedito. Una riga arrivata in una pagina dietro conta quando la sua
+  // scheda torna davanti, e intanto l'avviso parte per chi guarda altrove. Le richieste con la riga
   // in volo (`conRipiegoDetto`) tengono fermo l'avviso finché la loro riga ha il tempo di comparire.
   const CODA = ctx.avvisiFuoriPolitica || null;
+  const Davanti = require('../davantiAgliOcchi');
+  const righeDietro = new Map(); // webContents della scheda → { url, strato } della riga arrivata lì
   const AVVISO_RIPIEGO = 'ripiego';
   const FINESTRA_RIPIEGO_MS = 10 * 60 * 1000;
   const ATTESA_AVVISO_RIPIEGO_MS = 4000;
