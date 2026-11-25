@@ -174,12 +174,9 @@ class ConfermeSopraPagina {
   // Una volta per finestrella e per domanda: un sito che la fa andare e tornare non tiene OK spento per sempre.
   ridisegna(da) {
     const voce = this.mostrata ? this.coda.find((v) => v.id === this.mostrata) : null;
-    if (!voce) return;
-    if (da) {
-      voce.coperta ||= new WeakSet();
-      if (voce.coperta.has(da)) return;
-      voce.coperta.add(da);
-    }
+    voce.coperta ||= new WeakSet();
+    if (!voce || voce.coperta.has(da)) return;
+    voce.coperta.add(da);
     voce.id = ++this.seq;
     this.mostrata = null;
     setImmediate(() => this.posa());
