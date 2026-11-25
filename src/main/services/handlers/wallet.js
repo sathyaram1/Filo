@@ -230,6 +230,7 @@ module.exports = function register(on, ctx) {
   // quella di prima non dice niente su questa.
   async function ownKeyChanged() {
     ultimoAvvisoRipiego = 0;
+    righeDietro.clear();
     annullaAvvisoSospeso();
     if (CODA) CODA.ritira(AVVISO_RIPIEGO);
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
