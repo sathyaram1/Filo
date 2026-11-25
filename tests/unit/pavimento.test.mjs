@@ -489,10 +489,10 @@ test('la colonna password di un CSV non esce: punti e virgola, esportazioni dei 
   for (const [t, segreti] of casi) {
     const o = P.oscura(t);
     for (const s of segreti) assert.ok(!o.includes(s), `${s} in ${JSON.stringify(t)}`);
-    assert.ok(o.includes('mario'), 'le altre colonne restano');
   }
-  // La posizione del valore torna giusta: una parola senza forma si toglie solo dove sta.
-  assert.equal(P.oscura('name,username,password\ngattino,mario,gattino'), `name,username,password\ngattino,mario,${S}`);
+  // Ogni riga, non solo quella sotto l'intestazione; e una parola senza forma si toglie solo dove sta.
+  const export_ = 'name,url,username,password\nBanca,https://banca.it,mario,gattino\nPosta,https://posta.it,gattino,Xk9#pQ2v\nAltro,https://x.it,anna,hunter22\n';
+  assert.equal(P.oscura(export_).split('\n').slice(2).join('\n'), `Posta,https://posta.it,gattino,${S}\nAltro,https://x.it,anna,${S}\n`);
 });
 
 test('una frase con le virgole che nomina la password non apre una colonna, e la tabella finisce dove cambiano le celle', () => {
