@@ -37,7 +37,7 @@ function posizioni(fd, file) {
       i = buf.subarray(0, letti).indexOf(SENTINELLA, i + 1);
     }
   }
-  if (!trovate.length) throw new Error(`nessun filo dei fusibili in ${fs.realpathSync(`/proc/self/fd/${fd}`, { throwIfNoEntry: false }) || 'questo file'}`);
+  if (!trovate.length) throw new Error(`nessun filo dei fusibili in ${file}`);
   return trovate;
 }
 
