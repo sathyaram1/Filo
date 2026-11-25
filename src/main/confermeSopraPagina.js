@@ -106,11 +106,15 @@ function finestraDi(wc) {
   }
   return null;
 }
+// Chi ha dato l'input lo dice la regola dei gesti delle pagine: il clic che Filo dà da sé non porta l'utente là.
+const dellUtente = (wc, input) => {
+  try { return require('./services/permessiPagine').inputDellUtente(wc, input); } catch (_) { return true; }
+};
 function seguiGesti(wc) {
   if (!wc || seguiti.has(wc)) return;
   seguiti.add(wc);
   wc.on('input-event', (_e, input) => {
-    if (!input || !GESTI.has(input.type)) return;
+    if (!input || !GESTI.has(input.type) || !dellUtente(wc, input)) return;
     const w = finestraDi(wc);
     if (!w) return;
     const casa = casaDi(w);
