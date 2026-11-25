@@ -614,6 +614,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 .dash-cambio-testo, .dash-pagine-testo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-cambio-stato { flex: none; }
 .dash-cambio.dash-cambi-annullato .dash-cambio-testo { text-decoration: line-through; text-decoration-color: var(--dash-line-strong); }
+/* Il riquadro è un inline-block, che la riga barrata non attraversa: lo barra lui. */
+.dash-cambi-annullato .dash-altrui { text-decoration: line-through; }
+.dash-cambio.dash-cambi-annullato .dash-altrui { text-decoration-color: var(--dash-line-strong); }
 .dash-cambio-annulla {
   margin-left: auto; flex: none; font: inherit; font-size: 11.5px; color: var(--dash-ink-soft);
   background: transparent; border: 1px solid var(--dash-line-strong); border-radius: 13px; padding: 0 9px; cursor: pointer;
