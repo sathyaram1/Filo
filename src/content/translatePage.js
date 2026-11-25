@@ -690,6 +690,8 @@
     }
     if (fuori) st.extraEnded++;
     else st.ended++;
+    // Uno nascosto non si nomina: l'utente non lo vede.
+    if (!fuori && msg.spento) st.spenti.add(String(msg.sito || ''));
     st.applied += Number(msg.applied) || 0;
     st.left += Number(msg.left) || 0;
   }
