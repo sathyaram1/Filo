@@ -127,34 +127,13 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
   return { anticipa, controlla, _cache: cache };
 }
 
-// Il testo di un allegato che non è un'immagine né un PDF, o null: l'elenco dei tipi è quello del riquadro.
-function testoDiAllegato(f) {
-  try {
-    if (!f || typeof f.dataUrl !== 'string') return null;
-    const AT = globalThis.SN_FEEDBACK_ATTACH;
-    const tipo = String(f.type || '').toLowerCase();
-    if (AT && AT.classify({ name: f.name, type: tipo }) !== 'file') return null;
-    if (tipo === 'application/pdf' || /\.pdf$/i.test(String(f.name || ''))) return null;
-    const m = /^data:[^,]*?(;base64)?,/i.exec(f.dataUrl);
-    if (!m) return null;
-    const corpo = f.dataUrl.slice(m[0].length);
-    return m[1] ? daByte(Buffer.from(corpo, 'base64')) : decodeURIComponent(corpo);
-  } catch (_) { return null; }
-}
-
-// Windows salva testo anche in UTF-16 (PowerShell 5.1 con «>», il Visualizzatore eventi): letto come UTF-8 avrebbe
-// uno zero fra una lettera e l'altra, e nessuna password si riconoscerebbe.
-function daByte(b) {
-  if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) return b.subarray(2).toString('utf16le');
-  if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) return Buffer.from(b.subarray(2, b.length - (b.length % 2))).swap16().toString('utf16le');
-  const campione = b.subarray(0, 4096 - (Math.min(b.length, 4096) % 2));
-  let pari = 0;
-  let dispari = 0;
-  for (let i = 0; i < campione.length; i++) if (campione[i] === 0) { if (i % 2) dispari++; else pari++; }
-  const meta = campione.length / 2;
-  if (meta >= 4 && dispari > meta * 0.3 && pari < meta * 0.05) return b.subarray(0, b.length - (b.length % 2)).toString('utf16le');
-  if (meta >= 4 && pari > meta * 0.3 && dispari < meta * 0.05) return Buffer.from(b.subarray(0, b.length - (b.length % 2))).swap16().toString('utf16le');
-  return b.toString('utf8');
+// Un allegato che non è un'immagine né un PDF: l'elenco dei tipi è quello del riquadro. I byte li legge il controllo.
+function diTesto(f) {
+  if (!f || typeof f.dataUrl !== 'string') return false;
+  const AT = globalThis.SN_FEEDBACK_ATTACH;
+  const tipo = String(f.type || '').toLowerCase();
+  if (AT && AT.classify({ name: f.name, type: tipo }) !== 'file') return false;
+  return !(tipo === 'application/pdf' || /\.pdf$/i.test(String(f.name || '')));
 }
 
 // Lo stesso L0 per il riquadro e per la segnalazione confermata in chat: lo crea chi ha il cancello dei modelli.
@@ -162,4 +141,4 @@ let attivo = null;
 function usa(l0) { attivo = l0 || null; }
 function corrente() { return attivo; }
 
-module.exports = { crea, ATTESA_MS, testoDiAllegato, usa, corrente };
+module.exports = { crea, ATTESA_MS, usa, corrente };
