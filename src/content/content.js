@@ -3025,7 +3025,7 @@
         else if (msg.surface === 'help') openHelpSidebar();
         else if (msg.surface === 'valuta') valutaDalRiquadro();
         else if (msg.surface === 'traduci') traduciDalTasto();
-        else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId, msg.colore);
+        else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
       if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);
