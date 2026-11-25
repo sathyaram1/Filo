@@ -1121,6 +1121,141 @@ test('(Y) «Traduci la pagina» mentre si è in un’altra applicazione, con la 
   expect(await quante()).toBe(1);
 });
 
+// #662.2, #662.3: la riga del ripiego conta come detta solo in una scheda davanti agli occhi. Arrivata in una scheda
+// dietro, l'avviso lo dice a chi guarda altrove; la riga conta quando la sua scheda torna davanti, e da lì l'avviso in
+// attesa non esce più. Lo stesso quando la chiave cambia mentre l'avviso aspetta.
+const RIGA_402 = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
+const idScheda = (app, prefisso) => app.evaluate(({ BrowserWindow }, p) => {
+  const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+  const t = tm.tabs.find((x) => x.view.webContents.getURL().startsWith(p));
+  return t ? t.id : null;
+}, prefisso);
+const avvisiInAttesa = (app) => app.evaluate(() => globalThis.SN_AVVISI_FUORI_POLITICA.inAttesa().map((m) => m.text));
+const attiva = (shell, id) => shell.evaluate((i) => window.filoShell.tabs.activate(i), id);
+const toastAdesso = (page) => page.locator('.sn-toast', { hasText: 'crediti di Filo' }).count();
+
+async function homeDavanti(app, shell, openTab) {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtabPage(app);
+  await expect(home.locator('#input')).toBeVisible();
+  await redeemWallet(openTab);
+  await prepare(app);
+  const idHome = await idScheda(app, 'filo://newtab');
+  await attiva(shell, idHome);
+  await home.bringToFront().catch(() => {});
+  return { home, idHome };
+}
+
+test('(Z1) la risposta della home arriva con un’altra scheda davanti: l’avviso lo dice sulla pagina in vista, e tornati sulla home non si ripete', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  ownKeyStatus = 402;
+  const { home, idHome } = await homeDavanti(app, shell, openTab);
+  personalDelayMs = 5000;
+  await home.locator('#input').fill('ciao ripiego');
+  await home.locator('#sendBtn').click();
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Altrove</title><p>Una pagina qualunque.</p>');
+  const avvisi = await osservaAvvisi(page);
+  const quante = async () => (await avvisi()).split(RIGA_402).length - 1;
+  await expect(home.locator('.dash-bubble-note')).toContainText('ho usato i crediti di Filo', { timeout: 30_000 });
+  await expect.poll(quante, { timeout: 20_000 }).toBe(1);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'tests/.shots/662.2-avviso-altrove.png' }).catch(() => {});
+
+  await attiva(shell, idHome);
+  await home.bringToFront().catch(() => {});
+  await expect(home.locator('.dash-bubble-note')).toContainText('ho usato i crediti di Filo');
+  await home.waitForTimeout(6000);
+  expect(await avvisiInAttesa(app)).toEqual([]);
+  expect(await quante()).toBe(1);
+});
+
+test('(Z2) «spiega» con la risposta pagata coi crediti di Filo arrivata in una scheda lasciata: l’avviso lo dice nella scheda in vista', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  ownKeyStatus = 402;
+  personalDelayMs = 5000;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Lasciata</title>'
+    + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Una frase da spiegare dopo.</p>');
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup'))?.visibile, { timeout: 10000 }).toBe(true);
+  const idLasciata = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId);
+  const altra = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>In vista</title><p>Un’altra pagina.</p>');
+  const avvisi = await osservaAvvisi(altra);
+  const quante = async () => (await avvisi()).split(RIGA_402).length - 1;
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-key-fallback'), { timeout: 30_000 }).toBe(RIGA_402);
+  await expect.poll(quante, { timeout: 20_000 }).toBe(1);
+
+  // Tornati sulla scheda lasciata la riga è lì, e l'avviso, già detto, non la ripete.
+  const avvisiLasciata = await osservaAvvisi(page);
+  await attiva(shell, idLasciata);
+  await page.bringToFront().catch(() => {});
+  await page.waitForTimeout(6000);
+  expect(await testoDi(app, page, '.sn-popup .sn-key-fallback')).toBe(RIGA_402);
+  expect(await avvisiLasciata()).not.toContain('crediti di Filo');
+});
+
+test('(Z3) fuori da Filo con la home davanti: l’avviso aspetta; tornati sulla home la riga lo dice, e su un sito l’avviso non ricompare', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  ownKeyStatus = 402;
+  const { home } = await homeDavanti(app, shell, openTab);
+  await home.evaluate(() => { Document.prototype.hasFocus = () => false; });
+  await home.locator('#input').fill('ciao ripiego');
+  await home.locator('#sendBtn').click();
+  await expect(home.locator('.dash-bubble-note')).toContainText('ho usato i crediti di Filo', { timeout: 30_000 });
+  await expect.poll(() => avvisiInAttesa(app), { timeout: 20_000 }).toContain(RIGA_402);
+
+  await home.evaluate(() => { Document.prototype.hasFocus = () => true; window.dispatchEvent(new Event('focus')); });
+  await expect.poll(() => avvisiInAttesa(app), { timeout: 8_000 }).toEqual([]);
+
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Dopo</title><p>Un sito qualunque.</p>');
+  const avvisi = await osservaAvvisi(page);
+  await page.waitForTimeout(6000);
+  expect(await avvisi()).not.toContain('crediti di Filo');
+  expect(await toastAdesso(page)).toBe(0);
+});
+
+test('(Z4) l’avviso del ripiego aspetta e la chiave cambia nelle Impostazioni: tornati sulla pagina non esce', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Aspetta</title>'
+    + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da spiegare</p>');
+  const idSito = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId);
+  const avvisi = await osservaAvvisi(page);
+  const prima = seen.completions.length;
+  await selezionaColMouse(page, '#t');
+  await fuocoSullaPagina(app, page.url(), false);
+  await expect.poll(() => seen.completions.slice(prima).map((c) => c.key).join(','), { timeout: 15_000 })
+    .toContain(`${OWN_KEY},${PERSONAL_KEY}`);
+  await expect.poll(() => avvisiInAttesa(app), { timeout: 20_000 }).toContain(RIGA_402);
+  await page.evaluate(() => window.getSelection().removeAllRanges());
+
+  const options = await openTab('filo://options/options.html');
+  await expect(options.locator('#apiKey')).toBeVisible({ timeout: 10_000 });
+  await options.fill('#apiKey', 'sk-or-v1-new-key-777777');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).apiKeys.openrouter), { timeout: 10_000 })
+    .toBe('sk-or-v1-new-key-777777');
+  await expect.poll(() => avvisiInAttesa(app), { timeout: 8_000 }).toEqual([]);
+
+  await attiva(shell, idSito);
+  await fuocoSullaPagina(app, page.url(), true);
+  await page.waitForTimeout(6000);
+  expect(await avvisi()).not.toContain('crediti di Filo');
+  expect(await toastAdesso(page)).toBe(0);
+});
+
 // ── Il registro d'uso (#1601) ────────────────────────────────────────────────
 // Il commit su wallet-usage è atomico: una riga che la regola rifiuta faceva respingere il lotto intero, e la coda
 // lo ritentava ogni 30 secondi per sempre. Le righe si mettono in coda come le lascia una chiusura di Filo, e la
