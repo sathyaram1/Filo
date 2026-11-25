@@ -65,7 +65,7 @@ function spegniPrivilegiFile(eseguibile, { firma = false, piattaforma = process.
   if (privilegiFile(eseguibile) === 'spento') return false;
   const fd = fs.openSync(file, 'r+');
   try {
-    for (const p of posizioni(fd)) fs.writeSync(fd, Buffer.from([SPENTO]), 0, 1, p);
+    for (const p of posizioni(fd, file)) fs.writeSync(fd, Buffer.from([SPENTO]), 0, 1, p);
   } finally { fs.closeSync(fd); }
   if (privilegiFile(eseguibile) !== 'spento') throw new Error(`il fusibile in ${file} non si è spento`);
   if (firma && piattaforma === 'darwin' && file !== eseguibile) {
