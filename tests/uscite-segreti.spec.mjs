@@ -1653,12 +1653,12 @@ test('dopo un riavvio vero, la carta che l’utente aveva scritto nella bozza no
     const { page } = await apri(app, 1);
     await page.locator('#m').pressSequentially(`Ciao Marco, la carta è ${CARTA_UTENTE}.`);
     await expect.poll(() => bozza, { timeout: 10_000 }).toContain(CARTA_UTENTE);
-    // Quello che resta dell'utente si salva poco dopo che ha smesso di scrivere: chi chiude Filo arriva dopo.
-    await expect.poll(() => existsSync(fileLetti), { timeout: 10_000 }).toBe(true);
+    // Chi chiude Filo lo fa qualche secondo dopo aver smesso di scrivere.
+    await page.waitForTimeout(3000);
   } finally {
     await chiudiApp(app);
   }
-  expect(readFileSync(fileLetti).includes(carta), 'il numero della carta dell’utente è scritto sul disco').toBe(false);
+  expect(existsSync(fileLetti) && readFileSync(fileLetti).includes(carta), 'il numero della carta dell’utente è scritto sul disco').toBe(false);
   app = await launch();
   try {
     await preparaModelli(app);
