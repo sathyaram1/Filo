@@ -1209,18 +1209,14 @@ test('(Z2) «spiega» con la risposta pagata coi crediti di Filo arrivata in una
 test('(Z3) fuori da Filo con la home davanti: l’avviso aspetta; tornati sulla home la riga lo dice, e su un sito l’avviso non ricompare', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(150_000);
   ownKeyStatus = 402;
-  const { home } = await homeDavanti(app, shell, openTab);
+  const { home } = await homeDavanti(app, shell, openTab, { finestraDavanti: false });
+  expect(await finestraColFuoco(app), 'qui la finestra non ha il fuoco: lo finge la pagina').toBe(false);
   // Il fuoco finto di Playwright va tolto alla home e al suo content script, che prenderebbe l'avviso.
   await home.evaluate(() => { Document.prototype.hasFocus = () => false; });
   await fuocoSullaPagina(app, home.url(), false);
-  await app.evaluate(() => { const A = globalThis.SN_AVVISI_FUORI_POLITICA; globalThis.__log = []; for (const f of ['avvisa', 'prendi', 'ritira']) { const o = A[f]; A[f] = (...a) => { const r = o(...a); globalThis.__log.push([f, String(a[0]).slice(0, 30), Array.isArray(r) ? r.length : !!r, new Error().stack.split('\n').slice(2, 6).join(' | ')]); return r; }; } });
-  test.info().annotations.push({ type: 'x' });
-  globalThis.__dbg = () => app.evaluate(() => JSON.stringify(globalThis.__log, null, 1));
   await home.locator('#input').fill('ciao ripiego');
   await home.locator('#sendBtn').click();
   await expect(home.locator('.dash-bubble-note')).toContainText('ho usato i crediti di Filo', { timeout: 30_000 });
-  await home.waitForTimeout(12000);
-  console.log('DBG', await globalThis.__dbg(), await home.evaluate(() => document.hasFocus()));
   await expect.poll(() => avvisiInAttesa(app), { timeout: 20_000 }).toContain(RIGA_402);
 
   const avvisiHome = await osservaAvvisi(home);
