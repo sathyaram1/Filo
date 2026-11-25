@@ -110,7 +110,7 @@
     // faceva il menu stesso, entrando nella pagina.
     Translate.ricontrolla?.();
     const entry = registro()[String(iconId || '')];
-    if (entry && typeof entry.onClick === 'function') entry.onClick(colore);
+    if (entry && typeof entry.onClick === 'function') entry.onClick();
   }
 
   // Come si chiamano adesso, su questa pagina, le sue azioni che stanno nella barra laterale («Traduci» o
