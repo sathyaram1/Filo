@@ -214,6 +214,14 @@ function segnaMenu(wc, frame) {
   wc._filoMenuAperto = { alle: Date.now(), nodo, origine };
 }
 
+// L'input l'ha dato l'utente: non un modificatore premuto da solo, non il clic che Filo dà da sé a una pagina (il
+// «Salta» delle pubblicità). La usa anche chi segue dove l'utente lavora (confermeSopraPagina.js, #2647.1).
+function inputDellUtente(wc, input) {
+  const type = String((input && input.type) || '');
+  if (/key|char/i.test(type)) return !TASTI_SENZA_GESTO.has(String(input.key || ''));
+  return !clicDiFiloInCorso(wc);
+}
+
 // Come in Chromium un modificatore da solo o una combinazione che il browser si tiene non attivano la pagina (#737.1).
 function tastoPerLaPagina(input) {
   const key = String((input && input.key) || '');
