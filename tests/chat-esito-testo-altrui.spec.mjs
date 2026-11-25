@@ -275,9 +275,23 @@ test('#2648.1 dopo un OK finito male il bottone dice il perché col testo del mo
   test.setTimeout(60_000);
   const page = await home(app);
   try {
-    await livelloAutonomia(app, 'conservativo');
-    await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'p1', name: 'TOGLI_PERMESSO_SITO', arguments: JSON.stringify({ sito: VALORE }) }] }, { text: 'Ecco.' }]);
-    await chiedi(page, 'togli il permesso a quel sito');
+    await app.evaluate(() => {
+      const vero = globalThis.fetch;
+      globalThis.fetch = async (input, init) => (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(String((input && input.url) || input))
+        ? new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+        : vero(input, init));
+    });
+    const valore = `${FUNZIONE}: fornitore-nuovo/modello-x ${VALORE}`;
+    await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'modello_funzione', valore }) }] }, { text: 'Ecco.' }]);
+    await chiedi(page, 'cambia il modello del riassunto');
+    await expect.poll(() => confirmState(page), { timeout: 10_000 }).not.toBeNull();
+    // Fra la domanda e l'OK il valore smette di andare bene: all'OK l'azione non parte e dice perché.
+    await app.evaluate((_e, v) => {
+      const P = globalThis.SN_PREF;
+      const vero = P.buildPreferencePartial;
+      P.buildPreferencePartial = (...args) => (args[1] === v ? { rifiuto: `«${v}» non è un valore che «modello» accetta` } : vero(...args));
+      globalThis.__ripristinaPref = () => { P.buildPreferencePartial = vero; };
+    }, valore);
     await clickConfirm(page, 'ok', { timeout: 10_000 });
     const bottone = page.locator('.dash-action-btn', { hasText: '✗' });
     await expect(bottone).toBeVisible({ timeout: 10_000 });
