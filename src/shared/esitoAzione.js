@@ -684,6 +684,6 @@
     daRaccontare,
     esitoAzione, senzaEffetto, nomiFatti, successa, partita, conta, valido, voci, motivo, motivoAPezzi, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
     perTrascrizione, testoSegnalazione,
-    unisciDopo, primaRigaConferma: primaRiga, primaRigaParti, rigaDellaDomanda, rigaDiParti, piatto, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
+    unisciDopo, primaRigaConferma: primaRiga, primaRigaParti, rigaDellaDomanda, rigaDiParti, partiDellaRiga, suo, fra, unisci, piatto, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
