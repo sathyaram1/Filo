@@ -108,6 +108,7 @@ test('turno interrotto: una mossa senza effetto non sta fra le cose già fatte',
 // #553.16 — il riepilogo chiede all'esito comune cosa è riuscito, come l'archivio: un modo nuovo di «non è successo
 // niente» che l'esito impara resta fuori anche da qui, senza toccare il riepilogo.
 test('turno interrotto: fra le cose già fatte solo quelle che l\'esito comune conta come riuscite', () => {
+  A.interrotte([]);
   const ES = globalThis.SN_ESITO;
   const nuova = { type: 'TIMER', secondi: 60, _executed: true, _output: { nuovoModoDiNiente: true } };
   const fatta = { type: 'SVEGLIA', orario: '07:30', _executed: true };
