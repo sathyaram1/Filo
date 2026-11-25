@@ -68,7 +68,7 @@ function registro(max = MAX_LETTI, { cambiato = () => {}, saturo = () => {} } = 
     esporta: () => [...voci.values()].map(({ valore, regola, fonte, lotto, at }) => ({ valore, regola, fonte, lotto, at })),
     // Le voci salvate, meno quelle più vecchie del ricordo: tornano coi loro lotti, così lo sfoltimento resta giusto.
     ripristina(lista, ora = Date.now()) {
-      const limite = ora - GIORNI_RICORDO * 24 * 3600 * 1000;
+      const limite = inizioRicordo(ora);
       for (const x of Array.isArray(lista) ? lista : []) {
         const lotto = Number(x && x.lotto) || 0;
         const at = Number(x && x.at) || 0;
