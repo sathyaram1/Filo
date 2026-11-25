@@ -411,8 +411,9 @@
       case 'none':
         // La pagina che ospita non aveva testo proprio, ma i riquadri sì: «Non ho trovato testo»
         // davanti a uno schermo appena cambiato lingua sarebbe falso.
-        if (framesApplied) { Popup.showToast(...doneToast(0, framesLeft)); return; }
+        if (framesApplied) { Popup.showToast(...doneToast(0, framesLeft, spenti)); return; }
         if (framesLeft) { Popup.showToast(I18n.t('toast_page_translated_partial_frame'), { duration: 7000 }); return; }
+        if (spenti.length) { Popup.showToast(I18n.t('toast_page_only_off_frames', spenti.join(', ')), { duration: 7000 }); return; }
         Popup.showToast(I18n.t('toast_nothing_to_translate'));
         return;
       case 'failed':
