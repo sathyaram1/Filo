@@ -673,7 +673,7 @@
     frameRuns.delete(runId);
     // `tutti`: ogni riquadro a cui si è passata parola ha risposto, quindi ognuno stava già traducendo il suo documento.
     const tutti = !silent && st.extraAcked >= st.extraExpected;
-    return { left: silent + unfinished + st.left, applied: st.applied, tutti };
+    return { left: silent + unfinished + st.left, applied: st.applied, tutti, spenti: [...st.spenti].filter(Boolean) };
   }
 
   function onFrameReport(msg) {
