@@ -144,7 +144,7 @@
     let tolte = false;
     for (const r of righe) {
       const v = per.get(r.dataset.id);
-      if (v) statoCambio(r, { ...r._vista, frase: v.frase, annullabile: v.annullabile, annullatoDa: v.annullatoDa });
+      if (v) statoCambio(r, { ...r._vista, frase: v.frase, parti: v.parti || null, annullabile: v.annullabile, annullatoDa: v.annullatoDa });
       // Ritoccato fino al valore di partenza, il cambio non c'è più (cambi.js, fondi): nemmeno la sua riga.
       else if (r.isConnected) { r.remove(); tolte = true; }
     }
