@@ -304,15 +304,28 @@ test('#1803.2 una mossa a parole che lascia la barra com\'era: né la riga, né 
   expect(esiti[2]).toContain('È già nella barra dei siti');
   expect(esiti[3]).toMatch(/^Eseguita: Rinominato/);
 
-  // Riaperta, le mosse senza effetto restano non fatte, come «Sei già nella home», con la riga detta in diretta.
+  // Riaperta, le mosse senza effetto restano non fatte, come «Sei già nella home» (#553.15): la riga detta in diretta,
+  // con la sua icona e senza l'avviso di un guasto; il modello le rilegge come non fatte.
   const chat = (await app.evaluate(() => globalThis.SN_FILO_CHATS.list()))
     .find((c) => !c.app && c.messages.some((m) => m.text === 'rinomina YouTube in YouTube'));
   expect(chat).toBeTruthy();
+  const archiviate = chat.messages.filter((m) => m.role !== 'user').flatMap((m) => m.esiti || [])
+    .filter((v) => v.type === 'BARRA_SITI');
+  expect(archiviate.map((v) => [v.esito, v.senzaEffetto === true])).toEqual([
+    ['fallito', true], ['fallito', true], ['fallito', true], ['fatto', false],
+  ]);
+  const perModello = await app.evaluate((_e, v) => globalThis.SN_ESITO.perModello(v), archiviate);
+  expect((String(perModello).match(/NON fatta, non ha cambiato niente/g) || []).length).toBe(3);
   await app.evaluate((_e, c) => globalThis.SN_CLOSE_FILO_CHAT(c), chat.id);
   await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(chat.id)}`);
   for (const [, , riga] of turni) await expect(page.locator('#bubbles')).toContainText(riga, { timeout: 10_000 });
+  for (const [, , riga] of turni.slice(0, 3)) {
+    const r = page.locator('.dash-esiti-archiviati .dash-activity-row', { hasText: riga });
+    await expect(r).toHaveCount(1);
+    await expect(r.locator('.dash-activity-row-icon')).toHaveText('📌');
+    await expect(r).not.toContainText(/non riuscit|⚠/i);
+  }
   const testo = await page.locator('#bubbles').innerText();
-  expect((testo.match(/Barra dei siti non cambiata · /g) || []).length).toBe(3);
   expect((testo.match(/Ha sistemato la barra dei siti/g) || []).length).toBeLessThanOrEqual(1);
   expect(testo).not.toContain('Messo nella barra');
 });
