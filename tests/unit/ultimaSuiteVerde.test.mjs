@@ -1,4 +1,4 @@
-// Quale commit si pubblica (scripts/ultima-suite-verde.mjs): il più nuovo di main con la suite verde, e un
+// Quale commit si pubblica (scripts/ultima-suite-verde.mjs): il più nuovo di main con importanti.yml verde, e un
 // feedback quando la pubblicazione è ferma da troppo. Un verde sbagliato pubblica un rosso; uno mancato ferma tutto.
 
 import { test, describe } from 'node:test';
@@ -267,7 +267,7 @@ const fs = require('fs');
 const p = process.argv.find((a) => a.startsWith('repos/')) || '';
 const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
 fs.appendFileSync(process.env.FAKE_GH_ARGV, JSON.stringify(process.argv) + '\\n');
-if (p.includes('/actions/workflows/suite.yml/runs')) {
+if (p.includes('/actions/workflows/importanti.yml/runs')) {
   const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success')
     .map((r) => (s.zavorra ? { ...r, head_commit: { message: 'z'.repeat(s.zavorra) } } : r));
   process.stdout.write(JSON.stringify({ workflow_runs: runs }));
@@ -347,7 +347,7 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
     assert.equal(r.codice, 0);
     const filtro = (frammento) => r.chiamate.filter((a) => a.some((x) => x.includes(frammento)))
       .map((a) => (a.includes('--jq') ? a[a.indexOf('--jq') + 1] : ''));
-    const corse = filtro('/actions/workflows/suite.yml/runs');
+    const corse = filtro('/actions/workflows/importanti.yml/runs');
     const lavori = filtro('/jobs');
     assert.ok(corse.length && lavori.length, `chiamate a gh: ${JSON.stringify(r.chiamate)}`);
     for (const jq of corse) for (const c of CAMPI_CORSA) assert.ok(jq.includes(c), `alle corse si chiede solo il necessario, ${c} compreso: «${jq}»`);
@@ -392,7 +392,7 @@ describe('un fermo dopo una versione uscita apre il suo feedback, anche col feed
 const fs = require('fs');
 const p = process.argv.find((a) => a.startsWith('repos/')) || '';
 const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
-if (p.includes('/actions/workflows/suite.yml/runs')) {
+if (p.includes('/actions/workflows/importanti.yml/runs')) {
   const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
   process.stdout.write(JSON.stringify({ workflow_runs: runs }));
 } else if (/actions[/]runs[/][^/]+[/]jobs/.test(p)) {

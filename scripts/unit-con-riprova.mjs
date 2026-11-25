@@ -1,4 +1,4 @@
-// Gli unit test di un cancello su Windows (suite.yml, release.yml): tutti, poi i soli file rossi rifatti una volta, come
+// Gli unit test di un cancello su Windows (importanti.yml, release.yml): tutti, poi i soli file rossi rifatti una volta, come
 // la riprova sulla fusione (#1063). Un file che ripassa è un flaky: verde, ma detto. Il registro tiene i rossi rimasti.
 // Sentinella: tests/unit/unitConRiprova.test.mjs.
 

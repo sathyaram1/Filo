@@ -2,8 +2,10 @@
 #
 # COSA FA
 #   Ogni sei ore (cron) il job `scegli` prende il commit PIU' NUOVO di `main`
-#   la cui suite e' verde (Playwright su Linux e unit su Windows, a ogni fusione,
-#   in suite.yml). Se e' piu' nuovo dell'ultima release: CHIEDE AL SERVER il
+#   con le prove importanti verdi (cammini principali e catena degli
+#   aggiornamenti su Linux, unit su Windows, a ogni fusione, in importanti.yml;
+#   la suite completa non decide piu' niente, #2501). Se e' piu' nuovo
+#   dell'ultima release: CHIEDE AL SERVER il
 #   numero della versione nuova, builda ESATTAMENTE quel commit (installer NSIS
 #   per Windows, poi Mac e Linux) e lo pubblica come nuova GitHub Release.
 #   L'auto-update dentro Filo (electron-updater) la vede e aggiorna i tester.
@@ -87,7 +89,7 @@ concurrency:
 
 jobs:
   # ─── PRIMA DI TUTTO: QUALE COMMIT SI PUBBLICA ──────────────────────────────
-  # La suite gira a ogni fusione (suite.yml): la punta di main non e' quasi mai verde, il suo ultimo verde si'.
+  # Le prove importanti girano a ogni fusione (importanti.yml): si pubblica il loro ultimo verde, non la punta di main.
   # Ferma da piu' di 48 ore con codice nuovo: feedback, qualunque sia il motivo. Senza verdi la corsa e' rossa;
   # con un verde che da piu' di 12 ore non esce si prova lo stesso a pubblicarlo: il guasto a valle puo' essere passato.
   scegli:
@@ -122,7 +124,7 @@ jobs:
         with:
           node-version: ${{ steps.versione-node.outputs.versione }}
 
-      - name: L'ultimo commit di main con la suite verde
+      - name: L'ultimo commit di main con le prove importanti verdi
         id: scelta
         env:
           GH_TOKEN: ${{ github.token }}
@@ -141,7 +143,7 @@ jobs:
       version: ${{ steps.bump.outputs.version }}
       sha: ${{ steps.applica.outputs.sha }}
     steps:
-      - name: Checkout del commit provato dalla suite (con storia e tag completi)
+      - name: Checkout del commit provato (con storia e tag completi)
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.scegli.outputs.sha }}
@@ -161,7 +163,7 @@ jobs:
           PROVATO="${{ needs.scegli.outputs.sha }}"
           QUI=$(git rev-parse HEAD)
           if [ -z "$PROVATO" ] || [ "$QUI" != "$PROVATO" ]; then
-            echo "::error::nessun commit con la suite verde scelto (${PROVATO:-niente}), qui c'e' $QUI: non pubblico codice mai provato."
+            echo "::error::nessun commit con le prove importanti verdi scelto (${PROVATO:-niente}), qui c'e' $QUI: non pubblico codice mai provato."
             exit 1
           fi
           git fetch --tags --force
@@ -217,7 +219,7 @@ jobs:
         shell: bash
         run: |
           echo "::error::Controlli automatici rossi: pubblicazione annullata."
-          # Il commit provato e' l'ultimo di main con la suite verde, a volte giorni indietro: se ogni rosso e' gia' verde
+          # Il commit provato e' l'ultimo di main con le prove importanti verdi, a volte giorni indietro: se ogni rosso e' gia' verde
           # sulla punta, il feedback chiederebbe un lavoro fatto e si riaprirebbe a ogni chiusura (#1185). Nel dubbio si apre.
           PROVATO=$(git rev-parse --short HEAD)
           GIA_VERDI=""
@@ -227,7 +229,7 @@ jobs:
             PUNTA=$(git rev-parse --short FETCH_HEAD)
             if GIA_VERDI=$(node .punta-main/scripts/rossi-sulla-punta.mjs unit.log); then
               git worktree remove --force .punta-main || true
-              echo "::warning::I rossi del commit provato ${PROVATO} sono gia' verdi sulla punta di main (${PUNTA}): nessun feedback. La versione esce col primo commit di main con la suite verde."
+              echo "::warning::I rossi del commit provato ${PROVATO} sono gia' verdi sulla punta di main (${PUNTA}): nessun feedback. La versione esce col primo commit di main con le prove importanti verdi."
               { echo "## Rossi gia' corretti su main"; echo; echo "Rossi su ${PROVATO}, verdi sulla punta ${PUNTA}:"; printf -- '- %s\n' $GIA_VERDI; } >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
@@ -238,7 +240,7 @@ jobs:
             SULLA_PUNTA="
           Gia' verdi sulla punta di main, da non correggere: $(echo $GIA_VERDI)"
           fi
-          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti su Windows sul commit ${PROVATO} (il piu nuovo di main con la suite verde, non la punta di main): la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. La suite di quel commit aveva gia passato gli stessi test su Windows: se ora sono rossi, di norma il test dipende dai tempi o dalla macchina. Capisci perche e sistemalo; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
+          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti su Windows sul commit ${PROVATO} (il piu nuovo di main con le prove importanti verdi, non la punta di main): la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Le prove importanti di quel commit avevano gia passato gli stessi test su Windows: se ora sono rossi, di norma il test dipende dai tempi o dalla macchina. Capisci perche e sistemalo; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
           # I test rossi stanno all'INIZIO del log (una riga «not ok» per
           # ciascuno), la coda porta solo il riepilogo: prima si elencano
           # quelli, poi la coda. Un allarme con la sola coda non diceva quali
@@ -261,7 +263,7 @@ jobs:
           TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
           TESTO="${PREMESSA}
 
-          Commit provato: ${PROVATO}, l'ultimo di main con la suite verde.${SULLA_PUNTA}
+          Commit provato: ${PROVATO}, l'ultimo di main con le prove importanti verdi.${SULLA_PUNTA}
 
           Test rossi:
           ${ROSSI:-(nessuna riga not ok: guarda la coda)}
@@ -344,7 +346,7 @@ jobs:
       # Si costruisce il commit PROVATO, non la punta di main (#641): il numero
       # che il server ha appena scritto su main si applica qui, in locale, al
       # manifesto di questo albero, e non si spinge niente. Le fusioni entrate
-      # dopo il commit verde escono quando la loro suite e' verde.
+      # dopo il commit verde escono quando le loro prove importanti sono verdi.
       - name: Applica il numero al commit provato (in locale)
         if: steps.check.outputs.should_release == 'true'
         id: applica
@@ -356,7 +358,7 @@ jobs:
           node scripts/release-apply-version.mjs "$ATTESA"
           QUI=$(git rev-parse HEAD)
           if [ "$QUI" != "$PROVATO" ]; then
-            echo "::error::qui c'e' $QUI, la suite ha provato ${PROVATO:-(niente)}: non costruisco codice mai provato."
+            echo "::error::qui c'e' $QUI, le prove importanti hanno provato ${PROVATO:-(niente)}: non costruisco codice mai provato."
             exit 1
           fi
           echo "sha=$QUI" >> "$GITHUB_OUTPUT"
@@ -369,8 +371,8 @@ jobs:
               {
                 echo "## main si e' mosso dopo il commit verde: si pubblica comunque il commit provato"
                 echo ""
-                echo "La suite ha provato \`${PROVATO}\`, pubblicato come ${ATTESA}; main ora e' a \`${MAIN_ORA}\`."
-                echo "Commit entrati dopo, non in questa versione: ${DOPO}. Escono a una corsa successiva, quando la loro suite e' verde."
+                echo "Le prove importanti hanno provato \`${PROVATO}\`, pubblicato come ${ATTESA}; main ora e' a \`${MAIN_ORA}\`."
+                echo "Commit entrati dopo, non in questa versione: ${DOPO}. Escono a una corsa successiva, quando le loro prove importanti sono verdi."
               } >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
@@ -475,10 +477,49 @@ jobs:
         # conta da li').
         run: gh release edit "${{ steps.bump.outputs.version }}" --draft=false --latest --target "${{ steps.applica.outputs.sha }}"
 
+      # La suite completa di questo commit già verde: la versione esce segnata «stabile» (#2501). Altrimenti la segna
+      # suite.yml, con la corsa che chiede `suite-della-versione`. Un segno che non riesce non tocca una versione già uscita.
+      - name: Segna stabile, se la suite completa di questo commit e' verde
+        if: steps.check.outputs.should_release == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          git fetch --quiet --tags origin
+          git show "${GITHUB_SHA}:scripts/segna-stabile.mjs" > "${RUNNER_TEMP}/segna-stabile.mjs"
+          node "${RUNNER_TEMP}/segna-stabile.mjs" --commit "${{ steps.applica.outputs.sha }}" --se-suite-verde
+
       - name: Riepilogo
         if: steps.check.outputs.should_release == 'true'
         shell: bash
         run: echo "Pubblicata ${{ steps.bump.outputs.version }}"
+
+  # La versione appena uscita ha la sua corsa della suite (#2501): la suite gira su circa metà delle fusioni (le altre si
+  # raccolgono nella corsa dopo), e senza questa il segno «stabile» arriverebbe per caso. In un lavoro a sé: il permesso
+  # di avviare un workflow non sta dove si costruisce.
+  suite-della-versione:
+    needs: release
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.sha != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Chiedi la suite completa sul commit pubblicato, se non e' gia' verde
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ needs.release.outputs.sha }}
+        shell: bash
+        run: |
+          VERDI=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/suite.yml/runs?head_sha=${COMMIT}&status=success&per_page=1" --jq '.total_count')
+          if [ "${VERDI:-0}" != "0" ]; then
+            echo "La suite di ${COMMIT:0:10} e' gia' verde: la versione e' uscita segnata."
+            exit 0
+          fi
+          gh workflow run suite.yml --repo "${GITHUB_REPOSITORY}" --ref main -f commit="${COMMIT}"
+          echo "Chiesta la suite completa su ${COMMIT:0:10}: se e' verde, la versione si segna stabile."
 
   # ─── SECONDA META': LA VERSIONE PER MAC ──────────────────────────────────
   # Un pacchetto per Mac lo puo' costruire SOLO un Mac (serve `lipo` per fondere

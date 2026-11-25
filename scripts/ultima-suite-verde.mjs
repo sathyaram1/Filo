@@ -1,5 +1,5 @@
-// ultima-suite-verde.mjs — il commit da pubblicare: il più nuovo di main (primo genitore) con la suite verde.
-// Non pubblica e non scrive su git; se la pubblicazione è ferma da troppo tempo, per qualunque motivo, apre un feedback.
+// ultima-suite-verde.mjs — il commit da pubblicare: il più nuovo di main (primo genitore) con importanti.yml verde (#2501).
+// Non pubblica e non scrive su git; pubblicazione ferma da troppo, per qualunque motivo: un feedback.
 // Garanzie: tests/unit/ultimaSuiteVerde.test.mjs e tests/unit/releaseSuite.test.mjs.
 
 import { execFileSync } from 'node:child_process';
@@ -25,7 +25,9 @@ export function chiaveDelFermo(tipo, tag) {
 const EVENTI = new Set(['push', 'workflow_dispatch']);
 const PROFONDITA = 3000;
 
-/** Il lavoro di suite.yml che rifà il cancello di pubblicazione: gli unit test su Windows. */
+/** Il workflow il cui verde fa pubblicabile un commit. */
+export const WORKFLOW_VERDE = 'importanti.yml';
+/** Il suo lavoro che rifà il cancello di pubblicazione: gli unit test su Windows. */
 export const LAVORO_UNIT_WINDOWS = 'unit-windows';
 
 /**
@@ -36,7 +38,7 @@ export function passaIlCancello(lavori) {
   return (Array.isArray(lavori) ? lavori : []).some((j) => j?.name === LAVORO_UNIT_WINDOWS && j.conclusion === 'success');
 }
 
-/** Le corse riuscite di suite.yml su main, per commit (la più nuova per prima). PURA. */
+/** Le corse riuscite del workflow del verde su main, per commit (la più nuova per prima). PURA. */
 export function corseVerdi(runs) {
   const perSha = new Map();
   for (const r of Array.isArray(runs) ? runs : []) {
@@ -90,7 +92,7 @@ export function oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato, adesso 
 
 /**
  * Pubblicazione ferma: l'ultima versione ha più di `soglia` ore e su main c'è codice nuovo dopo di lei.
- * 'senza-verde' se nessun commit più nuovo ha la suite verde; 'dopo-il-verde' se un verde da pubblicare
+ * 'senza-verde' se nessun commit più nuovo è verde; 'dopo-il-verde' se un verde da pubblicare
  * c'è da più di `sogliaVerde` ore e non è uscito (cancello unit, numero, costruzione…); altrimenti ''. PURA.
  */
 export function rilascioFermo({
@@ -111,33 +113,33 @@ export function rigaCorsa(r) {
 export function testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, scartata, corse, esecuzione, erroreApi } = {}) {
   const giorni = Math.floor((oreDallUltima || 0) / 24);
   const righe = [
-    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit, ma nessuno ha la suite verde (.github/workflows/suite.yml: Playwright su Linux e unit test su Windows). Il lavoro di pubblicazione pubblica solo un commit con la suite verde, quindi gli utenti restano fermi a ${tag}.`,
+    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit, ma nessuno ha le prove importanti verdi (.github/workflows/${WORKFLOW_VERDE}: prove importanti e catena degli aggiornamenti su Linux, unit test su Windows). Il lavoro di pubblicazione pubblica solo un commit con quella corsa verde, quindi gli utenti restano fermi a ${tag}.`,
     '',
     verde
-      ? `Ultimo commit di main con la suite verde: ${verde}${corsaVerde?.html_url ? ` (${corsaVerde.html_url})` : ''}, che non è più nuovo di ${tag}.`
-      : 'Fra le ultime corse riuscite della suite su main non c\'è nessun commit verde.',
+      ? `Ultimo commit di main con le prove importanti verdi: ${verde}${corsaVerde?.html_url ? ` (${corsaVerde.html_url})` : ''}, che non è più nuovo di ${tag}.`
+      : 'Fra le ultime corse riuscite delle prove importanti su main non c\'è nessun commit verde.',
   ];
   if (scartata?.head_sha) {
-    righe.push(`La corsa riuscita più nuova, su ${scartata.head_sha}${scartata.html_url ? ` (${scartata.html_url})` : ''}, non ha passato gli unit test su Windows (o è di prima che la suite li provasse): il cancello di pubblicazione rifarebbe quei controlli su Windows, quindi non conta come verde.`);
+    righe.push(`La corsa riuscita più nuova, su ${scartata.head_sha}${scartata.html_url ? ` (${scartata.html_url})` : ''}, non ha passato gli unit test su Windows: il cancello di pubblicazione rifarebbe quei controlli su Windows, quindi non conta come verde.`);
   }
-  if (erroreApi) righe.push(`Attenzione: le corse della suite non si sono lette (${erroreApi}); la scelta è stata fatta senza.`);
-  righe.push('', 'Ultime corse della suite su main:');
+  if (erroreApi) righe.push(`Attenzione: le corse delle prove importanti non si sono lette (${erroreApi}); la scelta è stata fatta senza.`);
+  righe.push('', 'Ultime corse delle prove importanti su main:');
   const elenco = Array.isArray(corse) ? corse : [];
   righe.push(...(elenco.length ? elenco.map((r) => `  ${rigaCorsa(r)}`) : ['  (nessuna letta)']));
   righe.push(
     '',
-    'Cosa fare: apri le corse rosse qui sopra, capisci quali rossi si ripetono e correggili finché un commit di main non torna verde; se un rosso è d\'ambiente del contenitore senza schermo, va in tests/rossi-noti.json (contenitore.specs) col titolo esatto. Ogni suite rossa su main ha già aperto il suo feedback, anche quando il rosso sono gli unit test su Windows: parti da quelli.',
+    'Cosa fare: apri le corse rosse qui sopra, capisci quali rossi si ripetono e correggili finché un commit di main non torna verde. Ogni corsa rossa delle prove importanti su main ha già aperto il suo feedback, anche quando il rosso sono gli unit test su Windows: parti da quelli.',
     'Dalla cloud registro e allegati di una corsa non si scaricano: i suoi rossi stanno nelle annotazioni del lavoro, che si leggono con l\'API (gh api repos/<repo>/actions/runs/<corsa>/jobs, poi gh api repos/<repo>/check-runs/<id del lavoro>/annotations).',
   );
   if (esecuzione) righe.push('', `Registro di questa esecuzione: ${esecuzione}`);
-  return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: nessun commit di main con la suite verde`, testo: righe.join('\n') };
+  return { titolo: `Pubblicazione ferma${tag ? ` alla ${tag}` : ''} da ${giorni} giorni: nessun commit di main con le prove importanti verdi`, testo: righe.join('\n') };
 }
 
 /** Titolo e testo del feedback quando un verde c'è ma la pubblicazione non lo fa uscire. PURA. */
 export function testoFermoDopoIlVerde({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, oreDalVerde, pubblicazioni, esecuzione, erroreApi } = {}) {
   const giorni = Math.floor((oreDallUltima || 0) / 24);
   const righe = [
-    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit. Un commit con la suite Playwright verde da pubblicare c'è da ${Math.round(oreDalVerde || 0)} ore, quindi la pubblicazione si ferma DOPO aver scelto il commit: nel lavoro per Windows (controlli unit, chiavi di default, numero di versione, costruzione, file nella bozza) o nel passaggio da bozza a pubblicata.`,
+    `Nessuna versione nuova di Filo da ${giorni} giorni: l'ultima è ${tag}, e da allora su main sono entrati ${commitDopoTag} commit. Un commit con le prove importanti verdi da pubblicare c'è da ${Math.round(oreDalVerde || 0)} ore, quindi la pubblicazione si ferma DOPO aver scelto il commit: nel lavoro per Windows (controlli unit, chiavi di default, numero di versione, costruzione, file nella bozza) o nel passaggio da bozza a pubblicata.`,
     '',
     `Il commit verde più nuovo: ${verde}${corsaVerde?.html_url ? ` (${corsaVerde.html_url})` : ''}.`,
   ];
@@ -171,7 +173,7 @@ const eAntenato = (a, b) => { try { git('merge-base', '--is-ancestor', a, b); re
 const soloCodice = (da, a) => Number(gitForse('rev-list', '--count', '--first-parent', '--invert-grep', '--grep=^release: v[0-9]', `${da}..${a}`) || 0);
 
 function leggiCorse(repo, filtro) {
-  const j = ghApi(`repos/${repo}/actions/workflows/suite.yml/runs?branch=main&${filtro}`, SOLO_CORSE);
+  const j = ghApi(`repos/${repo}/actions/workflows/${WORKFLOW_VERDE}/runs?branch=main&${filtro}`, SOLO_CORSE);
   return Array.isArray(j?.workflow_runs) ? j.workflow_runs : [];
 }
 
@@ -205,9 +207,9 @@ async function main() {
   // Un verde trovato basta; senza, un errore nel leggere i lavori può essere il motivo, e si dice.
   if (!verde && erroreLavori && !erroreApi) erroreApi = erroreLavori;
 
-  // Il suite.yml di un avviso vuole solo lo sha: da lì conta i commit entrati dopo.
+  // L'avviso di importanti.yml vuole solo lo sha: da lì conta i commit entrati dopo.
   if (process.argv.includes('--stampa')) {
-    if (erroreApi) console.error(`[suite verde] corse non lette: ${erroreApi}`);
+    if (erroreApi) console.error(`[verde] corse non lette: ${erroreApi}`);
     if (verde) console.log(verde);
     return;
   }
@@ -241,18 +243,18 @@ async function main() {
     '## Quale commit si pubblica',
     '',
     sha
-      ? `- Si pubblica \`${sha}\`, il commit più nuovo di main con la suite verde${corsaVerde?.html_url ? ` ([corsa](${corsaVerde.html_url}))` : ''}.`
+      ? `- Si pubblica \`${sha}\`, il commit più nuovo di main con le prove importanti verdi${corsaVerde?.html_url ? ` ([corsa](${corsaVerde.html_url}))` : ''}.`
       : verde
-        ? `- Niente da pubblicare: il commit più nuovo con la suite verde è \`${verde}\`, non più nuovo di ${tag}.`
-        : '- Niente da pubblicare: nessun commit di main ha la suite verde fra le ultime corse riuscite.',
+        ? `- Niente da pubblicare: il commit più nuovo con le prove importanti verdi è \`${verde}\`, non più nuovo di ${tag}.`
+        : '- Niente da pubblicare: nessun commit di main ha le prove importanti verdi fra le ultime corse riuscite.',
     `- main adesso: \`${testa}\`.`,
     `- Commit di main dopo il verde, non ancora verdi o non ancora provati: ${nonProvati === null ? 'tutti (nessun verde)' : nonProvati}.`,
     tag
       ? `- Ultima versione: ${tag}, ${Number.isFinite(oreDallUltima) ? `${Math.round(oreDallUltima)} ore fa` : 'età sconosciuta'}; commit di codice dopo di lei: ${commitDopoTag}.`
       : '- Nessuna versione ancora pubblicata.',
   ];
-  if (scartata) riassunto.push(`- \`${scartata.head_sha}\` ha la suite Playwright verde ma non gli unit test su Windows: il cancello lo rifiuterebbe, non conta.`);
-  if (erroreApi) riassunto.push(`- Le corse della suite non si sono lette: ${erroreApi}.`);
+  if (scartata) riassunto.push(`- \`${scartata.head_sha}\` ha la corsa verde ma non gli unit test su Windows: il cancello lo rifiuterebbe, non conta.`);
+  if (erroreApi) riassunto.push(`- Le corse delle prove importanti non si sono lette: ${erroreApi}.`);
 
   const oreDalVerde = verdeDopoTag ? oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato, Date.now(), valida) : NaN;
   const fermo = rilascioFermo({ oreDallUltima, commitDopoTag, verdeDopoTag, oreDalVerde });
@@ -292,7 +294,7 @@ async function main() {
     process.exit(1);
   }
   if (erroreApi) {
-    console.log(`::error::le corse della suite non si sono lette (${erroreApi}): senza, nessun commit risulta verde.`);
+    console.log(`::error::le corse delle prove importanti non si sono lette (${erroreApi}): senza, nessun commit risulta verde.`);
     process.exit(1);
   }
 }

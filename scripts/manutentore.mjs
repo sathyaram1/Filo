@@ -17,7 +17,7 @@ import { leggiTentativo } from './lib/tentativi.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, leggiNonFidati, fileProbabiliDi, validaScheda } from './schede.mjs';
 import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
-import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
+import { passaIlCancello, scegliUltimoVerde, WORKFLOW_VERDE } from './ultima-suite-verde.mjs';
 import { CAUSE_MODIFICATO, CAUSE_NON_LETTO, famigliaPrezzo, leggiNotaRifiuti, NOTA_RIFIUTI, PREZZI, RIFIUTO_MODIFICATO, RIFIUTO_NON_LETTO, rifiutiVuoti } from './session-report.mjs';
 import '../src/shared/feedbackAttese.js';
 import '../src/shared/prioritaTre.js';
@@ -1039,7 +1039,7 @@ export function lavoriPromettibili(schede, ordine = []) {
 export function contestoRedattore({ blocco, capacita = '', schede = [], ordine = [], commit = '', motivo = '' }) {
   const b = blocco || {};
   const da = commit
-    ? [`Le righe sono quelle del commit ${unaRiga(commit).slice(0, 12)}, l'ultimo di main con la suite verde: la pubblicazione costruisce lui o uno dopo, e le righe fuse dopo restano accanto alla riscrittura.`]
+    ? [`Le righe sono quelle del commit ${unaRiga(commit).slice(0, 12)}, l'ultimo di main con le prove importanti verdi: la pubblicazione costruisce lui o uno dopo, e le righe fuse dopo restano accanto alla riscrittura.`]
     : [`Non so quale commit costruirà la pubblicazione (${unaRiga(motivo || 'nessun motivo')}): le righe sono quelle di questa cartella. Se la pubblicazione costruisce un commit che non le ha tutte, la riscrittura non esce.`];
   const promettibili = lavoriPromettibili(schede, ordine);
   const titoli = (l) => l.map((s) => `#${unaRiga(s.num)}${s.titolo ? ` ${unaRiga(s.titolo)}` : ''}`);
@@ -1146,8 +1146,8 @@ export function controllaNovita(consegna, { blocco, schede = [], ordine = [] }) 
 }
 
 /**
- * Il commit che la prossima pubblicazione costruisce al più presto: il più nuovo di main (primo genitore) con la suite
- * verde, come lo sceglie ultima-suite-verde.mjs. La pubblicazione prende lui o uno dopo, quindi le sue righe ci sono
+ * Il commit che la prossima pubblicazione costruisce al più presto: il più nuovo di main (primo genitore) con le prove
+ * importanti verdi, come lo sceglie ultima-suite-verde.mjs. La pubblicazione prende lui o uno dopo, quindi le sue righe ci sono
  * tutte. → { sha } | { motivo }. Mai un throw.
  */
 export async function ultimoVerde({ root = ROOT, env = process.env, fetchImpl = fetch, git = null, gh = null } = {}) {
@@ -1171,7 +1171,7 @@ export async function ultimoVerde({ root = ROOT, env = process.env, fetchImpl = 
     }
   };
   try {
-    const corse = await api(`repos/${repo}/actions/workflows/suite.yml/runs?branch=main&status=success&per_page=100`);
+    const corse = await api(`repos/${repo}/actions/workflows/${WORKFLOW_VERDE}/runs?branch=main&status=success&per_page=100`);
     const lavori = new Map();
     for (const sha of primo) {
       const r = (corse.workflow_runs || []).find((x) => x && x.head_sha === sha);
@@ -1179,9 +1179,9 @@ export async function ultimoVerde({ root = ROOT, env = process.env, fetchImpl = 
       if (!lavori.has(r.id)) lavori.set(r.id, passaIlCancello((await api(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`)).jobs));
       if (lavori.get(r.id)) return { sha };
     }
-    return { motivo: 'nessun commit di main con la suite verde fra le ultime cento corse' };
+    return { motivo: 'nessun commit di main con le prove importanti verdi fra le ultime cento corse' };
   } catch (e) {
-    return { motivo: `le corse della suite non si leggono (${unaRiga(e.message).slice(0, 160)})` };
+    return { motivo: `le corse delle prove importanti non si leggono (${unaRiga(e.message).slice(0, 160)})` };
   }
 }
 

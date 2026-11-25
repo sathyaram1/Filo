@@ -1,6 +1,6 @@
-// La suite completa gira in GitHub a ogni fusione su main (suite.yml); la pubblicazione (release.yml)
-// prende il commit più nuovo di main con la suite verde. Qui si legge che i due workflow lo fanno davvero:
-// i testi del repo lo promettono, e un pezzo mancante pubblicherebbe senza suite, in silenzio.
+// La suite completa gira in GitHub a ogni fusione su main (suite.yml) e registra i suoi rossi; le prove importanti
+// (importanti.yml) decidono la pubblicazione (release.yml), che prende il loro ultimo verde (#2501). Qui si legge che i
+// workflow lo fanno davvero: i testi del repo lo promettono, e un pezzo mancante pubblicherebbe senza prove, in silenzio.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,9 +14,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
 const YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
 const SUITE_YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'suite.yml'), 'utf8');
+const IMP_YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'importanti.yml'), 'utf8');
 const SCEGLI_JS = readFileSync(resolve(ROOT, 'scripts', 'ultima-suite-verde.mjs'), 'utf8');
 const { PASSI, casella } = await import('../../scripts/release-platform-alarm.mjs');
-const { CHIAVE_FERMO, SOGLIA_ORE, LAVORO_UNIT_WINDOWS } = await import('../../scripts/ultima-suite-verde.mjs');
+const { CHIAVE_FERMO, SOGLIA_ORE, LAVORO_UNIT_WINDOWS, WORKFLOW_VERDE } = await import('../../scripts/ultima-suite-verde.mjs');
 const { nomeEsitoParte, rossiDellePartiMancanti } = await import('../../scripts/suite-verdict.mjs');
 const { chiaviDelRegistroUnit } = await import('../../scripts/build-alarm.mjs');
 
@@ -46,8 +47,10 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
   const elenco = passi(suite);
   const verdettoJob = senzaCommenti(job('verdetto', SUITE_YML));
   const elencoVerdetto = passi(verdettoJob);
-  const unitJob = senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML));
-  const avvisoJob = senzaCommenti(job('avviso', SUITE_YML));
+  const unitJob = senzaCommenti(job(LAVORO_UNIT_WINDOWS, IMP_YML));
+  const avvisoJob = senzaCommenti(job('avviso', IMP_YML));
+  const importantiJob = senzaCommenti(job('importanti', IMP_YML));
+  const catenaJob = senzaCommenti(job('aggiornamenti', IMP_YML));
   const elencoAvviso = passi(avvisoJob);
   const suitePasso = elenco.find((p) => /npx playwright test/.test(p.corpo));
   const parti = ((suite.match(/^\s+parte:\s*\[([^\]]*)\]\s*$/m) || [])[1] || '').split(',').map((x) => Number(x.trim()));
@@ -64,21 +67,54 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
 
   test('una suite partita arriva in fondo; le fusioni arrivate intanto si raccolgono nell\'ultima', () => {
     const on = intestazione(SUITE_YML);
-    assert.match(on, /concurrency:\s*\n\s+group:\s*suite-\$\{\{\s*github\.ref\s*\}\}\s*\n\s+cancel-in-progress:\s*false/,
-      'annullare una suite a metà butta un\'ora e non dice niente di nessun commit');
+    assert.match(on, /concurrency:\s*\n\s+group:\s*suite-\$\{\{\s*github\.ref\s*\}\}-\$\{\{\s*inputs\.commit \|\| 'fusioni'\s*\}\}\s*\n\s+cancel-in-progress:\s*false/,
+      'annullare una suite a metà butta un\'ora; e la corsa chiesta per una versione non si fa scavalcare da una fusione');
   });
 
-  test('prova il commit della spinta; l\'avviso lo prende con la storia, per elencare i commit dopo l\'ultimo verde', () => {
-    for (const lavoro of [suite, verdettoJob, avvisoJob]) {
-      assert.match(lavoro, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
+  test('prova il commit della spinta, o quello chiesto per una versione; l\'avviso lo prende con la storia', () => {
+    for (const lavoro of [suite, verdettoJob]) {
+      assert.match(lavoro, /ref:\s*\$\{\{\s*inputs\.commit \|\| github\.sha\s*\}\}/);
     }
+    assert.match(verdettoJob, /SUITE_COMMIT:\s*\$\{\{\s*inputs\.commit \|\| github\.sha\s*\}\}/, 'il registro dice il commit provato');
+    assert.match(intestazione(SUITE_YML), /workflow_dispatch:\s*\n\s+inputs:\s*\n\s+commit:/);
+    assert.match(avvisoJob, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
     assert.match(avvisoJob, /fetch-depth:\s*0/);
   });
 
-  test('permessi di sola lettura: legge le corse, non scrive niente', () => {
+  test('permessi di sola lettura: scrive solo `stabile`, su main e nell\'ambiente fisso', () => {
     const on = intestazione(SUITE_YML);
     assert.match(on, /permissions:\s*\n\s+contents:\s*read\s*\n\s+actions:\s*read/);
-    assert.doesNotMatch(SUITE_YML, /:\s*write\b/, 'la suite non ha niente da scrivere');
+    const stabile = senzaCommenti(job('stabile', SUITE_YML));
+    assert.doesNotMatch(SUITE_YML.replace(job('stabile', SUITE_YML), ''), /:\s*write\b/, 'la suite non ha niente da scrivere');
+    assert.match(stabile, /^ {6}contents:\s*write\s*$/m);
+    assert.match(stabile, /^ {4}environment:\s*rilascio\s*$/m);
+    assert.match(intestazione(IMP_YML), /permissions:\s*\n\s+contents:\s*read\s*\n\s+actions:\s*read/);
+    assert.doesNotMatch(IMP_YML, /:\s*write\b/, 'le prove importanti non hanno niente da scrivere');
+  });
+
+  // #2501: un rosso della suite non apre più feedback; lo raccoglie il lavoro settimanale dalle righe del registro.
+  test('un rosso della suite non apre feedback: il verdetto lo registra a macchina, nel registro del lavoro', () => {
+    assert.doesNotMatch(senzaCommenti(SUITE_YML), /build-alarm|FILO_BUILD_PASSPHRASE/);
+    assert.doesNotMatch(SUITE_YML, /^\s{2}avviso:\s*$/m);
+    assert.doesNotMatch(SUITE_YML, /^\s{2}unit-windows:\s*$/m, 'gli unit su Windows stanno con le prove importanti');
+    const v = elencoVerdetto.find((p) => p.id === 'verdetto');
+    assert.match(v.corpo, /\| tee verdetto\.log/, 'le righe del registro stanno nel registro del lavoro, che dalla cloud si legge');
+    assert.match(readFileSync(resolve(ROOT, 'scripts', 'rossi-della-suite.mjs'), 'utf8'), /j\.name === 'verdetto'/,
+      'il lavoro settimanale legge il registro del lavoro che si chiama così');
+  });
+
+  test('suite verde su main: la versione di quel commit si segna stabile', () => {
+    const stabile = senzaCommenti(job('stabile', SUITE_YML));
+    const se = (stabile.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
+    const corsa = (ref, s, v) => ({ github: { ref }, needs: { suite: { result: s }, verdetto: { result: v } } });
+    assert.equal(valutaCondizione(se, corsa('refs/heads/main', 'success', 'success')), true);
+    assert.equal(valutaCondizione(se, corsa('refs/heads/main', 'success', 'failure')), false, 'una suite rossa non segna niente');
+    assert.equal(valutaCondizione(se, corsa('refs/heads/prova', 'success', 'success')), false);
+    assert.match(stabile, /PROVATO:\s*\$\{\{\s*inputs\.commit \|\| github\.sha\s*\}\}/);
+    assert.match(stabile, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/, 'col token che scrive gira lo strumento di main, non quello del commit chiesto');
+    assert.match(stabile, /git merge-base --is-ancestor "\$PROVATO" HEAD[\s\S]*exit 1[\s\S]*node scripts\/segna-stabile\.mjs --commit "\$PROVATO"/,
+      'un commit fuori da main non si segna');
+    assert.match(stabile, /fetch-depth:\s*0/, 'il tag della versione si trova solo con la storia');
   });
 
   // #1485: in fila su una macchina la suite ha passato il tetto del passo (200 minuti) e cresceva ancora.
@@ -180,16 +216,16 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
 
   // #1504: la parola della costruzione sta in un lavoro suo, nell'ambiente fisso. I lavori che fanno girare il codice
   // provato (npm ci, prove) non nominano segreti: senza ambiente un segreto arriva col valore omonimo del repo.
-  describe('un rosso nuovo su main apre un feedback, da un lavoro a parte', () => {
-    const allarme = elencoAvviso.find((p) => /build-alarm\.mjs/.test(p.corpo) && /Suite Playwright rossa/.test(p.corpo));
+  describe('importanti.yml: un rosso delle prove importanti o degli unit su main apre un feedback, da un lavoro a parte', () => {
+    const allarme = elencoAvviso.find((p) => /build-alarm\.mjs/.test(p.corpo) && /Prove importanti rosse su main/.test(p.corpo));
     const allarmeUnit = elencoAvviso.find((p) => /build-alarm\.mjs/.test(p.corpo) && /Unit test rossi su Windows/.test(p.corpo));
     const seAvviso = (avvisoJob.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
-    const corsa = ({ ref = 'refs/heads/main', suite: s = 'success', verdetto = 'success', unit = 'success', cancellata = false } = {}) => ({
+    const corsa = ({ ref = 'refs/heads/main', importanti = 'success', aggiornamenti = 'success', unit = 'success', cancellata = false } = {}) => ({
       github: { ref },
       cancellata,
       needs: {
-        suite: { result: s, outputs: {} },
-        verdetto: { result: verdetto, outputs: {} },
+        importanti: { result: importanti, outputs: {} },
+        aggiornamenti: { result: aggiornamenti, outputs: {} },
         [LAVORO_UNIT_WINDOWS]: { result: unit, outputs: {} },
       },
     });
@@ -197,46 +233,45 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     const condizione = (p) => (p.corpo.match(/^ {8}if:\s*(.+)$/m) || [])[1] || '';
 
     // #1788: col commit provato il server riconosce un rosso che una fusione arrivata dopo ha già corretto.
-    test('ogni allarme dice al server il commit su cui la suite ha girato', () => {
+    test('ogni allarme dice al server il commit su cui le prove hanno girato', () => {
       for (const p of [allarme, allarmeUnit]) {
         assert.match(p.corpo, /^ {10}COMMIT_PROVATO: \$\{\{ github\.sha \}\}$/m, p.nome);
         assert.match(p.corpo, /node scripts\/build-alarm\.mjs .* --commit "\$COMMIT_PROVATO"/, p.nome);
       }
     });
 
-    test('gira su main a ogni rosso, anche con npm ci rosso prima della suite; salta una corsa verde, un ramo, una corsa annullata', () => {
-      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows,\s*unit-windows-punta\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
+    test('gira su main a ogni rosso; salta una corsa verde, un ramo, una corsa annullata', () => {
+      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*importanti,\s*aggiornamenti,\s*unit-windows,\s*unit-windows-punta\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
       const apre = {
-        'rossi nuovi della suite': { verdetto: 'failure' },
-        'npm ci rosso in una parte, prima della suite': { suite: 'failure', verdetto: 'failure' },
-        'una parte rossa con il verdetto verde': { suite: 'failure' },
+        'prove importanti rosse o sopra il tetto': { importanti: 'failure' },
+        'catena degli aggiornamenti rossa': { aggiornamenti: 'failure' },
         'unit rossi su Windows': { unit: 'failure' },
         'unit su Windows fermati dal tetto del lavoro': { unit: 'cancelled' },
-        'suite e unit rossi insieme': { verdetto: 'failure', unit: 'failure' },
+        'prove importanti e unit rossi insieme': { importanti: 'failure', unit: 'failure' },
       };
       for (const [caso, esiti] of Object.entries(apre)) {
         assert.equal(valutaCondizione(seAvviso, corsa(esiti)), true, `${caso}: su main il feedback non partirebbe`);
       }
       assert.equal(valutaCondizione(seAvviso, corsa()), false, 'una corsa verde salta l\'avviso');
-      assert.equal(valutaCondizione(seAvviso, corsa({ ref: 'refs/heads/prova', verdetto: 'failure', unit: 'failure' })), false,
+      assert.equal(valutaCondizione(seAvviso, corsa({ ref: 'refs/heads/prova', importanti: 'failure', unit: 'failure' })), false,
         'su un ramo l\'avviso si salta prima dell\'ambiente, che lo respingerebbe');
-      assert.equal(valutaCondizione(seAvviso, corsa({ verdetto: 'failure', cancellata: true })), false);
+      assert.equal(valutaCondizione(seAvviso, corsa({ importanti: 'failure', cancellata: true })), false);
     });
 
     test('un passo per lavoro rosso, e il secondo parte anche se il primo non ha consegnato', () => {
       assert.ok(allarme && allarmeUnit, 'un rosso deve diventare un feedback, non un silenzio');
-      const scaricaSuite = passoCon(/download-artifact[\s\S]*name:\s*suite-playwright-/);
+      const scaricaImp = passoCon(/download-artifact[\s\S]*name:\s*importanti-registro/);
       const scaricaUnit = passoCon(/download-artifact[\s\S]*name:\s*unit-windows-registro/);
-      for (const p of [allarme, scaricaSuite]) {
-        assert.equal(valutaCondizione(condizione(p), corsa({ verdetto: 'failure' })), true, `«${p.nome}» salta a suite rossa`);
-        assert.equal(valutaCondizione(condizione(p), corsa({ suite: 'failure', verdetto: 'failure' })), true, `«${p.nome}» salta con una parte rossa`);
-        assert.equal(valutaCondizione(condizione(p), corsa({ unit: 'failure' })), false, `«${p.nome}» apre la suite per un rosso degli unit`);
+      assert.equal(valutaCondizione(condizione(allarme), corsa({ aggiornamenti: 'failure' })), true, 'la catena rossa apre il suo feedback');
+      for (const p of [allarme, scaricaImp]) {
+        assert.equal(valutaCondizione(condizione(p), corsa({ importanti: 'failure' })), true, `«${p.nome}» salta a prove importanti rosse`);
+        assert.equal(valutaCondizione(condizione(p), corsa({ unit: 'failure' })), false, `«${p.nome}» apre le prove importanti per un rosso degli unit`);
       }
       for (const p of [allarmeUnit, scaricaUnit]) {
         assert.equal(valutaCondizione(condizione(p), corsa({ unit: 'failure' })), true, `«${p.nome}» salta a unit rossi`);
-        assert.equal(valutaCondizione(condizione(p), corsa({ verdetto: 'failure' })), false, `«${p.nome}» apre gli unit per un rosso della suite`);
+        assert.equal(valutaCondizione(condizione(p), corsa({ importanti: 'failure' })), false, `«${p.nome}» apre gli unit per un rosso delle prove importanti`);
       }
-      for (const p of [allarme, allarmeUnit, scaricaSuite, scaricaUnit]) {
+      for (const p of [allarme, allarmeUnit, scaricaImp, scaricaUnit]) {
         assert.match(condizione(p), /^always\(\) && !cancelled\(\)/, `«${p.nome}» senza always(): dopo un passo rosso verrebbe saltato`);
       }
     });
@@ -246,12 +281,27 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
       assert.match(allarmeUnit.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
       assert.match(senzaCommenti(job('release')), /secrets\.FILO_BUILD_PASSPHRASE/, 'il cancello unit usa FILO_BUILD_PASSPHRASE');
       assert.match(avvisoJob, /^ {4}environment:\s*rilascio\s*$/m, 'la parola si legge solo nell\'ambiente `rilascio`, scritto fisso');
-      for (const [nome, testo] of [['suite', suite], ['verdetto', verdettoJob], [LAVORO_UNIT_WINDOWS, unitJob]]) {
+      for (const [nome, testo] of [['suite', suite], ['verdetto', verdettoJob], [LAVORO_UNIT_WINDOWS, unitJob], ['importanti', importantiJob], ['aggiornamenti', catenaJob]]) {
         assert.doesNotMatch(testo, /secrets\.|environment:/, `\`${nome}\` fa girare il codice provato: niente segreti né ambiente`);
       }
       assert.doesNotMatch(avvisoJob, /npm-ci-ritenta|^\s*(?:run:\s*)?(?:npm|npx|yarn|pnpm)\s/m,
         'in `avviso` niente installazione: lo stesso lavoro che legge la parola non esegue dipendenze');
-      assert.match(allarme.corpo, /PARTI_ESITO:\s*\$\{\{\s*needs\.suite\.result\s*\}\}/, 'l\'allarme deve sapere se una parte è rossa fuori dalla suite');
+    });
+
+    test('le prove importanti girano come nel contenitore, col loro tetto; la catena degli aggiornamenti a parte', () => {
+      assert.match(importantiJob, /ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a node scripts\/test-importanti\.mjs --chiavi chiavi-importanti\.txt/);
+      assert.doesNotMatch(importantiJob, /--tetto/, 'il tetto è quello dello script: alzarlo qui farebbe verde una corsa lunga');
+      assert.match(catenaJob, /node scripts\/test-importanti\.mjs --catena --chiavi chiavi-catena\.txt/);
+      for (const j of [importantiJob, catenaJob]) {
+        assert.match(j, /set -o pipefail/, 'col tee senza pipefail un rosso finirebbe verde');
+        assert.match(j, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
+        assert.doesNotMatch(j, /^ {4}(?:if|continue-on-error):/m, 'saltato o tollerato, la corsa sarebbe verde senza averlo passato');
+        const rossa = passi(j).find((p) => /la corsa resta rossa/.test(p.nome));
+        assert.ok(rossa && /exit 1/.test(rossa.corpo), 'un rosso lascia la corsa rossa');
+      }
+      const on = intestazione(IMP_YML);
+      assert.match(on, /^on:\s*\n\s+push:\s*\n\s+branches:\s*\[main\]/m);
+      assert.doesNotMatch(on, /paths(-ignore)?:/, 'ogni fusione va provata');
     });
 
     test('gli strumenti dell\'avviso usano solo moduli di Node: senza npm ci un import da node_modules lo farebbe tacere', () => {
@@ -273,10 +323,12 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     });
 
     test('legge gli allegati dei lavori provati, gli stessi che loro caricano', () => {
-      const caricaVerdetto = elencoVerdetto.find((p) => /upload-artifact/.test(p.corpo));
+      const caricaImp = passi(importantiJob).find((p) => /upload-artifact/.test(p.corpo));
+      const caricaCatena = passi(catenaJob).find((p) => /upload-artifact/.test(p.corpo));
       const caricaUnit = passi(unitJob).find((p) => /upload-artifact/.test(p.corpo));
       for (const [scarica, carica, cartella] of [
-        [passoCon(/download-artifact[\s\S]*name:\s*suite-playwright-/), caricaVerdetto, 'esiti-suite'],
+        [passoCon(/download-artifact[\s\S]*name:\s*importanti-registro/), caricaImp, 'esiti-importanti'],
+        [passoCon(/download-artifact[\s\S]*name:\s*catena-registro/), caricaCatena, 'esiti-catena'],
         [passoCon(/download-artifact[\s\S]*name:\s*unit-windows-registro/), caricaUnit, 'esiti-unit'],
       ]) {
         assert.ok(scarica && carica);
@@ -290,24 +342,13 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
       }
     });
 
-    test('il testo: i rossi con un tetto dichiarato, il link alla corsa, i commit entrati dopo l\'ultimo verde', () => {
-      assert.match(allarme.corpo, /head -80/);
-      assert.match(allarme.corpo, /elenco tagliato/);
-      assert.match(allarme.corpo, /N_TUTTE - 80/);
+    test('il testo: il link alla corsa, i commit entrati dopo l\'ultimo verde, la coda delle prove', () => {
       assert.match(allarme.corpo, /actions\/runs\/\$\{\{ github\.run_id \}\}/, 'chi prende il feedback deve arrivare alla corsa');
       assert.match(allarme.corpo, /node scripts\/ultima-suite-verde\.mjs --stampa/);
       assert.match(allarme.corpo, /git log --first-parent --format='%h %s' "\$\{VERDE\}\.\.HEAD"/);
-      assert.match(allarme.corpo, /head -40/);
-      assert.match(allarme.corpo, /N_COMMIT - 40/, 'anche il taglio dei commit si dice');
-      assert.match(allarme.corpo, /Nessuna suite verde su main/, 'senza un verde lo si dice, invece di un elenco vuoto');
+      assert.match(allarme.corpo, /Nessun commit verde su main/, 'senza un verde lo si dice, invece di un elenco vuoto');
       assert.match(allarme.corpo, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
-      assert.doesNotMatch(allarme.corpo, /prima di ogni pubblicazione/, 'la suite non gira più prima della pubblicazione');
-    });
-
-    test('le chiavi: quelle del verdetto, o `suite:non-partita` se il verdetto non c\'è', () => {
-      assert.match(allarme.corpo, /--chiavi-da esiti-suite\/chiavi-allarme\.txt/);
-      assert.match(allarme.corpo, /--chiave suite:non-partita/);
-      assert.match(allarme.corpo, /-s esiti-suite\/chiavi-allarme\.txt/);
+      assert.match(allarme.corpo, /il tetto non si alza/);
     });
 
     // I passi si fanno girare con lo strumento dell'allarme finto: gli allegati ci sono o mancano, l'invio va o no.
@@ -328,65 +369,41 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         return { stato: r.stato, registro: r.registro, riepilogo: r.riepilogo, titolo: argv?.[0], testo: argv?.[1] || '', chiavi: argv?.slice(2) };
       };
 
-      test('suite senza allegato (npm ci rosso in una parte): feedback con la chiave «non partita»', () => {
-        const r = gira(allarme, { env: { PARTI_ESITO: 'failure' } });
+      test('prove importanti senza allegato: feedback con la chiave delle prove rosse', () => {
+        const r = gira(allarme);
         assert.equal(r.stato, 0, r.registro);
-        assert.equal(r.titolo, 'Suite Playwright rossa su main: commit non pubblicabile');
-        assert.deepEqual(r.chiavi, ['--chiave', 'suite:non-partita', '--commit', SHA_PROVATO]);
-        assert.match(r.testo, /Una parte della suite NON e partita/);
+        assert.equal(r.titolo, 'Prove importanti rosse su main: commit non pubblicabile');
+        assert.deepEqual(r.chiavi, ['--chiave', 'importanti:rosse', '--commit', SHA_PROVATO]);
         assert.match(r.testo, /actions\/runs\/1/);
       });
 
-      test('suite con i rossi nuovi: feedback coi rossi e le chiavi del verdetto', () => {
+      test('le chiavi scritte dallo script delle prove e dalla catena, tutte, e la coda dei registri nel testo', () => {
         const r = gira(allarme, {
-          env: { PARTI_ESITO: 'success' },
           file: {
-            'esiti-suite/chiavi-allarme.txt': 'suite:tests/a.spec.mjs\n',
-            'esiti-suite/rossi-nuovi.txt': 'tests/a.spec.mjs › il caso rosso\n',
-            'esiti-suite/verdetto.log': 'Rossi nuovi: 1\n',
-            'esiti-suite/suite-risultati.json': '{}',
+            'esiti-importanti/chiavi-importanti.txt': 'importanti:rosse\nimportanti:durata\n',
+            'esiti-importanti/importanti.log': 'DURATA SOPRA IL TETTO: 300 s contro 240 s.\n',
+            'esiti-catena/chiavi-catena.txt': 'importanti:catena-aggiornamenti\n',
           },
         });
         assert.equal(r.stato, 0, r.registro);
-        assert.deepEqual(r.chiavi, ['--chiavi-da', 'esiti-suite/chiavi-allarme.txt', '--commit', SHA_PROVATO]);
-        assert.match(r.testo, /Rossi nuovi \(1\):\ntests\/a\.spec\.mjs › il caso rosso/);
-        assert.match(r.testo, /Verdetto:\nRossi nuovi: 1/);
-        assert.doesNotMatch(r.testo, /NON e partita|non ha lasciato il JSON/);
+        assert.deepEqual(r.chiavi, ['--chiave', 'importanti:rosse', '--chiave', 'importanti:durata', '--chiave', 'importanti:catena-aggiornamenti', '--commit', SHA_PROVATO]);
+        assert.match(r.testo, /Coda delle prove importanti:\nDURATA SOPRA IL TETTO/);
       });
 
       // #2313: dalla cloud gli artifact non si scaricano; i registri dei lavori si, con l'API.
       const REGISTRI = (avvisoJob.match(/^ {6}REGISTRI_DALLA_CLOUD:\s*"(.*)"\s*$/m) || [])[1] || '';
       const registriDellaCorsa = REGISTRI.replace(/\$\{\{ github\.repository \}\}/g, 'o/r').replace(/\$\{\{ github\.run_id \}\}/g, '1');
 
-      test('suite con i rossi nuovi: l\'errore di ogni rosso sta nel testo, e la strada per i registri che dalla cloud passa', () => {
+      test('i due feedback dicono la strada per i registri che dalla cloud passa', () => {
         assert.ok(REGISTRI, '`avviso` deve dire, una volta per i suoi due feedback, come leggere i registri dalla cloud');
-        const errori = '✗ tests/a.spec.mjs › il caso rosso\n    in tests/a.spec.mjs:12\n    Error: expect(locator).toBeVisible() failed\n';
-        const r = gira(allarme, {
-          env: { PARTI_ESITO: 'success', REGISTRI_DALLA_CLOUD: registriDellaCorsa },
-          file: {
-            'esiti-suite/chiavi-allarme.txt': 'suite:tests/a.spec.mjs\n',
-            'esiti-suite/rossi-nuovi.txt': 'tests/a.spec.mjs › il caso rosso\n',
-            'esiti-suite/rossi-errori.txt': errori,
-            'esiti-suite/verdetto.log': 'Rossi nuovi: 1\n',
-            'esiti-suite/suite-risultati.json': '{}',
-          },
-        });
-        assert.equal(r.stato, 0, r.registro);
-        assert.match(r.testo, /Rossi nuovi \(1\):\ntests\/a\.spec\.mjs › il caso rosso\n/);
-        assert.match(r.testo, /\n\n\nErrori dei rossi nuovi:\n✗ tests\/a\.spec\.mjs › il caso rosso\n {4}in tests\/a\.spec\.mjs:12\n {4}Error: expect\(locator\)\.toBeVisible\(\) failed\n\n\nVerdetto:/);
-        assert.ok(r.testo.indexOf('Nessuna suite verde su main') < r.testo.indexOf('Errori dei rossi nuovi'),
-          'i commit sospetti prima degli errori: oltre il tetto del server il taglio mangia la coda');
-        assert.ok(r.testo.includes('gh api repos/o/r/actions/runs/1/jobs'), r.testo);
+        const r = gira(allarme, { env: { REGISTRI_DALLA_CLOUD: registriDellaCorsa } });
         assert.ok(r.testo.includes('gh api repos/o/r/actions/jobs/<id>/logs'), r.testo);
-        assert.doesNotMatch(r.testo, /stanno negli artifact di questa esecuzione/, 'gli artifact dalla cloud non si scaricano: non sono la strada');
-        const senza = gira(allarme, { env: { PARTI_ESITO: 'success' }, file: { 'esiti-suite/rossi-nuovi.txt': 'tests/a.spec.mjs › x\n' } });
-        assert.doesNotMatch(senza.testo, /Errori dei rossi nuovi/, 'senza errori nessuna intestazione vuota');
         const unit = gira(allarmeUnit, { env: { REGISTRI_DALLA_CLOUD: registriDellaCorsa }, file: { 'esiti-unit/unit.log': 'not ok 1 - a\n' } });
         assert.ok(unit.testo.includes('gh api repos/o/r/actions/jobs/<id>/logs'), 'anche il feedback degli unit dice la strada');
       });
 
       test('un allarme non consegnato fa rosso `avviso`', () => {
-        const r = gira(allarme, { env: { PARTI_ESITO: 'failure', INVIO_ESITO: '1' } });
+        const r = gira(allarme, { env: { INVIO_ESITO: '1' } });
         assert.notEqual(r.stato, 0);
         assert.match(r.registro, /non consegnato/);
       });
@@ -482,8 +499,8 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
 
 // #1184: il cancello di pubblicazione rifà gli unit su Windows; se la suite non li prova, il «verde» scelto può essere
 // un commit che il cancello rifiuta a ogni giro, e la pubblicazione si ferma per giorni.
-describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubblicazione', () => {
-  const lavoro = senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML));
+describe('importanti.yml: gli unit test su Windows, gli stessi del cancello di pubblicazione', () => {
+  const lavoro = senzaCommenti(job(LAVORO_UNIT_WINDOWS, IMP_YML));
   const elenco = passi(lavoro);
   const unit = elenco.find((p) => p.id === 'unit');
 
@@ -509,7 +526,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
       'senza la riprova un flaky su Windows butta un verde, o un giro di pubblicazione');
     assert.match(unit.corpo, /continue-on-error:\s*true/, 'il passo dopo deve poter aprire il feedback');
     const node = (testo, nome) => nodeDeiWorkflow(testo).filter((x) => x.lavoro === nome).map((x) => x.fonte);
-    assert.deepEqual(node(SUITE_YML, LAVORO_UNIT_WINDOWS), node(YML, 'release'));
+    assert.deepEqual(node(IMP_YML, LAVORO_UNIT_WINDOWS), node(YML, 'release'));
     assert.deepEqual(node(YML, 'release'), [{ file: '.node-version' }]);
     assert.match(lavoro, /node scripts\/npm-ci-ritenta\.mjs/);
   });
@@ -536,7 +553,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
   });
 
   test('su main l\'avviso apre il feedback con le chiavi del cancello', () => {
-    const allarme = passi(senzaCommenti(job('avviso', SUITE_YML))).find((p) => /build-alarm\.mjs/.test(p.corpo) && /Unit test rossi su Windows/.test(p.corpo));
+    const allarme = passi(senzaCommenti(job('avviso', IMP_YML))).find((p) => /build-alarm\.mjs/.test(p.corpo) && /Unit test rossi su Windows/.test(p.corpo));
     assert.ok(allarme, 'un rosso che non diventa un feedback ferma la pubblicazione in silenzio');
     assert.match(allarme.corpo, /--chiavi-unit esiti-unit\/unit\.log/, 'le chiavi del cancello: lo stesso rosso visto qui e là apre un feedback solo');
     assert.match(allarme.corpo, /--chiave unit-windows:non-partiti/);
@@ -564,19 +581,19 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
   });
 
   // #2148: la suite dura ore, e una fusione arrivata intanto può aver già corretto i rossi del commit provato.
-  describe('a fine suite i rossi si rifanno su Windows sulla punta di main', () => {
-    const punta = senzaCommenti(job('unit-windows-punta', SUITE_YML));
+  describe('i rossi si rifanno su Windows sulla punta di main', () => {
+    const punta = senzaCommenti(job('unit-windows-punta', IMP_YML));
     const passiPunta = passi(punta);
     const rifai = passiPunta.find((p) => p.id === 'rifai');
     const se = (punta.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
     const corsa = ({ ref = 'refs/heads/main', unit: u = 'failure', cancellata = false } = {}) => ({
       github: { ref }, cancellata,
-      needs: { suite: { result: 'success' }, verdetto: { result: 'success' }, [LAVORO_UNIT_WINDOWS]: { result: u } },
+      needs: { [LAVORO_UNIT_WINDOWS]: { result: u } },
     });
 
-    test('gira su Windows dopo la suite, solo su main e a unit rossi, col codice della punta e senza segreti', () => {
+    test('gira su Windows dopo gli unit, solo su main e a unit rossi, col codice della punta e senza segreti', () => {
       assert.match(punta, /runs-on:\s*windows-latest/, 'i rossi sono di Windows: su Linux passerebbero senza essere corretti');
-      assert.match(punta, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows\s*\]\s*$/m, 'a fine suite, quando l\'avviso apre il feedback');
+      assert.match(punta, /^ {4}needs:\s*\[\s*unit-windows\s*\]\s*$/m, 'dopo gli unit, prima che l\'avviso apra il feedback');
       assert.equal(valutaCondizione(se, corsa()), true);
       assert.equal(valutaCondizione(se, corsa({ unit: 'success' })), false);
       assert.equal(valutaCondizione(se, corsa({ ref: 'refs/heads/prova' })), false);
@@ -589,7 +606,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
 
     test('legge il registro che carica il lavoro degli unit, e passa all\'avviso cosa ha trovato', () => {
       const scarica = passiPunta.find((p) => /download-artifact/.test(p.corpo));
-      const carica = passi(senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML))).find((p) => /upload-artifact/.test(p.corpo));
+      const carica = passi(senzaCommenti(job(LAVORO_UNIT_WINDOWS, IMP_YML))).find((p) => /upload-artifact/.test(p.corpo));
       const nome = (p) => (p.corpo.match(/^ {10}name:\s*(\S+)\s*$/m) || [])[1];
       assert.equal(nome(scarica), nome(carica));
       assert.match(scarica.corpo, /path:\s*esiti-unit\s*$/m);
@@ -597,7 +614,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
       assert.deepEqual(usciteDelLavoro(punta), {
         punta: { passo: 'rifai', chiave: 'punta' }, gia_verdi: { passo: 'rifai', chiave: 'gia_verdi' }, tutti: { passo: 'rifai', chiave: 'tutti' },
       });
-      const allarmeUnit = passi(senzaCommenti(job('avviso', SUITE_YML))).find((p) => /Unit test rossi su Windows/.test(p.corpo) && /build-alarm/.test(p.corpo));
+      const allarmeUnit = passi(senzaCommenti(job('avviso', IMP_YML))).find((p) => /Unit test rossi su Windows/.test(p.corpo) && /build-alarm/.test(p.corpo));
       for (const [env, uscita] of [['PUNTA', 'punta'], ['GIA_VERDI', 'gia_verdi'], ['TUTTI_GIA_VERDI', 'tutti']]) {
         assert.match(allarmeUnit.corpo, new RegExp(`^ {10}${env}: \\$\\{\\{ needs\\.unit-windows-punta\\.outputs\\.${uscita} \\}\\}$`, 'm'));
       }
@@ -640,7 +657,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
   });
 });
 
-describe('release.yml: si pubblica il commit più nuovo di main con la suite verde', () => {
+describe('release.yml: si pubblica il commit più nuovo di main con le prove importanti verdi', () => {
   const release = () => senzaCommenti(job('release'));
   const scegli = senzaCommenti(job('scegli'));
 
@@ -663,10 +680,41 @@ describe('release.yml: si pubblica il commit più nuovo di main con la suite ver
     assert.match(scegli, /id:\s*scelta/);
   });
 
-  test('la scelta guarda solo corse riuscite di suite.yml su main', () => {
-    assert.match(SCEGLI_JS, /actions\/workflows\/suite\.yml\/runs\?branch=main&/);
+  test('la scelta guarda solo corse riuscite di importanti.yml su main, non la suite completa (#2501)', () => {
+    assert.equal(WORKFLOW_VERDE, 'importanti.yml');
+    assert.match(SCEGLI_JS, /actions\/workflows\/\$\{WORKFLOW_VERDE\}\/runs\?branch=main&/);
+    assert.doesNotMatch(senzaCommenti(SCEGLI_JS.split('\n').filter((r) => !/^\s*(\/\/|\*)/.test(r)).join('\n')), /workflows\/suite\.yml/);
     assert.match(SCEGLI_JS, /status=success/);
     assert.match(SCEGLI_JS, /--first-parent/);
+    assert.match(readFileSync(resolve(ROOT, 'scripts', 'manutentore.mjs'), 'utf8'), /workflows\/\$\{WORKFLOW_VERDE\}\/runs/,
+      'il redattore delle novità legge lo stesso verde che la pubblicazione costruisce');
+  });
+
+  test('dopo la pubblicazione la versione si segna stabile se la suite completa del suo commit è già verde', () => {
+    const r = release();
+    const passo = passi(r).find((p) => /segna-stabile/.test(p.corpo));
+    assert.ok(passo, 'una versione con la suite già verde uscirebbe senza segno');
+    assert.ok(r.indexOf('segna-stabile') > r.indexOf('--draft=false'), 'si segna una versione già pubblicata');
+    assert.match(passo.corpo, /--commit "\$\{\{ steps\.applica\.outputs\.sha \}\}" --se-suite-verde/);
+    assert.match(passo.corpo, /continue-on-error:\s*true/, 'un segno mancato non fa rossa una versione già uscita');
+    assert.match(passo.corpo, /git show "\$\{GITHUB_SHA\}:scripts\/segna-stabile\.mjs"/, 'lo strumento di questa corsa: il commit provato può essere più vecchio');
+  });
+
+  // La suite gira su circa metà delle fusioni: senza una corsa sul commit di ogni versione, il segno arriva per caso.
+  test('una versione uscita senza la suite verde sul suo commit chiede la sua corsa della suite', () => {
+    const j = senzaCommenti(job('suite-della-versione'));
+    assert.match(j, /^ {4}needs:\s*release\s*$/m);
+    const se = (j.match(/^ {4}if:\s*\$\{\{\s*(.+?)\s*\}\}\s*$/m) || [])[1] || '';
+    const corsa = (result, uscita, sha = 'a'.repeat(40)) => ({ needs: { release: { result, outputs: { should_release: uscita, sha } } } });
+    assert.equal(valutaCondizione(se, corsa('success', 'true')), true);
+    assert.equal(valutaCondizione(se, corsa('success', 'false')), false, 'niente di nuovo pubblicato: niente da provare');
+    assert.equal(valutaCondizione(se, corsa('failure', 'true')), false);
+    assert.match(j, /^ {6}actions:\s*write\s*$/m);
+    assert.doesNotMatch(j, /secrets\.|environment:|actions\/checkout/, 'avvia un workflow e basta: niente segreti, niente codice');
+    assert.match(j, /workflows\/suite\.yml\/runs\?head_sha=\$\{COMMIT\}&status=success/);
+    assert.match(j, /gh workflow run suite\.yml --repo "\$\{GITHUB_REPOSITORY\}" --ref main -f commit="\$\{COMMIT\}"/);
+    assert.match(j, /COMMIT:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/);
+    assert.doesNotMatch(senzaCommenti(job('release')), /actions:\s*write/, 'dove si costruisce il token non avvia workflow');
   });
 
   test('pubblicazione ferma da più di 48 ore: un feedback con la sua chiave, e la corsa rossa', () => {
@@ -760,13 +808,13 @@ describe('release.yml: si pubblica il commit più nuovo di main con la suite ver
 describe('ogni allarme dice al server cosa è rotto', () => {
   test('ogni passo che chiama build-alarm.mjs nei workflow passa le sue chiavi', () => {
     let chiamate = 0;
-    for (const [nome, testo] of [['release.yml', YML], ['suite.yml', SUITE_YML]]) {
+    for (const [nome, testo] of [['release.yml', YML], ['suite.yml', SUITE_YML], ['importanti.yml', IMP_YML]]) {
       for (const p of passi(senzaCommenti(testo)).filter((x) => /node scripts\/build-alarm\.mjs/.test(x.corpo))) {
         chiamate += 1;
         assert.match(p.corpo, /--chiav/, `${nome}: il passo «${p.nome}» apre un allarme senza chiavi`);
       }
     }
-    assert.equal(chiamate, 3, 'le chiamate dirette sono tre: il cancello unit, la suite rossa e gli unit rossi su Windows');
+    assert.equal(chiamate, 3, 'le chiamate dirette sono tre: il cancello unit, le prove importanti rosse e gli unit rossi su Windows');
     assert.match(senzaCommenti(job('release')), /build-alarm\.mjs [^\n]*--chiavi-unit unit\.log/, 'il cancello unit dà una chiave per file di test');
   });
 
@@ -980,7 +1028,7 @@ describe('una meta\' di piattaforma che fallisce apre un feedback', () => {
 // lavoro vuol dire «se questo fallisce, la corsa resta verde». Un lavoro così
 // che non apra un feedback è un rosso che nessuno vedrà mai.
 test('ogni lavoro che può fallire lasciando la corsa verde apre un feedback', () => {
-  for (const testo of [YML, SUITE_YML]) {
+  for (const testo of [YML, SUITE_YML, IMP_YML]) {
     const jobs = testo.slice(testo.search(/^jobs:\s*$/m));
     const nomi = [...jobs.matchAll(/^ {2}([a-z][\w-]*):\s*$/gm)].map((m) => m[1]);
     // `continue-on-error` del LAVORO sta a quattro spazi; quello di un passo a otto.

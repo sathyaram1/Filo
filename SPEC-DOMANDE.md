@@ -997,6 +997,7 @@ fra l'addetto comunicazioni e l'owner.
 | lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) | `high` |
 | lunedì | potatura dei rami (§ 4.7) | `rami` | 5 | Opus; Haiku da provare | `high` |
 | domenica | audit di sicurezza | `audit` | 45 | Opus | `high` |
+| lunedì | suite completa: riporta verde (§ 4.2, #2501) | `audit` | 45 | Opus | `high` |
 
 Lo sforzo parte da `high`, come nelle fasi di un feedback dopo il primo lavoro
 (§ 6.4), perché nessun ricorrente costruisce codice da zero. Modello e sforzo si
@@ -1005,11 +1006,13 @@ del lavoro (§ 4.3) può lanciare riordino e potatura anche fuori cadenza.
 
 Com'è fatto dal #1153:
 
-- il server semina la tabella una volta, coi testi di `ruoli/` del suo repo; da
+- il server semina ogni ricorrente della tabella una volta, coi testi di
+  `ruoli/` del suo repo, anche quello aggiunto dopo la prima semina (#2501); da
   lì un ricorrente si cambia, si spegne, si toglie o si aggiunge solo in Routine
   → Compiti ricorrenti, e uno tolto non torna. Le ore della tabella: revisione
   delle domande 07:00, gestione del lavoro 06:00, addetto comunicazioni 09:00,
-  riordino lunedì 01:00, potatura lunedì 02:00, audit domenica 00:30;
+  riordino lunedì 01:00, potatura lunedì 02:00, suite completa lunedì 03:00,
+  audit domenica 00:30;
 - nascono spenti la gestione del lavoro e l'addetto comunicazioni, i cui
   strumenti arrivano coi punti 9 e 14 (§ 13): un'istanza senza i suoi strumenti
   spende e basta;
@@ -1023,8 +1026,9 @@ Com'è fatto dal #1153:
 
 ### 4.2 Due canali di aggiornamento
 
-- **Veloce** (com'è oggi): una versione ogni sei ore, il commit più nuovo con la
-  suite verde.
+- **Veloce** (com'è oggi): una versione ogni sei ore, il commit più nuovo con le
+  prove importanti e gli unit verdi (#2501; la suite completa la riporta verde
+  un compito settimanale, e a suite verde la versione si segna «stabile»).
 - **Stabile** (nuovo): una versione minor il lunedì alle 00:00. Esce solo se non
   c'è nessun feedback di sicurezza a priorità 3 aperto. La domenica l'audit li
   cerca; le routine hanno 24 ore per chiuderli. Se ne resta uno aperto, quella
@@ -1276,8 +1280,8 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
     lo rifiuta, come rifiuta le ricerche alla posta dopo la casella. Chi lo
     legge per mestiere parte lì: oggi l'addetto comunicazioni, la gestione del
     lavoro, l'audit, la revisione delle domande, «Gestisci la risposta», il
-    riordino della coda, la potatura dei rami, gli esperimenti e il loro
-    giudice (§ 4.6);
+    riordino della coda, la potatura dei rami, la suite completa che torna
+    verde, gli esperimenti e il loro giudice (§ 4.6);
     lo smistamento e la risposta (§ 3.5) di una domanda riservata, e il loro
     biglietto prende il segno alla consegna (#2001), come chi riceve il
     registro delle decisioni (§ 3.6), che è testo di altre domande, o il
@@ -1548,7 +1552,7 @@ fidato e figlio. I nipoti contano come figli.
 | Compito | Urgenza |
 |---|---|
 | Gestisci la risposta | 47 |
-| Gestione del lavoro, audit di sicurezza, riordino della coda | 45 |
+| Gestione del lavoro, audit di sicurezza, riordino della coda, suite completa: riporta verde | 45 |
 | Esperimento della gestione del lavoro, e il giudice cieco che ne confronta l'esito (§ 4.6) | 44 |
 | Revisione delle domande, addetto comunicazioni | 30 |
 | Unione di feedback | 20 |

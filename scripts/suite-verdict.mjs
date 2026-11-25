@@ -4,13 +4,14 @@
 //
 // PERCHÉ ESISTE
 //   La suite completa gira SOLO in GitHub Actions, a ogni fusione su main
-//   (.github/workflows/suite.yml), e si pubblica solo un commit con la suite
-//   verde. Lì un rosso non vale per forza «non pubblicare»: nel contenitore
+//   (.github/workflows/suite.yml): non decide la pubblicazione (#2501), ma i
+//   suoi rossi li raccoglie il lavoro settimanale, e a suite verde la versione
+//   si segna «stabile». Un rosso non vale per forza «guasto»: nel contenitore
 //   senza schermo ci sono casi che sono rossi da sempre e per motivi
 //   d'ambiente (una cattura dello schermo, un sito esterno), scritti in
 //   tests/rossi-noti.json → contenitore.specs. Senza questo confronto la
-//   suite sarebbe rossa a ogni giro e nessuna versione uscirebbe più; col
-//   confronto fatto «a occhio» da un agente, il giudizio cambiava a ogni giro.
+//   suite sarebbe rossa a ogni giro e nessuna versione si segnerebbe stabile;
+//   col confronto fatto «a occhio» da un agente, il giudizio cambiava a ogni giro.
 //
 // COSA CONTA COME ROSSO
 //   Un caso il cui esito finale è «unexpected» (fallito in tutti i tentativi,
@@ -296,10 +297,10 @@ export function classificaErroriGlobali(errori, ciSonoRossiNuovi) {
  */
 export function verdetto(json, noti) {
   const casi = raccogliCasi(json);
-  const v = { totale: casi.length, verdi: 0, flaky: 0, saltati: 0, notiCoperti: [], nuovi: [], avvisi: [] };
+  const v = { totale: casi.length, verdi: 0, flaky: 0, saltati: 0, notiCoperti: [], nuovi: [], avvisi: [], instabili: [] };
   for (const c of casi) {
     if (c.stato === 'expected') v.verdi += 1;
-    else if (c.stato === 'flaky') v.flaky += 1;
+    else if (c.stato === 'flaky') { v.flaky += 1; v.instabili.push(c); }
     else if (c.stato === 'skipped') v.saltati += 1;
     else {
       const voce = vocePerCaso(c, noti);
@@ -367,6 +368,25 @@ export function rigaRosso(c) {
     return `errore fuori dai casi: ${c.titolo}${c.strascicoDi ? ` (strascico di ${c.strascicoDi}, non un guasto a sé)` : ''}`;
   }
   return `tests/${c.spec}.spec.mjs › ${c.titoloCompleto || c.titolo}`;
+}
+
+/** Il segno delle righe del registro: le legge scripts/rossi-della-suite.mjs dal registro del lavoro, dalla cloud. */
+export const SEGNO_REGISTRO = '[registro-suite]';
+
+/**
+ * Le righe a macchina di una corsa (#2501): l'esito (`completo` solo se ogni caso ha girato, così un caso che manca
+ * vale verde), i rossi nuovi e le prove instabili, rosse a un tentativo e verdi a un altro sullo stesso commit. Il
+ * commit provato si scrive: in una corsa chiesta per una versione non è quello della corsa (la punta di main). PURA.
+ */
+export function righeRegistro(v, { completo = true, commit = '' } = {}) {
+  const nuovi = Array.isArray(v?.nuovi) ? v.nuovi : [];
+  const intera = completo && !nuovi.some((c) => c.tetto || c.parteMancante);
+  return [
+    ...(/^[0-9a-f]{40}$/.test(commit) ? [`${SEGNO_REGISTRO} commit\t${commit}`] : []),
+    `${SEGNO_REGISTRO} esito\t${intera ? 'completo' : 'incompleto'}`,
+    ...nuovi.filter((c) => !c.strascicoDi).map((c) => `${SEGNO_REGISTRO} rosso\t${rigaRosso(c)}`),
+    ...(Array.isArray(v?.instabili) ? v.instabili : []).map((c) => `${SEGNO_REGISTRO} instabile\t${rigaRosso(c)}`),
+  ];
 }
 
 /** I tetti del testo degli errori, che finisce nel feedback: il server ne tiene 10.000 caratteri in tutto. */
@@ -512,6 +532,8 @@ function scriviErrori(opt, nuovi) {
   if (opt.errori) writeFileSync(resolve(opt.errori), testo ? `${testo}\n` : '', 'utf8');
 }
 
+const COMMIT_PROVATO = process.env.SUITE_COMMIT || process.env.GITHUB_SHA || '';
+
 async function main() {
   const USO = 'Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>] [--errori <file>] [--parti <N> --esiti <cartella>]';
   let opt;
@@ -534,6 +556,7 @@ async function main() {
   const fermo = (messaggio, chiavi, nuovi = []) => {
     console.error(messaggio);
     for (const c of parti) console.error(`  ✗ ${rigaRosso(c)}`);
+    console.log(righeRegistro({ nuovi: [...parti, ...nuovi] }, { completo: false, commit: COMMIT_PROVATO }).join('\n'));
     if (opt.out && parti.length) writeFileSync(resolve(opt.out), `${parti.map(rigaRosso).join('\n')}\n`, 'utf8');
     scriviChiavi(opt, parti.length && !chiavi.includes(CHIAVE_NON_PARTITA) ? [...chiavi, CHIAVE_NON_PARTITA] : chiavi);
     scriviErrori(opt, nuovi);
@@ -569,6 +592,7 @@ async function main() {
   // gli avvisi (i soli teardown scaduti in una corsa senza rossi nuovi).
   v.nuovi.unshift(...parti);
   console.log(testoRiassunto(v));
+  console.log(righeRegistro(v, { completo: !parti.length, commit: COMMIT_PROVATO }).join('\n'));
   if (opt.out) {
     const righe = v.nuovi.map(rigaRosso);
     writeFileSync(resolve(opt.out), righe.length ? `${righe.join('\n')}\n` : '', 'utf8');

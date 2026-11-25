@@ -1,4 +1,4 @@
-// Il cancello di pubblicazione prova l'ultimo commit di main con la suite verde, a volte giorni indietro: qui i suoi
+// Il cancello di pubblicazione prova l'ultimo verde delle prove importanti, a volte giorni indietro: qui i suoi
 // rossi si rifanno sulla punta di main, da cui questo file gira. Esce 0 solo se ogni rosso è un file di test che lì
 // passa: allora il feedback chiederebbe un lavoro già fatto, e si riaprirebbe a ogni chiusura (#1185).
 

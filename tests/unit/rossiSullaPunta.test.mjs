@@ -202,7 +202,7 @@ describe('il passo «Controlli falliti» di release.yml', { skip: !haBash && 'se
       const [titolo, testo, ...resto] = r.allarme;
       assert.equal(titolo, 'Controlli automatici rossi: nessuna versione pubblicata');
       assert.deepEqual(resto, ['--chiavi-unit', 'unit.log']);
-      assert.match(testo, new RegExp(`Commit provato: ${s.provato}, l'ultimo di main con la suite verde\\.`));
+      assert.match(testo, new RegExp(`Commit provato: ${s.provato}, l'ultimo di main con le prove importanti verdi\\.`));
       assert.match(testo, /Gia' verdi sulla punta di main, da non correggere: tests\/unit\/altro\.test\.mjs/);
       assert.match(testo, /aggiornamentiAutomatici\.test\.mjs:116:1/);
       assert.equal(r.copiaRimasta, false);
