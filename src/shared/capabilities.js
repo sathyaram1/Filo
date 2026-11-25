@@ -324,9 +324,9 @@
     },
     {
       id: 'color-picker', title: 'Contagocce colore', category: 'media',
-      desc: 'Preleva il colore di un punto qualsiasi dello schermo e ne copia il codice negli appunti.',
-      invoke: 'Icona «Color picker» in «Altro…» della barra laterale.',
-      doesNot: 'Disponibile solo dove il sistema lo supporta.',
+      desc: 'Preleva il colore di un punto della pagina e ne copia il codice (#RRGGBB) negli appunti. La pagina resta ferma com\'era e una lente sotto il puntatore ingrandisce i pixel e mostra il codice; un clic lo prende, le frecce spostano di un pixel (Maiusc: dieci) e Invio prende quello sotto la lente, Esc o il tasto destro rinunciano.',
+      invoke: 'Icona «Color picker» in «Altro…» della barra laterale, anche su una pagina di Filo come la nuova scheda.',
+      doesNot: 'Non preleva fuori dalla pagina (le altre applicazioni, la barra delle schede); non parte dalla chat.',
     },
     {
       id: 'qr-code', title: 'QR code della pagina', category: 'media',
