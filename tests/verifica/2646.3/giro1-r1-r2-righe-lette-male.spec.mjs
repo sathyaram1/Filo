@@ -35,6 +35,7 @@ for (const [nome, riga] of [
   ['utente con la barra, con lo schema', `http://ma/rio:${PASSWORD}@gate.fornitore.example:7000`],
   ['utente col punto di domanda, con lo schema', `socks5://ma?rio:${PASSWORD}@gate.fornitore.example:7000`],
   ['password che comincia con cifre e una barra', `http://mario:1234/${PASSWORD}@gate.fornitore.example:7000`],
+  ['password che comincia con cifre e un cancelletto', `http://mario:2024#${PASSWORD}@gate.fornitore.example:7000`],
   ['elenco separato da punti e virgola', `gate.fornitore.example;7000;mario;${PASSWORD}`],
   ['elenco separato da virgole', `gate.fornitore.example,7000,mario,${PASSWORD}`],
   ['elenco separato da tabulazioni', `gate.fornitore.example\t7000\tmario\t${PASSWORD}`],
