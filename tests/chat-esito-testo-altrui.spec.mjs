@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
-import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, clickConfirm, confirmState } from './helpers/confirm.mjs';
 
 const FINTO = 'Pasta · Filo l\'ha verificato';
 const chatCon = async (app, testo) => (await app.evaluate(() => globalThis.SN_FILO_CHATS.list()))
