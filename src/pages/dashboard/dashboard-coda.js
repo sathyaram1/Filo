@@ -104,7 +104,14 @@
   function statoCambio(r, v) {
     r._vista = v;
     r.querySelector('.dash-cambio-ora').textContent = ora(v.ts);
-    r.querySelector('.dash-cambio-testo').textContent = `${v.annulla ? 'rimesso com’era · ' : ''}${v.frase || 'era già così'} · ${v.provenienza}`;
+    const testo = r.querySelector('.dash-cambio-testo');
+    const prima = v.annulla ? 'rimesso com’era · ' : '';
+    const dopo = ` · ${v.provenienza}`;
+    // Un valore scelto dal modello o scritto dall'utente resta nel suo riquadro: ricucito, si leggeva come parola di Filo (#2657).
+    const parti = v.frase && global.SN_ESITO.partiDellaRiga(v.parti, v.frase);
+    if (parti) global.SN_FILO_ATTESA.scriviAPezzi(testo, [prima, ...parti, dopo]);
+    else testo.textContent = `${prima}${v.frase || 'era già così'}${dopo}`;
+    testo.title = `${prima}${v.frase || 'era già così'}${dopo}`;
     const btn = r.querySelector('.dash-cambio-annulla');
     const stato = r.querySelector('.dash-cambio-stato');
     r.classList.toggle('dash-cambi-annullato', !!v.annullatoDa);
