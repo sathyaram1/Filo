@@ -2233,7 +2233,7 @@
         chiudi(hex);
       });
       overlay.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); rinuncia(); });
-      document.addEventListener('keydown', suTasto, true);
+      window.addEventListener('keydown', suTasto, true);
       window.addEventListener('resize', rinuncia, true);
       document.addEventListener('visibilitychange', suVisibilita, true);
 
