@@ -129,14 +129,14 @@
     giro(a, 0);
     return [...out].sort((x, y) => y.length - x.length);
   }
-  // Fra «» basta l'inizio del testo, accorciato con «…» o tagliato lungo; nudo serve il testo intero e non una parola
-  // corta, che una frase di Filo può contenere da sé.
+  // Fra «» basta l'inizio del testo, accorciato con «…» o tagliato lungo. Una parola corta resta di Filo: il nome di
+  // un'impostazione («tema») coincide spesso con la chiave scritta dal modello, e così corta non fa dire niente a Filo.
   function conScrittoDalModello(testo, a) {
     const scritti = scrittoDalModello(a);
     if (!scritti.length) return testo;
     const fraVirgolette = (x) => {
       const y = x.replace(/…$/, '').trim();
-      return !!y && scritti.some((s) => s === x || (y !== x && y.length >= 3 && s.startsWith(y)) || (y.length >= 40 && s.startsWith(y)));
+      return y.length >= 6 && scritti.some((s) => s === x || (y !== x && s.startsWith(y)) || (y.length >= 40 && s.startsWith(y)));
     };
     const out = [];
     const nudo = (t) => {
