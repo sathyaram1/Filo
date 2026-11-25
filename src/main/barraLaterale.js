@@ -859,7 +859,7 @@ class BarraLaterale {
     const attiva = this._attiva();
     const incognito = this._incognito();
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
-    if (d.tipo === 'pagina') { this.eseguiSullaPagina(id, { colore }); return; }
+    if (d.tipo === 'pagina') { this.eseguiSullaPagina(id); return; }
     const daTastiera = !dallaFila && this.motivo === 'tasto';
     const fai = () => {
       switch (id) {
