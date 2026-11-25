@@ -134,7 +134,12 @@ test('detto altrove dalla scheda davanti: non si offre, non si dà, esce dalla c
   assert.ok(a.avvisa('ripiego', componi), 'la pausa la tiene chi l’ha detto: la coda non ne mette una sua');
   righe = new Set(['sito']);
   assert.deepEqual(a.prendi('id2', { scheda: 'sito' }), [], 'la scheda che lo chiede ha la riga: non lo mostra due volte');
+  assert.deepEqual(chiesto.slice(-1), ['sito'], 'chiede con la scheda che lo prende');
   assert.deepEqual(a.inAttesa(), []);
+  righe = new Set();
+  a.avvisa('ripiego', componi);
+  assert.deepEqual(a.prendi('id3', { scheda: 'sito' }).map((m) => m.text), ['ripiego'], 'senza riga lo prende e lo mostra');
+  assert.deepEqual(visti, ['ripiego']);
 });
 
 test('tornati su Filo dalla barra delle schede: quelli in coda si offrono di nuovo, quelli presi no', () => {
