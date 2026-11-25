@@ -176,9 +176,7 @@
     b.addEventListener('click', (e) => {
       if (!e.isTrusted || b.getAttribute('aria-disabled') === 'true') return;
       // Scelta dentro «Altro…»: i contatori la tengono a parte (#1471).
-      const daAltro = b.classList.contains('riserva');
-      if (it.id === 'colorPicker' && typeof window.EyeDropper === 'function') contagocce(it.id, daAltro);
-      else api.azione({ id: it.id, daAltro });
+      api.azione({ id: it.id, daAltro: b.classList.contains('riserva') });
     });
     b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
