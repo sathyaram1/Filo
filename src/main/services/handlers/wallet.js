@@ -389,8 +389,9 @@ module.exports = function register(on, ctx) {
   on(MSG.WALLET_SALDO_PREPARA, filoOnly(async () => { rileggiSaldo(); return { ok: true }; }));
 
   // Anche dai siti: la riga sta nei riquadri sulle pagine web. Il peggio che un mittente può fare è
-  // zittire per dieci minuti un avviso che ripete una frase.
-  on(MSG.KEY_FALLBACK_SHOWN, async () => { ripiegoMostrato(); return { ok: true }; });
+  // zittire per dieci minuti un avviso che ripete una frase, e solo dalla scheda davanti.
+  // `detto: false`: la pagina era dietro, e la riga conterà quando la sua scheda torna davanti.
+  on(MSG.KEY_FALLBACK_SHOWN, async (msg, sender) => ({ ok: true, detto: rigaArrivata(msg, sender) }));
 
   // Nuova chiave: il portafoglio esiste sul server, la chiave non è qui.
   on(MSG.WALLET_REISSUE, filoOnly(async () => {
