@@ -58,22 +58,9 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
   async function anticipa(testo) {
     const t = String(testo == null ? '' : testo);
     if (!t.trim() || !(await acceso())) return false;
+    try { statico.prepara(); } catch (_) {}
     rileggiTesto(t);
     return true;
-  }
-
-  // Quello che il passaggio verso i modelli nasconde il modello della rilettura non lo vede: qui si riconosce con le
-  // stesse regole (pavimento della privacy e segreti custoditi anche travestiti), più carte e conti del guardiano.
-  function trovatiSenzaModello(g, testo, custoditi) {
-    let valori = [];
-    let tratti = [];
-    try { valori = (g.segretiNelTesto(testo) || []).filter((x) => x && x.valore); } catch (_) {}
-    try {
-      const P = globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
-      valori.push(...(P.trova(testo) || []).filter((x) => x && x.valore));
-    } catch (_) {}
-    try { tratti = g.trattiSegreti(testo, custoditi) || []; } catch (_) {}
-    return { valori, tratti };
   }
 
   async function custoditi() {
@@ -82,19 +69,17 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
     } catch (_) { return []; }
   }
 
+  // Quello che il passaggio verso i modelli nasconde il modello della rilettura non lo vede: qui si riconosce con le
+  // stesse regole (pavimento della privacy e segreti custoditi anche travestiti), più carte e conti del guardiano.
+  // null se il lettore non ha risposto: per gli allegati è l'unico controllo, e la rilettura vale come saltata.
   async function statici(testo, allegati) {
-    const g = G();
-    if (!g) return [];
-    const cs = await custoditi();
+    const r = await statico.leggi({ testo, allegati, custoditi: await custoditi() });
+    if (!r) return null;
     const out = [];
-    if (testo) {
-      const { valori, tratti } = trovatiSenzaModello(g, testo, cs);
-      out.push(...L().daValori(testo, valori), ...L().daTratti(testo, tratti));
-    }
+    if (testo && r.testo) out.push(...L().daValori(testo, r.testo.valori), ...L().daTratti(testo, r.testo.tratti));
     allegati.forEach((a, k) => {
-      if (a == null) return;
-      const { valori, tratti } = trovatiSenzaModello(g, a, cs);
-      out.push(...L().daAllegato(k, valori, tratti));
+      const x = r.allegati && r.allegati[k];
+      if (a != null && x) out.push(...L().daAllegato(k, x.valori, x.tratti));
     });
     return out;
   }
