@@ -1,5 +1,5 @@
 // Verifica #2648.1 giro 2: il perché di un'impostazione rifiutata che ripete un PEZZO del valore scelto dal modello
-// (un elenco spezzato alle virgole o alle «e») lo tiene nel riquadro, in diretta e nella chat riaperta. Modello finto.
+// (un elenco spezzato alle virgole, un valore con due spazi) lo tiene nel riquadro, in diretta e riaperta. Modello finto.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from '../../helpers/chatFinta.mjs';
 import { livelloAutonomia } from '../../helpers/autonomia.mjs';
