@@ -1051,7 +1051,7 @@ module.exports = {
   installa, negaTutto, rispondi, scaricamentoSenzaGesto, navigazioneDiFilo, passaScheda, PERMESSI_DA_CHAT, chiediScaricamenti, sitoDegliScaricamenti, SCARICAMENTI_FINESTRA_MS, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoPer, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerRichiamare, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, gestoSulloStrato, gestoNelloStrato, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
-  TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
+  TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, inputDellUtente,_inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
   _usaAnnuncio: (fn) => { annuncia = fn; },
   _usaFontiSchermo: (f) => { fontiDelloSchermo = f; },
