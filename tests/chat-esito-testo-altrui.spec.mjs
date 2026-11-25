@@ -283,8 +283,12 @@ test('#2648.1 un\'impostazione chiesta di nuovo uguale dice «Già così» col v
         : vero(input, init));
     });
     const cambia = (id) => ({ id, name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'modello_funzione', valore: `${FUNZIONE}: fornitore-nuovo/modello-x ${VALORE}` }) });
-    await modelloFinto(app, [{ text: '', toolCalls: [cambia('g1')] }, { text: '', toolCalls: [cambia('g2')] }, { text: 'Fatto.' }]);
-    await chiedi(page, 'cambia il modello del riassunto, e ancora');
+    await modelloFinto(app, [{ text: '', toolCalls: [cambia('g1')] }, { text: 'Cambiato.' }, { text: '', toolCalls: [cambia('g2')] }, { text: 'Fatto.' }]);
+    await chiedi(page, 'cambia il modello del riassunto');
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Cambiato.' }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await chiedi(page, 'rimettilo uguale');
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 15_000 });
     const gia = page.locator('.dash-activity-row', { hasText: 'Già così' });
     await expect(gia).toBeAttached({ timeout: 8_000 });
