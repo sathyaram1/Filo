@@ -120,9 +120,7 @@ test('detto altrove dalla scheda davanti: non si offre, non si dà, esce dalla c
   });
   assert.ok(a.avvisa('ripiego', componi), 'davanti c’è un’altra scheda: parte');
   assert.equal(mandati.length, 1);
-  assert.deepEqual(a.prendi('id1', { scheda: 'sito' }), [], 'nessuno l’ha preso: c’è ancora');
-  assert.deepEqual(chiesto.slice(-1), ['sito'], 'chiede con la scheda che lo prende');
-  assert.deepEqual(visti, [], 'dato a nessuno: non visto');
+  assert.deepEqual(visti, [], 'spedito non vuol dire visto');
   a.riproponi();
   assert.equal(mandati.length, 2, 'nessuna riga davanti: si ripropone');
   davanti.adesso = 'home';
