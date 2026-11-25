@@ -57,16 +57,10 @@
     const l = Array.isArray(a && a._cambi) ? a._cambi : [];
     const una = (c) => {
       const f = pulito(c && c.frase);
-      const p = f && pezziDellaFrase(c.parti);
-      return p && piatto(p).trim() === f ? p : [f];
+      const p = f && esito().partiDellaRiga(c.parti, f);
+      return p ? p.filter((x) => x !== '') : [f];
     };
     return unisci(l.map(una).filter((p) => p[0] !== ''), '; ').flat();
-  }
-  function pezziDellaFrase(p) {
-    if (!Array.isArray(p) || p.length > 60) return null;
-    const out = p.map((x) => (typeof x === 'string' ? x : x && typeof x === 'object' && typeof x.citazione === 'string'
-      ? (x.nuda === true ? suo(x.citazione) : fra(x.citazione)) : null));
-    return out.some((x) => x == null) ? null : out.filter((x) => x !== '');
   }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
