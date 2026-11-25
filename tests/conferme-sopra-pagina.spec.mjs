@@ -595,7 +595,7 @@ test('una finestrella aperta da un’altra finestra di Filo sopra il testo della
   const area = await areaDomanda(app);
   expect(area).toBeTruthy();
   // L'utente sta leggendo la domanda (un tasto lì); la finestrella parte dall'altra finestra senza un suo gesto nuovo.
-  await finestrellaSopra(incognito, area, finto, () => vista.keyboard.press('Shift'));
+  await finestrellaSopra(incognito, area, finto, () => tastoSullaDomanda(vista));
   await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
   await expect.poll(() => finestrelle(app)).toEqual([false]);
   // Il sito la sposta o la ingrandisce: resta nascosta finché c'è la domanda.
