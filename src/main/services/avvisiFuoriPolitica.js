@@ -11,7 +11,7 @@ const PAUSA_MS = 10 * 60 * 1000;
 // `manda(messaggio)` lo offre alle schede: lo mostra solo quella in vista, che prima lo prende.
 function crea({ manda, ora = Date.now, nuovoId = () => crypto.randomUUID() } = {}) {
   const mostrati = new Map(); // chiave → quando si è visto
-  const inCoda = new Map(); // chiave → { messaggio, alMostrare }
+  const inCoda = new Map(); // chiave → { messaggio, alMostrare, dettoAltrove }
 
   // `dettoAltrove(davanti)` della voce dice se la scheda davanti (`davanti.scheda`, o quella che sa lui) lo mostra già
   // in un altro modo: allora esce dalla coda senza partire, e la pausa la tiene lui.
