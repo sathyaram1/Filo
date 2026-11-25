@@ -118,6 +118,40 @@ test('con la chiave ma senza un modello da chiamare la home resta intera: la str
   await expect(page.locator('#tieni .dash-carta-voce', { hasText: /Opzioni/ }).first()).toBeVisible({ timeout: 15_000 });
 });
 
+// #2650 — chi non era ancora accolto la ritrovava a ogni finestra incognito nuova: lì dentro niente di detto resta.
+test('in incognito l\'intervista non si apre, a ogni finestra; la finestra normale la tiene', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await expect(crediti(page)).toBeVisible({ timeout: 15_000 });
+  await stubModelli(app);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' } }); });
+  const aperte = [page];
+  for (const giro of [1, 2]) {
+    await shell.evaluate(() => window.filoShell.openIncognito());
+    const inc = await home(app, aperte);
+    aperte.push(inc);
+    await expect(inc.locator('#tieni .dash-carta[data-chiave="editor"]')).toBeVisible({ timeout: 15_000 });
+    await expect(inc.locator('#input')).toBeVisible();
+    await expect(inc.locator('body')).not.toHaveAttribute('data-state', 'thread');
+    await expect(inc.locator('.dash-bubble-filo', { hasText: 'Ciao, sono Filo' })).toHaveCount(0);
+    await expect(inc.locator('#skipOnboarding')).toHaveCount(0);
+    if (giro === 1) {
+      await inc.locator('#input').fill('che tempo fa domani?');
+      await inc.locator('#sendBtn').click();
+      await expect(inc.locator('.dash-bubble-filo', { hasText: 'Dimmi pure.' })).toBeVisible({ timeout: 15_000 });
+      await expect(inc.locator('.dash-bubble-filo', { hasText: 'Ciao, sono Filo' })).toHaveCount(0);
+      await inc.screenshot({ path: 'tests/.shots/2650-incognito-senza-intervista.png' });
+      // Chiusa l'ultima incognito, la prossima riparte da un incognito vuoto: è lì che l'intervista tornava.
+      await inc.evaluate(() => window.close());
+      await expect.poll(() => app.windows().includes(inc), { timeout: 10_000 }).toBe(false);
+      aperte.pop();
+    }
+  }
+  // Fuori dall'incognito l'intervista resta da fare, e si apre.
+  await page.reload();
+  await expect(page.locator('.dash-bubble-filo').first()).toContainText('Ciao, sono Filo', { timeout: 15_000 });
+});
+
 test.describe('chi è già stato accolto', () => {
   test.use({ accoglienzaFatta: true });
 
