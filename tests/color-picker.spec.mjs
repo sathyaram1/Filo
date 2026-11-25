@@ -2,7 +2,7 @@
 // Filo sceglie sulla foto della pagina. Qui il contagocce di sistema non si finge: è la strada vera dell'app.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { premiNellaBarra } from './helpers/barra.mjs';
+import { premiNellaBarra, mettiNellaBarra } from './helpers/barra.mjs';
 import { home } from './helpers/chatFinta.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
