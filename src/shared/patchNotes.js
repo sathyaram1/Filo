@@ -20,6 +20,7 @@
       version: '0.2.304', date: '2026-11-25',
       fixes: [
         { testo: 'Il Color picker della barra laterale funziona, anche nella nuova scheda: una lente ingrandisce i pixel sotto il puntatore e un clic copia il codice del colore.', segnalazione: 2651 },
+        { testo: 'Nelle righe dei cambi della home e nel segno di spunta sul tuo messaggio, il valore di un\'impostazione scritto da te o scelto da Filo per te sta nel suo riquadro, così non si confonde con le parole di Filo.', segnalazione: [2655, 2657] },
         { testo: 'Un proxy degli elenchi con un indirizzo email come utente, o con un indirizzo IPv6 fra quadre, ora si collega e la sua password resta protetta. Scritto senza http:// o socks5:// davanti, Filo chiede al fornitore che tipo di proxy è e lo usa nel modo giusto, anche per scaricare i video.', segnalazione: 2646 },
         { testo: 'Un proxy scritto in una forma che Filo non sa leggere, come un indirizzo IPv6 senza parentesi quadre, è protetto intero come una chiave API: si salva cifrato, l\'assistente non lo passa ai modelli e l\'archivio esportato non lo porta se non spunti «Includi le chiavi».', segnalazione: 2646 },
         { testo: 'Un articolo lasciato a metà, dopo aver chiuso e riaperto Filo, riparte dal punto in cui eri. La pulizia delle schede alla riapertura sa fin dove eri arrivato negli articoli, nei video e negli audio, e non li tratta come pagine mai aperte.', segnalazione: 349 },
