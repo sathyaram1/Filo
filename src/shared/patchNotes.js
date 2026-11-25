@@ -17,6 +17,7 @@
         { testo: 'Nelle righe dei cambi della home e nel segno di spunta sul tuo messaggio, il valore di un\'impostazione scritto da te o scelto da Filo per te sta nel suo riquadro, così non si confonde con le parole di Filo.', segnalazione: [2655, 2657] },
         { testo: 'Quando traduci la pagina, i riquadri incorporati da un sito dove hai spento Filo, come un blocco di commenti, restano com\'erano, e l\'avviso finale dice quale sito è rimasto fuori.', segnalazione: 2656 },
         { testo: 'Il numero di carta o il codice che hai scritto in una bozza resta tuo anche dopo aver chiuso e riaperto Filo: se il sito te la rimette davanti e chiedi aiuto all\'assistente, Filo non lo tratta più come un segreto letto dalla pagina e non lo tiene per un mese fra quelli da non far uscire.', segnalazione: 810 },
+        { testo: 'In una conversazione riaperta, una richiesta che non ha cambiato niente, come la home chiesta mentre eri già lì, un sito già nella barra o l\'accesso quando eri già dentro, si legge come quando Filo ti aveva risposto, con la sua icona e senza l\'avviso di errore, anche nelle conversazioni salvate prima. Filo non la conta più fra le cose fatte.', segnalazione: 553 },
       ],
     },
     {
