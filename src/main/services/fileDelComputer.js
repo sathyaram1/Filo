@@ -225,5 +225,17 @@ function concessoDaLink(partizione, input) {
   return permesso(concessioni.get(partizione), percorsoDi(input));
 }
 
+// Un file chiesto da un clic dell'utente su una pagina di Filo (il collegamento in chat, il gettone di una scheda): si
+// apre, o un avviso dice perché no. Chi chiama ha già controllato pagina e gesto. { ok, motivo? }.
+async function apriDaUnClic(win, url) {
+  const g = await giudica(url);
+  if (!g.ok) {
+    const a = require('./indirizzoFermato').avvisoFileNonAperto(g);
+    try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave, tipo: 'indirizzo_fermato' } }); } catch (_) {}
+    return { ok: false, motivo: g.motivo };
+  }
+  return { ok: !!win._filoTabs.openTab(g.url, { fileDelComputer: true, origine: { tipo: 'filo', gesto: true } }) };
+}
+
 module.exports = { PARTIZIONE, VISIBILI, percorsoDi, indirizzoDi, giudica, scrittoDallUtente, concedi, revoca, concessoDaLink, preparaSessione,
-  concessioneDi, permesso, inSessioneDiFile, CSP_DOCUMENTO };
+  concessioneDi, permesso, inSessioneDiFile, apriDaUnClic, CSP_DOCUMENTO };
