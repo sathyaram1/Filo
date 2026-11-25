@@ -112,6 +112,13 @@ test("l'invito filo:// arriva a Filo anche su Linux", () => {
 // al posto del programma. Se sparisce, il doppio clic torna a non aprire
 // niente su metà delle macchine Linux, in silenzio.
 
+// Il programma finto porta in coda il filo dei fusibili, come Electron: lo smistatore spegne lì i privilegi file://
+// prima di mettere il lanciatore (lib/fusibili-electron.js). Dopo `exit 0` la shell non legge più.
+function programmaFinto(script) {
+  const { SENTINELLA } = require(join(ROOT, 'scripts', 'lib', 'fusibili-electron.js'));
+  return Buffer.concat([Buffer.from(script), SENTINELLA, Buffer.from([1, 9]), Buffer.from('101100011\n')]);
+}
+
 test('il doppio clic sul pacchetto Linux avvia Filo senza la gabbia di sicurezza', async () => {
   const { writeFileSync, readFileSync: leggi, existsSync: c_e } = await import('node:fs');
   const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
