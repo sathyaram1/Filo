@@ -31,7 +31,16 @@ async function ambiente() {
   const pagine = new Map();
   const suono = wav();
   const server = createServer((req, res) => {
-    if (req.url === '/suono.wav') { res.writeHead(200, { 'Content-Type': 'audio/wav', 'Content-Length': suono.length }); res.end(suono); return; }
+    // Senza le richieste a pezzi il lettore non sa spostarsi nell'audio.
+    if (req.url === '/suono.wav') {
+      const m = /bytes=(\d+)-(\d*)/.exec(req.headers.range || '');
+      if (!m) { res.writeHead(200, { 'Content-Type': 'audio/wav', 'Content-Length': suono.length, 'Accept-Ranges': 'bytes' }); res.end(suono); return; }
+      const da = Number(m[1]);
+      const a = m[2] ? Math.min(Number(m[2]), suono.length - 1) : suono.length - 1;
+      res.writeHead(206, { 'Content-Type': 'audio/wav', 'Content-Length': a - da + 1, 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${da}-${a}/${suono.length}` });
+      res.end(suono.subarray(da, a + 1));
+      return;
+    }
     const corpo = pagine.get(req.url);
     res.writeHead(corpo ? 200 : 404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(corpo || '');
