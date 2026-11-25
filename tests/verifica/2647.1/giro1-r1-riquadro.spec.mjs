@@ -60,7 +60,6 @@ test('r1 il clic sul tasto «Accedi» incorporato da un altro sito porta l’ute
   }), riquadro);
   await new Promise((r) => setTimeout(r, 500));
   // Il primo e unico gesto dell'utente in questa finestra: il clic sul tasto incorporato.
-  if (process.env.CONTROLLO) await incognito.mouse.click(500, 400);
   await incognito.mouse.click(100, 100);
   await expect.poll(() => finestrelle(app), { timeout: 10_000 }).toHaveLength(1);
   await new Promise((r) => setTimeout(r, 1500));
