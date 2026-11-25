@@ -562,14 +562,29 @@ const finestrelle = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.g
 
 // Il clic che permette di aprirla (#737.1) è un gesto dell'utente in quella finestra: `poi` lo riporta dove serve.
 async function finestrellaSopra(pagina, area, u, poi = async () => {}) {
+  await finestrellaIn(pagina, u, sulTesto(area), poi);
+}
+const sulTesto = (area) => ({ x: Math.round(area.x + area.width / 2 - 220), y: Math.round(area.y + area.height / 2 - 50) });
+async function finestrellaIn(pagina, u, { x, y }, poi = async () => {}) {
   await pagina.mouse.click(5, 5);
   await poi();
-  const x = Math.round(area.x + area.width / 2 - 220);
-  const y = Math.round(area.y + area.height / 2 - 50);
   await pagina.evaluate(({ u, x, y }) => {
     window.open(`${u}?client_id=a&redirect_uri=b`, 'g', `popup,left=${x},top=${y},width=440,height=100`);
   }, { u, x, y });
 }
+// La sposta il sito, da sé: come fa un sito ostile che la porta sopra la domanda solo dopo che si è aperta.
+const spostaFinestrella = (pagina, { x, y }) => pagina.evaluate(({ x, y }) => { window.open('', 'g').moveTo(x, y); }, { x, y });
+const posizioneFinestrella = (app) => app.evaluate(({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && /^https?:/.test(x.webContents.getURL()));
+  return w ? w.getBounds() : null;
+});
+// Il numero della domanda a schermo: cambia a ogni ridisegno, che fa ripartire il mezzo secondo prima di OK.
+const numeroDomanda = (app) => app.evaluate(({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && x._filoTabs.conferme.mostrata);
+  return w ? w._filoTabs.conferme.mostrata : null;
+});
+// Un tasto che non risponde alla domanda: l'utente è nella sua finestra (un modificatore da solo non lo dice).
+const tastoSullaDomanda = (vista) => vista.keyboard.press('ArrowDown');
 
 test('una finestrella aperta da un’altra finestra di Filo sopra il testo della domanda si nasconde, e torna alla risposta', async ({ app, shell, openTab, testServer }) => {
   const finto = testServer.html('<title>Filo</title><p>Filo chiede conferma. Filo vuole impostare: Tema → Scuro.</p>', { pubblico: true });
