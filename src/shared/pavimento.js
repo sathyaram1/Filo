@@ -513,6 +513,74 @@
       const i = celle.findIndex((c) => INTESTAZIONE.test(c));
       if (i >= 0 && celle.length > 1 && !(i === 0 && celle.filter(Boolean).length === 2)) { col = i; sep = barre ? '|' : '\t'; }
     }
+    colonnaCsv(s, out);
+  }
+
+  // La stessa colonna in un CSV, a virgole o a punti e virgola, con le celle anche fra virgolette (#1403.2): le
+  // esportazioni delle password dei browser e dei gestionali. Le righe sotto contano finché hanno tante celle quante
+  // l'intestazione; con due colonne sole il valore deve avere la forma di una password, come in una frase.
+  const MAX_CAMPO_CSV = 4096;
+  function rigaCsv(s, i, sep) {
+    const celle = [];
+    for (;;) {
+      if (s[i] === '"') {
+        let v = '';
+        let j = i + 1;
+        let chiuso = -1;
+        while (j < s.length && j - i <= MAX_CAMPO_CSV) {
+          if (s[j] === '"') {
+            if (s[j + 1] === '"') { v += '"'; j += 2; continue; }
+            chiuso = j;
+            break;
+          }
+          v += s[j++];
+        }
+        // Una virgoletta che non si chiude è un carattere qualunque: la cella si legge com'è scritta.
+        if (chiuso >= 0) {
+          celle.push({ v, a: i + 1 });
+          let k = chiuso + 1;
+          while (k < s.length && s[k] !== sep && s[k] !== '\n') k++;
+          if (s[k] === sep) { i = k + 1; continue; }
+          return { celle, fine: k + 1 };
+        }
+      }
+      let k = i;
+      while (k < s.length && s[k] !== sep && s[k] !== '\n') k++;
+      celle.push({ v: s.slice(i, k), a: i });
+      if (s[k] === sep) { i = k + 1; continue; }
+      return { celle, fine: k + 1 };
+    }
+  }
+  function intestazioneCsv(s, i) {
+    for (const sep of [',', ';']) {
+      const { celle, fine } = rigaCsv(s, i, sep);
+      if (celle.length < 2 || celle.some((c) => !c.v.trim() || c.v.length > 40)) continue;
+      const col = celle.findIndex((c) => INTESTAZIONE_CSV.test(c.v.trim()));
+      if (col < 0 || (col === 0 && celle.length === 2)) continue;
+      return { sep, col, n: celle.length, fine };
+    }
+    return null;
+  }
+  function colonnaCsv(s, out) {
+    let i = 0;
+    while (i < s.length) {
+      const a = s.indexOf('\n', i);
+      const fineRiga = a < 0 ? s.length : a;
+      const riga = s.slice(i, fineRiga);
+      const tab = riga.length <= 2000 && !riga.includes('\t') && !/^\s*\|/.test(riga) && NOMINA_ETICHETTA.test(riga)
+        ? intestazioneCsv(s, i) : null;
+      if (!tab) { i = fineRiga + 1; continue; }
+      i = tab.fine;
+      while (i < s.length) {
+        const r = rigaCsv(s, i, tab.sep);
+        if (r.celle.length === 1 && !r.celle[0].v.trim()) { i = r.fine; continue; }
+        if (r.celle.length !== tab.n) break;
+        const c = r.celle[tab.col];
+        const v = valorePassword(c.v, { forma: tab.n < 3 });
+        if (v) out.push(alPosto(v, c.a, c.v));
+        i = r.fine;
+      }
+    }
   }
 
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
