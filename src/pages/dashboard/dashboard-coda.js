@@ -111,7 +111,6 @@
     const parti = v.frase && global.SN_ESITO.partiDellaRiga(v.parti, v.frase);
     if (parti) global.SN_FILO_ATTESA.scriviAPezzi(testo, [prima, ...parti, dopo]);
     else testo.textContent = `${prima}${v.frase || 'era già così'}${dopo}`;
-    testo.title = `${prima}${v.frase || 'era già così'}${dopo}`;
     const btn = r.querySelector('.dash-cambio-annulla');
     const stato = r.querySelector('.dash-cambio-stato');
     r.classList.toggle('dash-cambi-annullato', !!v.annullatoDa);
