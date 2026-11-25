@@ -703,6 +703,14 @@
     // Qui arriva solo un riquadro che chi lo ospita vede o traduce in sottofondo (il preload ha fermato gli altri): ai
     // suoi passa lo stesso giudizio, e nel "ci sono" dice quanti ne contare. Dentro uno fuori conto, tutti fuori conto.
     const fuori = !!msg.fuoriConto;
+    // Sito dove l'utente ha spento Filo (#2656, lo dice il main): il riquadro resta com'è, e chi sta dentro di lui con
+    // lui; risponde subito, così il conto non lo aspetta e l'avviso può nominare il sito.
+    if (msg.spento === true) {
+      tellFrames(runId, framesOf(document), false);
+      reportToHost(runId, { phase: 'ack', frames: 0, fuori: 0 }, fuori);
+      reportToHost(runId, { phase: 'end', applied: 0, left: 0, spento: 1 }, fuori);
+      return;
+    }
     const modo = fuori ? Extract.NASCOSTE.TRADUCI : await leggiModo();
     const { shown, skipped, background } = embeddedFrames(modo);
     tellFrames(runId, skipped, false);
