@@ -141,7 +141,7 @@ function carica() {
   const s = lista.find((x) => x && typeof x.sale === 'string' && x.sale);
   if (!s) return;
   sale = s.sale;
-  const limite = Date.now() - GIORNI_RICORDO * 24 * 3600 * 1000;
+  const limite = inizioRicordo();
   for (const x of lista) {
     if (x && typeof x.suo === 'string' && Number(x.at) >= limite && !suoi.has(x.suo)) suoi.set(x.suo, Number(x.at));
   }
