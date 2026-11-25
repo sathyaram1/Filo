@@ -52,7 +52,9 @@ test('a Normale «cancella il file in Download» lo sposta nel cestino dopo un c
     await clickConfirm(page, 'ok');
     await expect.poll(() => existsSync(file), { timeout: 15_000 }).toBe(false);
     if (process.platform === 'linux') expect(nelCestino(nome), 'il file si ritrova nel cestino').toBe(true);
-    await expect(page.locator('.dash-action-btn').filter({ hasText: `Nel cestino «${nome}»` })).toBeVisible({ timeout: 10_000 });
+    // Il nome del file sta nel suo riquadro, fuori dalle parole di Filo (#2648).
+    const bottone = page.locator('.dash-action-btn').filter({ hasText: 'Nel cestino' });
+    await expect(bottone.locator('.dash-altrui', { hasText: nome })).toBeVisible({ timeout: 10_000 });
   } finally {
     await ripristina(app);
     togliDalCestino(nome);
@@ -285,7 +287,7 @@ test('dopo il clic il modello sa che il file è nel cestino; un file sparito pri
     await chiedi(page, `cancella ${nome}`);
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
     await clickConfirm(page, 'ok');
-    await expect(page.locator('.dash-action-btn').filter({ hasText: `Nel cestino «${nome}»` })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.dash-action-btn').filter({ hasText: 'Nel cestino' }).locator('.dash-altrui', { hasText: nome })).toBeVisible({ timeout: 10_000 });
     await chiedi(page, 'grazie');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15_000 }).toBeGreaterThan(1);
     const ultimo = JSON.stringify((await chiamateAlModello(app)).at(-1));

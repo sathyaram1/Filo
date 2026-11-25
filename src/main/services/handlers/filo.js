@@ -118,9 +118,13 @@ module.exports = function register(on, ctx) {
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
     const Levels = globalThis.SN_ACTION_LEVELS;
+    const azioneFatta = { ...msg.action, _output: r && r.output };
     const fatto = r && r.executed && Levels && Levels.describeDone
-      ? String(Levels.describeDone({ ...msg.action, _output: r.output }) || '').split('\n')[0].trim() : '';
-    return { ok: true, ...r, ...(fatto ? { fatto } : {}) };
+      ? String(Levels.describeDone(azioneFatta) || '').split('\n')[0].trim() : '';
+    // A pezzi quando porta un testo non di Filo: il bottone lo chiude nel riquadro (#2648.1).
+    const fattoParti = fatto ? Levels.describeDoneParts(azioneFatta) : [];
+    const aPezzi = fattoParti.some((p) => p && typeof p === 'object');
+    return { ok: true, ...r, ...(fatto ? { fatto } : {}), ...(aPezzi ? { fattoParti } : {}) };
   });
 
   on(MSG.FILO_FEEDBACK_ALLEGATI, soloFilo(async (msg) => {

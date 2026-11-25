@@ -198,7 +198,9 @@ async function azioneImpostaPreferenza(action, { sender }) {
   const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
   const costo = typeof action._costoModello === 'string' && action._costoModello ? { costoModello: action._costoModello } : {};
   const avviso = built.avviso ? { avviso: built.avviso } : {};
-  return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo, ...avviso } };
+  // `campo` e `valore`: il valore scritto dal modello, che la riga chiude nel riquadro (#2648.1).
+  const scritto = built.valore ? { campo: built.campo, valore: built.valore } : {};
+  return { executed: true, kept: true, output: { etichetta: built.label, ...scritto, ...(stile ? { stile } : {}), ...costo, ...avviso } };
 }
 
 async function azioneImpostaEstetica(action) {
@@ -292,7 +294,7 @@ async function azioneAnnullaCambio(action, { assistente }) {
   // Il cancello ha già chiesto la parola scritta: un annullo che alza quanto esce ha il livello di una difesa.
   const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat', confermato: true });
   if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
-  return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [], ...(r.saltatiPerche ? { saltatiPerche: r.saltatiPerche } : {}) } };
+  return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, ...(r.parti ? { fraseParti: r.parti } : {}), saltati: r.saltati || [], ...(r.saltatiPerche ? { saltatiPerche: r.saltatiPerche } : {}) } };
 }
 
 async function azioneRimedioCrediti(action) {

@@ -107,7 +107,62 @@
   }
 
   // Il perché di un'azione non riuscita, quando Filo lo sa: lo dicono il diario in diretta e la chat riaperta.
-  function motivo(a) {
+  const motivo = (a) => { const m = motivoAPezzi(a); return Array.isArray(m) ? piatto(m) : m; };
+  // Lo stesso perché a pezzi quando porta un testo non di Filo (la riga d'errore di un programma, il nome di una
+  // finestra): chi lo mostra lo chiude nel riquadro (#2648.1). Altrimenti la frase.
+  function motivoAPezzi(a) {
+    const m = motivoGrezzo(a);
+    return typeof m === 'string' && m ? conScrittoDalModello(m, a) : m;
+  }
+  // Gli argomenti dell'azione li ha scritti il modello: un perché che li ripete (il valore rifiutato, il sito nominato
+  // male), chiunque l'abbia composto, li tiene nel riquadro (#2648.1). Sentinella: tests/unit/righeEsitoAPezzi.test.mjs.
+  function scrittoDalModello(a) {
+    const out = new Set();
+    const giro = (v, d) => {
+      if (typeof v === 'string') {
+        const t = pulito(v).replace(/\s+/g, ' ');
+        if (/\p{L}/u.test(t)) out.add(t);
+      } else if (v && typeof v === 'object' && d < 3) {
+        for (const [k, x] of Object.entries(v)) if (!k.startsWith('_') && (d || (k !== 'type' && k !== 'id'))) giro(x, d + 1);
+      }
+    };
+    giro(a, 0);
+    return [...out].sort((x, y) => y.length - x.length);
+  }
+  // Fra «» basta l'inizio del testo, accorciato con «…» o tagliato lungo. Una parola corta resta di Filo: il nome di
+  // un'impostazione («tema») coincide spesso con la chiave scritta dal modello, e così corta non fa dire niente a Filo.
+  function conScrittoDalModello(testo, a) {
+    const scritti = scrittoDalModello(a);
+    if (!scritti.length) return testo;
+    const fraVirgolette = (x) => {
+      const y = x.replace(/…$/, '').trim();
+      return y.length >= 6 && scritti.some((s) => s === x || (y !== x && s.startsWith(y)) || (y.length >= 40 && s.startsWith(y)));
+    };
+    const out = [];
+    const nudo = (t) => {
+      while (t) {
+        let best = null;
+        for (const s of scritti) {
+          const j = s.length >= 6 ? t.indexOf(s) : -1;
+          if (j >= 0 && (!best || j < best.j)) best = { j, s };
+        }
+        if (!best) { out.push(t); return; }
+        if (best.j) out.push(t.slice(0, best.j));
+        out.push({ citazione: best.s, nuda: true });
+        t = t.slice(best.j + best.s.length);
+      }
+    };
+    let k = 0;
+    for (const m of testo.matchAll(/«([^«»]+)»/g)) {
+      if (!fraVirgolette(m[1])) continue;
+      nudo(testo.slice(k, m.index));
+      out.push({ citazione: m[1] });
+      k = m.index + m[0].length;
+    }
+    nudo(testo.slice(k));
+    return out.some(riquadro) ? out : testo;
+  }
+  function motivoGrezzo(a) {
     const o = a && a._output;
     if (!o) return '';
     const tipo = String((a && a.type) || '').toUpperCase();
@@ -117,8 +172,8 @@
     if (tipo === 'VEDI_SCHERMO') {
       if (o.spenta) return 'è spento in Preferenze';
       if (o.permesso === 'mac') return 'serve il permesso «Registrazione schermo»';
-      if (o.nessuna) return `nessuna finestra «${pulito(o.richiesta)}»`;
-      if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
+      if (o.nessuna) return ['nessuna finestra ', { citazione: pulito(o.richiesta) }];
+      if (o.errore) return [...(o.finestra ? [{ citazione: pulito(o.finestra) }, ': '] : []), pulito(o.errore)];
     }
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     if (o.blocked === 'file') {
@@ -136,8 +191,8 @@
     // Un comando partito e finito male: il perché è il suo codice d'uscita e la prima riga d'errore, come nel riquadro.
     if (partita(a)) {
       if (o.timedOut) return 'interrotto: ci metteva troppo';
-      const prima = String(o.stderr || o.stdout || '').split('\n').map((s) => s.trim()).find(Boolean) || '';
-      return `uscito con codice ${o.code}${prima ? `: ${pulito(prima)}` : ''}`;
+      const prima = pulito(String(o.stderr || o.stdout || '').split('\n').map((s) => s.trim()).find(Boolean) || '');
+      return prima ? [`uscito con codice ${o.code}: `, { citazione: prima, nuda: true }] : `uscito con codice ${o.code}`;
     }
     if (o.restyle === 'no-page' || o.traduzione === 'no-page') return 'nessuna pagina web aperta';
     if (o.traduzione === 'spento') return 'Filo è spento su questo sito';
@@ -240,13 +295,18 @@
     return out;
   }
   // Le parti salvate di una riga valgono solo se dicono la riga piatta salvata accanto: una sola frase, due forme.
+  // L'unica regola per ogni frase a pezzi che arriva da fuori (la chat riaperta, i cambi, l'annullo).
   function partiDellaRiga(parti, riga) {
     if (!Array.isArray(parti) || parti.length > 60 || !riga) return null;
     const p = parti.map((x) => (typeof x === 'string' ? x
       : x && typeof x === 'object' && typeof x.citazione === 'string' ? { citazione: x.citazione, ...(x.nuda === true ? { nuda: true } : {}) } : null));
     if (p.some((x) => x == null) || !p.some(riquadro)) return null;
-    return rigaDiParti(p) === riga ? p : null;
+    return rigaDiParti(p).trim() === String(riga).trim() ? p : null;
   }
+  // Un pezzo non di Filo: `fra` la frase piatta lo dice fra «», `suo` nudo.
+  const suo = (t) => (t ? { citazione: t, nuda: true } : '');
+  const fra = (t) => (t ? { citazione: t } : '');
+  const unisci = (pezzi, sep) => pezzi.filter(Boolean).flatMap((p, i) => (i ? [sep, p] : [p]));
   // Riga piatta e riga a pezzi di una domanda, accorciate insieme: `parti` null se la riga è tutta di Filo.
   // Tagliata prima del riquadro, restano le sole parole di Filo: mai il testo piatto, che lo ricucirebbe.
   function rigaDellaDomanda(c, max = MAX_RIGA) {
@@ -316,6 +376,8 @@
     const parti = v.riga ? partiDellaRiga(v.parti, v.riga) : null;
     if (parti) out.parti = parti;
     if (v.motivo) out.motivo = v.motivo;
+    const motivoParti = v.motivo ? partiDellaRiga(v.motivoParti, v.motivo) : null;
+    if (motivoParti) out.motivoParti = motivoParti;
     if (v.file) out.file = v.file;
     if (v.link) out.link = v.link;
     if (v.salvate) out.salvate = v.salvate;
@@ -401,7 +463,7 @@
       const f = type === 'APRI_FILE' && x.file ? fileDi(x.file) : null;
       const generica = SENZA_TITOLO[type] ? SENZA_TITOLO[type][x.esito === CHIESTO ? 0 : 1] : '';
       return senzaVuoti({
-        type, esito: x.esito, riga: generica || breve(x.riga, MAX_RIGA), parti: generica ? null : x.parti, motivo: breve(x.motivo, MAX_MOTIVO), file: f,
+        type, esito: x.esito, riga: generica || breve(x.riga, MAX_RIGA), parti: generica ? null : x.parti, motivo: breve(x.motivo, MAX_MOTIVO), motivoParti: x.motivoParti, file: f,
         link: type === 'NAVIGA' && x.link ? linkDi(x.link) : null,
         salvate: type === 'CERCA_SALVATE' && x.salvate ? salvateDi(x.salvate) : null,
         proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
@@ -463,9 +525,13 @@
     const link = type === 'NAVIGA' && fatta ? linkDi(x) : null;
     const salvate = type === 'CERCA_SALVATE' && fatta ? salvateNominate(x) : null;
     const perche = esito === FALLITO ? motivo(x) || (diretta ? diretta.text : '') : '';
+    // Il perché che porta un testo non di Filo resta a pezzi anche riaperto, accorciato insieme (#2648.1).
+    const m = esito === FALLITO ? motivoAPezzi(x) : '';
+    const pm = Array.isArray(m) ? rigaDellaDomanda({ text: piatto(m), parti: m }, MAX_MOTIVO) : null;
     const evento = type === 'EVENTO_CALENDARIO' && esito === PROPOSTO ? eventoDi(x) : null;
     return senzaVuoti({
-      type, esito, riga: breve(riga, MAX_RIGA), parti, motivo: breve(perche, MAX_MOTIVO), file, link, salvate, evento,
+      type, esito, riga: breve(riga, MAX_RIGA), parti, file, link, salvate, evento,
+      ...(pm && pm.parti ? { motivo: pm.riga, motivoParti: pm.parti } : { motivo: breve(perche, MAX_MOTIVO) }),
       partita: esito === FALLITO && partita(x),
       // Un no della regola di autonomia: riaperta, la riga dice «Non dimenticato» come il diario in diretta.
       no: esito === FALLITO && !!(o && o.no),
@@ -542,12 +608,14 @@
     }
     if (v.esito === FALLITO) {
       const perche = pulito(v.motivo);
+      const pezziPerche = perche ? partiDellaRiga(v.motivoParti, perche) : null;
       // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
       const R = global.SN_RIGHE_ATTIVITA;
       const no = v.no === true || v.motivo === MOTIVO_NO;
       const etichetta = R ? R.etichettaNonFatta(v.type, { no, partita: v.partita === true }) : '';
       const testo = [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · ');
-      const aPezzi = !etichetta && parti ? ['Non riuscita · ', ...parti, ...(perche ? [` · ${perche}`] : [])] : null;
+      const testa = etichetta || !parti ? [[etichetta || 'Non riuscita', etichetta ? '' : riga].filter(Boolean).join(' · ')] : ['Non riuscita · ', ...parti];
+      const aPezzi = (!etichetta && parti) || pezziPerche ? [...testa, ...(perche ? [' · ', ...(pezziPerche || [perche])] : [])] : null;
       return { icona: '⚠', testo, fallita: true, ...(aPezzi ? { parti: aPezzi } : {}) };
     }
     if (!riga) return null;
@@ -614,8 +682,8 @@
 
   global.SN_ESITO = {
     daRaccontare,
-    esitoAzione, senzaEffetto, nomiFatti, successa, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
+    esitoAzione, senzaEffetto, nomiFatti, successa, partita, conta, valido, voci, motivo, motivoAPezzi, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
     perTrascrizione, testoSegnalazione,
-    unisciDopo, primaRigaConferma: primaRiga, primaRigaParti, rigaDellaDomanda, rigaDiParti, piatto, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
+    unisciDopo, primaRigaConferma: primaRiga, primaRigaParti, rigaDellaDomanda, rigaDiParti, partiDellaRiga, suo, fra, unisci, piatto, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -89,24 +89,11 @@
   const MAX_DETTAGLI = 3;
 
   const pulisci = (t) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
-  // «Timer avviato · Pasta · 5 min» → «Pasta · 5 min»; «Cerco sul web: orari» → «orari». Senza separatore, niente.
-  function dettaglioDi(testo) {
-    const t = pulisci(testo);
-    const m = t.match(/^[^·:]*?(?:\s·\s|:\s)(.+)$/);
-    return m ? m[1].trim() : '';
-  }
-  const primoPezzo = (d) => pulisci(d).split(' · ')[0];
-  function elenco(pezzi) {
-    const unici = [];
-    for (const p of pezzi) if (p && !unici.includes(p)) unici.push(p);
-    const mostrati = unici.slice(0, MAX_DETTAGLI);
-    const restano = unici.length - mostrati.length;
-    return mostrati.length ? `${mostrati.join(', ')}${restano > 0 ? ` +${restano}` : ''}` : '';
-  }
 
-  // La riga a pezzi (#2648): un testo non di Filo resta un pezzo suo anche nel titolo, mai cucito nelle sue parole.
+  // Ogni voce è una riga a pezzi (#2648): una frase tutta di Filo è un pezzo solo, un testo non suo resta un pezzo suo
+  // anche nel titolo, mai cucito nelle sue parole. Una strada sola per i due casi; la frase piatta la ricompone SN_ESITO.
   const riquadro = (p) => !!p && typeof p === 'object' && typeof p.citazione === 'string';
-  const piatto = (p) => (global.SN_ESITO ? global.SN_ESITO.piatto(p) : p.join(''));
+  const piatto = (p) => global.SN_ESITO.piatto(p);
   function pulite(parti) {
     const out = [];
     for (const p of parti) {
@@ -119,17 +106,18 @@
     if (typeof s[s.length - 1] === 'string') s[s.length - 1] = s[s.length - 1].trimEnd();
     return s.filter((p) => p !== '');
   }
-  const aPezzi = (x) => Array.isArray(x.parti) && x.parti.some(riquadro);
+  const parti = (x) => pulite(Array.isArray(x.parti) && x.parti.some(riquadro) ? x.parti : [String(x.testo == null ? '' : x.testo)]);
+  // «Timer avviato · Pasta · 5 min» → «Pasta · 5 min»; «Cerco sul web: orari» → «orari». Senza separatore, niente.
   // Il separatore lo cerca solo fra le parole di Filo prima del primo riquadro.
   function dettaglio(x) {
     if (Array.isArray(x.dettaglio)) return pulite(x.dettaglio);
     const d = pulisci(x.dettaglio);
     if (d) return [d];
-    if (!aPezzi(x)) { const s = dettaglioDi(x.testo); return s ? [s] : []; }
-    const p0 = x.parti[0];
-    const m = typeof p0 === 'string' ? p0.match(/^[^·:]*?(?:\s·\s|:\s)([\s\S]*)$/) : null;
-    return m ? pulite([m[1], ...x.parti.slice(1)]) : [];
+    const p = parti(x);
+    const m = typeof p[0] === 'string' ? p[0].match(/^[^·:]*?(?:\s·\s|:\s)([\s\S]*)$/) : null;
+    return m ? pulite([m[1], ...p.slice(1)]) : [];
   }
+  const dettaglioDi = (testo) => piatto(dettaglio({ testo }));
   function primoPezzoParti(d) {
     const out = [];
     for (const p of d) {
@@ -161,7 +149,7 @@
       const x = v[0];
       const t = TITOLI[String(x.tipo || '').toUpperCase()];
       if (x.esito !== 'ok' || !t) {
-        const r = pulite(aPezzi(x) ? x.parti : [String(x.testo == null ? '' : x.testo)]);
+        const r = parti(x);
         return titolo(r.length ? r : [t ? t[0] : 'Azione']);
       }
       const d = dettaglio(x);
@@ -174,13 +162,16 @@
       const d = elencoParti(v.map((x) => primoPezzoParti(dettaglio(x))));
       return titolo(d.length ? [`${t[1](v.length)} · `, ...d] : [t[1](v.length)]);
     }
+    // Tipi diversi: il nome breve di ciascuno, o le prime parole di Filo della sua riga.
     const nomi = v.map((x) => {
       const tt = TITOLI[String(x.tipo || '').toUpperCase()];
-      return tt ? tt[2] : primoPezzo(pulisci(x.testo).split(/:\s/)[0]).toLowerCase();
+      if (tt) return [tt[2]];
+      const p0 = parti(x)[0];
+      return primoPezzoParti([typeof p0 === 'string' ? p0.split(/:\s/)[0].toLowerCase() : '']);
     });
-    const d = elenco(nomi);
+    const d = elencoParti(nomi);
     const testa = v.every((x) => x.esito === 'fallita') ? `${v.length} azioni non riuscite` : `${v.length} azioni`;
-    return d ? `${testa} · ${d}` : testa;
+    return titolo(d.length ? [`${testa} · `, ...d] : [testa]);
   }
 
   // ===== Il disegno =====

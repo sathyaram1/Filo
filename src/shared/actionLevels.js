@@ -154,6 +154,14 @@
     const P = global.SN_PULSANTI_PREFERENZE;
     return P ? P.pulsanteDi(a) : '';
   };
+  // La frase del cambio da rimettere, coi valori non di Filo nel riquadro (`_fraseCambioParti`, del main): pezzi che
+  // non dicono la frase, o nessun pezzo, e la frase sta tutta nel riquadro come prima (#2648.1). null senza frase.
+  function fraseDelCambio(a) {
+    const f = String((a && a._fraseCambio) || '').trim();
+    if (!f) return null;
+    const p = esito().partiDellaRiga(a._fraseCambioParti, f);
+    return p ? p.map((x) => (typeof x === 'string' ? x : cit(x.citazione, x.nuda === true))) : [cit(f, true)];
+  }
   // Le frasi di cosa cambierebbe il ripristino: un elenco del main, ognuna nel suo riquadro.
   const frasiRipristino = (a) => {
     const f = a && a._ripristino && a._ripristino.frasi;
@@ -1183,7 +1191,9 @@
         const stile = stileDellAccoglienza(a);
         if (stile) return `Userò questo stile: «${stile}»`;
         const built = prefBuilt(a);
-        return built && !built.rifiuto ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
+        if (!built || built.rifiuto) return 'Preferenza modificata';
+        // Il valore scritto dal modello resta nel riquadro, come nella domanda a cui l'utente ha detto sì.
+        return built.valore ? [`Impostazione applicata: ${built.campo} → `, cit(built.valore, true)] : `Impostazione applicata: ${built.label}`;
       },
     },
     IMPOSTA_ESTETICA: {
@@ -1467,15 +1477,14 @@
       difesa: (a) => !(a && a._livelloCambio === 1) && !(a && a._allentaCambio === false),
       dove: (a) => (a && typeof a._doveCambio === 'string' ? a._doveCambio : ''),
       describe: (a) => {
-        // La frase del cambio riporta testi salvati (uno stile, un'etichetta, una cartella): sta tutta nel riquadro.
-        const f = String((a && a._fraseCambio) || '').trim();
-        const base = f ? ['Filo vuole rimettere com\'era prima di:\n', cit(f, true)] : ['Filo vuole rimettere com\'era l\'ultimo cambio.'];
+        const f = fraseDelCambio(a);
+        const base = f ? ['Filo vuole rimettere com\'era prima di:\n', ...f] : ['Filo vuole rimettere com\'era l\'ultimo cambio.'];
         if (a && a._livelloCambio === 1) return base;
         return [...base, '\n\nTocca un\'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l\'hai chiesto tu.'];
       },
       describeDone: (a) => {
-        const f = String((a && a._fraseCambio) || '').trim();
-        return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
+        const f = fraseDelCambio(a);
+        return f ? ['Rimesso com\'era prima di: ', ...f] : 'Cambio annullato';
       },
     },
     // ── i pulsanti della pagina Preferenze chiesti in chat (#1619) ───────────
@@ -1908,10 +1917,11 @@
   }
 
   // La stessa spiegazione in una riga di testo: la regola sta in SN_ESITO, che disegna anche le righe a pezzi.
-  function piatto(parti) {
+  function esito() {
     if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
-    return global.SN_ESITO.piatto(parti);
+    return global.SN_ESITO;
   }
+  const piatto = (parti) => esito().piatto(parti);
 
   function describe(action) {
     return piatto(describeParts(action));
@@ -1919,11 +1929,18 @@
 
   // A fatto compiuto, per l'esito che torna al modello; senza voce propria vale `describe`.
   function describeDone(action) {
-    if (!action || typeof action !== 'object') return '';
+    return piatto(describeDoneParts(action));
+  }
+  // La stessa a pezzi, come `describeParts`: il bottone dopo l'OK la disegna coi riquadri (#2648.1).
+  function describeDoneParts(action) {
+    if (!action || typeof action !== 'object') return [];
     const entry = REGISTRY[String(action.type || '').toUpperCase()];
-    if (!entry) return '';
-    if (!entry.describeDone) return describe(action);
-    try { return entry.describeDone(action) || ''; } catch (_) { return ''; }
+    if (!entry) return [];
+    if (!entry.describeDone) return describeParts(action);
+    let d;
+    try { d = entry.describeDone(action); } catch (_) { return []; }
+    if (!Array.isArray(d)) return d ? [String(d)] : [];
+    return d.filter((p) => (typeof p === 'string' ? p : riquadro(p)));
   }
 
   // L'indirizzo di un'azione che esce in rete, preso da tutti i campi che l'esecuzione accetta: il freno contro
@@ -1969,5 +1986,5 @@
   const LOTTO_ELIMINA = 200;
   const LOTTO_RINOMINA = 40;
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, piatto, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale, traduzioneFatta, LOTTO_ELIMINA, LOTTO_RINOMINA };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, piatto, describeDone, describeDoneParts, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, ricercaImmaginiDi, costoIndirizzo, cosaAccount, alOriginale, traduzioneFatta, LOTTO_ELIMINA, LOTTO_RINOMINA };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

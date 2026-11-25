@@ -16,6 +16,8 @@ const require = createRequire(import.meta.url);
 function carica() {
   const sandbox = {};
   vm.createContext(sandbox);
+  // Come la pagina: la frase piatta di un titolo la ricompone SN_ESITO, caricato prima.
+  vm.runInContext(readFileSync(join(ROOT, 'src', 'shared', 'esitoAzione.js'), 'utf8'), sandbox, { filename: 'esitoAzione.js' });
   vm.runInContext(readFileSync(join(DIR, 'filo-attesa.js'), 'utf8'), sandbox, { filename: 'filo-attesa.js' });
   return sandbox.SN_FILO_ATTESA;
 }

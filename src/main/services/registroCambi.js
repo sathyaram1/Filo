@@ -80,7 +80,8 @@ function salva(evento, incognito) {
 }
 
 function raccogli(ctx, evento) {
-  const voce = { id: evento.id, frase: K().frase(evento), tipo: evento.tipo };
+  // `parti`: la stessa frase coi valori non di Filo nel loro riquadro, per la riga della chat (#2648.1).
+  const voce = { id: evento.id, frase: K().frase(evento), tipo: evento.tipo, ...aPezzi(evento) };
   for (let c = ctx; c; c = c.padre) if (Array.isArray(c.raccolti)) c.raccolti.push(voce);
 }
 
@@ -200,7 +201,11 @@ async function livelloDi(id) {
   await attesa();
   const lista = await leggiLista();
   const e = daRimettere(bersaglio(lista, id), lista);
-  return e ? { livello: K().livello(e), frase: K().frase(e), id: e.id, ...(await annulloAllenta(e)) } : null;
+  return e ? { livello: K().livello(e), frase: K().frase(e), ...aPezzi(e), id: e.id, ...(await annulloAllenta(e)) } : null;
+}
+function aPezzi(e) {
+  const parti = K().fraseAPezzi(e);
+  return parti ? { parti } : {};
 }
 // Il verso del freno lo giudica la regola delle preferenze sul pezzo che l'annullo scriverebbe adesso (#1840): rimettere
 // com'era una protezione la stringe. Senza saperlo giudicare, vale come abbassata. `dove`: la pagina per farlo a mano.
@@ -309,7 +314,7 @@ async function annullaOra(id, prov = {}) {
   });
   if (!riuscito) return { ok: false, motivo, id: e.id };
   try { app.annullato([...new Set([String(id || ''), String(trovato.id), String(e.id)])].filter(Boolean), trovato); } catch (_) {}
-  return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati, ...(saltati.length ? { saltatiPerche: perche } : {}) };
+  return { ok: true, id: e.id, frase: K().frase(e), ...aPezzi(e), eventi: raccolti, saltati, ...(saltati.length ? { saltatiPerche: perche } : {}) };
 }
 
 module.exports = { avvia, con, conDettaglio, corrente, registra, registraZoom, leggi, tutti, lista, ultimi, livelloDi, annulla, collega, attesa };

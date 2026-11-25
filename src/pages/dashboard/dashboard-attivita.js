@@ -1711,6 +1711,12 @@
         // A cosa fatta il bottone è una ricevuta: «Filo vuole…» con la spunta davanti diceva fatto e da fare insieme.
         const ricevuta = fatto || (row && !row.failed ? row.text : '') || 'Fatto';
         btn.textContent = (r && r.executed) ? `✓ ${ricevuta.length > 140 ? `${ricevuta.slice(0, 139)}…` : ricevuta}` : `✗ ${guasto.length > 70 ? `${guasto.slice(0, 67)}…` : guasto}`;
+        // Un testo non di Filo nella ricevuta o nel perché resta nel suo riquadro, accorciato coi suoi pezzi (#2648.1).
+        const pezzi = (r && r.executed)
+          ? (fatto ? r.fattoParti : (row && !row.failed && row.parti)) : (row && row.failed && row.parti);
+        const corta = Array.isArray(pezzi)
+          ? global.SN_ESITO.rigaDellaDomanda({ text: r && r.executed ? ricevuta : guasto, parti: pezzi }, r && r.executed ? 140 : 70) : null;
+        if (corta && corta.parti) conRiquadri(btn, [(r && r.executed) ? '✓ ' : '✗ ', ...corta.parti]);
         if (fatto.length > 140) btn.title = fatto;
         else if (!(r && r.executed)) btn.title = guasto;
         // #874 — il sistema ha detto no dopo l'OK (un permesso, una rete fuori portata): la frase e, se serve, il tasto.
@@ -1725,6 +1731,8 @@
         }
         if (type === 'ELIMINA_FILE') {
           btn.textContent = (r && r.executed) ? `✓ ${testoEliminati(r.output)}` : `✗ ${motivoNessunaEliminazione(r && r.output)}`;
+          // Il nome del file viene dal disco: nel suo riquadro, come nella riga del diario.
+          if (r && r.executed && row && row.parti) conRiquadri(btn, ['✓ ', ...row.parti]);
         }
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
@@ -2030,7 +2038,7 @@
       if (activity && activity.el && global.SN_DASH_CAMBI) global.SN_DASH_CAMBI.segna(activity.el, ids);
     }
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '', row.parti || null);
     // Il turno l'aveva archiviata come chiesta: adesso è successa.
     archiviaEsito(a, { chat, fatto, cambi: ids.map((c) => c.id) });
   }
@@ -2041,9 +2049,10 @@
     a._executed = false;
     delete a._confirm;
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a, row.title || '');
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a, row.title || '', row.parti || null);
     archiviaEsito(a, { chat, chiesta });
     btn.textContent = `✗ ${row ? row.text : 'Non eseguita'}`;
+    if (row && row.parti) conRiquadri(btn, ['✗ ', ...row.parti]);
     if (permessoDaConcedere(a)) btn.after(bottonePermesso(a));
   }
 

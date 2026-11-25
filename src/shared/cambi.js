@@ -457,10 +457,27 @@
     if (typeof x === 'boolean') return x ? 'sì' : 'no';
     return breve(typeof x === 'object' ? JSON.stringify(x) : String(x), 40);
   }
-  function elencoDi(lista, n = 3) {
-    const l = lista.map((x) => breve(x, 40));
-    return l.length > n ? `${l.slice(0, n).join(', ')} e altri ${l.length - n}` : l.join(', ');
+  // Un valore che Filo non ha scritto (un nome, un testo, un id di modello) è un pezzo suo: chi mostra la frase lo
+  // chiude nel riquadro, la frase piatta lo dice com'era (#2648.1). I pezzi e la loro regola stanno in SN_ESITO.
+  function esito() {
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
+    return global.SN_ESITO;
   }
+  const suo = (t) => esito().suo(t);
+  const fra = (t) => esito().fra(t);
+  const unisci = (pezzi, sep) => esito().unisci(pezzi, sep);
+  function elencoDi(lista, n = 3) {
+    const l = lista.map((x) => suo(breve(x, 40)));
+    return [...unisci(l.slice(0, n), ', '), l.length > n ? ` e altri ${l.length - n}` : ''];
+  }
+  // Il valore tale e quale com'è stato scritto è del modello o dell'utente; uno tradotto in parole è di Filo.
+  function pezzoValore(v, x) {
+    const t = valoreDi(v, x);
+    const grezzo = typeof x === 'string' && !(v && v.valori && Object.prototype.hasOwnProperty.call(v.valori, x)) ? x : '';
+    const tale = !!grezzo.trim() && (t === grezzo || t === breve(grezzo, 40)) && !/^-?\d+(?:[.,]\d+)?$/.test(t);
+    return tale ? suo(t) : t;
+  }
+  const piatto = (parti) => esito().piatto(parti.filter((p) => p !== ''));
   function oraDi(iso) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
@@ -473,41 +490,44 @@
     return T && T.fmtDurationLabel ? T.fmtDurationLabel(sec) : `${Math.round(sec / 60)} min`;
   }
   function nomeTimer(t) {
-    const label = breve(t && t.label, 40);
+    const label = fra(breve(t && t.label, 40));
+    const nome = label ? [' ', label] : [];
     if (t && t.kind === 'alarm') {
       const M = global.SN_FILO_MEMORY;
       const rip = ricorrente(t) && M && M.formatRepeat ? ` ${M.formatRepeat(t.repeat)}` : '';
-      return `sveglia${label ? ` «${label}»` : ''} delle ${t.atTime || oraDi(t.endsAt)}${rip}`;
+      return ['sveglia', ...nome, ` delle ${t.atTime || oraDi(t.endsAt)}${rip}`];
     }
-    return `timer${label ? ` «${label}»` : ''}`;
+    return ['timer', ...nome];
   }
 
-  function fraseCambio(c) {
+  const fraseCambio = (c) => piatto(partiCambio(c));
+  // La frase di un cambio a pezzi: stringhe di Filo e riquadri coi valori che non sono suoi.
+  function partiCambio(c) {
     const k = String(c && c.chiave || '');
     if (k.startsWith('timer:')) {
       if (!c.prima && c.dopo) {
         const d = c.dopo.kind === 'alarm' ? '' : durataDi(c.dopo);
-        return `nuov${c.dopo.kind === 'alarm' ? 'a' : 'o'} ${nomeTimer(c.dopo)}${d ? `, ${d}` : ''}`;
+        return [`nuov${c.dopo.kind === 'alarm' ? 'a' : 'o'} `, ...nomeTimer(c.dopo), d ? `, ${d}` : ''];
       }
-      if (c.prima && !c.dopo) return `tolt${c.prima.kind === 'alarm' ? 'a' : 'o'} ${c.prima.kind === 'alarm' ? 'la' : 'il'} ${nomeTimer(c.prima)}`;
+      if (c.prima && !c.dopo) return [`tolt${c.prima.kind === 'alarm' ? 'a' : 'o'} ${c.prima.kind === 'alarm' ? 'la' : 'il'} `, ...nomeTimer(c.prima)];
       if (c.prima && c.dopo) {
         const oraPrima = c.prima.kind === 'alarm' ? (c.prima.atTime || oraDi(c.prima.endsAt)) : oraDi(c.prima.endsAt);
         const oraDopo = c.dopo.kind === 'alarm' ? (c.dopo.atTime || oraDi(c.dopo.endsAt)) : oraDi(c.dopo.endsAt);
-        if (oraPrima === oraDopo && !uguale(c.prima.label, c.dopo.label)) return `${nomeTimer(c.prima)} → «${breve(c.dopo.label, 40)}»`;
-        if (c.dopo.kind === 'alarm') return `${nomeTimer(c.prima)} → ${oraDopo}`;
-        return `${nomeTimer(c.dopo)}: scade alle ${oraPrima} → ${oraDopo}`;
+        if (oraPrima === oraDopo && !uguale(c.prima.label, c.dopo.label)) return [...nomeTimer(c.prima), ' → ', fra(breve(c.dopo.label, 40)) || '«»'];
+        if (c.dopo.kind === 'alarm') return [...nomeTimer(c.prima), ` → ${oraDopo}`];
+        return [...nomeTimer(c.dopo), `: scade alle ${oraPrima} → ${oraDopo}`];
       }
-      return 'un timer';
+      return ['un timer'];
     }
     if (k.startsWith('proxy:')) {
-      const dom = k.slice(6);
-      if (!c.prima && c.dopo) return `${dom} sempre da ${nomePaese(c.dopo.country)}`;
-      if (c.prima && !c.dopo) return `${dom}: tolta la regola su ${nomePaese(c.prima.country)}`;
-      return `${dom}: da ${nomePaese(c.prima && c.prima.country)} → da ${nomePaese(c.dopo && c.dopo.country)}`;
+      const dom = suo(k.slice(6));
+      if (!c.prima && c.dopo) return [dom, ` sempre da ${nomePaese(c.dopo.country)}`];
+      if (c.prima && !c.dopo) return [dom, `: tolta la regola su ${nomePaese(c.prima.country)}`];
+      return [dom, `: da ${nomePaese(c.prima && c.prima.country)} → da ${nomePaese(c.dopo && c.dopo.country)}`];
     }
     if (k.startsWith('zoom:')) {
       const p = (x) => (Number.isFinite(Number(x)) ? `${Math.round(Number(x))}%` : '?');
-      return `zoom di ${k.slice(5)}: ${p(c.prima)} → ${p(c.dopo)}`;
+      return [`zoom di ${k.slice(5)}: ${p(c.prima)} → ${p(c.dopo)}`];
     }
     if (k.startsWith('icona:')) {
       const D = global.SN_DISPOSIZIONE_ICONE;
@@ -516,24 +536,24 @@
       const zona = (p) => (D && D.nomeZona ? D.nomeZona(p && p.zona) : { nome: 'barra laterale', in: 'nella' });
       const posto = (p) => `${Number(p && p.posto) || '?'}° posto`;
       if (c.prima && c.dopo && c.prima.zona === c.dopo.zona) {
-        return `${nome} ${zona(c.dopo).in} ${zona(c.dopo).nome}: ${posto(c.prima)} → ${posto(c.dopo)}`;
+        return [`${nome} ${zona(c.dopo).in} ${zona(c.dopo).nome}: ${posto(c.prima)} → ${posto(c.dopo)}`];
       }
-      return `${nome}: ${zona(c.prima).nome} → ${zona(c.dopo).nome}`;
+      return [`${nome}: ${zona(c.prima).nome} → ${zona(c.dopo).nome}`];
     }
     if (k === 'desktop') {
-      if (c.come) return `icone del desktop ${fraseOrdineDesktop(c.come)}`;
+      if (c.come) return [`icone del desktop ${fraseOrdineDesktop(c.come)}`];
       const n = spostateSulDesktop(c);
       const auto = !!(c.prima && c.prima.auto) !== !!(c.dopo && c.dopo.auto);
       const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
       const mac = !!((c.prima && c.prima.finder) || (c.dopo && c.dopo.finder));
       if (auto) parti.push(`${mac ? '«Ordina per» del Finder' : '«Disponi automaticamente»'} ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
-      return `icone del desktop: ${parti.join(', ')}`;
+      return [`icone del desktop: ${parti.join(', ')}`];
     }
     const v = voce(k);
     const nome = v ? v.nome : 'un\'impostazione di Filo';
     if (c.segreto) {
       const cosa = c.vuotoPrima && !c.vuotoDopo ? 'inserita' : (!c.vuotoPrima && c.vuotoDopo ? 'tolta' : 'cambiata');
-      return `${nome}: ${cosa}`;
+      return [`${nome}: ${cosa}`];
     }
     if (v && v.elenco) {
       const a = Array.isArray(c.prima) ? c.prima.map(String) : [];
@@ -545,33 +565,44 @@
       const N = global.SN_NOMI_SITO;
       const leggi = v.leggibile || (N && N.leggibile ? (x) => N.leggibile(x) : null);
       const leggibili = (l) => elencoDi(leggi ? l.map(leggi) : l);
-      if (piu.length) parti.push(`aggiunt${piu.length > 1 ? 'i' : 'o'} ${leggibili(piu)}`);
-      if (meno.length) parti.push(`tolt${meno.length > 1 ? 'i' : 'o'} ${leggibili(meno)}`);
-      return `${nome}: ${parti.join(', ') || 'riordinati'}`;
+      if (piu.length) parti.push([`aggiunt${piu.length > 1 ? 'i' : 'o'} `, ...leggibili(piu)]);
+      if (meno.length) parti.push([`tolt${meno.length > 1 ? 'i' : 'o'} `, ...leggibili(meno)]);
+      return [`${nome}: `, ...(parti.length ? unisci(parti, ', ').flat() : ['riordinati'])];
     }
     if (v && v.testo) {
       const dopo = String(c.dopo || '').trim();
-      return dopo ? `${nome}: «${breve(dopo, 50)}»` : `${nome}: tolto`;
+      return dopo ? [`${nome}: `, fra(breve(dopo, 50))] : [`${nome}: tolto`];
     }
-    return `${nome}: ${valoreDi(v, c.prima)} → ${valoreDi(v, c.dopo)}`;
+    return [`${nome}: `, pezzoValore(v, c.prima), ' → ', pezzoValore(v, c.dopo)];
   }
 
-  // Le frasi di un evento, una per cambio: chi le mostra sceglie quante.
-  function frasi(evento) {
+  // Le frasi di un evento, una per cambio (a pezzi in `partiFrasi`): chi le mostra sceglie quante.
+  function partiFrasi(evento) {
     const cambi = evento && Array.isArray(evento.cambi) ? evento.cambi : [];
-    const out = cambi.filter((c) => !(c && c.coperto)).map(fraseCambio);
+    const out = cambi.filter((c) => !(c && c.coperto)).map(partiCambio);
     const coperti = cambi.filter((c) => c && c.coperto);
     if (coperti.length) {
       const tolti = coperti.every((c) => !c.dopo);
       const quanti = coperti.length === 1 ? 'una funzione' : `${coperti.length} funzioni`;
-      out.push(`modelli scelti a mano per ${quanti}: ${tolti ? 'tolti' : 'cambiati'}, valgono quelli predefiniti di Filo`);
+      out.push([`modelli scelti a mano per ${quanti}: ${tolti ? 'tolti' : 'cambiati'}, valgono quelli predefiniti di Filo`]);
     }
     return out;
   }
-  function frase(evento, max = 3) {
-    const f = frasi(evento);
-    if (f.length <= max) return f.join('; ');
-    return `${f.slice(0, max).join('; ')} e altri ${f.length - max} cambi`;
+  const frasi = (evento) => partiFrasi(evento).map(piatto);
+  function fraseParti(evento, max = 3) {
+    const f = partiFrasi(evento);
+    const dette = unisci(f.slice(0, max), '; ').flat();
+    return f.length <= max ? dette : [...dette, ` e altri ${f.length - max} cambi`];
+  }
+  const frase = (evento, max = 3) => piatto(fraseParti(evento, max));
+  // I pezzi della frase, solo quando c'è un riquadro: tutta di Filo, resta la frase.
+  function fraseAPezzi(evento, max = 3) {
+    const p = [];
+    for (const x of fraseParti(evento, max)) {
+      if (x === '') continue;
+      if (typeof x === 'string' && typeof p[p.length - 1] === 'string') p[p.length - 1] += x; else p.push(x);
+    }
+    return p.some((x) => typeof x !== 'string') ? p : null;
   }
 
   const DOVE = {
@@ -799,6 +830,7 @@
     valore: (chiave, x) => valoreDi(voce(chiave), x),
     frasi,
     frase,
+    fraseAPezzi,
     provenienza,
     fondibile,
     fondi,

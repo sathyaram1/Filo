@@ -20,10 +20,10 @@
   // Un valore che non è parola di Filo (scelto dal modello, scritto da un sito, letto dal disco) entra nella riga come
   // pezzo suo, che la home e la chat riaperta chiudono nel riquadro (#2648). Il testo piatto resta quello di sempre:
   // `fra` è un valore che la riga dice fra «», `suo` uno che dice nudo. Sentinella: tests/unit/righeEsitoAPezzi.test.mjs.
-  const suo = (v) => { const t = pulito(v); return t ? { citazione: t, nuda: true } : ''; };
-  const fra = (v) => { const t = pulito(v); return t ? { citazione: t } : ''; };
+  const suo = (v) => esito().suo(pulito(v));
+  const fra = (v) => esito().fra(pulito(v));
   const corto = (v, max) => { const t = pulito(v); return t.length > max ? `${t.slice(0, max - 3)}…` : t; };
-  const unisci = (pezzi, sep) => pezzi.filter(Boolean).flatMap((p, i) => (i ? [sep, p] : [p]));
+  const unisci = (pezzi, sep) => esito().unisci(pezzi, sep);
   function aPezzi(icon, pezzi, resto) {
     const parti = [];
     for (const p of pezzi) {
@@ -34,11 +34,12 @@
     const r = { icon, text: piatto(parti), ...resto };
     return parti.some((p) => typeof p !== 'string') ? { ...r, parti } : r;
   }
-  // La regola del testo piatto sta in SN_ESITO; chi carica solo questo modulo (il main, una prova) lo trova lo stesso.
-  function piatto(parti) {
+  // Le regole dei pezzi stanno in SN_ESITO; chi carica solo questo modulo (il main, una prova) lo trova lo stesso.
+  function esito() {
     if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
-    return global.SN_ESITO.piatto(parti);
+    return global.SN_ESITO;
   }
+  const piatto = (parti) => esito().piatto(parti);
   const restanoAperte = (o) => global.SN_ESITO.restanoAperte(o);
   // Titolo e testo di una segnalazione li sceglie src/shared/allegatiSegnalazione.js, come l'invio e il riquadro.
   function segnalazione() {
@@ -50,9 +51,16 @@
     const d = new Date(ts);
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
   }
-  function frasiCambi(a) {
+  // Le frasi dei cambi coi valori non di Filo nel riquadro (`parti`, del registro dei cambi); pezzi che non dicono la
+  // loro frase non valgono, e resta la frase (#2648.1).
+  function pezziCambi(a) {
     const l = Array.isArray(a && a._cambi) ? a._cambi : [];
-    return l.map((c) => pulito(c && c.frase)).filter(Boolean).join('; ');
+    const una = (c) => {
+      const f = pulito(c && c.frase);
+      const p = f && esito().partiDellaRiga(c.parti, f);
+      return p ? p.filter((x) => x !== '') : [f];
+    };
+    return unisci(l.map(una).filter((p) => p[0] !== ''), '; ').flat();
   }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
@@ -94,16 +102,21 @@
     // La frase è quella dell'evento del filo, col nome della pagina Preferenze (#557, #867); senza
     // evento il valore era già quello.
     IMPOSTA_PREFERENZA: (a) => {
-      const f = frasiCambi(a);
+      const o = a._output || {};
+      const f = pezziCambi(a);
       // Il costo del modello scelto per una funzione resta scritto anche se il modello non lo ripete (#819).
-      const costo = pulito(a._output && a._output.costoModello);
-      if (f) return { icon: '⚙', text: `Impostato · ${f}${costo ? ` · ${costo}` : ''}` };
-      const etichetta = pulito(a._output && a._output.etichetta);
-      return { icon: '⚙', text: `${etichetta ? `Già così · ${etichetta}` : 'Impostazione già così'}${costo ? ` · ${costo}` : ''}` };
+      const costo = pulito(o.costoModello);
+      const coda = costo ? ` · ${costo}` : '';
+      if (f.length) return aPezzi('⚙', ['Impostato · ', ...f, coda]);
+      const valore = suo(o.valore);
+      if (valore && pulito(o.campo)) return aPezzi('⚙', [`Già così · ${pulito(o.campo)} → `, valore, coda]);
+      const etichetta = pulito(o.etichetta);
+      return { icon: '⚙', text: `${etichetta ? `Già così · ${etichetta}` : 'Impostazione già così'}${coda}` };
     },
     ANNULLA_CAMBIO: (a) => {
-      const f = pulito(a._output && a._output.frase);
-      return { icon: '↩', text: `Rimesso com’era${f ? ` · prima di: ${f}` : ''}` };
+      const o = a._output || {};
+      const f = pezziCambi({ _cambi: [{ frase: o.frase, parti: o.fraseParti }] });
+      return aPezzi('↩', ['Rimesso com’era', ...(f.length ? [' · prima di: ', ...f] : [])]);
     },
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
@@ -255,8 +268,9 @@
       const T = global.SN_THEME_TOKENS;
       const t = T && T.get && T.get(tok);
       const val = a.valore ?? a.value ?? a.val ?? a.colore;
-      const f = frasiCambi(a);
-      if (f) return { icon: '🎨', text: `Aspetto · ${f.replace(/^aspetto, /, '')}` };
+      const f = pezziCambi(a);
+      if (typeof f[0] === 'string') f[0] = f[0].replace(/^aspetto, /, '');
+      if (f.length) return aPezzi('🎨', ['Aspetto · ', ...f]);
       // Senza evento il valore era già quello: si dice come per le preferenze, mai «token = valore» (#557).
       return aPezzi('🎨', [`Aspetto già così · ${(t && t.label) || 'un dettaglio'}`, ...(val ? [': ', suo(val)] : [])]);
     },
@@ -579,9 +593,10 @@
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
-      const perche = global.SN_ESITO.motivo(a);
+      const m = global.SN_ESITO.motivoAPezzi(a);
+      const perche = Array.isArray(m) ? m : (m ? [m] : []);
       const cosa = etichettaNonFatta(type, { no: rifiutataDallaRegola(a), partita: global.SN_ESITO.partita(a) }) || 'Azione non riuscita';
-      return { icon: '⚠', text: `${cosa}${perche ? ` · ${perche}` : ''}`, failed: true };
+      return aPezzi('⚠', [cosa, ...(perche.length ? [' · ', ...perche] : [])], { failed: true });
     }
     const fn = ACTIVITY_ROWS[type];
     if (fn) return fn(a);
