@@ -60,6 +60,7 @@ test('la riga del cambio nella coda della home tiene il valore nel riquadro: nat
   await expect(riga()).toHaveClass(/dash-cambi-annullato/, { timeout: 8_000 });
   await guarda('annullato');
   // Barrata tutta, anche il riquadro.
+  console.log('DEBUG', await riga().locator('.dash-altrui').evaluate((q) => JSON.stringify({ chiuso: !!q.closest('.dash-cambi-annullato'), td: getComputedStyle(q).textDecoration, regole: [...document.styleSheets].flatMap((s) => { try { return [...s.cssRules].map((r) => r.cssText); } catch (_) { return []; } }).filter((t) => t.includes('dash-altrui')) })));
   expect(await riga().locator('.dash-altrui').evaluate((q) => getComputedStyle(q).textDecorationLine)).toContain('line-through');
 
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
