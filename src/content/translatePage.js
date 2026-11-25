@@ -400,6 +400,7 @@
     if (!result) return;
     const framesLeft = (frames && frames.left) || 0;
     const framesApplied = (frames && frames.applied) || 0;
+    const spenti = (frames && frames.spenti) || [];
     switch (result.kind) {
       case 'batch':
         Popup.showToast(I18n.t('toast_page_translate_batch', result.applied, result.total), { duration: 7000 });
