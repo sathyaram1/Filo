@@ -52,7 +52,9 @@ test('a Normale «cancella il file in Download» lo sposta nel cestino dopo un c
     await clickConfirm(page, 'ok');
     await expect.poll(() => existsSync(file), { timeout: 15_000 }).toBe(false);
     if (process.platform === 'linux') expect(nelCestino(nome), 'il file si ritrova nel cestino').toBe(true);
-    await expect(page.locator('.dash-action-btn').filter({ hasText: `Nel cestino «${nome}»` })).toBeVisible({ timeout: 10_000 });
+    // Il nome del file sta nel suo riquadro, fuori dalle parole di Filo (#2648).
+    const bottone = page.locator('.dash-action-btn').filter({ hasText: 'Nel cestino' });
+    await expect(bottone.locator('.dash-altrui', { hasText: nome })).toBeVisible({ timeout: 10_000 });
   } finally {
     await ripristina(app);
     togliDalCestino(nome);
