@@ -89,6 +89,7 @@ test('la firma NON tocca le due copie intermedie della build universale', () => 
   // "Expected all non-binary files to have identical SHAs". Senza questa
   // guardia il pacchetto per Mac non si costruisce affatto.
   const { default: afterPack } = require(join(ROOT, pkg.build.afterPack));
+  const { default: firma } = require(join(ROOT, 'scripts', 'after-pack-mac.js'));
 
   const contesto = (appOutDir) => ({
     electronPlatformName: 'darwin',
