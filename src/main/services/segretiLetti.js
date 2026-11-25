@@ -236,7 +236,13 @@ function tieni(chiave, r, desde = 0) {
 // `chiave` è l'elemento della pagina: il suo testo cresce mentre l'utente scrive, e sostituisce il precedente.
 function immessoDallUtente(chiave, testo, desde) {
   const r = compatto(testo);
-  if (r) tieni(`immesso:${chiave}`, r, Number(desde));
+  if (!r) return;
+  tieni(`immesso:${chiave}`, r, Number(desde));
+  daRicordare.set(chiave, String(testo));
+  if (!ricordoInAttesa) {
+    ricordoInAttesa = setTimeout(ricordaSuoi, ATTESA_SUOI_MS);
+    if (typeof ricordoInAttesa.unref === 'function') ricordoInAttesa.unref();
+  }
 }
 // Chi legge una scheda lo chiama prima: quello che l'utente ha appena immesso, fermo nell'attesa del preload, parte e
 // arriva qui prima della lettura, che viaggia dopo sullo stesso canale di ogni frame (#2641).
