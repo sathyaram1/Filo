@@ -1216,8 +1216,12 @@ test('(Z3) fuori da Filo con la home davanti: l’avviso aspetta; tornati sulla 
   await expect(home.locator('.dash-bubble-note')).toContainText('ho usato i crediti di Filo', { timeout: 30_000 });
   await expect.poll(() => avvisiInAttesa(app), { timeout: 20_000 }).toContain(RIGA_402);
 
+  const avvisiHome = await osservaAvvisi(home);
   await home.evaluate(() => { Document.prototype.hasFocus = () => true; window.dispatchEvent(new Event('focus')); });
+  await fuocoSullaPagina(app, home.url(), true);
   await expect.poll(() => avvisiInAttesa(app), { timeout: 8_000 }).toEqual([]);
+  await home.waitForTimeout(1500);
+  expect(await avvisiHome(), 'la riga sotto la risposta l’ha già detto').not.toContain('crediti di Filo');
 
   const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Dopo</title><p>Un sito qualunque.</p>');
   const avvisi = await osservaAvvisi(page);
