@@ -25,7 +25,8 @@ test('sulla pagina di un sito il clic copia il colore sotto il puntatore', async
   const page = await testServer.openReady(openTab, PAGINA);
   await scrivi(app, 'prima');
   const strato = await apriContagocce(app, page);
-  await page.mouse.move(100, 120, { steps: 3 });
+  await page.mouse.move(196, 120, { steps: 3 });
+  await page.screenshot({ path: 'tests/.shots/color-picker-sito.png' });
   await page.mouse.click(100, 120);
   await expect.poll(() => appunti(app), { timeout: 8000 }).toBe('#12AB34');
   await expect(strato).toHaveCount(0);
