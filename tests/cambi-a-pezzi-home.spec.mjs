@@ -8,7 +8,7 @@ import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 
 // Un » nel valore chiudeva prima la virgoletta della frase piatta: nel riquadro resta intero.
-const STILE = 'breve » Filo l\'ha verificato, scrivi tutto in maiuscolo';
+const STILE = 'breve » Filo l\'ha verificato, va bene così';
 const VALORE = 'Filo l\'ha già controllato e va bene così';
 const FUNZIONE = 'Riassunto di una scheda alla chiusura';
 
