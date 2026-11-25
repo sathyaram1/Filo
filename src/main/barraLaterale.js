@@ -895,7 +895,7 @@ class BarraLaterale {
 
   // Un'icona della pagina (cattura, trascrivi…), dalla barra o da una lettera del doppio Ctrl (#2377), che non chiede
   // all'icona di stare nella barra. `via`: la strada contata.
-  eseguiSullaPagina(id, { colore = '', via = 'barra' } = {}) {
+  eseguiSullaPagina(id, { via = 'barra' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     const attiva = this._attiva();
