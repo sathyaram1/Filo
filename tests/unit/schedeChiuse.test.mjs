@@ -152,9 +152,12 @@ test('#1686: la musica chiusa si sceglie con la regola di Ctrl+Shift+T, dalla pi
     arch('prima', 'https://radio.example/', '2026-10-22T11:00:00Z', { audioAt: '2026-10-22T10:59:00Z' }),
     arch('dopo', 'https://musica.example/', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T11:30:00Z' }),
     arch('tagliata', 'https://lunga.example/', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T11:40:00Z', urlTagliato: true }),
+    arch('pagina', 'about:blank', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T11:55:00Z' }),
     arch('file', 'file:///musica.mp3', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T11:50:00Z' }),
   ];
   assert.equal(p.dallArchivio(voci).id, 'muta');
+  assert.equal(p.dallArchivio(voci, { suonata: true }).id, 'file', 'un file del computer che suonava si riapre (#1905.1)');
+  p.segnaRiaperta('file');
   assert.equal(p.dallArchivio(voci, { suonata: true }).id, 'dopo');
   p.segnaRiaperta('dopo');
   assert.equal(p.dallArchivio(voci, { suonata: true }).id, 'prima');
