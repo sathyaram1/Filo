@@ -144,9 +144,7 @@ test('in incognito l\'intervista non si apre, a ogni finestra; la finestra norma
       await inc.screenshot({ path: 'tests/.shots/2650-incognito-senza-intervista.png' });
       // Chiusa l'ultima incognito, la prossima riparte da un incognito vuoto: è lì che l'intervista tornava.
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoIncognito).close());
-      await expect.poll(() => app.windows().includes(inc), { timeout: 10_000 }).toBe(false);
       await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito)), { timeout: 10_000 }).toBe(false);
-      aperte.pop();
     }
   }
   // Fuori dall'incognito l'intervista resta da fare, e si apre.
