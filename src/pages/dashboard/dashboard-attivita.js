@@ -1991,7 +1991,8 @@
     const esito = E.esitoAzione(a);
     // La stessa voce che archivia il turno (le parole del diario coi numeri, il perché di un no): una regola sola.
     const voce = E.voceArchivio(a) || { type, esito };
-    if (voce.esito === E.FALLITO && chiesta && voce.type !== 'FERMATA') {
+    // Una mossa senza effetto tiene la riga della diretta («È già nella barra dei siti»), non la domanda.
+    if (voce.esito === E.FALLITO && chiesta && voce.type !== 'FERMATA' && !voce.senzaEffetto) {
       voce.riga = chiesta;
       if (a && a._rigaChiesta === chiesta && a._rigaChiestaParti) voce.parti = a._rigaChiestaParti;
       else delete voce.parti;

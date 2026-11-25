@@ -24,10 +24,34 @@
     if (o && o.fatto) return COMPIUTO;
     if (o && o.proposta) return PROPOSTO;
     if (a._executed === false) return FALLITO;
-    // Un comando della finestra che non ha mosso niente (la home chiesta dalla
-    // home): il sistema lo segna eseguito, ma raccontarlo come fatto mente.
-    if (o && (o.already || o.invariata)) return FALLITO;
+    // Il sistema la segna eseguita, ma raccontarla come fatta mente.
+    if (senzaEffetto(a)) return FALLITO;
     return FATTO;
+  }
+
+  // Eseguita senza cambiare niente (la home chiesta dalla home, la barra dei siti già così, nessuna scheda da chiudere):
+  // non è fatta e non è un guasto. Diario, archivio e riepilogo dopo un guasto la leggono da qui (#553.15).
+  function senzaEffetto(a) {
+    const o = a && a._output;
+    if (!o || a._executed === false || a._confirm || a._domanda || o.blocked || o.proposta || o.fatto) return false;
+    if (o.already || o.invariata) return true;
+    const d = rigaDelDiario(a);
+    return !!(d && d.failed);
+  }
+
+  // I nomi delle azioni fatte di una risposta archiviata, meno quelli che i suoi esiti danno per non riusciti: le chat
+  // salvate prima di #553.14 tengono fra le fatte la mossa senza effetto. Un nome senza esiti del suo tipo resta.
+  function nomiFatti(nomi, esiti) {
+    const voci = Array.isArray(esiti) ? esiti.filter((v) => v && typeof v.type === 'string') : [];
+    if (!Array.isArray(nomi) || !voci.length) return nomi;
+    const riuscite = new Map();
+    for (const v of voci) riuscite.set(v.type, (riuscite.get(v.type) || 0) + (conta(v.esito) ? 1 : 0));
+    return nomi.filter((t) => {
+      if (typeof t !== 'string' || t === 'FERMATA' || !riuscite.has(t)) return true;
+      const n = riuscite.get(t);
+      riuscite.set(t, n - 1);
+      return n > 0;
+    });
   }
 
   // Le azioni che l'archivio nomina in `actions`, quelle successe: chi legge solo i nomi le dà per fatte, quindi una mossa
@@ -284,6 +308,8 @@
     }
     return ev.data && ev.titolo ? ev : null;
   }
+  // L'icona della riga in diretta (🏠, 📌): un simbolo, mai parole o un testo che passi per un'icona.
+  const icona = (s) => typeof s === 'string' && /^[^\p{L}\p{N}\p{Z}\p{C}]{1,3}$/u.test(s);
   function senzaVuoti(v) {
     const out = { type: v.type, esito: v.esito };
     if (v.riga) out.riga = v.riga;
@@ -298,6 +324,10 @@
     if (v.partita) out.partita = true;
     if (v.riprova) out.riprova = true;
     if (v.no) out.no = true;
+    if (v.senzaEffetto && v.esito === FALLITO) {
+      out.senzaEffetto = true;
+      if (icona(v.icona)) out.icona = v.icona;
+    }
     if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
     if (v.autore === 'segnalazione') out.autore = 'segnalazione';
     if (typeof v.segnalazione === 'string' && v.segnalazione.trim()) out.segnalazione = v.segnalazione.slice(0, MAX_AZIONE);
@@ -377,7 +407,8 @@
         proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
         evento: type === 'EVENTO_CALENDARIO' && x.esito === PROPOSTO && x.evento ? eventoDi(x.evento) : null,
         partita: x.esito === FALLITO && x.partita === true, riprova: x.esito === FALLITO && x.riprova === true,
-        no: x.esito === FALLITO && x.no === true, autore: x.autore, ...segnalazioneDi(type, x, true),
+        no: x.esito === FALLITO && x.no === true, senzaEffetto: x.senzaEffetto === true, icona: x.icona,
+        autore: x.autore, ...segnalazioneDi(type, x, true),
         ...(generica ? {} : bottoneDi(x.esito, type, x.azione, x.conferma)),
       });
     }
@@ -396,6 +427,17 @@
     }
     // Un pannello che aspetta il clic dell'utente (il riordino, l'elenco da eliminare) non è un'azione fallita.
     let esito = x._domanda && x._executed === false && !x._confirm ? CHIESTO : esitoAzione(x);
+    // Riaperta, la mossa senza effetto si dice come in diretta, con la sua icona e senza avviso: non si è rotto niente.
+    const vuota = esito === FALLITO && senzaEffetto(x) ? rigaDelDiario(x) : null;
+    if (vuota && vuota.text) {
+      const d = vuota.parti ? rigaDellaDomanda({ text: vuota.text, parti: vuota.parti }) : { riga: primaRiga(vuota.text), parti: null };
+      const perche = motivo(x);
+      return senzaVuoti({
+        type, esito, riga: breve(d.riga || vuota.text, MAX_RIGA), parti: d.parti, senzaEffetto: true, icona: vuota.icon,
+        motivo: perche && pulito(perche) !== pulito(vuota.text) ? breve(perche, MAX_MOTIVO) : '',
+        ...segnalazioneDi(type, x),
+      });
+    }
     // La riga del diario in diretta, coi suoi numeri: riaperta, la chat e il modello leggono la stessa frase.
     const diretta = esito === CHIESTO || esito === FALLITO ? null : rigaDelDiario(x);
     if (diretta && diretta.failed) esito = FALLITO;
@@ -495,6 +537,9 @@
       const testo = `Conferma chiesta${riga ? ` · ${riga}` : ''}`;
       return { icona: '❔', testo, fallita: true, ...(parti ? { parti: ['Conferma chiesta · ', ...parti] } : {}) };
     }
+    if (v.esito === FALLITO && v.senzaEffetto === true) {
+      return { icona: icona(v.icona) ? v.icona : '•', testo: riga || 'Era già così', fallita: true, ...(parti ? { parti } : {}) };
+    }
     if (v.esito === FALLITO) {
       const perche = pulito(v.motivo);
       // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
@@ -539,6 +584,7 @@
       const cosa = campo(v.riga) || v.type;
       if (v.type === 'FERMATA') return `- NON fatta, fermata da Filo (un segreto non esce): ${cosa}`;
       if (v.esito === CHIESTO) return `- NON fatta: chiesta la conferma all'utente, che allora non l'aveva ancora data: ${cosa}${segnalazione(v)}`;
+      if (v.esito === FALLITO && v.senzaEffetto === true) return `- NON fatta, non ha cambiato niente: ${cosa}${v.motivo ? ` (perché: ${campo(v.motivo)})` : ''}`;
       if (v.esito === FALLITO) return `- NON riuscita: ${cosa}${v.motivo ? ` (perché: ${campo(v.motivo)})` : ''}${segnalazione(v)}`;
       if (v.esito === PROPOSTO) return `- proposta col bottone sotto la risposta: ${cosa}${segnalazione(v)}`;
       return `- fatta: ${cosa}${segnalazione(v)}`;
@@ -568,7 +614,7 @@
 
   global.SN_ESITO = {
     daRaccontare,
-    esitoAzione, successa, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
+    esitoAzione, senzaEffetto, nomiFatti, successa, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
     perTrascrizione, testoSegnalazione,
     unisciDopo, primaRigaConferma: primaRiga, primaRigaParti, rigaDellaDomanda, rigaDiParti, piatto, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };

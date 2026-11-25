@@ -45,7 +45,8 @@ test('un\'azione fatta si archivia con la riga del diario in diretta, e una non 
   const sveglia = E.voceArchivio({ type: 'SVEGLIA', ora: '07:30', _executed: false, _output: {} });
   assert.equal(E.rigaDellaVoce(sveglia).testo, 'Sveglia non impostata');
   const vuota = E.voceArchivio({ type: 'CHIUDI_SCHEDE', _executed: true, _output: { chiuse: 0, nessuna: 'niente' } });
-  assert.equal(E.rigaDellaVoce(vuota).testo, 'Nessuna scheda chiusa · c\'è solo questa', 'niente chiuso non si racconta come fatto');
+  assert.deepEqual(E.rigaDellaVoce(vuota), { icona: '✕', testo: 'Nessuna scheda chiusa', fallita: true }, 'niente chiuso non si racconta come fatto, né come un guasto');
+  assert.match(E.perModello([vuota]), /- NON fatta, non ha cambiato niente: Nessuna scheda chiusa \(perché: c'è solo questa\)/);
 });
 const CA = globalThis.SN_CHAT_ARCHIVE;
 const FC = globalThis.SN_FILO_CONTESTO;
@@ -128,9 +129,70 @@ test('una mossa senza effetto non sta fra le successe: riaperta, si legge come i
   assert.equal(E.voci(m.actions).some((v) => v.type === 'COMANDO_FINESTRA'), false, 'chi legge solo i nomi non la conta');
   const [v] = m.esiti;
   assert.equal(v.esito, 'fallito');
-  assert.equal(E.rigaDellaVoce(v).testo, 'Comando non eseguito · Sei già nella home', 'la frase del diario in diretta');
-  assert.match(E.perModello(m.esiti), /- NON riuscita: .*\(perché: Sei già nella home\)/);
-  assert.doesNotMatch(E.perModello(m.esiti), /- fatta/);
+  assert.deepEqual(E.rigaDellaVoce(v), { icona: '🏠', testo: 'Sei già nella home', fallita: true }, 'la riga del diario in diretta');
+  assert.match(E.perModello(m.esiti), /- NON fatta, non ha cambiato niente: Sei già nella home/);
+  assert.doesNotMatch(E.perModello(m.esiti), /- fatta|NON riuscita/);
+});
+
+// #553.15 — riletta, una mossa senza effetto si racconta come in diretta: la sua icona e la sua frase, senza il
+// triangolo d'avviso e senza «Comando non eseguito», che fa pensare a un guasto.
+test('riaperta, la mossa senza effetto ha la riga e l\'icona della diretta, non un avviso', () => {
+  const casi = [
+    [{ type: 'COMANDO_FINESTRA', comando: 'home', _executed: true, _output: { window: 'home', already: true } }, '🏠', 'Sei già nella home'],
+    [{ type: 'BARRA_SITI', operazione: 'aggiungi', indirizzo: 'youtube.com', _executed: true, _output: { gia: true, invariata: true, voce: 'YouTube' } }, '📌', 'È già nella barra dei siti · YouTube'],
+    [{ type: 'BARRA_SITI', operazione: 'sposta', elemento: 'YouTube', _executed: true, _output: { invariata: true, voce: 'YouTube' } }, '📌', 'È già a quel posto nella barra dei siti · YouTube'],
+    [{ type: 'ACCOUNT', voce: 'accedi', _executed: true, _output: { gia: 'dentro' } }, '👤', 'Eri già dentro Filo'],
+    [{ type: 'CHIUDI_SCHEDE', _executed: true, _output: { chiuse: 0, nessuna: 'niente' } }, '✕', 'Nessuna scheda chiusa'],
+  ];
+  for (const [a, icona, testo] of casi) {
+    const dalVivo = RA.riga(a);
+    assert.equal(dalVivo.icon, icona, `${a.type}: icona in diretta`);
+    assert.equal(E.senzaEffetto(a), true, a.type);
+    assert.equal(E.successa(a), false, `${a.type}: non sta fra le fatte`);
+    const [v] = CA.toStoredMessage({ role: 'filo', text: 'ok', esiti: [a] }).esiti;
+    assert.equal(v.esito, 'fallito', a.type);
+    assert.equal(v.senzaEffetto, true, a.type);
+    const riga = E.rigaDellaVoce(v);
+    assert.equal(riga.icona, icona, `${a.type}: la stessa icona riaperta`);
+    assert.equal(E.piatto(riga.parti || [riga.testo]), testo, `${a.type}: la stessa frase riaperta`);
+    assert.equal(E.piatto(riga.parti || [riga.testo]), E.piatto(dalVivo.parti || [dalVivo.text]), `${a.type}: come in diretta`);
+    assert.equal(riga.fallita, true, `${a.type}: fuori dal riassunto delle fatte`);
+    assert.doesNotMatch(riga.testo, /non eseguit|non cambiat|non riuscit|⚠/i, a.type);
+    // Una seconda lettura (la voce già ripulita che torna) la tiene uguale.
+    assert.deepEqual(E.voceArchivio(v), v, `${a.type}: stabile alla rilettura`);
+  }
+  // Le mosse che hanno agito, o i veri no, restano come prima.
+  assert.equal(E.senzaEffetto({ type: 'COMANDO_FINESTRA', comando: 'home', _executed: true, _output: { window: 'home' } }), false);
+  assert.equal(E.senzaEffetto({ type: 'CHIUDI_SCHEDE', _executed: true, _output: { chiuse: 2 } }), false);
+  assert.equal(E.senzaEffetto({ type: 'TIMER', _executed: false, _output: { error: 'x' } }), false);
+  const [no] = CA.toStoredMessage({ role: 'filo', text: 'ok', esiti: [{ type: 'TIMER', secondi: 5, _executed: false, _output: { error: 'rotto' } }] }).esiti;
+  assert.equal(E.rigaDellaVoce(no).icona, '⚠', 'un guasto vero resta un avviso');
+});
+
+test('una voce salvata non porta un\'icona che non sia un simbolo', () => {
+  const v = E.voceArchivio({ type: 'COMANDO_FINESTRA', esito: 'fallito', riga: 'Sei già nella home', senzaEffetto: true, icona: '<b>x</b>' });
+  assert.equal(v.icona, undefined);
+  assert.equal(E.rigaDellaVoce(v).icona, '•');
+  assert.equal(E.voceArchivio({ type: 'TIMER', esito: 'fatto', riga: 'Timer', senzaEffetto: true, icona: '🏠' }).senzaEffetto, undefined, 'solo su una non fatta');
+});
+
+// #553.15 — le chat salvate prima di #553.14 tengono la mossa senza effetto fra i nomi delle fatte, mentre il loro
+// esito dice che non è riuscita: riaperte, quel nome non arriva più a chi legge.
+test('riletta, una chat vecchia non conta fra le fatte il nome che il suo esito dà per non riuscito', () => {
+  const FE = globalThis.SN_FILO_EVENTI;
+  const vecchio = {
+    role: 'filo', text: 'Sei già qui.', actions: ['COMANDO_FINESTRA', 'TIMER', 'FERMATA', 'RICORDO_FILO'],
+    esiti: [
+      { type: 'COMANDO_FINESTRA', esito: 'fallito', riga: 'Torna alla home', motivo: 'era già così' },
+      { type: 'TIMER', esito: 'fatto', riga: 'Timer avviato · 1 min' },
+      { type: 'FERMATA', esito: 'fallito', riga: 'Fermato' },
+    ],
+  };
+  const copia = FE.copiaChat({ id: 'c1', messages: [{ role: 'user', text: 'portami alla home' }, vecchio, { role: 'filo', text: 'x', actions: ['TIMER'] }] });
+  assert.deepEqual(copia.messages[1].actions, ['TIMER', 'FERMATA', 'RICORDO_FILO']);
+  assert.deepEqual(copia.messages[2].actions, ['TIMER'], 'senza esiti il nome resta');
+  assert.deepEqual(vecchio.actions.length, 4, 'il disco non si tocca');
+  assert.deepEqual(E.nomiFatti(['TIMER', 'TIMER'], [{ type: 'TIMER', esito: 'fatto' }, { type: 'TIMER', esito: 'fallito' }]), ['TIMER']);
 });
 
 test('le righe della chat riaperta dicono fatto, non riuscito col perché, e conferma chiesta', () => {

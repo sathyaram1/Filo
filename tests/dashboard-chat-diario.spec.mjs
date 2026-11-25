@@ -535,6 +535,13 @@ test('F6 — la home chiesta dalla home, riletta da una scheda nuova o dalla hom
   await page.locator('#input').fill('portami alla home');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Sei già qui' })).toBeVisible({ timeout: 10_000 });
+  // #553.15 — la riga in diretta, con cui confrontare quella riletta.
+  await page.locator('.dash-activity .dash-activity-head').click();
+  const dalVivo = page.locator('.dash-activity .dash-activity-row', { hasText: 'Sei già nella home' });
+  await expect(dalVivo).toHaveCount(1);
+  const icona = (r) => r.locator('.dash-activity-row-icon').textContent();
+  const iconaDalVivo = await icona(dalVivo);
+  expect(iconaDalVivo).toBe('🏠');
 
   const risposta = () => app.evaluate(async () => (await globalThis.SN_IL_FILO.chats())
     .flatMap((c) => c.messages).find((m) => m.role === 'filo' && /Sei già qui/.test(m.text)) || null);
@@ -550,7 +557,11 @@ test('F6 — la home chiesta dalla home, riletta da una scheda nuova o dalla hom
     await expect(p.locator('#input')).toBeVisible();
     const bolla = p.locator('#bubbles .dash-bubble-filo', { hasText: 'Sei già qui' });
     await expect(bolla).toBeVisible({ timeout: 10_000 });
-    await expect(bolla.locator('.dash-esiti-archiviati .dash-activity-row', { hasText: 'Sei già nella home' })).toHaveCount(1);
+    const riletta = bolla.locator('.dash-esiti-archiviati .dash-activity-row', { hasText: 'Sei già nella home' });
+    await expect(riletta).toHaveCount(1);
+    // Come in diretta: la casetta e la frase, mai l'avviso di un comando non eseguito (#553.15).
+    expect(await icona(riletta)).toBe(iconaDalVivo);
+    await expect(riletta).not.toContainText(/non eseguito|non riuscit|⚠/i);
     await expect(p.locator('#bubbles')).not.toContainText(/azionato un comando/i);
   }
   await rilette[0].screenshot({ path: 'tests/.shots/diario-home-gia-qui-riletta.png' });
