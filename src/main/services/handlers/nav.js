@@ -390,6 +390,8 @@ module.exports = function register(on, ctx) {
     applied: Number(msg?.applied) || 0,
     left: Number(msg?.left) || 0,
     fuoriConto: msg?.fuoriConto ? 1 : 0,
+    // Il nome del sito spento lo legge il main dal mittente: l'avviso della pagina lo nomina.
+    ...(msg?.spento ? { spento: 1, sito: sitoDelRiquadro(sender) } : {}),
   }));
 
   on(MSG.REPLACE_MISSPELLING, async (msg, sender) => {
