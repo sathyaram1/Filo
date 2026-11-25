@@ -431,7 +431,7 @@ const spentoConFiglio = (src) => `<!doctype html><html lang="en"><body style="ma
   <button id="play">Play video</button> <span id="w">Comments are closed</span>
   <iframe id="figlio" src="${src}" width="300" height="70" style="border:0"></iframe>
 </body></html>`;
-const ospite = (src, testo = true) => `<!doctype html><html lang="en"><head><title>Football era</title></head>
+const ospite = (src, testo = true) => `<!doctype html><html lang="en"><head>${testo ? '<title>Football era</title>' : ''}</head>
 <body style="font:16px sans-serif;padding:20px">
   ${testo ? '<h1 id="head">The end of an era in European football</h1><p id="p1">First paragraph of the body text, long enough to be picked up.</p>' : ''}
   <iframe id="embed" src="${src}" width="460" height="180" style="border:1px solid #333"></iframe>
