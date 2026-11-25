@@ -475,7 +475,7 @@ test('chiesta in chat, una pagina il cui unico testo viene da un sito dove Filo 
   const page = await testServer.openReady(openTab, ospite(testServer.html(RIQUADRO, { pubblico: true }), false));
   await guardaAvvisi(page);
   await expect(page.frameLocator('#embed').locator('#w')).toBeVisible();
-  expect((await traduci(app)).stato).toBe('partita');
+  expect((await traduci(app)).output).toMatchObject({ traduzione: 'partita' });
   await expect.poll(() => avvisi(page).then((a) => a.join(' | ')), { timeout: 15_000 })
     .toMatch(/Il testo di questa pagina viene da sito-pubblico\.test, dove hai spento Filo/);
   expect((await avvisi(page)).join(' | ')).not.toMatch(/Non ho trovato testo/);
