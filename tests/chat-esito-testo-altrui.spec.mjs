@@ -304,6 +304,7 @@ test('#2648.1 lo schermo guardato senza la finestra chiesta dice il nome scelto 
   try {
     await livelloAutonomia(app, 'yolo');
     await modelloFinto(app, [{ text: '', toolCalls: [{ id: 's1', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: VALORE }) }] }, { text: 'Non la trovo.' }]);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ schermo: { guarda: true } }));
     const chiesto = 'guarda quella finestra';
     await chiedi(page, chiesto);
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Non la trovo.' })).toBeVisible({ timeout: 15_000 });
