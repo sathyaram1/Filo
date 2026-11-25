@@ -99,7 +99,8 @@ test('articolo e video lasciati a metà: la posizione si salva, arriva al giudiz
     const pA = await apri(app, shell, articolo);
     await rotellaFinoAMeta(pA);
     await expect.poll(() => tm(app, (m) => m.tabs.find((t) => t.title === 'Articolo').scrollPct), { timeout: 5_000 }).toBeGreaterThanOrEqual(45);
-    await apri(app, shell, video);
+    const pV = await apri(app, shell, video);
+    await expect.poll(() => pV.evaluate(() => { const a = document.getElementById('a'); return a.duration ? Math.round(a.currentTime / a.duration * 100) : -1; }), { timeout: 10_000, message: 'l’audio della pagina non è arrivato a metà' }).toBeGreaterThanOrEqual(45);
     await expect.poll(() => tm(app, (m) => m.tabs.find((t) => t.title === 'Video').mediaPct), { timeout: 10_000 }).toBeGreaterThanOrEqual(45);
     await apri(app, shell, notizie);
     await apri(app, shell, davanti);
