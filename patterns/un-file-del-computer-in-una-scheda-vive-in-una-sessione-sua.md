@@ -39,7 +39,7 @@ Il fusibile è del binario, non della sessione, e va spento dappertutto:
 - nel pacchetto, in `scripts/after-pack.js`, su ogni sistema e su ogni copia, prima della firma del Mac e del
   lanciatore di Linux; un binario senza filo ferma la costruzione;
 - nelle prove, dal globalSetup: sul posto se `node_modules/electron` è di questo checkout, altrimenti (i cloni delle
-  routine usano i moduli della cartella della sessione) una copia spenta nella temporanea del sistema, passata con
+  routine usano i moduli della cartella della sessione) una copia spenta in `node_modules/.cache/` del checkout, passata con
   `ELECTRON_OVERRIDE_DIST_PATH`; sul Mac la copia o il binario modificato si rifirmano in locale;
 - in `npm start`, dal prestart, sul posto.
 
