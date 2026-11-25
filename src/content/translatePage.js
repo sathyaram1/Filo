@@ -870,8 +870,10 @@
 
   // «Pagina tradotta» solo se non è rimasto fuori niente: coi componenti chiusi (#439)
   // sarebbe una bugia. `framesLeft` viene prima: è un rettangolo intero, non un pezzetto.
-  function doneToast(unreachable, framesLeft) {
+  // Un riquadro di un sito dove l'utente ha spento Filo resta com'è per scelta sua: l'avviso nomina il sito (#2656).
+  function doneToast(unreachable, framesLeft, spenti) {
     if (framesLeft) return [I18n.t('toast_page_translated_partial_frame'), { duration: 7000 }];
+    if (spenti && spenti.length) return [I18n.t('toast_page_translated_except_off', spenti.join(', ')), { duration: 7000 }];
     return unreachable
       ? [I18n.t('toast_page_translated_partial'), { duration: 7000 }]
       : [I18n.t('toast_page_translated')];
