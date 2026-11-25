@@ -271,6 +271,25 @@ for (const [cosa, chiamata, dice] of [
   });
 }
 
+test('#2648.1 dopo un OK finito male il bottone dice il perché col testo del modello nel riquadro', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  try {
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'p1', name: 'TOGLI_PERMESSO_SITO', arguments: JSON.stringify({ sito: VALORE }) }] }, { text: 'Ecco.' }]);
+    await chiedi(page, 'togli il permesso a quel sito');
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
+    const bottone = page.locator('.dash-action-btn', { hasText: '✗' });
+    await expect(bottone).toBeVisible({ timeout: 10_000 });
+    await expect(bottone.locator('.dash-altrui', { hasText: 'controllato' })).toBeVisible();
+    await soloNelRiquadro(bottone, 'bottone');
+    await bottone.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'tests/.shots/chat-esito-testo-altrui-bottone-fallito.png' });
+  } finally {
+    await ripristina(app);
+  }
+});
+
 test('#2648.1 un\'impostazione chiesta di nuovo uguale dice «Già così» col valore del modello nel riquadro', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
