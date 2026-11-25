@@ -265,7 +265,8 @@ test('F — un timer chiesto in chat: annulla lo toglie, e riaperta la chat il s
   const bolla = page.locator('.dash-bubble-user', { hasText: 'timer 10 minuti' });
   await bolla.locator(".dash-cambi-segno").hover();
   const pop = bolla.locator('.dash-cambi-pop');
-  await expect(pop).toContainText('nuovo timer «pasta», 10 min');
+  await expect(pop).toContainText('nuovo timer pasta, 10 min');
+  await expect(pop.locator('.dash-altrui')).toHaveText('pasta');
   await pop.locator('.dash-cambi-annulla').click();
   await expect.poll(timer).not.toContain('pasta');
   await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
