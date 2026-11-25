@@ -223,6 +223,98 @@ test('#2648.1 i nodi di un comando e di un file mostrato, e il fumetto sul nodo,
   }
 });
 
+// Le parole di Filo (fuori dai riquadri) di ogni elemento che nomina il testo del modello.
+const fuoriDi = (loc, v) => loc.evaluateAll((els, valore) => els
+  .filter((el) => el.textContent.includes(valore))
+  .map((el) => {
+    const fuori = [];
+    const giro = (n) => {
+      for (const c of n.childNodes) {
+        if (c.nodeType === 3) fuori.push(c.textContent);
+        else if (!(c.classList && c.classList.contains('dash-altrui'))) giro(c);
+      }
+    };
+    giro(el);
+    return { tutto: el.textContent, fuori: fuori.join('') };
+  }), v);
+async function soloNelRiquadro(loc, dove) {
+  const righe = await fuoriDi(loc, VALORE);
+  expect(righe.length, `${dove}: c'è il testo del modello`).toBeGreaterThan(0);
+  for (const r of righe) expect(r.fuori, `${dove}: ${r.tutto}`).not.toContain('controllato');
+}
+
+for (const [cosa, chiamata, dice] of [
+  ['un\'impostazione rifiutata per il valore', { name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'tema', valore: VALORE }) }, 'non è un valore'],
+  ['un permesso tolto a un sito nominato male', { name: 'TOGLI_PERMESSO_SITO', arguments: JSON.stringify({ sito: VALORE }) }, 'non è un sito'],
+]) {
+  test(`#2648.1 ${cosa}: il perché tiene il testo del modello nel riquadro, nella riga, nel titolo del nodo e nella chat riaperta`, async ({ app }) => {
+    test.setTimeout(60_000);
+    const page = await home(app);
+    try {
+      await livelloAutonomia(app, 'yolo');
+      await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'x1', ...chiamata }] }, { text: 'Non è andata.' }]);
+      const chiesto = `prova ${chiamata.name}`;
+      await chiedi(page, chiesto);
+      await expect(page.locator('.dash-bubble-filo', { hasText: 'Non è andata.' })).toBeVisible({ timeout: 15_000 });
+      const riga = page.locator('.dash-activity-row', { hasText: dice }).last();
+      await expect(riga).toBeAttached({ timeout: 8_000 });
+      await soloNelRiquadro(page.locator('.dash-activity-row'), 'in diretta');
+      for (const r of await fuoriDi(page.locator('.dash-activity-seg-label'), VALORE)) expect(r.fuori, r.tutto).not.toContain('controllato');
+
+      const chat = await chatCon(app, chiesto);
+      expect(chat, 'la conversazione è in archivio').toBeTruthy();
+      await riapri(app, page, chat.id);
+      await expect(page.locator('.dash-esiti-archiviati .dash-activity-row', { hasText: dice })).toBeVisible({ timeout: 8_000 });
+      await soloNelRiquadro(page.locator('.dash-esiti-archiviati .dash-activity-row, .dash-bubble-note'), 'riaperta');
+    } finally {
+      await ripristina(app);
+    }
+  });
+}
+
+test('#2648.1 un\'impostazione chiesta di nuovo uguale dice «Già così» col valore del modello nel riquadro', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  try {
+    await livelloAutonomia(app, 'yolo');
+    await app.evaluate(() => {
+      const vero = globalThis.fetch;
+      globalThis.fetch = async (input, init) => (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(String((input && input.url) || input))
+        ? new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+        : vero(input, init));
+    });
+    const cambia = (id) => ({ id, name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'modello_funzione', valore: `${FUNZIONE}: fornitore-nuovo/modello-x ${VALORE}` }) });
+    await modelloFinto(app, [{ text: '', toolCalls: [cambia('g1')] }, { text: '', toolCalls: [cambia('g2')] }, { text: 'Fatto.' }]);
+    await chiedi(page, 'cambia il modello del riassunto, e ancora');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 15_000 });
+    const gia = page.locator('.dash-activity-row', { hasText: 'Già così' });
+    await expect(gia).toBeAttached({ timeout: 8_000 });
+    await soloNelRiquadro(gia, 'già così');
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('#2648.1 lo schermo guardato senza la finestra chiesta dice il nome scelto dal modello nel riquadro', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  try {
+    await livelloAutonomia(app, 'yolo');
+    await modelloFinto(app, [{ text: '', toolCalls: [{ id: 's1', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: VALORE }) }] }, { text: 'Non la trovo.' }]);
+    const chiesto = 'guarda quella finestra';
+    await chiedi(page, chiesto);
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Non la trovo.' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.dash-activity-row', { hasText: 'nessuna finestra' })).toBeAttached({ timeout: 8_000 });
+    await soloNelRiquadro(page.locator('.dash-activity-row'), 'in diretta');
+    const chat = await chatCon(app, chiesto);
+    await riapri(app, page, chat.id);
+    await expect(page.locator('.dash-esiti-archiviati .dash-activity-row', { hasText: 'nessuna finestra' })).toBeVisible({ timeout: 8_000 });
+    await soloNelRiquadro(page.locator('.dash-esiti-archiviati .dash-activity-row'), 'riaperta');
+  } finally {
+    await ripristina(app);
+  }
+});
+
 test('#2648.1 riaperta, un comando finito male dice la riga d\'errore del programma nel suo riquadro', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
