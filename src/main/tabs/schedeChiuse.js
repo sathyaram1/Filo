@@ -112,7 +112,7 @@ function crea({ tetto = TETTO } = {}) {
   // La voce che ha suonato per ultima (#1397): «rimettimi la musica» con la scheda già chiusa.
   function ultimaCheSuonava() {
     let scelta = null;
-    for (const v of pila) if (!v.riaperta && v.audioAt > 0 && web(v.url) && (!scelta || v.audioAt > scelta.audioAt)) scelta = v;
+    for (const v of pila) if (!v.riaperta && v.audioAt > 0 && riapribile(v.url) && (!scelta || v.audioAt > scelta.audioAt)) scelta = v;
     return scelta;
   }
 
