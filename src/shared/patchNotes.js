@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.305', date: '2026-11-25',
+      fixes: [
+        { testo: 'Una finestra in incognito non apre più l\'intervista di benvenuto: la chat ti risponde subito, anche se l\'intervista non l\'hai ancora fatta.', segnalazione: 2650 },
+      ],
+    },
+    {
       version: '0.2.304', date: '2026-11-25',
       fixes: [
         { testo: 'Il Color picker della barra laterale funziona, anche nella nuova scheda: una lente ingrandisce i pixel sotto il puntatore e un clic copia il codice del colore.', segnalazione: 2651 },
