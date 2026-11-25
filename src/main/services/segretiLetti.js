@@ -163,10 +163,57 @@ const compatto = (t) => String(t || '').replace(/[\s-]/g, '').toLowerCase();
 // Chi compone la provenienza di una pagina e chi la riconosce sono la stessa regola, in src/shared/urlExfil.js.
 const daPagina = (fonte) => !!globalThis.SN_URL_EXFIL?.fonteDiPagina?.(fonte);
 const copre = (r, x) => { const v = compatto(x && x.valore); return !!v && r.includes(v); };
+
+// Dei segreti che l'utente ha immesso resta, fra un avvio e l'altro e quanto i letti, solo un'impronta col sale di
+// questa cartella dati: una bozza o un modulo che il sito gli rimette davanti dopo un riavvio non li fa letti (#810.24).
+const MAX_SUOI = 20000;
+const ATTESA_SUOI_MS = 2000;
+const suoi = new Map();
+let sale = '';
+const daRicordare = new Map();
+let ricordoInAttesa = null;
+function impronta(v) {
+  const crypto = require('node:crypto');
+  if (!sale) sale = crypto.randomBytes(16).toString('hex');
+  return crypto.createHash('sha256').update(`${sale}\u0000${v}`).digest('hex').slice(0, 32);
+}
+// Fuori dal giro dei tasti: cercare i segreti in un documento lungo costa decine di millisecondi.
+function ricordaSuoi() {
+  if (ricordoInAttesa) { clearTimeout(ricordoInAttesa); ricordoInAttesa = null; }
+  const G = globalThis.SN_GUARDIANO_STATICO;
+  const testi = [...daRicordare.values()];
+  daRicordare.clear();
+  if (!G || !testi.length) return;
+  carica();
+  let giaLetti = null;
+  const ora = Date.now();
+  let cambiato = false;
+  for (const t of testi) {
+    let trovati = [];
+    try { trovati = G.segretiNelTesto(t.replace(/\u0001/g, '\n')); } catch (_) {}
+    for (const x of trovati) {
+      const v = compatto(x && x.valore);
+      if (!v) continue;
+      // Un codice letto prima che l'utente lo scrivesse resta letto, anche dopo un riavvio.
+      if (!giaLetti) giaLetti = new Set(letti.tutti().map((y) => compatto(y.valore)));
+      if (giaLetti.has(v)) continue;
+      const k = impronta(v);
+      const at = suoi.get(k);
+      if (at !== undefined && ora - at < 24 * 3600 * 1000) continue;
+      suoi.delete(k);
+      suoi.set(k, ora);
+      cambiato = true;
+    }
+  }
+  while (suoi.size > MAX_SUOI) suoi.delete(suoi.keys().next().value);
+  if (cambiato) salvaPresto();
+}
+
 function dellUtente(x, fonte) {
-  if (!immessi.size || !daPagina(fonte)) return false;
+  if ((!immessi.size && !suoi.size) || !daPagina(fonte)) return false;
   for (const r of immessi.values()) if (copre(r, x)) return true;
-  return false;
+  const v = compatto(x && x.valore);
+  return !!v && suoi.size > 0 && suoi.has(impronta(v));
 }
 // `desde`: quando è partito il pezzo che l'utente ha appena immesso. Un codice letto prima resta letto: riscriverlo non
 // lo fa diventare suo (giri 5 e 6).
