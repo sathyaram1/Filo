@@ -155,4 +155,7 @@ function motoreSenzaPrivilegi({ radice, cache = null, piattaforma = process.plat
   return { dist: copia, copia: true };
 }
 
-module.exports = { SENTINELLA, PRIVILEGI_FILE, fileDelFilo, privilegiFile, spegniPrivilegiFile, eseguibileDelPacchetto, afterPack, motoreSenzaPrivilegi };
+module.exports = {
+  SENTINELLA, PRIVILEGI_FILE, fileDelFilo, privilegiFile, spegniPrivilegiFile, eseguibileDelPacchetto, afterPack,
+  cartellaDelleCopie, motoreSenzaPrivilegi,
+};
