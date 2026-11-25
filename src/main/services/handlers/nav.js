@@ -4,6 +4,15 @@ const { app } = require('electron');
 const { soloFilo, filoNegatoAllaPagina, paginaNonDiFilo, daPaginaNonDiFilo } = require('./origine');
 const { azione: contata } = require('../azioniContate');
 const Strade = require('../contatoriStrade');
+const { vociCheSpengono, sitoDi } = require('./filoSpento');
+const NomiSito = require('../../../shared/nomiSito.js');
+
+function sitoDelRiquadro(sender) {
+  let url = '';
+  try { url = String((sender && sender.frame && sender.frame.url) || ''); } catch (_) { url = ''; }
+  const s = sitoDi(url);
+  return s ? (NomiSito.leggibile(s) || s) : '';
+}
 
 // Una pagina di Filo aperta da un'altra pagina di Filo (#1468): la strada la dice chi manda (un comando, una carta della
 // home, la chat), sennò è un collegamento; aperta da una strada che è anche un'icona, è anche la sua azione.
