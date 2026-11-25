@@ -458,10 +458,14 @@
     return breve(typeof x === 'object' ? JSON.stringify(x) : String(x), 40);
   }
   // Un valore che Filo non ha scritto (un nome, un testo, un id di modello) è un pezzo suo: chi mostra la frase lo
-  // chiude nel riquadro, la frase piatta lo dice com'era (#2648.1). `fra` lo dice fra «», `suo` nudo.
-  const suo = (t) => (t ? { citazione: t, nuda: true } : '');
-  const fra = (t) => (t ? { citazione: t } : '');
-  const unisci = (pezzi, sep) => pezzi.filter(Boolean).flatMap((p, i) => (i ? [sep, p] : [p]));
+  // chiude nel riquadro, la frase piatta lo dice com'era (#2648.1). I pezzi e la loro regola stanno in SN_ESITO.
+  function esito() {
+    if (!global.SN_ESITO && typeof require === 'function') { try { require('./esitoAzione.js'); } catch (_) {} }
+    return global.SN_ESITO;
+  }
+  const suo = (t) => esito().suo(t);
+  const fra = (t) => esito().fra(t);
+  const unisci = (pezzi, sep) => esito().unisci(pezzi, sep);
   function elencoDi(lista, n = 3) {
     const l = lista.map((x) => suo(breve(x, 40)));
     return [...unisci(l.slice(0, n), ', '), l.length > n ? ` e altri ${l.length - n}` : ''];
