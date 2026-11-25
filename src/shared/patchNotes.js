@@ -11,6 +11,7 @@
     {
       version: '0.2.304', date: '2026-11-25',
       fixes: [
+        { testo: 'Il Color picker della barra laterale funziona, anche nella nuova scheda: una lente ingrandisce i pixel sotto il puntatore e un clic copia il codice del colore.', segnalazione: 2651 },
         { testo: 'Un proxy degli elenchi con un indirizzo email come utente, o con un indirizzo IPv6 fra quadre, ora si collega e la sua password resta protetta. Scritto senza http:// o socks5:// davanti, Filo chiede al fornitore che tipo di proxy è e lo usa nel modo giusto, anche per scaricare i video.', segnalazione: 2646 },
       ],
     },
