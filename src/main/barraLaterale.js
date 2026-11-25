@@ -904,8 +904,7 @@ class BarraLaterale {
     Strade.misura('azione', id, via, { incognito: this._incognito() });
     this.chiudi();
     this._restituisciTastiera();
-    const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
-    this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...(scelto ? { colore: scelto } : {}), scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
+    this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
     this._consegnaInAttesa();
     return true;
   }
