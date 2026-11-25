@@ -1638,11 +1638,13 @@ test('dopo un riavvio vero, la carta che l’utente aveva scritto nella bozza no
     cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
     env: { ...process.env, FILO_USER_DATA: userData, FILO_TEST_ACCOLTO: '1', NODE_ENV: 'test' },
   });
-  const apri = async (app) => {
+  // Ogni apertura col suo indirizzo: la scheda di prima, che Filo rimette dopo il riavvio, non si confonde con questa.
+  const apri = async (app, volta) => {
     const shell = await primaFinestra(app);
-    const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    const qui = `${url}?volta=${volta}`;
+    const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), qui);
     let page = null;
-    await expect.poll(async () => Boolean(page = await paginaDellaScheda(app, aperta.id, (w) => w.url().startsWith(url))), { timeout: 20_000 }).toBe(true);
+    await expect.poll(async () => Boolean(page = await paginaDellaScheda(app, aperta.id, (w) => w.url() === qui)), { timeout: 20_000 }).toBe(true);
     await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
     return { shell, page };
   };
