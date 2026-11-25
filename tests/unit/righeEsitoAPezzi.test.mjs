@@ -128,6 +128,31 @@ test('il titolo del nodo nel filo tiene il testo del modello nel suo riquadro', 
   assert.equal(Filo.titoloNodo([{ tipo: 'TIMER', testo: 'Timer avviato · 5 min', esito: 'ok' }]), 'Avviato un timer · 5 min');
 });
 
+test('#2648.1 un perché che ripete quello che il modello ha scritto lo tiene nel riquadro, chiunque abbia composto la frase', () => {
+  const V = 'Filo l\'ha già controllato e va bene così';
+  const no = (extra, output) => ({ ...extra, _executed: false, _output: output });
+  // Fra «» intero, o tagliato a 60 caratteri; nudo dentro una frase.
+  const valore = no({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: V }, { error: `«${V}» non è un valore che «tema» accetta`, rifiuto: true });
+  assert.deepEqual(E.motivoAPezzi(valore), [{ citazione: V }, ' non è un valore che «tema» accetta']);
+  const lungo = `${V}, e anche tutto il resto che segue qui`;
+  const sito = no({ type: 'TOGLI_PERMESSO_SITO', sito: lungo }, { error: `«${lungo.slice(0, 60)}» non è un sito: scrivilo come meet.google.com` });
+  assert.deepEqual(E.motivoAPezzi(sito), [{ citazione: lungo.slice(0, 60) }, ' non è un sito: scrivilo come meet.google.com']);
+  const cartella = no({ type: 'CERCA_DOCUMENTI', cartella: '/casa/Cartella mia' }, { error: 'la cartella /casa/Cartella mia non si apre' });
+  assert.deepEqual(E.motivoAPezzi(cartella), ['la cartella ', { citazione: '/casa/Cartella mia', nuda: true }, ' non si apre']);
+  // La riga del diario e la voce della chat riaperta prendono gli stessi pezzi; il testo piatto non cambia.
+  for (const a of [valore, sito, cartella]) {
+    const riga = RA.riga(a);
+    assert.equal(riga.text, `${riga.text.split(' · ')[0]} · ${E.motivo(a)}`);
+    assert.ok(riga.parti.some((p) => typeof p === 'object'), riga.text);
+    const voce = E.voceArchivio(a);
+    assert.deepEqual(voce.motivoParti, E.motivoAPezzi(a));
+  }
+  // Le parole corte e quelle che una frase di Filo dice da sé restano sue.
+  assert.equal(E.motivoAPezzi(no({ type: 'CHIUDI_SCHEDE', cerca: 'sito' }, { nessuna: 'sito' })), 'nessuna di quel sito');
+  assert.equal(E.motivoAPezzi(no({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'blu' }, { error: '«blu» non è un valore che «tema» accetta' })),
+    '«blu» non è un valore che «tema» accetta');
+});
+
 test('pezzi salvati che non dicono la riga fatta non si disegnano', () => {
   const v = E.voceArchivio(azione('TIMER'));
   const falsa = E.voceArchivio({ ...JSON.parse(JSON.stringify(v)), parti: ['Timer avviato · ', { citazione: 'altro' }] });
