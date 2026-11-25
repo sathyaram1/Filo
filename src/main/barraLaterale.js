@@ -836,11 +836,10 @@ class BarraLaterale {
 
   // ── azioni ──────────────────────────────────────────────────────────────
 
-  // `colore`: quello che la barra ha già preso col contagocce (#1246), da passare alla pagina.
   // `daAltro`: scelta dentro «Altro…», per i contatori (#1471).
   // `via` 'fila': premuta nella fila del tasto destro della scheda davanti, dove sta un'icona della finestra (#1434.2);
   // lì è spenta come nella barra, e non conta come una scelta fatta nella barra.
-  esegui(id, { colore = '', daAltro = false, via = 'barra' } = {}) {
+  esegui(id, { daAltro = false, via = 'barra' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
     const dallaFila = via === 'fila';
