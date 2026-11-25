@@ -1846,6 +1846,15 @@
     } catch (_) {}
   }
 
+  // Mirino disegnato da noi: quello di sistema su sfondo variabile può risultare invisibile. Hotspot al centro (16,16).
+  const CURSORE_MIRINO = `url("data:image/svg+xml;utf8,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">' +
+    '<line x1="16" y1="2" x2="16" y2="30" stroke="black" stroke-width="3"/>' +
+    '<line x1="2" y1="16" x2="30" y2="16" stroke="black" stroke-width="3"/>' +
+    '<line x1="16" y1="2" x2="16" y2="30" stroke="white" stroke-width="1.5"/>' +
+    '<line x1="2" y1="16" x2="30" y2="16" stroke="white" stroke-width="1.5"/>' +
+    '</svg>')}") 16 16, crosshair`;
+
   // Risolve con { dataUrl, rect } — ritaglio PNG e rettangolo in pixel CSS — o null se
   // l'utente annulla. Gli errori escono come reject, non loggati.
   async function selectScreenRegion() {
