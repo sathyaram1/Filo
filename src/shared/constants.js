@@ -1162,11 +1162,23 @@
 
   // L'unica lettura di un proxy (#2134.2), di chi si collega e di chi ne custodisce i segreti: una password usata è
   // sempre custodita. Forme: «[utente[:password]@]host[:porta]» e quella degli elenchi «host:porta:utente:password»
-  // (#905.4). Senza schema socks5 (i nomi li risolve il proxy), http con le credenziali, che Chromium coi socks non
-  // manda. `uso`: { proxyRules, auth }; `scritte`: le credenziali come sono nel testo e l'indirizzo `senza`. PURA.
+  // (#905.4), dove l'utente può essere un indirizzo email e l'host un IPv6 fra quadre (#2646.1). Senza schema socks5 (i
+  // nomi li risolve il proxy), http con le credenziali, che Chromium coi socks non manda: è un'ipotesi, `senzaSchema`
+  // la segnala a chi può chiederlo al fornitore (proxyTab.resolveSentito). `uso`: { proxyRules, auth }; `scritte`: le
+  // credenziali come sono nel testo e l'indirizzo `senza`. PURA.
   const SCHEMA_PROXY = /^([a-z][a-z0-9+.-]*):\/\//i;
-  const FORMA_ELENCO = /^([^\s:/?#@[\]]+):(\d{1,5}):([^:@/?#]+):(.+)$/;
+  // L'utente non comincia con @: «utente:1234@host:porta» resta un indirizzo con le credenziali, non un elenco.
+  const FORMA_ELENCO = /^(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+):(\d{1,5}):([^:/?#@\s][^:/?#]*):(.+)$/i;
   const CREDENZIALI_URL = /^([^/?#]+)@/;
+  // Una riga che si legge nei due modi («mario:123:x@gate.it:8080») vale nel modo in cui il fornitore ha un indirizzo
+  // vero: con un punto, fra quadre o localhost.
+  const INDIRIZZO_VERO = /^(\[[0-9a-f:.]+\]|localhost|[^\s:/?#@[\]]*\.[^\s:/?#@[\]]*)$/i;
+  const FINE_URL = /@(\[[0-9a-f:.]+\]|[^\s:/?#@[\]]+):\d{1,5}$/i;
+  function elencoVero(el, resto) {
+    if (!el || INDIRIZZO_VERO.test(el[1])) return el;
+    const u = FINE_URL.exec(resto);
+    return u && INDIRIZZO_VERO.test(u[1]) ? null : el;
+  }
   const decodifica = (x) => { try { return decodeURIComponent(x); } catch (_) { return x; } };
   function leggiProxy(v) {
     if (!pieno(v)) return null;
@@ -1174,7 +1186,7 @@
     const sm = SCHEMA_PROXY.exec(t);
     const resto = sm ? t.slice(sm[0].length) : t;
     const davanti = sm ? sm[0] : '';
-    const el = FORMA_ELENCO.exec(resto);
+    const el = elencoVero(FORMA_ELENCO.exec(resto), resto);
     let scritte = null;
     if (el) scritte = { credenziali: `${el[3]}:${el[4]}`, password: el[4], senza: `${davanti}${el[1]}:${el[2]}` };
     else {
@@ -1195,7 +1207,7 @@
     if (!scritte && uso && uso.auth) {
       scritte = { credenziali: `${uso.auth.username}:${uso.auth.password}`, password: uso.auth.password, senza: uso.proxyRules };
     }
-    return { uso, scritte };
+    return { uso, scritte, senzaSchema: !sm };
   }
 
   // Utente e password di un proxy come sono scritti: { credenziali, password, senza }, null se non ce ne sono. PURA.

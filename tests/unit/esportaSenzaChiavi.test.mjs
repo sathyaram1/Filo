@@ -189,6 +189,25 @@ test('il proxy scritto senza schema esce col solo indirizzo, e la password solo 
   assert.equal(readExportZip(buildExportZip(dati, { chiavi: true })).data.settings.proxy.datacenter, SENZA_SCHEMA);
 });
 
+// #2646.1: nella forma degli elenchi l'utente può essere un indirizzo email e l'host un IPv6 fra quadre.
+test('un elenco con l\'utente email o l\'host IPv6 esce col solo indirizzo, e la password è un segreto', () => {
+  for (const [forma, indirizzo] of [
+    ['gate.esempio.com:8080:mario@posta.esempio.it:passwordsegreta', 'gate.esempio.com:8080'],
+    ['[2001:db8::1]:8080:mario:passwordsegreta', '[2001:db8::1]:8080'],
+    ['http://[2001:db8::1]:8080:mario@posta.esempio.it:passwordsegreta', 'http://[2001:db8::1]:8080'],
+  ]) {
+    const dati = { settings: { theme: 'dark', proxy: { datacenter: forma } } };
+    assert.equal(C.haSegreti(dati.settings), true, `${forma}: la casella «Includi le chiavi» deve comparire`);
+    assert.ok(C.segretiDelProxy(forma).some((x) => x.valore === 'passwordsegreta'), `${forma}: la password è custodita`);
+    const zip = buildExportZip(dati);
+    assert.equal(zip.includes(Buffer.from('passwordsegreta')), false, forma);
+    const parsed = readExportZip(zip);
+    assert.equal(parsed.data.settings.proxy.datacenter, indirizzo, forma);
+    assert.deepEqual(parsed.proxySenzaCredenziali, ['datacenter']);
+    assert.equal(readExportZip(buildExportZip(dati, { chiavi: true })).data.settings.proxy.datacenter, forma);
+  }
+});
+
 test('le credenziali del proxy valgono fino all\'ultima @ prima dell\'host, come per chi lo usa', () => {
   assert.deepEqual(C.credenzialiProxy(' http://mario:pa@ss@gate.esempio.com:8080 '),
     { credenziali: 'mario:pa@ss', password: 'pa@ss', senza: 'http://gate.esempio.com:8080' });

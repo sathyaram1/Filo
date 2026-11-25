@@ -62,7 +62,68 @@ function endpointFor(template, country) {
     .replace(/\{COUNTRY\}/g, country.toUpperCase());
   if (!globalThis.SN_CONST) require('../../shared/constants.js');
   const p = globalThis.SN_CONST.leggiProxy(filled);
-  return (p && p.uso) || null;
+  if (!p || !p.uso) return null;
+  if (!p.senzaSchema) return p.uso;
+  const indirizzo = p.uso.proxyRules.replace(/^[^:]+:\/\//, '');
+  const sentito = schemaSentito.get(chiaveSentito(indirizzo, p.uso.auth));
+  return sentito ? { ...p.uso, proxyRules: `${sentito}://${indirizzo}` } : { ...p.uso, daSentire: indirizzo };
+}
+
+// Uno schema non scritto è un'ipotesi (SN_CONST.leggiProxy): chi parla solo socks5 si perderebbe in http, e viceversa
+// (#2646.1). Lo si chiede al fornitore la prima volta: un socks5 risponde 0x05, un proxy http «HTTP/». Con le
+// credenziali si chiede prima l'http, perché in socks5 Chromium non le manda e chi parla i due sulla stessa porta
+// (gli elenchi di Webshare) va preso in http. Restano solo le risposte certe; senza, vale l'ipotesi.
+const schemaSentito = new Map(); // chiaveSentito → 'socks5' | 'http'
+const chiaveSentito = (indirizzo, auth) => `${auth && auth.username ? 'c' : ''}|${indirizzo}`;
+const SONDA_MS = 2500;
+const SALUTO = Buffer.from([0x05, 0x01, 0x00, 0x0d, 0x0a, 0x0d, 0x0a]);
+const DOMANDA_HTTP = Buffer.from('GET / HTTP/1.0\r\n\r\n', 'latin1');
+async function sondaSchema(indirizzo, { ms = SONDA_MS, primaHttp = false } = {}) {
+  let u;
+  try { u = new URL(`http://${indirizzo}`); } catch (_) { return null; }
+  if (!u.port) return null;
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  const domande = primaHttp ? [DOMANDA_HTTP, SALUTO] : [SALUTO];
+  const scadenza = Date.now() + ms;
+  for (let i = 0; i < domande.length; i++) {
+    const resto = scadenza - Date.now();
+    if (resto <= 0) return null;
+    // Un socks5 che tace davanti all'http non deve mangiarsi anche il tempo del saluto socks5.
+    const r = await chiediSchema(host, Number(u.port), domande[i], Math.floor(resto / (domande.length - i)));
+    if (r) return r;
+  }
+  return null;
+}
+
+function chiediSchema(host, port, domanda, ms) {
+  return new Promise((fine) => {
+    let s = null;
+    let finito = false;
+    const chiudi = (x) => {
+      if (finito) return;
+      finito = true;
+      clearTimeout(t);
+      try { s.destroy(); } catch (_) {}
+      fine(x);
+    };
+    const t = setTimeout(() => chiudi(null), ms);
+    try { s = require('net').connect({ host, port }); } catch (_) { chiudi(null); return; }
+    s.on('error', () => chiudi(null));
+    s.on('close', () => chiudi(null));
+    s.once('connect', () => s.write(domanda));
+    s.once('data', (b) => chiudi(b[0] === 0x05 ? 'socks5' : b.toString('latin1', 0, 5) === 'HTTP/' ? 'http' : null));
+  });
+}
+
+// resolve, con lo schema non scritto chiesto al fornitore la prima volta: lo usano la scheda e i programmi che
+// scaricano per lei, così escono dalla stessa porta.
+async function resolveSentito(country, opzioni = {}, { sonda = sondaSchema } = {}) {
+  const r = resolve(country, opzioni);
+  if (!r || !r.daSentire) return r;
+  const primaHttp = !!(r.auth && r.auth.username);
+  const schema = await sonda(r.daSentire, { primaHttp });
+  if (schema === 'socks5' || schema === 'http') schemaSentito.set(chiaveSentito(r.daSentire, r.auth), schema);
+  return resolve(country, opzioni);
 }
 
 // Niente fallback fra tier: la scelta è del chiamante. null se il tier non è configurato.
@@ -81,6 +142,7 @@ function resolve(country, { tier, settings, env } = {}) {
     proxyRules: ep.proxyRules,
     bypassRules: cfg.bypass || '',
     auth: ep.auth,
+    ...(ep.daSentire ? { daSentire: ep.daSentire } : {}),
   };
 }
 
@@ -188,7 +250,7 @@ const paeseDi = (p) => (p && normalizeCountry(p.country) ? { country: normalizeC
 // scelto per quel lavoro (`paese`, per «Riprova») o dalla regola del sito. Se uno di questi vale ma non si può usare,
 // `{ rifiuto }`: mai la connessione vera al suo posto. `paese` torna solo se non viene dalla regola, che si rilegge.
 async function uscitaPerProgramma({ ses = null, url = '', paese = null, regole = leggiRegole,
-  impostazioni = async () => globalThis.SN_STORAGE?.getSettings?.() } = {}) {
+  impostazioni = async () => globalThis.SN_STORAGE?.getSettings?.(), sonda = sondaSchema } = {}) {
   const voce = voceDellaSessione(ses);
   if (voce && voce.rete) {
     const proxy = indirizzoPerProgramma(voce.rete.proxyRules, voce.auth);
@@ -202,7 +264,7 @@ async function uscitaPerProgramma({ ses = null, url = '', paese = null, regole =
   if (!scelta) return { proxy: '', paese: null };
   let settings = null;
   try { settings = await impostazioni(); } catch (_) {}
-  const resolved = resolve(scelta.country, { tier: scelta.tier, settings });
+  const resolved = await resolveSentito(scelta.country, { tier: scelta.tier, settings }, { sonda });
   const proxy = resolved ? indirizzoPerProgramma(resolved.proxyRules, resolved.auth) : '';
   return proxy ? { proxy, paese: tieni } : { rifiuto: true, paese: tieni };
 }
@@ -219,6 +281,8 @@ module.exports = {
   providerHost,
   endpointFor,
   resolve,
+  resolveSentito,
+  sondaSchema,
   registraRete,
   clearPartitionAuth,
   credenzialiDellaSessione,

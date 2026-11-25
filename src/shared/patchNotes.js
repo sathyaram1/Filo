@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.304', date: '2026-11-25',
+      fixes: [
+        { testo: 'Un proxy degli elenchi con un indirizzo email come utente, o con un indirizzo IPv6 fra quadre, ora si collega e la sua password resta protetta. Scritto senza http:// o socks5:// davanti, Filo chiede al fornitore che tipo di proxy è e lo usa nel modo giusto, anche per scaricare i video.', segnalazione: 2646 },
+      ],
+    },
+    {
       version: '0.2.303', date: '2026-11-24',
       fixes: [
         { testo: 'Alt+T senza niente di selezionato traduce la pagina anche dopo un clic in un video che viene da un sito dove hai spento Filo.', segnalazione: 504 },

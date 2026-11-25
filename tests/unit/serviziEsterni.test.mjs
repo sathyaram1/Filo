@@ -58,6 +58,8 @@ const COMPOSTI = [
   { file: 'src/pages/dashboard/dashboard-comandi.js', testo: 'raw : `https://${raw}`', perche: 'il sito scritto dall’utente, che si apre in una scheda' },
   { file: 'src/shared/stessoSito.js', testo: '`http://${s}`', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/urlExfil.js', testo: 'new URL(`http://${s}`)', perche: 'l’indirizzo che un comando contatta, per giudicarlo prima che parta (#2293)' },
+  { file: 'src/main/services/proxyTab.js', testo: 'new URL(`http://${indirizzo}`)', perche: 'ne estrae host e porta del proxy da chiedere' },
+  { file: 'src/main/services/proxyTab.js', testo: "require('net').connect({ host, port", servizio: 'proxy-altro-paese' },
   { file: 'src/shared/urlExfil.js', testo: '`http://${u.slice(s[0].length)}`', perche: 'la forma web di un indirizzo con un altro schema, per giudicarlo prima che parta (#2293)' },
   { file: 'src/shared/nomiSito.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/tabTriage.js', testo: 's = `https://${s}`', perche: 'ne estrae il nome del sito da tenere sempre aperto' },

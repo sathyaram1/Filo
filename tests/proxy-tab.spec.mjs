@@ -570,9 +570,11 @@ test('una scheda americana portata in Germania carica dalla Germania (#1272)', a
 
 // #905.4: gli elenchi dei fornitori danno «host:porta:utente:password», e molti l'indirizzo con utente e password senza
 // schema davanti. Tutti e due si collegano con la password.
-for (const [forma, endpoint] of [
+for (const [forma, endpoint, utente = 'utente-us'] of [
   ['host:porta:utente:password', (port) => `127.0.0.1:${port}:utente-{country}:${PASSWORD_PROXY}`],
   ['utente:password@host:porta senza schema', (port) => `utente-{country}:${PASSWORD_PROXY}@127.0.0.1:${port}`],
+  // #2646.1: l'utente degli elenchi può essere un indirizzo email.
+  ['host:porta:email:password', (port) => `127.0.0.1:${port}:utente-{country}@posta.esempio.it:${PASSWORD_PROXY}`, 'utente-us@posta.esempio.it'],
 ]) {
   test(`un proxy scritto come «${forma}» apre la scheda dal paese scelto (#905.4)`, async ({ app, openTab, testServer }) => {
     test.setTimeout(90_000);
@@ -582,10 +584,27 @@ for (const [forma, endpoint] of [
       const id = await conProxyColPaeseNelNome(app, openTab, testServer, proxy, endpoint(proxy.port));
       const pagina = await inPaese(app, id, 'US', `http://pagina.filo.invalid:${sito.port}/pagina-us`);
       await expect(pagina.locator('#pronta')).toHaveText('pagina us');
-      expect(proxy.utentiPer('/pagina-us'), 'la pagina passa dal proxy, con utente e password').toEqual(['utente-us']);
+      expect(proxy.utentiPer('/pagina-us'), 'la pagina passa dal proxy, con utente e password').toEqual([utente]);
     } finally {
       await sito.close();
       await proxy.close();
     }
   });
 }
+
+// #2646.1: un fornitore che parla solo socks5, scritto con utente e password ma senza schema, autorizza per indirizzo:
+// la scheda esce dal suo socks5, non da un http che lui non capisce.
+test('un fornitore solo socks5 scritto «utente:password@host:porta» apre la scheda dal paese scelto (#2646.1)', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const sito = await sitoConLinkAccorciati();
+  const socks = await startSocks5({ mapHostTo: '127.0.0.1' });
+  try {
+    const id = await conProxyColPaeseNelNome(app, openTab, testServer, socks, `utente-{country}:${PASSWORD_PROXY}@127.0.0.1:${socks.port}`);
+    const pagina = await inPaese(app, id, 'US', `http://pagina.filo.invalid:${sito.port}/pagina-us`);
+    await expect(pagina.locator('#pronta')).toHaveText('pagina us');
+    expect(socks.connections.some((c) => c.host === 'pagina.filo.invalid'), 'la pagina passa dal socks5').toBe(true);
+  } finally {
+    await sito.close();
+    await socks.close();
+  }
+});
