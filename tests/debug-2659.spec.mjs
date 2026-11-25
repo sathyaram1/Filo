@@ -20,7 +20,7 @@ test('debug', async ({ app, openTab, testServer }) => {
   await page.waitForTimeout(3000);
   const dopo = await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    return { dbg: globalThis.__dbg, tabs: tm.tabs.map((t) => ({ id: t.id, dist: t.view.webContents.isDestroyed(), wc: t.view.webContents.id })) };
+    return { dbg: globalThis.__dbg, tabs: tm.tabs.map((t) => ({ id: t.id, haWc: !!t.view.webContents, tipo: typeof t.view.webContents, dist: t.view.webContents && t.view.webContents.isDestroyed() })) };
   });
   console.log(JSON.stringify(dopo, null, 1));
 });
