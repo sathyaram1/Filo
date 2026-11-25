@@ -209,11 +209,10 @@ const INCOGNITO_READABLE = new Set([
 // leggono e si scrivono sul disco come fuori, se no il limite di spesa lì dentro non esiste (#591). Sono totali, non navigazione.
 const INCOGNITO_SHARED = new Set(['costs', 'credits']);
 
-// Di queste chiavi l'incognito vede dal disco solo un segno, non il contenuto. «Già accolto» (finita o rifatta) vale per
-// tutte le finestre, se no l'intervista riparte in incognito (#2578); le risposte date restano fuori.
+// Di queste chiavi l'incognito vede un segno, mai il contenuto. L'intervista in incognito non si apre: quello che vi si
+// dice sparisce alla chiusura, e ricomincerebbe a ogni finestra (#2578, #2650). Chi non è accolto lo accoglie la normale.
 const INCOGNITO_SEGNI = {
-  filo_onboarding: (v) => (v && typeof v === 'object' && (v.done === true || v.rifatta === true) ? { done: true } : undefined),
-  filo_welcomed: (v) => (v ? true : undefined),
+  filo_onboarding: () => ({ done: true }),
 };
 
 function dalDiscoInIncognito(k) {
@@ -672,6 +671,7 @@ async function get(keysOrNull) {
         const v = dalDiscoInIncognito(k);
         if (v !== undefined) out[k] = v;
       }
+      for (const k of Object.keys(INCOGNITO_SEGNI)) if (!(k in out) && !INCOGNITO.tombstones.has(k)) out[k] = dalDiscoInIncognito(k);
       for (const k of Object.keys(INCOGNITO.data)) out[k] = INCOGNITO.data[k];
     }
     for (const k of STATE.osservate) if (k in out) out[k] = staccata(k, out[k]);
