@@ -218,7 +218,7 @@
       if (s.ids.includes(c.id)) continue;
       s.ids.push(c.id);
       // Subito la frase arrivata con l'azione; lo stato preciso arriva dal main un attimo dopo.
-      if (c.frase && !s.viste.has(c.id)) s.viste.set(c.id, { id: c.id, frasi: [c.frase], annullabile: true });
+      if (c.frase && !s.viste.has(c.id)) s.viste.set(c.id, { id: c.id, frasi: [c.frase], ...(c.parti ? { frasiParti: c.parti } : {}), annullabile: true });
     }
     disegna(s);
     aggiorna([s]).catch(() => {});
