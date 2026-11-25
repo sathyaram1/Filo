@@ -21,7 +21,7 @@ function fileDelFilo(eseguibile) {
 }
 
 // Le posizioni del byte del fusibile, una per filo (due in un binario universale del Mac).
-function posizioni(fd) {
+function posizioni(fd, file) {
   const { size } = fs.fstatSync(fd);
   const buf = Buffer.alloc(BLOCCO + SENTINELLA.length + 2 + PRIVILEGI_FILE + 1);
   const trovate = [];
