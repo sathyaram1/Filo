@@ -672,8 +672,9 @@
         ? 'proposta dalla segnalazione automatica di Filo, non da te' : 'proposta da te';
       return ` (${chi}; testo intero: «${corpo}»)`;
     };
-    return (Array.isArray(voci) ? voci : []).map((v) => {
-      if (!v || !v.type) return '';
+    return (Array.isArray(voci) ? voci : []).map((voce) => {
+      if (!voce || !voce.type) return '';
+      const v = comeInDiretta(voce);
       const cosa = campo(v.riga) || v.type;
       if (v.type === 'FERMATA') return `- NON fatta, fermata da Filo (un segreto non esce): ${cosa}`;
       if (v.esito === CHIESTO) return `- NON fatta: chiesta la conferma all'utente, che allora non l'aveva ancora data: ${cosa}${segnalazione(v)}`;
