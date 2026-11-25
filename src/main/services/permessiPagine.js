@@ -238,9 +238,7 @@ function seguiGesti(wc) {
   try {
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
-      if (!GESTI.has(type) || !tastoPerLaPagina(input)) return;
-      const mouse = !/key|char/i.test(type);
-      if (mouse && clicDiFiloInCorso(wc)) return;
+      if (!GESTI.has(type) || !inputDellUtente(wc, input) || !tastoPerLaPagina(input)) return;
       const avvio = AVVII_DI_UN_GESTO.has(type);
       if (avvio) wc._filoGestoDiFilo = false;
       else if (wc._filoGestoDiFilo) return;
