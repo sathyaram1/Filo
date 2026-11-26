@@ -47,17 +47,21 @@ function coperte(parole) {
       return j;
     }
   };
+  // Il pezzo di ogni parola: comincia dopo l'ultimo annuncio; `null` prima del primo.
+  const pezzoDi = [];
+  const lunghezza = new Map();
+  for (let i = 0, da = null; i < p.length; i++) {
+    if (presenta.has(p[i])) { da = i + 1; continue; }
+    if (annuncio(i)) da = i;
+    pezzoDi[i] = da;
+    if (da !== null) lunghezza.set(da, (lunghezza.get(da) || 0) + 1);
+  }
   let catena = 0;
-  let dopoAnnuncio = false;
-  let pezzo = 0;
   for (let i = 0; i < p.length; i++) {
-    if (presenta.has(p[i])) { out[i] = true; dopoAnnuncio = true; catena = -1; continue; }
-    if (annuncio(i)) { dopoAnnuncio = true; catena = -1; }
-    if (annuncio(i)) pezzo = i;
+    if (presenta.has(p[i])) { out[i] = true; catena = -1; continue; }
+    if (annuncio(i)) catena = -1;
     const w = p[i];
-    let n = 0;
-    while (pezzo + n < p.length && !presenta.has(p[pezzo + n]) && (n === 0 || !annuncio(pezzo + n))) n++;
-    const sola = dopoAnnuncio && n === 1;
+    const sola = pezzoDi[i] !== null && lunghezza.get(pezzoDi[i]) === 1;
     if (STATO.test(w) || (S && (S.descrive.test(w) || S.nonValore.test(w)))
       || (!sola && (QUANDO.test(w) || (S && (S.tempo.test(w) || S.misura.test(w)))))) out[i] = true;
     if (APOSTROFATA.test(w) && (i === catena || !/^l['’]/.test(w))) { out[i] = true; if (i === catena) catena = i + 1; continue; }
