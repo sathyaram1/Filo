@@ -60,7 +60,6 @@ function crea({ gate, azioni, impostazioni, segreti = async () => [], redTeam = 
   async function anticipa(testo) {
     const t = String(testo == null ? '' : testo);
     if (!t.trim() || !(await acceso())) return false;
-    try { statico.prepara(); } catch (_) {}
     rileggiTesto(t);
     return true;
   }
