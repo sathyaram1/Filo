@@ -122,4 +122,4 @@ async function leggi(dati, { tempoMaxMs = TEMPO_MAX_MS, sogliaQui = SOGLIA_QUI }
   });
 }
 
-module.exports = { leggi, leggiQui, prepara, testoDiDataUrl, TEMPO_MAX_MS };
+module.exports = { leggi, leggiQui, testoDiDataUrl, TEMPO_MAX_MS, SOGLIA_QUI };
