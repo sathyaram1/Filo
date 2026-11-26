@@ -347,7 +347,7 @@ function formeLibere(testo) {
   const X = exfil();
   const G = guardiano();
   if (!X || !X.segretiDetti) return [];
-  const l = String(testo || '').toLowerCase();
+  const l = minuscolo(testo);
   const valore = (v) => X.segretiDetti(`password ${pulito(v)}`);
   const forma = (v) => (G && G.sembraPassword && formaDiPassword(pulito(v)) ? [{ valore: pulito(v) }] : []);
   const out = [];
