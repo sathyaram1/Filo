@@ -400,7 +400,7 @@
       }
     };
     prendi(PRESENTA_PASSWORD, false);
-    prendi(PRESENTA_CODICE, true);
+    prendi(PRESENTA_CODICE(), true);
     return out;
   }
 
