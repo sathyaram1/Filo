@@ -228,7 +228,7 @@
               const etichetta = inTesta ? frase.slice(-CODA) : prima;
               const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
               // Il PIN conta se è lui il nome più vicino al numero: in «Codice cliente 4829, numero segreto…» il numero è del cliente.
-              const ultimo = nome ? [...etichetta.matchAll(NOMI_CODICE)].pop() : null;
+              const ultimo = pinNellaFrase ? [...etichetta.matchAll(NOMI_CODICE)].pop() : null;
               const pin = !!ultimo && NOME_PIN.test(ultimo[0]);
               const entra = forte || pin || chiave.apre;
               if (nonApre && !(nome && entra)) continue;
