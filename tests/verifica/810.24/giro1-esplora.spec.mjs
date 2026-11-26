@@ -55,12 +55,12 @@ async function scriviAllAiuto(aiuto, testo) {
 }
 const letti = (app) => app.evaluate(() => globalThis.SN_SEGRETI_LETTI.tutti().map((x) => x.valore.replace(/[\s-]/g, '').toLowerCase()));
 
+// Per indirizzo intero: dopo il riavvio Filo rimette la scheda di prima, e la nuova ha un altro indirizzo sulla stessa origine.
 async function apriScheda(app, shell, url) {
-  const host = new URL(url).host;
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   let page = null;
   await expect.poll(() => {
-    page = app.windows().find((w) => { try { return new URL(w.url()).host === host; } catch (_) { return false; } }) || null;
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
     return !!page;
   }, { timeout: 10_000 }).toBe(true);
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
