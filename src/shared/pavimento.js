@@ -9,8 +9,10 @@
   // Le forme del guardiano che contano qui: l'IBAN no, si spiega, si copia e si chiede come un indirizzo. La password
   // nemmeno: il guardiano la cerca fra le parole vicine all'etichetta (indirizzi di campo, codice), qui conta il suo posto.
   const REGOLE_GUARDIANO = new Set(['chiave', 'codice', 'carta']);
-  // Il verbo che annuncia il valore, nelle lingue delle etichette (#1403.6): «Le mot de passe est …», «Der PIN ist …».
-  const VERBO = '(?:è|e\'|era|is|was|c[\'’]est|est|était|ist|lautet|war|es|é|luidt|jest|brzmi|это|был[аио]?|будет|является|είναι|ήταν)';
+  // Il verbo che annuncia il valore, nelle lingue delle etichette (#1403.6), uno solo per password e codici: «Le mot de
+  // passe est …», «Der PIN ist …». Il futuro sta in FUTURO, il «to» polacco accanto al nome che lo regge.
+  const VERBO = '(?:è|e\'|era|is|was|c[\'’]est|est|[ée]tait|ist|lautet|war|es|é|luidt|jest|brzmi|это|был[аио]?|будет|является|είναι|ήταν)';
+  const FUTURO = '(?:sarà|sera|será|serà|serão|będzie)';
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
