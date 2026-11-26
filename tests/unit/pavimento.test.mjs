@@ -611,9 +611,23 @@ test('la risposta sotto chi chiede la password esce come segnaposto dal paviment
 });
 
 // #2692 — il PIN dato in risposta in una conversazione copiata esce come la password: dopo il nome di chi scrive,
-// dopo l'orario della copia di WhatsApp, dopo «certo,», sotto i solleciti di chi chiede.
+// dopo l'orario della copia di WhatsApp, dopo «certo,», sotto i solleciti di chi chiede, sotto i messaggi senza numero
+// (degli altri, o di chi risponde prima del numero), dopo parole qualunque nel messaggio, nella copia di Telegram.
 test('il codice dato in risposta a chi lo chiede in chat esce come segnaposto, come la password', () => {
   const casi = [
+    ['Marco: qual è il pin della carta?\nAnna: anche io lo voglio\nLuc: 4821', `Marco: qual è il pin della carta?\nAnna: anche io lo voglio\nLuc: ${S}`],
+    ['Marco: qual è il pin della carta?\nLuc: aspetta che controllo\nLuc: 4821', `Marco: qual è il pin della carta?\nLuc: aspetta che controllo\nLuc: ${S}`],
+    ['Marco: qual è il pin della carta?\nLuc: ciao\nLuc: 4821', `Marco: qual è il pin della carta?\nLuc: ciao\nLuc: ${S}`],
+    ['Marco: qual è il pin della carta?\nLuc: te lo scrivo qui: 4821', `Marco: qual è il pin della carta?\nLuc: te lo scrivo qui: ${S}`],
+    ['Marco: qual è il pin della carta?\nLuc: è sempre 4821', `Marco: qual è il pin della carta?\nLuc: è sempre ${S}`],
+    ['Marco: qual è il pin della carta?\nLuc: ciao Marco! 4821', `Marco: qual è il pin della carta?\nLuc: ciao Marco! ${S}`],
+    ['qual è il pin?\nLuc: 4821', `qual è il pin?\nLuc: ${S}`],
+    ['Marco, [26.11.26 15:42]\nqual è il pin della carta?\n\nLuc, [26.11.26 15:43]\n4821',
+      `Marco, [26.11.26 15:42]\nqual è il pin della carta?\n\nLuc, [26.11.26 15:43]\n${S}`],
+    ['Marco: ciao scusa, sono alla cassa del supermercato e non mi ricordo più il pin della carta, me lo dici?\nLuc: 4821',
+      `Marco: ciao scusa, sono alla cassa del supermercato e non mi ricordo più il pin della carta, me lo dici?\nLuc: ${S}`],
+    // Come la password («Totale: Gatto2024» sotto chi la chiede esce): una riga «Nome: …» sotto la domanda è chi risponde.
+    ['Qual è il codice del cancello?\nTotale: 4821', `Qual è il codice del cancello?\nTotale: ${S}`],
     ['Marco: qual è il pin della carta?\nLuc: 4821', `Marco: qual è il pin della carta?\nLuc: ${S}`],
     ['Marco: mi mandi il codice del cancello?\nLuc: certo, 4829', `Marco: mi mandi il codice del cancello?\nLuc: certo, ${S}`],
     ['Marco: qual è il pin?\nMarco: dai sono alla cassa\n\nLuc: eccolo: 4821', `Marco: qual è il pin?\nMarco: dai sono alla cassa\n\nLuc: eccolo: ${S}`],
