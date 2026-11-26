@@ -271,6 +271,24 @@ test('col possessivo o col nome subito dopo «code» il numero di un pacco o di 
   ]) assert.ok(!P.oscura(t).includes(t.match(/\d{4,}/)[0]), t);
 });
 
+// #1403.44: il codice del proprio telefono o computer lo sblocca, anche dove «telefono» o «phone» fa pensare a un numero.
+test('il codice per sbloccare il proprio telefono o computer, detto col possessivo, non esce in nessuna lingua', () => {
+  for (const t of [
+    'Le code de mon téléphone est 4829', 'Le code de mon ordinateur est 4829', 'El código de mi teléfono es 4829',
+    'Il codice del mio telefono è 4829', 'The code of my phone is 4829', 'My phone code is 4829', "My phone's code is 4829",
+    'Le code de mon portable est 4829', 'My computer code is 4829', 'My laptop code is 4829', 'El código de mi ordenador es 4829',
+    'El código de mi computadora es 4829', 'O código do meu computador é 4829', 'Kod do mojego komputera to 4829',
+    'Il mio codice del telefono è 4829', 'Mon code de téléphone est 4829', 'Le code de mon nouveau téléphone est 4829',
+    'Il codice della mia SIM è 4829', 'Il codice del mio telefono è 1990', 'Codice del mio telefono:\n4829',
+    'Le code de mon téléphone est « 4829 »', 'De code van mijn computer is 4829', 'My phone unlock code: 4829',
+  ]) assert.ok(!P.oscura(t).includes(t.match(/\d{4}/)[0]), t);
+  for (const t of [
+    'The code of my phone number is 4829', 'My phone code for Italy is 0039', 'The phone code for Italy is 0039',
+    'Il codice del telefono del cliente è 4829', 'Il codice prodotto del telefono è 4829', 'Le code produit du téléphone est 4829',
+    'Le numéro de mon téléphone est 4829', 'Il codice del mio ordine telefonico è 4829', 'Chiama il numero di telefono 0248291736',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
 test('in tedesco il codice annunciato al futuro, dopo una relativa o con lo scopo non esce', () => {
   for (const t of [
     'Dein Code wird 482913 sein', 'Der Code, den du erhalten hast, ist 482913', 'Der Code, den ich bekommen habe, lautet 482913',
