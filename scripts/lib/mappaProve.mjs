@@ -35,6 +35,34 @@ export function percorsoDaIndirizzo(indirizzo, root) {
   return rel.startsWith('src/') ? rel : null;
 }
 
+/**
+ * Le registrazioni di una parte della suite, una per prova: i lanci della stessa prova (un'app per caso, main e
+ * pagine) diventano un record solo, con gli indirizzi già portati ai file del repo. Restano offset: le righe le fa
+ * costruisciMappa, coi sorgenti del commit provato.
+ */
+export function unisciRegistrazioni(registrazioni, root) {
+  const perProva = new Map();
+  for (const reg of registrazioni || []) {
+    const prova = String(reg?.prova || '');
+    let file = perProva.get(prova);
+    if (!file) perProva.set(prova, (file = new Map()));
+    const metti = (rel, intervalli) => {
+      let set = file.get(rel);
+      if (!set) file.set(rel, (set = new Set()));
+      for (const [da, a] of intervalli || []) set.add(`${da}:${a}`);
+    };
+    for (const [rel, iv] of Object.entries(reg?.file || {})) if (String(rel).startsWith('src/')) metti(rel, iv);
+    for (const [u, iv] of Object.entries(reg?.indirizzi || {})) {
+      const rel = percorsoDaIndirizzo(u, root);
+      if (rel) metti(rel, iv);
+    }
+  }
+  return [...perProva].map(([prova, file]) => ({
+    prova,
+    file: Object.fromEntries([...file].map(([rel, set]) => [rel, [...set].map((k) => k.split(':').map(Number))])),
+  }));
+}
+
 /** Gli inizi di riga di un testo, per passare da un offset alla riga (da 1). */
 export function iniziDiRiga(testo) {
   const out = [0];
