@@ -739,12 +739,10 @@
     }
   }
 
-  // Fra virgolette con lo spazio dentro («la password è « Mela!Verde77 »», la grafia francese) il valore si legge come
-  // senza spazi: gli spazi passano fuori, e la lunghezza resta, così ogni posto trovato vale anche nel testo vero (#1403.11).
-  // L'apostrofo attaccato a una parola («dell'altra») non apre né chiude; le altre virgolette sì, anche dopo «は». Dentro
-  // il valore un apostrofo fra due lettere o cifre («« l'Albero77 »») è della password, non la chiude.
+  // Fra virgolette con lo spazio dentro il valore si legge come senza spazi: gli spazi passano fuori, e la lunghezza
+  // resta, così ogni posto trovato vale anche nel testo vero (#1403.11). La regex la definisce urlExfil.js.
   const Q = `${VIRGOLETTE}‚‹›「」『』`;
-  const CON_SPAZI_DENTRO = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${Q}](?:(?:[^\\n${Q}]|(?<=[\\p{L}\\p{N}])['’‘](?=[\\p{L}\\p{N}])){0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
+  const CON_SPAZI_DENTRO = new RegExp(global.SN_URL_EXFIL.VIRGOLETTE.fra, 'gu');
   const HA_VIRGOLETTE = new RegExp(`[${Q}]`, 'u');
   const TESTA_VIRGOLETTE = new RegExp(`^[${Q}]+`, 'u');
   const CODA_VIRGOLETTE = new RegExp(`[${Q}]+$`, 'u');
