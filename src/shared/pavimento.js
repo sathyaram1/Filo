@@ -182,7 +182,7 @@
   // Lo sblocco detto col verbo, senza «codice»: «Per sbloccare il mio telefono uso 6118», «I unlock my phone with 6215».
   const SBLOCCO_COL_NUMERO = new RegExp(`(?<![\\p{L}])${SBLOCCA}\\s+(?:${LEGAME_SBLOCCO}\\s+)*(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}`
     + '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)'
-    + `\\s*[:=]?\\s*["«“]?(\\d{4,8})(?![\\d\\p{L}])`, 'giu');
+    + `\\s*[:=]?\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
   function codiceDelMioApparecchio(s, out) {
     for (const m of s.matchAll(QUELLO_DEL_MIO)) {
       if (NUCLEO_NEL_TESTO.test(s.slice(Math.max(0, m.index - 200), m.index))) out.push({ valore: m[1], regola: 'codice' });
