@@ -151,7 +151,7 @@
     + `(?:\\s+(?:(?:unlock|lock|screen|access)\\s+)?|-)?${NOME_SBLOCCO})${CHIUDE_SBLOCCO}`, 'iu');
   // «The serial code of my phone»: un nome comune davanti a «code» ne fa un identificativo, come nell'etichetta inglese.
   const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
-  const DAVANTI_AL_NOME = /^(?:the|and|gli|una|une|uno|los|las|der|die|das|den|dem|des|het|een|ein\w*|unlock|lock|screen|access|pin|puk|sim|what|what['’]?s|here|ecco|anche|also|plus)$/i;
+  const DAVANTI_AL_NOME = /^(?:il|lo|la|le|el|un|the|and|gli|una|une|uno|los|las|der|die|das|den|dem|des|het|een|ein\w*|unlock|lock|screen|access|pin|puk|sim|what|what['’]?s|here|ecco|anche|also|plus)$/i;
   const delMioApparecchio = (coda) => {
     const m = DEL_MIO_APPARECCHIO.exec(coda);
     if (!m || !INIZIA_COL_NOME.test(m[0])) return !!m;
