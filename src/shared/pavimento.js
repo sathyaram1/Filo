@@ -86,9 +86,11 @@
   // separatore o il verbo che chiude l'etichetta («Telegram code: 48291», «il codice per autorizzare l'operazione è …»),
   // dopo un'etichetta breve in testa («Codice OTP 482913»), prima di «è il tuo codice», da solo in testa alla riga o alla
   // cella dopo l'etichetta. Un altro numero della frase («The code uses port 3000») non è il codice.
-  const NOMI_CODICE = /\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa)\b/gi;
-  const CHIUDE_ETICHETTA = /(?:[:=#]|(?:^|\s)(?:è|e'|is|was|era|sarà|will\s+be|sono|are)|\bn\.|\bnr\.?|\bno\.)\s*$/i;
-  const PRIMA_DEL_NOME = /^\s*(?:[:=-]\s*)?(?:è|e'|is|=|sarà|was)\s+(?:[\p{L}'’-]+\s+){0,4}?(?:codic[ei]|codes?|pin|otp|passcode)\b/iu;
+  const NOMI_CODICE = new RegExp(NOMI_DEL_CODICE, 'gi');
+  const CHIUDE_ETICHETTA = new RegExp(`(?:[:=#]|(?:^|\\s)(?:${VERBO}|sarà|will\\s+be|sono|are)|\\bn\\.|\\bnr\\.?|\\bno\\.)\\s*$`, 'i');
+  // Il polacco «to» solo dopo «kod»: in inglese «code to …» è una destinazione.
+  const CHIUDE_KOD = /\sto\s*$/i;
+  const PRIMA_DEL_NOME = new RegExp(`^\\s*(?:[:=-]\\s*)?(?:${VERBO}|=|sarà)\\s+(?:[\\p{L}'’-]+\\s+){0,4}?${NOMI_DEL_CODICE}`, 'iu');
   function alPostoDelCodice(z, m, inTesta, forte) {
     const prima = z.slice(0, m.index);
     if (inTesta) return !prima.trim();
