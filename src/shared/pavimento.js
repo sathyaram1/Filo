@@ -54,8 +54,8 @@
   // Le stesse due regole nelle lingue dei nomi del codice (#1403.13): «Le code de suivi est …», «El código del pedido es …»,
   // «Kod rabatowy to …», «Der Code der Bestellung ist …». «Code» solo col complemento, perché da solo è anche inglese.
   const SEPARA_ALTRE = `(?:\\s*[:=#]|\\s+(?:${VERBO}|${FUTURO}|to)(?![\\p{L}]))?\\s*$`;
-  // Il possessivo vale l'articolo («Le code de mon colis», «Kod mojej paczki»); «code» senza complemento solo dopo un
-  // articolo francese o in testa alla riga. Una sigla («Le code NAF») è un nome come un altro, salvo quelle del monouso.
+  // Il possessivo vale l'articolo («Le code de mon colis», «Kod mojej paczki»). «Le code banque», senza complemento,
+  // passa dall'elenco degli identificativi: lì la parola dopo «code» può essere un aggettivo («Le code généré est …»).
   const POSSESSIVO_ALTRE = '(?:mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leurs?|mis|mi|tus?|sus?|nuestr[oa]s?|vuestr[oa]s?'
     + '|meus?|minhas?|teus?|tuas?|seus?|suas?|noss[oa]s?|moj\\p{L}*|mój|twoj\\p{L}*|twój|swoj\\p{L}*|swój|nasz\\p{L}*|wasz\\p{L}*)';
   const ETICHETTA_ALTRE = new RegExp(`(?:\\b[Cc]ode\\s+(?:(?:de|du|des|van)\\s+(?:(?:la|les|le|de|het)\\s+|l['’]\\s*|${POSSESSIVO_ALTRE}\\s+)?|d['’]\\s*)`
