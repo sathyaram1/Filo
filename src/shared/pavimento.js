@@ -175,9 +175,14 @@
   const RELATIVA = /^\s*,\s*(?:den|die|das|der|dem|welche[nmrs]?|che|which|that|que|qui|kt[óo]r\p{L}*)\s[^,;!?\n\d]{1,40},/iu;
   const SENZA_VIRGOLETTA = new RegExp(`(?:${INTORNO_APERTE}[ \\t]*)+$`);
   const DOPO_VIRGOLETTA = new RegExp(`^(?:[ \\t]*${INTORNO_CHIUSE})+`);
-  function alPostoDelCodice(z, m, inTesta, forte) {
+  // `risposta`: la riga sotto, dopo chi scrive (`testa`). Sotto chi chiede il codice vale ogni punto del messaggio,
+  // come per la password («Luc: è sempre 4821», #2692); sotto una riga che lo nomina e basta, solo la testa.
+  function alPostoDelCodice(z, m, inTesta, forte, risposta) {
     const prima = z.slice(0, m.index).replace(SENZA_VIRGOLETTA, '');
-    if (inTesta) return !prima.trim();
+    if (inTesta) {
+      if (!risposta) return !prima.trim();
+      return m.index >= risposta.testa && (risposta.chiesto || !prima.slice(risposta.testa).trim());
+    }
     if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length).replace(DOPO_VIRGOLETTA, ''))) return true;
     const da = Math.max(0, prima.length - CODA);
     const n = [...prima.slice(da).matchAll(NOMI_CODICE)].pop();
@@ -194,6 +199,11 @@
   // Un codice usa e getta di lettere e cifre («Steam Guard code: 7K2F9», quello da scrivere sulla TV, «WDJB-MJHT»):
   // conta solo al posto del codice, come i numeri, e col nome del codice nella frase.
   const CODICE_ALFANUMERICO = /(?<![\w./:-])(?:(?=[A-Z]*\d)(?=\d*[A-Z])[A-Z0-9]{5,10}|[A-Z]{4}-[A-Z]{4})(?![\w/-])/g;
+  const UN_CODICE = new RegExp(FORMA_CODICE.source);
+  const UN_ALFANUMERICO = new RegExp(CODICE_ALFANUMERICO.source);
+  const haUnCodice = (z, nome) => UN_CODICE.test(z) || (nome && UN_ALFANUMERICO.test(z));
+  // I messaggi sotto la domanda che si saltano cercando la risposta: in chat ne passano parecchi senza numero.
+  const RIGHE_SALTATE = 8;
   function codiciVicini(s, out) {
     const righe = s.split('\n');
     for (let i = 0; i < righe.length; i++) {
@@ -212,14 +222,23 @@
           const ultima = f === pezzi.length - 1;
           if (ultima && c + 1 < celle.length && !haGiaIlNumero(frase)) zona.push({ z: celle[c + 1], inTesta: true });
           const dove = righe[i].indexOf(frase);
-          if (righe[i].trim().length <= 80 && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
-            for (let j = i + 1, vuote = 0; j < righe.length && vuote <= 2; j++) {
+          const R = riservati();
+          const chiesto = !!R && R.chiede(righe[i]);
+          if ((chiesto || righe[i].trim().length <= 80) && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
+            // Sotto chi chiede il codice la risposta è il primo messaggio con un numero, come per la password: i solleciti
+            // di chi chiede, i messaggi senza numero e l'intestazione di Telegram si saltano (#2692).
+            const chi = R ? R.parlaInChat(righe[i]) : null;
+            for (let j = i + 1, vuote = 0, saltate = 0; j < righe.length && vuote <= 2 && saltate <= RIGHE_SALTATE; j++) {
               if (!righe[j].trim()) { vuote++; continue; }
-              zona.push({ z: righe[j], inTesta: true });
+              vuote = 0;
+              const parla = R ? R.parlaInChat(righe[j]) : null;
+              if (chi && parla && parla.chi === chi.chi) { saltate++; continue; }
+              if (chiesto && !haUnCodice(parla ? parla.resto : righe[j], nome)) { saltate++; continue; }
+              zona.push({ z: righe[j], inTesta: true, risposta: { chiesto, testa: parla ? righe[j].length - parla.resto.length : 0 } });
               break;
             }
           }
-          for (const { z, inTesta } of zona) {
+          for (const { z, inTesta, risposta } of zona) {
             const predefinito = PREDEFINITO.test(`${frase} ${z}`);
             const nonApre = predefinito || NON_APRE.test(`${frase} ${z}`);
             const trovati = [...z.matchAll(FORMA_CODICE)].map((m) => ({ m, v: m[2] || m[4] }));
@@ -234,7 +253,7 @@
               const entra = forte || pin || chiave.apre;
               if (nonApre && !(nome && entra)) continue;
               if (predefinito && chiave.pin && !forte) continue;
-              if (nome ? !(alPostoDelCodice(z, m, inTesta, forte || pin) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
+              if (nome ? !(alPostoDelCodice(z, m, inTesta, forte || pin, risposta) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
                 : !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
               // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
               if (!lettere && !m[2] && ANNO.test(v) && !chiave.solo) continue;
@@ -843,9 +862,13 @@
   // Le password scritte a mano (la risposta sotto chi la chiede, «Utente / Password: mario / …», dopo il nome della rete):
   // le forme del correttore, da un posto solo (riservatiNelTesto.js). Qui la risposta conta solo sulle righe sotto la
   // domanda, e solo un valore con una cifra o un simbolo: una parola qualunque resta (tests/unit/pavimento.test.mjs).
-  function scritteAMano(s, out) {
+  // Il codice dato in risposta lo legge codiciVicini, che sa quali numeri non aprono niente (#2692).
+  function riservati() {
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
-    const R = global.SN_RISERVATI_TESTO;
+    return global.SN_RISERVATI_TESTO || null;
+  }
+  function scritteAMano(s, out) {
+    const R = riservati();
     if (!R) return;
     const basso = s.toLowerCase();
     const stesso = basso.length === s.length;

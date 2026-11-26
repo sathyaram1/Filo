@@ -214,6 +214,19 @@ function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
 }
 
 const chiParla = (riga) => { const m = riga.match(PARLA); return m ? m[1].trim() : null; };
+// La riga di una conversazione copiata, anche con l'orario davanti come la copia WhatsApp o Telegram
+// («[15:42, 26/11/2026] Luc: …», «26/11/26, 15:42 - Luc: …»): { chi, resto } o null. Per il pavimento (#2692).
+const ORARIO_CHAT = /^[^\S\n]*(?:\[[^\]\n]{1,40}\]|\d{1,2}[./-]\d{1,2}[./-]\d{2,4},?[^\S\n]+\d{1,2}[.:]\d{2}(?::\d{2})?(?:[^\S\n]*[-–])?)/u;
+function parlaInChat(riga) {
+  const s = String(riga || '').replace(ORARIO_CHAT, '');
+  const m = s.match(PARLA);
+  return m ? { chi: m[1].trim().toLowerCase(), resto: s.slice(m[0].length) } : null;
+}
+// La riga chiede una password o un codice («qual è il pin?», «mandami il codice del cancello»), con le regole della
+// richiesta di questo file: il pavimento legge la risposta sotto come quella a chi chiede la password (#2692).
+function chiede(riga) {
+  try { return richieste(minuscolo(riga)).some((r) => r.chiesta); } catch (_) { return false; }
+}
 // Chi scrive il campo si firma così nelle conversazioni copiate; le pagine di chat non mettono nomi, e un altro nome
 // può essere chiunque del gruppo.
 const CHI_SCRIVE = new Set(['io', 'tu', 'me', 'you', 'i']);
@@ -426,6 +439,6 @@ function trova(testo, { sotto = false } = {}) {
   return lunghi(out);
 }
 
-global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, minuscolo, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi };
+global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, minuscolo, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi, parlaInChat, chiede };
 if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
