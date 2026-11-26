@@ -44,8 +44,8 @@ test('r1 il valore di una frase si legge nella riga del cambio almeno quanto pri
   const riga = page.locator(`.dash-cambio[data-id="${await nata.getAttribute('data-id')}"]`);
   await riga.scrollIntoViewIfNeeded();
   await riga.screenshot({ path: 'tests/.shots/v2662g2-r1-ferma.png' });
-  // Sul main la stessa riga diceva «stile dell'agente: «Rispondi in …»: una decina di lettere del valore, circa 60 pixel.
-  expect(await visto(riga), 'riga ferma: del valore si leggono le prime parole').toBeGreaterThanOrEqual(55);
+  // Sul main la stessa riga diceva «stile dell'agente: «Rispondi in …»: una decina di lettere del valore.
+  expect(await visto(riga, "Rispondi"), "riga ferma: del valore si leggono le prime parole").toBeGreaterThanOrEqual(8);
 });
 
 test('r1 con tre valori cambiati insieme il primo si legge', async ({ app }) => {
@@ -61,5 +61,5 @@ test('r1 con tre valori cambiati insieme il primo si legge', async ({ app }) => 
   const riga = page.locator(`.dash-cambio[data-id="${await nata.getAttribute('data-id')}"]`);
   await riga.scrollIntoViewIfNeeded();
   await riga.screenshot({ path: 'tests/.shots/v2662g2-r1-tre-valori.png' });
-  expect(await visto(riga), 'il primo valore si legge').toBeGreaterThanOrEqual(55);
+  expect(await visto(riga, "Rispondi"), "il primo valore si legge").toBeGreaterThanOrEqual(8);
 });
