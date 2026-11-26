@@ -74,8 +74,10 @@ jobs:
         continue-on-error: true
         timeout-minutes: 150
         shell: bash
-        # FILO_COPERTURA: ogni prova registra quali funzioni di src/ fa eseguire, per la mappa prova → file (#2502).
-        run: FILO_COPERTURA=copertura ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_BLOB_OUTPUT_NAME=parte-${{ matrix.parte }}.zip xvfb-run -a npx playwright test --shard=${{ matrix.parte }}/4 --global-timeout=8400000 --reporter=list,blob
+        # Ogni prova registra quali funzioni di src/ fa eseguire, per la mappa prova → file (#2502).
+        env:
+          FILO_COPERTURA: copertura
+        run: ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_BLOB_OUTPUT_NAME=parte-${{ matrix.parte }}.zip xvfb-run -a npx playwright test --shard=${{ matrix.parte }}/4 --global-timeout=8400000 --reporter=list,blob
 
       # Un lancio di Electron per caso scrive due file: qui diventano un record per prova, e la mappa la fa il verdetto.
       - name: Registrazioni della parte in un file
