@@ -93,7 +93,7 @@
       // Un cambio ritoccato dopo (cambi.js, fondi) resta all'ora del primo ritocco: `fine` lo fa tornare a chi allinea.
       const fine = Number.isFinite(ms(e.agg)) && ms(e.agg) > ms(e.ts) ? { fine: e.agg } : {};
       altri.push({
-        k: 'cambio', key: `c:${e.id}`, id: e.id, ts: e.ts, ...fine, tipo: e.tipo || '', frase: e.frase || '', provenienza: e.provenienza || '',
+        k: 'cambio', key: `c:${e.id}`, id: e.id, ts: e.ts, ...fine, tipo: e.tipo || '', frase: e.frase || '', ...(Array.isArray(e.parti) ? { parti: e.parti } : {}), provenienza: e.provenienza || '',
         annullabile: !!e.annullabile, annullatoDa: e.annullatoDa || null, annulla: e.annulla || null, _n: n++,
       });
     }

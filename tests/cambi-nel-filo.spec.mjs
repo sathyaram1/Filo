@@ -205,7 +205,9 @@ test('D — da una finestra incognito nessun evento arriva su disco, ma lì dent
   await scrivi(incog, 'timer 10 minuti per il segreto incognito', 'Avviato.');
   const bolla = incog.locator('.dash-bubble-user', { hasText: 'segreto incognito' });
   await bolla.locator(".dash-cambi-segno").hover();
-  await expect(bolla.locator('.dash-cambi-pop')).toContainText('nuovo timer «segreto incognito», 10 min');
+  // L'etichetta scelta dal modello sta nel suo riquadro, senza virgolette (#2657).
+  await expect(bolla.locator('.dash-cambi-pop')).toContainText('nuovo timer segreto incognito, 10 min');
+  await expect(bolla.locator('.dash-cambi-pop .dash-altrui')).toHaveText('segreto incognito');
 
   await app.evaluate(async () => { await globalThis.SN_REGISTRO_CAMBI.attesa(); await globalThis.__filoStorage.flushNow(); });
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
@@ -263,7 +265,8 @@ test('F — un timer chiesto in chat: annulla lo toglie, e riaperta la chat il s
   const bolla = page.locator('.dash-bubble-user', { hasText: 'timer 10 minuti' });
   await bolla.locator(".dash-cambi-segno").hover();
   const pop = bolla.locator('.dash-cambi-pop');
-  await expect(pop).toContainText('nuovo timer «pasta», 10 min');
+  await expect(pop).toContainText('nuovo timer pasta, 10 min');
+  await expect(pop.locator('.dash-altrui')).toHaveText('pasta');
   await pop.locator('.dash-cambi-annulla').click();
   await expect.poll(timer).not.toContain('pasta');
   await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
@@ -274,7 +277,8 @@ test('F — un timer chiesto in chat: annulla lo toglie, e riaperta la chat il s
   const riaperta = page.locator('.dash-bubble-user', { hasText: 'timer 10 minuti' });
   await expect(riaperta.locator('.dash-cambi-segno')).toHaveClass(/dash-cambi-tutti-annullati/, { timeout: 10_000 });
   await riaperta.locator(".dash-cambi-segno").hover();
-  await expect(riaperta.locator('.dash-cambi-pop')).toContainText('nuovo timer «pasta», 10 min');
+  await expect(riaperta.locator('.dash-cambi-pop')).toContainText('nuovo timer pasta, 10 min');
+  await expect(riaperta.locator('.dash-cambi-pop .dash-altrui')).toHaveText('pasta');
   await ripristina(app);
 });
 

@@ -58,7 +58,11 @@
     const testo = document.createElement('span');
     testo.className = 'dash-cambi-frase';
     const frase = (v.frasi && v.frasi.length) ? v.frasi.join('; ') : 'era già così';
-    testo.textContent = v.annulla ? `rimesso com'era · ${frase}` : frase;
+    const prima = v.annulla ? 'rimesso com\'era · ' : '';
+    // I valori non di Filo nel loro riquadro, come nella riga del diario sotto (#2657).
+    const parti = v.frasi && v.frasi.length ? global.SN_ESITO.partiDellaRiga(v.frasiParti, frase) : null;
+    if (parti) global.SN_FILO_ATTESA.scriviAPezzi(testo, [prima, ...parti]);
+    else testo.textContent = `${prima}${frase}`;
     r.appendChild(testo);
     if (v.annullatoDa) {
       r.classList.add('dash-cambi-annullato');
@@ -202,7 +206,7 @@
   }
 
   // `daQui`: la bolla dell'utente, o un elemento che le sta sotto (il blocco di attività del turno).
-  // `cambi`: gli id, o le voci { id, frase } che il main manda con l'azione.
+  // `cambi`: gli id, o le voci { id, frase, parti } che il main manda con l'azione.
   function segna(daQui, cambi) {
     const bolla = bollaUtenteDi(daQui);
     const voci = (Array.isArray(cambi) ? cambi : []).map((c) => (typeof c === 'string' ? { id: c } : c)).filter((c) => c && c.id);
@@ -214,7 +218,7 @@
       if (s.ids.includes(c.id)) continue;
       s.ids.push(c.id);
       // Subito la frase arrivata con l'azione; lo stato preciso arriva dal main un attimo dopo.
-      if (c.frase && !s.viste.has(c.id)) s.viste.set(c.id, { id: c.id, frasi: [c.frase], annullabile: true });
+      if (c.frase && !s.viste.has(c.id)) s.viste.set(c.id, { id: c.id, frasi: [c.frase], ...(c.parti ? { frasiParti: c.parti } : {}), annullabile: true });
     }
     disegna(s);
     aggiorna([s]).catch(() => {});
