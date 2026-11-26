@@ -11,7 +11,7 @@
     {
       version: '0.2.305', date: '2026-11-25',
       fixes: [
-        { testo: 'Se alleghi a un feedback un file .csv con una colonna di password, come l\'esportazione delle password del browser, prima che parta Filo ti avvisa. E mentre ricontrolla un file di log grosso, finestre e schede rispondono.', segnalazione: 1403 },
+        { testo: 'Se alleghi a un feedback un file .csv con una colonna di password, come l\'esportazione delle password del browser, prima che parta Filo ti avvisa, e quelle password non arrivano a nessun modello, come già quelle di una tabella. E mentre ricontrolla un file di log grosso, finestre e schede rispondono.', segnalazione: 1403 },
         { testo: 'Una finestra in incognito non apre più l\'intervista di benvenuto: la chat ti risponde subito, anche se l\'intervista non l\'hai ancora fatta.', segnalazione: 2650 },
         { testo: 'Se Filo risponde coi suoi crediti perché OpenRouter ha rifiutato la tua chiave, e la risposta arriva in una scheda che non stai guardando, un avviso te lo dice nella pagina che hai davanti. Se torni prima sulla scheda della risposta, basta la riga sotto la risposta e l\'avviso non si ripete.', segnalazione: 662 },
       ],
