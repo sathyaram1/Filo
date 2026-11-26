@@ -101,7 +101,7 @@
     if (!fra.trim()) return true;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
     if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
-    if (CHIUDE_ETICHETTA.test(fra)) return true;
+    if (CHIUDE_ETICHETTA.test(fra) || (/^kod/i.test(n[0]) && CHIUDE_KOD.test(fra))) return true;
     return /^[\s•*·>–-]*$/.test(prima.slice(0, n.index)) && !/\d/.test(fra) && fra.trim().split(/\s+/).length <= 4;
   }
   // Un codice usa e getta di lettere e cifre («Steam Guard code: 7K2F9», quello da scrivere sulla TV, «WDJB-MJHT»):
