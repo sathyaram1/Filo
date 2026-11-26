@@ -122,7 +122,7 @@ function richieste(l, tutte = false) {
     // La frase si cerca in un tratto corto: un testo lungo senza punti, con la parola ripetuta, non diventa quadratico.
     const f = new RegExp(FINE_FRASE.source, 'g').exec(l.slice(m.j, m.j + FRASE_MAX));
     const a = f ? m.j + f.index + f[0].length : Math.min(l.length, m.j + FRASE_MAX);
-    const prima = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop();
+    const prima = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?؟;]+\s|[。！？]+|\n/).pop();
     const riga = l.slice(m.j, m.j + FRASE_MAX).split('\n')[0];
     const testa = l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split('\n').pop();
     // Il punto di domanda conta nell'inciso che nomina la password: «la password è gattonero, tu quando arrivi?» la dà.
