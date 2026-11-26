@@ -68,18 +68,19 @@ body { container: dash-pagina / inline-size; }
   position: relative;
   height: calc(100vh / var(--sn-zoom, 1));
   display: grid;
-  grid-template-columns: var(--dash-colonna) 1fr var(--dash-colonna);
+  /* Il centro tiene il suo minimo e le colonne cedono loro: sotto, il campo diventava una fessura. */
+  grid-template-columns: minmax(0, var(--dash-colonna)) minmax(min(240px, 50%), 1fr) minmax(0, var(--dash-colonna));
   grid-template-rows: auto 1fr auto;
   column-gap: var(--dash-gap);
   padding: 12px var(--dash-lato) 28px;
   box-sizing: border-box;
 }
 
-@media (max-width: 980px) {
+@container dash-pagina (max-width: 980px) {
   .dash { --dash-gap: 16px; --dash-lato: 20px; --dash-colonna: 200px; padding-bottom: 20px; }
 }
 /* Le colonne non si nascondono: le carte (un timer che suona) servono anche nella finestra più stretta. */
-@media (max-width: 720px) {
+@container dash-pagina (max-width: 720px) {
   .dash { --dash-gap: 12px; --dash-lato: 12px; --dash-colonna: 170px; padding-bottom: 16px; }
 }
 
