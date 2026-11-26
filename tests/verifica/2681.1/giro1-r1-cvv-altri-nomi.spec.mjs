@@ -1,10 +1,11 @@
 // Verifica #2681.1, giro 1: un campo del CVV chiamato in un'altra lingua è segreto anche coi nomi comuni oltre
 // a quelli della segnalazione (la variante «di verifica», che in italiano e in inglese è già segreta, e le lingue
-// che Filo conosce per la password). Rossa finché il valore arriva al modello.
+// che Filo conosce per la password). Rossa finché il CVV si legge nella foto della pagina che va al modello.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { vistaAvviso, copertura } from '../../helpers/avvisoSito.mjs';
 import { paginaDellAiuto } from '../../helpers/riquadri.mjs';
+import { fotoDelTurno } from '../../helpers/turniDellAiuto.mjs';
 
 async function preparaModelli(app) {
   await app.evaluate(async () => {
@@ -12,7 +13,7 @@ async function preparaModelli(app) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.HELP]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash', [C.ACTIONS.EXPLAIN]: 'deepseek-flash' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
   });
@@ -40,11 +41,6 @@ async function apriAiuto(app, shell, page) {
   return aiuto;
 }
 
-async function arrivato(app, page) {
-  const testo = await app.evaluate(() => JSON.stringify(globalThis.__visti || []));
-  return testo.split(new URL(page.url()).origin).join('').replace(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+/g, '');
-}
-
 // L'avviso del sito sospetto compare solo se la pagina sembra chiedere la carta: qui si supera se c'è.
 async function superaAvvisoSeC(app) {
   const coperta = async () => (await copertura(app).catch(() => null))?.coperta === true;
@@ -58,9 +54,31 @@ async function superaAvvisoSeC(app) {
   await expect.poll(coperta, { timeout: 6_000 }).toBe(false);
 }
 
+// Quanti valori cambiano fra le due foto dentro il campo: zero vuol dire che il CVV non si legge.
+async function pixelDiversi(page, immagini) {
+  return page.evaluate(async ([a, b]) => {
+    const b0 = document.querySelector('#c').getBoundingClientRect();
+    const r = { left: b0.left + 3, top: b0.top + 3, width: b0.width - 6, height: b0.height - 6 };
+    const pixel = async (url) => {
+      const byte = Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+      const img = await createImageBitmap(new Blob([byte]));
+      const cv = document.createElement('canvas');
+      cv.width = img.width; cv.height = img.height;
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const sx = img.width / window.innerWidth, sy = img.height / window.innerHeight;
+      return ctx.getImageData(Math.round(r.left * sx), Math.round(r.top * sy), Math.round(r.width * sx), Math.round(r.height * sy)).data;
+    };
+    const [pa, pb] = [await pixel(a), await pixel(b)];
+    let n = 0;
+    for (let i = 0; i < pa.length; i++) if (pa[i] !== pb[i]) n++;
+    return n;
+  }, immagini);
+}
+
 const modulo = (etichetta) => `<!doctype html><html><head><title>Pagamento</title></head><body><h1>Pagamento</h1>
   <form><div><label for="t">Titolare</label> <input id="t"></div>
-  <div><label for="c">${etichetta}</label> <input id="c" inputmode="numeric" maxlength="4"></div>
+  <div><label for="c">${etichetta}</label> <input id="c" inputmode="numeric" maxlength="4" style="width:200px;font-size:22px"></div>
   <button type="button">Paga</button></form></body></html>`;
 
 const NOMI = [
@@ -72,22 +90,22 @@ const NOMI = [
 ];
 
 for (const nome of NOMI) {
-  test(`r1 il CVV scritto sotto «${nome}» non arriva al modello`, async ({ app, shell, openTab, testServer }) => {
+  test(`r1 il CVV scritto sotto «${nome}» è coperto nella foto della pagina che va al modello`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(60_000);
     const page = await testServer.openReady(openTab, modulo(nome));
     await superaAvvisoSeC(app);
-    await page.fill('#t', 'Mario Bianchi');
-    await page.fill('#c', '8264');
-    await expect(page.locator('#c')).toHaveValue('8264');
     await preparaModelli(app);
     await modelloFinto(app, JSON.stringify({ text: 'Premi «Paga».', status: 'done' }));
     const aiuto = await apriAiuto(app, shell, page);
-    await aiuto.fill('.sn-sidebar-input textarea', 'aiutami a pagare');
-    await aiuto.press('.sn-sidebar-input textarea', 'Enter');
-    await expect(aiuto.locator('.sn-sidebar', { hasText: 'Premi «Paga».' })).toBeVisible({ timeout: 20_000 });
-    const testo = await arrivato(app, page);
-    console.log('RIGHE', nome, testo.includes('Mario Bianchi'), testo.length, testo.slice(0, 3000));
-    expect(testo, 'il modello deve aver ricevuto la pagina col campo').toContain(':: #c');
-    expect(testo, `il CVV scritto sotto «${nome}» è arrivato al modello`).not.toContain('8264');
+    const immagini = [];
+    for (const [i, v] of ['8264', '1937'].entries()) {
+      await page.fill('#c', v);
+      await aiuto.fill('.sn-sidebar-input textarea', 'aiutami a pagare');
+      await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+      immagini.push(await fotoDelTurno(app, 'aiutami a pagare', i));
+    }
+    expect(immagini[0], 'al modello deve arrivare la foto della pagina').toMatch(/^data:image\//);
+    expect(immagini[1]).toMatch(/^data:image\//);
+    expect(await pixelDiversi(page, immagini), `il CVV scritto sotto «${nome}» si legge nella foto`).toBe(0);
   });
 }
