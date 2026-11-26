@@ -1,5 +1,5 @@
 // Protocollo filo://: serve pagine interne e asset dal disco (la tabella
-// host → cartella sta in filoHandler). Registrato standard+secure+fetch, quindi
+// host → cartella sta in percorsoFilo.js). Registrato standard+secure+fetch, quindi
 // non deve MAI servire un file fuori dalla root del progetto (filo://icone: dalla cartella dati).
 
 const { protocol, net } = require('electron');
