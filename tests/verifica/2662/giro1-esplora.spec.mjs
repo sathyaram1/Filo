@@ -81,8 +81,8 @@ test('cronologia: tanti cambi insieme e timer rinominato', async ({ app }) => {
     const k = C.FILO_TIMERS || 'filo_timers';
     const now = Date.now();
     const t = { id: 'tv1', kind: 'timer', label: 'Pasta » al dente', startedAt: new Date(now).toISOString(), endsAt: new Date(now + 600000).toISOString() };
-    await globalThis.SN_STORAGE.set({ [k]: [t] });
-    await globalThis.SN_STORAGE.set({ [k]: [{ ...t, label: 'Riso <b>nero</b>' }] });
+    await globalThis.SN_STORAGE.setRaw(k, [t]);
+    await globalThis.SN_STORAGE.setRaw(k, [{ ...t, label: 'Riso <b>nero</b>' }]);
   }).catch((e) => console.log('TIMER ERR', String(e)));
   const timer = page.locator('.dash-cambio', { hasText: /timer/ }).last();
   if (await timer.count()) {
