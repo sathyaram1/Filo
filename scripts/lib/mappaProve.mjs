@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { SOGLIA_SPEC_DI_UN_MODULO } from './spec-che-usano.mjs';
 
-const { percorsoFilo } = createRequire(import.meta.url)('../../src/main/percorsoFilo.js');
+// Si chiede solo a chi costruisce la mappa: finish:check e le sue prove girano anche da copie degli script senza src/.
+const percorsoFilo = (host, rel) => createRequire(import.meta.url)('../../src/main/percorsoFilo.js').percorsoFilo(host, rel);
 
 export const VERSIONE_MAPPA = 1;
 export const SEGNO_RIGA = '[mappa-prove]';
