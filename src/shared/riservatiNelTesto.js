@@ -406,6 +406,6 @@ function trova(testo, { sotto = false } = {}) {
   return lunghi(out);
 }
 
-global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi };
+global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, minuscolo, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi };
 if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
