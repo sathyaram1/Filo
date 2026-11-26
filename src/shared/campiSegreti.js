@@ -16,16 +16,18 @@
     const CAMPO_CON_VALORE = new RegExp(`^(${NOMI_DEI_CAMPI.join('|')})$`, 'i');
     const INPUT_BOTTONE = /^(button|submit|reset|image|checkbox|radio|hidden|file|range|color)$/i;
     const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
-    // Le etichette della password fuori dall'alfabeto latino, per i campi e per il testo (pavimento.js le prende da qui:
-    // una lingua nuova si aggiunge solo qui). \b non vede quelle lettere: il confine lo dice l'alfabeto. In greco
-    // «κωδικός» è anche il codice di qualunque cosa (#1403.5): password solo da solo, d'accesso o col possessivo.
-    const GRECO = '[\\u0370-\\u03FF\\u1F00-\\u1FFF]';
-    const ETICHETTE_NON_LATINE = '(?<![\\u0400-\\u04FF])(?:парол[ьяа]|лозинк[аеу]|құпия\\s+сөз|нууц\\s+үг|сырсөз)(?![\\u0400-\\u04FF])'
-      + `|(?<!${GRECO})(?<!ταχυδρομικ[οό]ς\\s+)κωδικ[οό]ς(?!${GRECO})`
-      + `(?![ \\t]+(?!(?:πρ[οό]σβασης|εισ[οό]δου|σ[υύ]νδεσης|μου|σου|σας|του|της|μας)(?!${GRECO}))${GRECO})`
-      + `|(?<!${GRECO})συνθηματικ[οό](?!${GRECO})`
+    // Le etichette della password fuori dall'alfabeto latino, per i campi, per il testo e per la chat (pavimento.js e
+    // urlExfil.js le prendono da qui: una lingua nuova si aggiunge solo qui). \b non vede quelle lettere: il confine lo
+    // dice LETTERA, senza il punto di domanda greco (U+037E) e la ano teleia (U+0387) che chiudono la parola. Russo,
+    // ucraino, bulgaro e serbo declinano troppo: lì vale la radice. In greco «κωδικός» è anche ogni altro codice: il
+    // postale, d'errore, d'ordine o del prodotto restano.
+    const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u037D\\u037F-\\u0386\\u0388-\\u03FF\\u0400-\\u052F\\u1E00-\\u1FFF]';
+    const ETICHETTE_NON_LATINE = `(?<!${LETTERA})(?:(?:парол|лозинк)${LETTERA}*|(?:құпия\\s+сөз|нууц\\s+үг|сырсөз)(?!${LETTERA}))`
+      + `|(?<!${LETTERA})(?<!ταχυδρομικ\\S{0,3}\\s+)κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)(?!${LETTERA})`
+      + '(?!\\s+(?:προ[ϊι][οό]ντ|πελ[αά]τ|παραγγελ|κρ[αά]τησ|αποστολ|παρακολο[υύ]θ|εκπτ|[εέ]κπτ|κουπον|προσφορ|ταχυδρομ|αφμ|ειδ|σφ[αά]λμ))'
+      + `|(?<!${LETTERA})συνθηματικ[οόάαύυ]{1,2}(?!${LETTERA})`
       + '|(?<![\\u0600-\\u06FF])(?:(?:كلمة|رمز)\\s+(?:ال)?(?:مرور|سر|عبور)|گذرواژه|پاس\\s?ورڈ)(?![\\u0600-\\u06FF])'
-      + '|סיסמ[הא]|पासवर्ड|รหัสผ่าน|密[码碼](?![学學])|口令|パスワード|비밀번호|암호(?!화)'
+      + '|סיסמ[הא]|पासवर्ड|รหัสผ่าน|密[码碼](?![学學])|口令|パスワード|暗証番号|비밀번호|패스워드|암호(?!화)'
       + '|পাসও(?:\\u09DF|\\u09AF\\u09BC)ার্ড|પાસવર્ડ|கடவுச்சொல்|పాస్\\u200C?వర్డ్|ಪಾಸ್\\u200C?ವರ್ಡ್|പാസ്\\u200C?വേഡ്|මුරපදය'
       + '|პაროლი|գաղտնաբառ|የይለፍ\\s?ቃል|စကားဝှက်|ពាក្យសម្ងាត់|ລະຫັດຜ່ານ';
     // Dopo l'etichetta, il verbo che annuncia il valore come «è» (#1403.8): in cinese, giapponese, coreano e thai
