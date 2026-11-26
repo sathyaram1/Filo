@@ -189,6 +189,23 @@ test('un codice usa e getta non esce come lo scrivono gli SMS; i codici che non 
   ]) assert.equal(P.oscura(t), t, t);
 });
 
+// Le lingue delle etichette valgono anche per i codici (#1403.13): il nome del codice e il verbo che lo annuncia.
+test('un codice usa e getta non esce in francese, tedesco, spagnolo, portoghese, olandese e polacco', () => {
+  for (const t of [
+    'Le code est 482913', "le code d'accès est 482913", "Le code c'est 482913", "le code d'accès 482913",
+    '482913 est votre code de vérification',
+    'der Zugangscode ist 482913', 'Ihr Bestätigungscode lautet 482913', '482913 ist dein Code',
+    'el código es 482913', 'el código de acceso es 482913', 'el código de acceso 482913', '482913 es tu código',
+    'O código é 482913', 'Uw verificatiecode is 482913', 'Twój kod to 482913', 'Kod dostępu: 482913',
+    'il codice é 482913',
+  ]) assert.ok(!P.oscura(t).includes('482913'), t);
+  for (const t of [
+    'Le code postal est 75001', 'El código de cliente es 4829', 'Der Kundencode ist 4829',
+    'Le code est compilé en 4829 ms', 'El código tiene 4829 líneas', 'the barcode is 48291034',
+    'Send the code to 4829 people',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
 // Al posto del valore una parola qualunque conta anche in mezzo alla riga e sotto i bottoni, se sta da sola.
 test('una password nel posto del valore non esce: in mezzo alla riga, con una parentesi dopo, sotto i bottoni', () => {
   const casi = [
