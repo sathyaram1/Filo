@@ -14,13 +14,13 @@
         { testo: 'Una finestra in incognito non apre più l\'intervista di benvenuto: la chat ti risponde subito, anche se l\'intervista non l\'hai ancora fatta.', segnalazione: 2650 },
         { testo: 'Se Filo risponde coi suoi crediti perché OpenRouter ha rifiutato la tua chiave, e la risposta arriva in una scheda che non stai guardando, un avviso te lo dice nella pagina che hai davanti. Se torni prima sulla scheda della risposta, basta la riga sotto la risposta e l\'avviso non si ripete.', segnalazione: 662 },
         { testo: 'Quando un sito chiude da sé la finestra che aveva aperto su un altro sito, come quella di un pagamento o di una chat, se ne va anche la sua scheda, senza lasciarne una vuota.', segnalazione: 2659 },
+        { testo: 'Nelle righe dei cambi della home e nel segno di spunta sul tuo messaggio, il valore di un\'impostazione scritto da te o scelto da Filo per te sta nel suo riquadro, così non si confonde con le parole di Filo.', segnalazione: [2655, 2657] },
       ],
     },
     {
       version: '0.2.304', date: '2026-11-25',
       fixes: [
         { testo: 'Il Color picker della barra laterale funziona, anche nella nuova scheda: una lente ingrandisce i pixel sotto il puntatore e un clic copia il codice del colore.', segnalazione: 2651 },
-        { testo: 'Nelle righe dei cambi della home e nel segno di spunta sul tuo messaggio, il valore di un\'impostazione scritto da te o scelto da Filo per te sta nel suo riquadro, così non si confonde con le parole di Filo.', segnalazione: [2655, 2657] },
         { testo: 'Un proxy degli elenchi con un indirizzo email come utente, o con un indirizzo IPv6 fra quadre, ora si collega e la sua password resta protetta. Scritto senza http:// o socks5:// davanti, Filo chiede al fornitore che tipo di proxy è e lo usa nel modo giusto, anche per scaricare i video.', segnalazione: 2646 },
         { testo: 'Un proxy scritto in una forma che Filo non sa leggere, come un indirizzo IPv6 senza parentesi quadre, è protetto intero come una chiave API: si salva cifrato, l\'assistente non lo passa ai modelli e l\'archivio esportato non lo porta se non spunti «Includi le chiavi».', segnalazione: 2646 },
         { testo: 'Un articolo lasciato a metà, dopo aver chiuso e riaperto Filo, riparte dal punto in cui eri. La pulizia delle schede alla riapertura sa fin dove eri arrivato negli articoli, nei video e negli audio, e non li tratta come pagine mai aperte.', segnalazione: 349 },
