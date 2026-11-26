@@ -526,7 +526,7 @@ export function testoDellaMappa({ letta, daMappa }) {
   if (!daMappa) return '';
   const m = letta.mappa;
   const righe = [`▸ Mappa prova → file (${letta.fonte}, commit ${String(m.commit || '?').slice(0, 10)}): ${daMappa.specs.length} spec passano dalle funzioni cambiate e li lancio.`];
-  if (daMappa.soloCaricano.length) righe.push(`  Altri ${daMappa.soloCaricano.length} caricano soltanto i file cambiati: non li lancio, li corre la suite su main. L'elenco col tempo previsto: node scripts/mappa-prove.mjs`);
+  if (daMappa.soloCaricano.length) righe.push(`  Altri ${daMappa.soloCaricano.length} caricano soltanto i file cambiati, o passano da funzioni che quasi tutte le prove eseguono: non li lancio, li corre la suite su main. L'elenco col tempo previsto: node scripts/mappa-prove.mjs`);
   if (daMappa.nota) righe.push(`  ${daMappa.nota}`);
   return righe.join('\n');
 }
