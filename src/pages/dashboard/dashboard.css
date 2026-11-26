@@ -51,6 +51,9 @@ html, body {
      con `zoom > 1` rubava altezza e innescava anche uno scroll verticale. */
   overflow-x: hidden;
 }
+/* Le soglie delle colonne si misurano qui e non sulla finestra: col testo ingrandito (`zoom`) la home dispone come in
+   una finestra più stretta, invece di tenere le colonne larghe e lasciare al campo una fessura (#1551.1). */
+body { container: dash-pagina / inline-size; }
 
 /* L'attributo `hidden` vale `display: none` per la UA stylesheet, ma le nostre regole
    `display: inline-flex` lo sovrascrivono: qui gli si ridà la priorità. */
