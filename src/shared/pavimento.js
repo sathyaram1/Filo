@@ -1038,7 +1038,7 @@
       fine = x.inizio;
     }
     // L'ordine è quello della copia col solo \n (trova): un \r in più non fa passare un valore davanti a un altro.
-    const lungo = (v) => v.length - (v.match(/\r/g) || []).length;
+    const lungo = (v) => v.length - (v.match(/\r\n/g) || []).length;
     const valori = [...ovunque].sort((a, b) => lungo(b) - lungo(a));
     for (const v of valori) {
       const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
