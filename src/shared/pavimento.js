@@ -607,7 +607,8 @@
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   function trova(valore) {
-    const s = virgoletteStrette(testo(valore));
+    const vero = testo(valore);
+    const s = virgoletteStrette(vero);
     const out = [];
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
