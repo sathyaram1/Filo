@@ -759,6 +759,28 @@
     return y;
   }
 
+  // Le virgolette dicono dove finisce una password con gli spazi («la password è «Mela! Verde77»»): un valore trovato in
+  // testa o in coda vale per tutto quello che sta fra loro (#1403.27). Una frase citata che nomina la password resta.
+  // Per il pavimento e per il correttore (correttoreRiservati.js); `valori`: stringhe o `{ valore, regola }`.
+  const PAROLE_FRA_VIRGOLETTE = 8;
+  const NOMINA_CORTA = new RegExp(ETICHETTA_CORTA, 'i');
+  function interiFraVirgolette(vero, valori) {
+    const s = testo(vero);
+    const nudo = (v) => String(v).replace(TESTA_VIRGOLETTE, '').replace(CODA_VIRGOLETTE, '').toLowerCase();
+    const presi = new Set((valori || []).filter((x) => typeof x === 'string' || (x && (!x.regola || x.regola === 'password')))
+      .map((x) => nudo(typeof x === 'string' ? x : x.valore)).filter((v) => v.length >= 3));
+    const out = [];
+    if (!presi.size || !HA_VIRGOLETTE.test(s)) return out;
+    const bordo = (p) => presi.has(nudo(p)) || presi.has(nudo(p).replace(/[.,;:!?]+$/, ''));
+    for (const m of s.matchAll(FRA_VIRGOLETTE)) {
+      const v = m[3];
+      const parole = v.split(/\s+/);
+      if (parole.length < 2 || parole.length > PAROLE_FRA_VIRGOLETTE || NOMINA_ETICHETTA.test(v) || NOMINA_CORTA.test(v)) continue;
+      if (bordo(parole[0]) || bordo(parole[parole.length - 1])) out.push({ valore: v, regola: 'password' });
+    }
+    return out;
+  }
+
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   function trova(valore) {
