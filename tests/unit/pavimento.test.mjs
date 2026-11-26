@@ -229,6 +229,42 @@ test('nelle altre lingue il codice di un ordine, di una spedizione o di un error
   ]) assert.ok(!P.oscura(t).includes(t.match(/\d{4,}/)[0]), t);
 });
 
+// Il possessivo vale l'articolo: «de mon colis» è un identificativo come «du colis», «de ma carte» un segreto come «de la carte».
+test('col possessivo o col nome subito dopo «code» il numero di un pacco o di una banca resta; quello di una carta o di un conto no', () => {
+  for (const t of [
+    'Le code de mon colis est 482913', 'Le code de mon billet est 482913', 'Le code de mon dossier est 482913',
+    'El código de mi paquete es 482913', 'El código de mi vuelo es 482913', 'Der Code meines Pakets ist 482913',
+    'Der Code meiner Sendung ist 482913', 'O código do meu pacote é 482913', 'Kod mojej paczki to 482913',
+    'Le code banque est 30004', 'Le code guichet est 00828', 'Le code commune est 75056', 'Le code établissement est 30004',
+    'Le code douanier est 85171300', 'Le code NAF est 6201Z', 'Le code INSEE est 75056', 'El código CNAE es 6201',
+  ]) assert.equal(P.oscura(t), t, t);
+  for (const t of [
+    'Le code de ma carte est 4829', 'Le code de la carte est 4829', 'Le code de mon compte est 482913',
+    'El código de mi tarjeta es 4829', 'El código de la cuenta es 482913', 'El código de mi móvil es 4829',
+    'Der Code meiner Karte ist 4829', 'Der Code meines Kontos ist 482913', 'Der Code meines Handys ist 4829',
+    'O código do meu cartão é 4829', 'Kod mojej karty to 4829', 'Le code de ma porte est 4829', 'Der Code meiner Tür ist 4829',
+    'Le code confidentiel est 4829', 'Le code généré est 482913', 'Le code affiché est 482913', 'Code sent: 482913',
+  ]) assert.ok(!P.oscura(t).includes(t.match(/\d{4,}/)[0]), t);
+});
+
+test('in tedesco il codice annunciato al futuro, dopo una relativa o con lo scopo non esce', () => {
+  for (const t of [
+    'Dein Code wird 482913 sein', 'Der Code, den du erhalten hast, ist 482913', 'Der Code, den ich bekommen habe, lautet 482913',
+    'Der Code zum Einloggen ist 482913', 'Der Code für die Anmeldung ist 482913', 'Il codice, che hai ricevuto, è 482913',
+  ]) assert.ok(!P.oscura(t).includes('482913'), t);
+  assert.equal(P.oscura('In the code, MAX_SIZE is 65536'), 'In the code, MAX_SIZE is 65536');
+});
+
+// Un elenco solo dei verbi per password e codici: due copie col nome uguale non si caricano dopo una fusione.
+test('il verbo che annuncia una password vale come per i codici, al futuro e col «to» polacco', () => {
+  for (const [t, v] of [
+    ['Le mot de passe est Girasole77', 'Girasole77'], ['Das Passwort lautet Girasole77', 'Girasole77'],
+    ['Das Passwort wird Girasole77 sein', 'Girasole77'], ['La password sarà Girasole77', 'Girasole77'],
+    ['Le mot de passe sera Girasole77', 'Girasole77'], ['Hasło to Girasole77', 'Girasole77'],
+  ]) assert.ok(!P.oscura(t).includes(v), t);
+  assert.equal(P.oscura('send the password to mario77'), 'send the password to mario77');
+});
+
 // Il pavimento gira su ogni chiamata a un modello, nel processo principale: una riga lunga piena di codici annunciati
 // si controlla in fretta e li toglie tutti (prima costava centinaia di unità di riferimento, ora meno di dieci).
 test('una riga di 120.000 caratteri che ripete un codice annunciato si controlla in fretta', () => {
