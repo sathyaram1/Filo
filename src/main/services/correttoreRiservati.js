@@ -33,7 +33,8 @@ function spiega(parole, k) {
   let a = k + 1;
   while (a < parole.length && !presenta.has(pulita(parole[a])) && !/[:=：]$/.test(parole[a - 1])) a++;
   const pezzo = parole.slice(da, a).map(pulita);
-  if (dopoAnnuncio && S.inizio.test(pezzo[0])) return true;
+  // «usa Nyckel», «come gattonero» presentano il valore, anche se il pavimento le legge come un consiglio.
+  if (dopoAnnuncio && S.inizio.test(pezzo[0]) && !/^(?:usa|use|scegli|sceglila|come)$/.test(pezzo[0])) return true;
   const sola = dopoAnnuncio && pezzo.length === 1;
   let ultima = -1;
   pezzo.forEach((p, i) => {
