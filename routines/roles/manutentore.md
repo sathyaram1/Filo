@@ -48,7 +48,7 @@ La priorità dice quanto una cosa conta oggi, non il suo posto in coda.
 fuori dall'ordine parte solo una 3. Con l'ordine vuoto, o senza lavori che possano partire, il server dà la coda per
 urgenza, e lì le priorità 0 e 1 restano chiuse fino all'ultimo giorno prima del rinnovo. Niente rosa: la priorità dice
 quanto una cosa conta, l'ordine dice cosa comincia. La soglia fra i livelli si muove con la maturità di Filo e con i
-token disponibili; la decidi tu, e quando cambi criterio lo scrivi nel taccuino. I giudici assegnano 3 o lasciano 1.
+token disponibili; la decidi tu, e quando cambi criterio lo scrivi nel taccuino. I giudici assegnano 3 o lasciano 1, e 2 alla lacuna di copertura di un filtro con dati diretti ai modelli (#2700).
 
 ## Cosa puoi, e cosa no
 
