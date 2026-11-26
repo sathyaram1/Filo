@@ -406,7 +406,7 @@
   const CODICE_SORGENTE = /^(?:[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?|[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\(.*)$/;
   const NOME_DI_TIPO = /^(?:str|string|int|integer|bool|boolean|number|bytes|any|object|char|varchar|text|unknown|void)(?:\[\])?$/i;
   // Un indirizzo o un'email sotto «Reset your password:» ha la forma di una password ma è il link per cambiarla.
-  const INDIRIZZO_O_EMAIL = (v) => /:\/\/|^www\./i.test(v) || EMAIL.test(v);
+  const INDIRIZZO_O_EMAIL = global.SN_GUARDIANO_STATICO.indirizzoOEmail;
   function formaVicina(pezzo) {
     const v = pezzo.replace(/^[:=\-–—→«"'“‘(\[]+/, '').replace(/[.,;:!?)»"'”’\]]+$/, '');
     if (v.length < 6 || v.length > 64 || v.includes(SEGNAPOSTO) || INDIRIZZO_O_EMAIL(v) || CODICE_SORGENTE.test(v)) return '';
