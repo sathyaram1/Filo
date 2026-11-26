@@ -26,9 +26,7 @@ async function apri(app, dir, nome, html) {
   const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
   const esito = async () => JSON.parse((await pagina.locator('body').getAttribute('data-esito')) || '{}');
   await expect.poll(async () => (await esito()).fine, { timeout: 20_000 }).toBe(1);
-  const r = await esito();
-  console.log(nome, JSON.stringify(r));
-  return r;
+  return esito();
 }
 
 function cartella() {
