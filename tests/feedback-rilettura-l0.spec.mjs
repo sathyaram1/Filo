@@ -241,6 +241,54 @@ test('un log allegato con una password: il riquadro si riapre con l\'avviso e il
   expect(await app.evaluate(() => globalThis.__invii.map((p) => (p.files || []).map((f) => f.name)))).toEqual([['note.txt', 'filo.log']]);
 });
 
+// #1403.2 — la colonna «password» di un CSV, nel formato normale, dà l'avviso come quella a tabulazioni.
+test('un CSV allegato con la colonna password a punti e virgola: il riquadro si riapre con l\'avviso e il file segnato', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-text').fill('Allego l\'esportazione: il login fallisce sempre');
+  await page.locator('.sn-fb-file').setInputFiles([{ name: 'utenti.csv', mimeType: 'text/csv', buffer: Buffer.from('utente;password\nmario.rossi;hunter22\n') }]);
+  await expect(page.locator('.sn-fb-file-chip')).toHaveCount(1);
+  await page.locator('.sn-fb-send').click();
+  const avviso = page.locator('.sn-fb-l0');
+  await expect(avviso).toBeVisible({ timeout: 12_000 });
+  await expect(avviso).toContainText('In un file allegato c’è una password');
+  await expect(page.locator('.sn-fb-file-chip--l0')).toContainText('utenti.csv');
+  expect(await invii(app)).toEqual([]);
+});
+
+// #1403.2 — il controllo senza modello legge gli allegati fuori dal processo che tiene finestre e schede.
+test('un log da 4 MB allegato: mentre si rilegge Filo risponde, e la password in fondo al log dà l\'avviso', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  const righe = [];
+  let n = 0;
+  for (let i = 0; n < 4 * 1024 * 1024 - 2_000; i++) {
+    const r = `2026-11-20T10:00:00.123Z INFO [net] GET https://example.com/api/v1/items?page=${i} status=200 durata=${i % 997}ms\n`;
+    righe.push(r);
+    n += r.length;
+  }
+  righe.push('utente = mario.rossi\npassword = hunter22\n');
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-text').fill('Allego il log: il login fallisce sempre.');
+  await page.locator('.sn-fb-file').setInputFiles([{ name: 'filo.log', mimeType: 'text/plain', buffer: Buffer.from(righe.join('')) }]);
+  await expect(page.locator('.sn-fb-file-chip')).toHaveCount(1);
+  // Il passo più lungo fra due giri del processo principale, dall'invio all'avviso.
+  await app.evaluate(() => {
+    const l = { max: 0, ultimo: performance.now() };
+    l.t = setInterval(() => { const ora = performance.now(); l.max = Math.max(l.max, ora - l.ultimo); l.ultimo = ora; }, 10);
+    globalThis.__fermo = l;
+  });
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-l0')).toContainText('In un file allegato c’è una password', { timeout: 30_000 });
+  const fermo = await app.evaluate(() => { clearInterval(globalThis.__fermo.t); return globalThis.__fermo.max; });
+  test.info().annotations.push({ type: 'fermo', description: `${Math.round(fermo)} ms` });
+  expect(fermo, 'il processo di finestre e schede non resta fermo mentre si rilegge il log').toBeLessThan(250);
+});
+
 test('testo che scorre: lo sfondo delle evidenze va a capo come la casella, barra di scorrimento compresa', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
