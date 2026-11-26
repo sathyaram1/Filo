@@ -327,9 +327,8 @@
   // lo precisano, mai dentro un indirizzo né dopo una virgola che apre altro. Dopo quelle parole i due
   // punti annunciano la parola che li precede: lì «1500» o «BENVENUTO10» sono altro. `stretto`: solo l'attacco,
   // e che ci sia: «Password dimenticata?» non annuncia niente.
-  // Le parole che annunciano il dato subito dopo il suo nome, nelle lingue delle etichette (#1403.6, #1403.33): un elenco
-  // solo per il guardiano, il correttore (riservatiNelTesto.js) e il pavimento (pavimento.js). Sentinella in
-  // tests/unit/annunciUnElenco.test.mjs; nessuna chiede di essere protetta in una regex.
+  // Le parole che annunciano il dato dopo il suo nome, in tutte le lingue delle etichette: un elenco solo per guardiano,
+  // correttore e pavimento (#1403.33, sentinella tests/unit/annunciUnElenco.test.mjs). Nessuna va protetta in una regex.
   const ANNUNCI = Object.freeze(['è', "e'", 'e’', 'é', 'era', 'sarebbe', 'sarà', 'is', 'are', 'was', 'sono', 'ecco', 'here',
     'vale', 'risulta', "c'est", 'c’est', 'est', 'était', 'etait', 'sera', 'ist', 'lautet', 'war', 'wird', 'es', 'será',
     'serà', 'serão', 'luidt', 'jest', 'brzmi', 'będzie', 'это', 'был', 'была', 'было', 'были', 'будет', 'является',
