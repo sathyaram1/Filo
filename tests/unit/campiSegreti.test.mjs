@@ -94,7 +94,7 @@ test('ogni chiamata di crea nell’app passa i nomi del CVV del guardiano', asyn
       if (voce.isDirectory()) giu(p);
       else if (p.endsWith('.js')) {
         const testo = fs.readFileSync(p, 'utf8');
-        for (const m of testo.matchAll(/\bcrea\)?\(window,[\s\S]{0,160}?\)[;.]/g)) chiamate.push([p, m[0]]);
+        for (const m of testo.matchAll(/\bcrea\}?\)?\(window,[\s\S]{0,240}?\)[;.]/g)) chiamate.push([p, m[0]]);
       }
     }
   };
