@@ -26,7 +26,14 @@ const RICHIESTA = new RegExp([
   '(?:send|give|tell|share|what|need|can\\s+you|could\\s+you|do\\s+you)',
   // «ti ricordi la password», «come è la password», «che password ha il wifi», «e la password del wifi».
   '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?<=^|:\\s*)e\\s+(?:la|il))',
-].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
+  // Le lingue dei nomi della password (urlExfil.js, PRESENTA): «скинь пароль от wifi», «vad är lösenordet».
+  '(?:скинь(?:те)?|кинь(?:те)?|дай(?:те)?|скажи(?:те)?|напиши(?:те)?|пришли(?:те)?|отправь(?:те)?|подскажи(?:те)?|надішли(?:ть)?|какой|какая|какое|який|яка|нужен|нужна|кажи|прати|пошаљи|реци)',
+  '(?:πες|πείτε|δώσε|δώστε|στείλε|στείλτε|ποιος|ποια|ποιο|χρειάζομαι|ξέρεις)',
+  '(?:skicka|ge\\s+mig|säg|vad\\s+är|gi\\s+meg|hva\\s+er|hvad\\s+er|giv\\s+mig|lähetä|kerro|mikä|küldd?|küldj|add\\s+meg|mondd|pošli|pošlete|dej|dejte|řekni|daj|reci|pošalji|koja\\s+je|gönder|söyle|nedir|trimite|spune|dă-mi|care\\s+este|gửi|cho\\s+(?:mình|tôi|em|anh)|là\\s+gì|kirim|kasih|minta|berapa|apa)',
+  '(?:schick|gib|sag|was\\s+ist|wie\\s+ist|envoie|donne|dis-moi|quel\\s+est|c[\'’]est\\s+quoi|mándame|pásame|dame|dime|cuál\\s+es|me\\s+passa|stuur|geef|wat\\s+is|wyślij|podaj|jakie\\s+jest)',
+].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|')
+  // Le scritture senza spazi non hanno confine fra le parole: «密码是多少».
+  + '|多少|什么|是啥|告诉我|发我|给我|教えて|何ですか|알려|뭐야|뭐예요', 'iu');
 // Un elenco solo per il saluto in testa alla risposta e per quello prima della richiesta corta (#2638.1).
 const SALUTI = 'ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera';
 const SALUTO = new RegExp(`^(?:${SALUTI})$`, 'u');
