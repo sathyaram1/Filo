@@ -34,6 +34,12 @@ const RICHIESTA = new RegExp([
   '(?:skicka|ge\\s+mig|säg|vad\\s+är|gi\\s+meg|hva\\s+er|hvad\\s+er|giv\\s+mig|lähetä|kerro|mikä|küldd?|küldj|add\\s+meg|mondd|pošli|pošlete|dej|dejte|řekni|daj|reci|pošalji|koja\\s+je|gönder|söyle|nedir|trimite|spune|dă-mi|care\\s+este|gửi|cho\\s+(?:mình|tôi|em|anh)|là\\s+gì|kirim|kasih|minta|berapa)',
   '(?:kan\\s+(?:du|jeg|jag|i)|sende|sänd|atar\\s+m[ıi]s[ıi]n|m[ıi]s[ıi]n|musun|müsün|kaç|ne(?=[^\\p{L}]*$)|care\\s+e|da-mi|zi-mi|[șşs]tii)',
   '(?:(?:schick|gib|sag)\\s+mir|was\\s+ist|wie\\s+ist|envoie|donne|dis-moi|quel\\s+est|c[\'’]est\\s+quoi|mándame|pásame|dame|dime|cuál\\s+es|me\\s+passa|stuur|geef|wat\\s+is|wyślij|podaj|jakie\\s+jest)',
+  // In francese, tedesco, spagnolo e portoghese: «envoie-moi le mot de passe», «gib mir das Passwort» (#1403.14).
+  '(?:(?:envoie|donne|dis|file|passe)[-\\s]?moi|tu\\s+(?:peux|pourrais|as|aurais|connais)|vous\\s+(?:pouvez|pourriez|avez)'
+    + '|t[\'’]as|c[\'’]est\\s+quoi|quel\\s+est|j[\'’]ai\\s+besoin|(?:schick|gib|sag|nenn)(?:e|st)?\\s+mir'
+    + '|(?:kannst|könntest|hast|weißt|weisst)\\s+du|wie\\s+(?:ist|lautet|war)|was\\s+ist|ich\\s+brauche'
+    + '|(?:m[aá]nda|p[aá]sa|env[ií]a|d[aá]|di)me(?:l[ao])?|me\\s+(?:pasas|mandas|das|dices|env[ií]as|passa|manda|diz|envia)'
+    + '|puedes|podr[ií]as|tienes|sabes|necesito|pode|podes|poderia|tem|preciso|cu[aá]l\\s+es)',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|')
   // Le scritture senza spazi non hanno confine fra le parole: «密码是多少».
   // 吗 e 呢 chiudono la domanda al posto del punto di domanda: «你知道wifi密码吗», «密码呢».
