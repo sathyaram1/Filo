@@ -128,14 +128,36 @@
     + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
     + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
     + '|devices?|appareils?|ger[äa]te?s?|urz[ąa]dzeni[ea]|apparaats?)';
-  const NOME_SBLOCCO = '(?:codic[ei]|codes?|c[óo]digos?|kod(?:u|em|y)?|pin|passcode)';
-  const LEGAME_SBLOCCO = '(?:di|del|della|dello|dei|degli|delle|of|for|on|the|de|du|des|do|da|dos|das|para|pour|von|vom|f[üu]r|zu|zum'
-    + '|der|van|voor|het|od|dla|la|le|les|il|lo|el|los|las|o|a|os|as)';
-  const CHIUDE_SBLOCCO = `(?:\\s*[:=#]|\\s+(?:${VERBO}|${FUTURO}|to|will\\s+be|sono|are|sind|zijn)(?![\\p{L}])(?:\\s+(?:il|el|le|o|the))?)?\\s*$`;
+  const APPARECCHIO_SOLO = new RegExp(`^${APPARECCHIO}$`, 'iu');
+  // Anche attaccato all'apparecchio, come si scrive in tedesco e olandese: «Handycode», «telefooncode», «Entsperrcode».
+  const NOME_SBLOCCO = '(?:(?:entsperr|sperr|zugangs|toegangs|ontgrendel)?(?:codic[ei]|codes?)|c[óo]digos?|kod(?:u|em|y)?|pin|passcode)';
+  const LEGAME_SBLOCCO = '(?:di|del|della|dello|dei|degli|delle|per|of|for|on|to|in|the|de|du|des|do|da|dos|das|para|pour|sur|en|von|vom|f[üu]r|zu|zum'
+    + '|auf|der|van|voor|op|het|od|dla|na|w|la|le|les|il|lo|el|los|las|o|a|os|as)';
+  // La parola che dice a cosa serve il codice, fra il nome e l'apparecchio: «le code secret de mon téléphone».
+  const QUALIFICA_SBLOCCO = '(?:d[\'’]\\s*)?(?:sblocco|blocco|segreto|accesso|schermo|sicurezza|d[ée]verrouillage|verrouillage|d[ée]blocage|secret'
+    + '|acc[èe]s|[ée]cran|s[ée]curit[ée]|desbloqueo|bloqueo|desbloqueio|bloqueio|secreto|acceso|acesso|pantalla|tela|seguridad|seguran[çc]a'
+    + '|unlock|lock|screen|access|security|entsperr\\p{L}*|sperr\\p{L}*|ontgrendel\\p{L}*|odblokow\\p{L}*|blokad\\p{L}*|pin|personnel|personal)';
+  // Fra il verbo e il numero possono stare i due punti o un avverbio («is now», «è sempre»); «e» senza accento è un refuso.
+  const AVVERBIO_SBLOCCO = '(?:now|always|still|currently|actually|just|sempre|ancora|ora|adesso|attualmente|toujours|maintenant|actuellement'
+    + '|siempre|ahora|todav[íi]a|actualmente|agora|ainda|jetzt|immer|noch|aktuell|nu|altijd|nog|teraz|zawsze|nadal|wci[ąa][żz])';
+  const CHIUDE_SBLOCCO = `(?:\\s*[:=#]|\\s*,?\\s+(?:${VERBO}|${FUTURO}|e|cest|sarebbe|serait|ser[íi]a|wäre|would\\s+be|to|will\\s+be|sono|are|sind|zijn)`
+    + `(?![\\p{L}])(?:\\s*[:=])?(?:\\s+${AVVERBIO_SBLOCCO})?(?:\\s+(?:il|el|le|o|the))?)?\\s*$`;
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
-  const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])(?:${NOME_SBLOCCO}(?:\\s+${LEGAME_SBLOCCO})*\\s+${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}`
-    + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}(?:\\s+${LEGAME_SBLOCCO})*\\s+${AGGETTIVO}${APPARECCHIO}`
-    + `|${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}(?:['’]s)?\\s+(?:(?:unlock|lock|screen|access)\\s+)?${NOME_SBLOCCO})${CHIUDE_SBLOCCO}`, 'iu');
+  const TRA_NOME_E_APPARECCHIO = `(?:\\s+(?:${LEGAME_SBLOCCO}|${QUALIFICA_SBLOCCO}))*`;
+  const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}`
+    + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${AGGETTIVO}${APPARECCHIO}`
+    + `|${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}(?:['’]s)?(?:\\s+(?:ha|has|hat|heeft|tiene|tem|ma)(?:\\s+(?:il|un|the|a|el|o|den|einen|de))?)?`
+    + `(?:\\s+(?:(?:unlock|lock|screen|access)\\s+)?|-)?${NOME_SBLOCCO})${CHIUDE_SBLOCCO}`, 'iu');
+  // «The serial code of my phone»: un nome comune davanti a «code» ne fa un identificativo, come nell'etichetta inglese.
+  const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
+  const DAVANTI_AL_NOME = /^(?:the|and|gli|una|une|uno|los|las|der|die|das|den|dem|des|het|een|ein\w*|unlock|lock|screen|access|pin|puk|sim|what|whats|here|ecco|anche|also|plus)$/i;
+  const delMioApparecchio = (coda) => {
+    const m = DEL_MIO_APPARECCHIO.exec(coda);
+    if (!m || !INIZIA_COL_NOME.test(m[0])) return !!m;
+    const w = /([A-Za-z][A-Za-z'-]{2,})\s+$/.exec(coda.slice(0, m.index));
+    return !w || DAVANTI_AL_NOME.test(w[1]) || RESTA_UN_CODICE.test(w[1]) || SEGNO_FORTE.test(w[1]) || UN_VERBO.test(w[1])
+      || new RegExp(`^${POSSESSIVO}$`, 'iu').test(w[1]);
+  };
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
