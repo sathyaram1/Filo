@@ -21,7 +21,10 @@ function riservati(testo) {
   try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l)); } catch (_) {}
   // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
-  return [...RT().lunghi(out), ...RT().trova(testo)];
+  const valori = [...RT().lunghi(out), ...RT().trova(testo)];
+  // Una password con gli spazi fra virgolette vale intera, come nel pavimento.
+  try { valori.push(...RT().lunghi(PAV().interiFraVirgolette(testo, valori))); } catch (_) {}
+  return valori;
 }
 
 // Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
