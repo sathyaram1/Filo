@@ -135,33 +135,57 @@
   // chiudere l'etichetta, così «il codice del telefono del cliente» e «my phone number» restano identificativi.
   const POSSESSIVO = `(?:mi[oaei]|tu[oaei]|su[oaei]|nostr[oaei]|vostr[oaei]|loro|my|your|his|her|our|their|${POSSESSIVO_ALTRE}`
     + '|(?:mein|dein|sein|ihr|unser|eur)\\p{L}*|mijn|jouw|je|uw|zijn|haar|onze?)';
-  // L'elenco degli apparecchi è uno solo: vale per la frase col possessivo e per l'etichetta senza (#1403.44).
-  const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
-    + '|t[ée]l|celus?|compus?|gsms?|smartphones?'
-    + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
-    + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
-    + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
-    + '|devices?|appareils?|ger[äa]te?s?|urz[ąa]dzeni[ea]|apparaats?)';
   const APPARECCHIO_SOLO = new RegExp(`^${APPARECCHIO}$`, 'iu');
   // Anche attaccato all'apparecchio, come si scrive in tedesco e olandese: «Handycode», «telefooncode», «Entsperrcode».
   const NOME_SBLOCCO = '(?:(?:entsperr|sperr|zugangs|toegangs|ontgrendel)?(?:codic[ei]|codes?)|c[óo]digos?|kod(?:u|em|y)?|pin|passcode)';
   const LEGAME_SBLOCCO = '(?:di|del|della|dello|dei|degli|delle|per|of|for|on|to|in|the|de|du|des|do|da|dos|das|para|pour|sur|en|von|vom|f[üu]r|zu|zum'
-    + '|auf|der|van|voor|op|het|od|dla|na|w|la|le|les|il|lo|el|los|las|o|a|os|as)';
-  // La parola che dice a cosa serve il codice, fra il nome e l'apparecchio: «le code secret de mon téléphone».
-  const QUALIFICA_SBLOCCO = '(?:d[\'’]\\s*)?(?:sblocco|blocco|segreto|accesso|schermo|sicurezza|d[ée]verrouillage|verrouillage|d[ée]blocage|secret'
-    + '|acc[èe]s|[ée]cran|s[ée]curit[ée]|desbloqueo|bloqueo|desbloqueio|bloqueio|secreto|acceso|acesso|pantalla|tela|seguridad|seguran[çc]a'
-    + '|unlock|lock|screen|access|security|entsperr\\p{L}*|sperr\\p{L}*|ontgrendel\\p{L}*|odblokow\\p{L}*|blokad\\p{L}*|pin|personnel|personal)';
-  // Fra il verbo e il numero possono stare i due punti o un avverbio («is now», «è sempre»); «e» senza accento è un refuso.
+    + '|auf|der|van|voor|op|het|od|dla|na|w|la|le|les|il|lo|el|los|las|o|a|os|as|al|alla|sul|sulla|nel|nella|au|à|om|te)';
+  // La parola che dice a cosa serve il codice, fra il nome e l'apparecchio: le parole che già tengono segreto un codice
+  // («personale», «nuovo», «secret»), i segni dell'entrare e quelle dello sblocco, coi loro verbi («pour déverrouiller»).
+  const SBLOCCA = '(?:sblocc\\p{L}*|unlock\\p{L}*|d[ée]verrouill\\p{L}*|verrouill\\p{L}*|d[ée]bloqu\\p{L}*|d[ée]bloc\\p{L}*|desbloqu\\p{L}*'
+    + '|bloqu\\p{L}*|entsperr\\p{L}*|sperr\\p{L}*|ontgrendel\\p{L}*|odblok\\p{L}*|blokad\\p{L}*)';
+  const QUALIFICA_SBLOCCO = `(?:d['’]\\s*)?(?:${SBLOCCA}|blocco|schermo|[ée]cran|pantalla|tela|lock|screen|segreto|secreto`
+    + `|${RESTA_UN_CODICE.source.slice(1, -1)}|${RESTA_ALTRE.source.slice(1, -1)}|${SEGNO_FORTE.source})(?![\\p{L}])`;
+  // Prima e dopo il verbo può stare un avverbio («ora è», «is now»), e il verbo può essere composto («è sempre stato»,
+  // «has been»); «e» senza accento è un refuso; la virgola o i due punti valgono il verbo («il codice del mio telefono, 4829»).
   const AVVERBIO_SBLOCCO = '(?:now|always|still|currently|actually|just|sempre|ancora|ora|adesso|attualmente|toujours|maintenant|actuellement'
     + '|siempre|ahora|todav[íi]a|actualmente|agora|ainda|jetzt|immer|noch|aktuell|nu|altijd|nog|teraz|zawsze|nadal|wci[ąa][żz])';
-  const CHIUDE_SBLOCCO = `(?:\\s*[:=#]|\\s*,?\\s+(?:${VERBO}|${FUTURO}|e|cest|sarebbe|serait|ser[íi]a|wäre|would\\s+be|to|will\\s+be|sono|are|sind|zijn)`
-    + `(?![\\p{L}])(?:\\s*[:=])?(?:\\s+${AVVERBIO_SBLOCCO})?(?:\\s+(?:il|el|le|o|the))?)?\\s*$`;
+  const VERBO_SBLOCCO = `(?:${VERBO}|e|cest|serait|ser[íi]a|wäre|would\\s+be|to|will\\s+be|sind|zijn)`;
+  const PARTICIPIO = '(?:stat[oaie]|been|[ée]t[ée]|sido|gewesen|geweest)';
+  const AUSILIARE = '(?:has|have|had|ha|hat|heeft|a|avait|hab[íi]a|tem|tinha)';
+  const AVV = `(?:\\s+${AVVERBIO_SBLOCCO})?`;
+  const CHIUDE_CORPO = `(?:\\s*[:=#,]|\\s*,?${AVV}\\s+(?:${VERBO_SBLOCCO}(?![\\p{L}])(?:${AVV}\\s+${PARTICIPIO})?|${AUSILIARE}${AVV}\\s+${PARTICIPIO})`
+    + `(?![\\p{L}])(?:\\s*[:=])?${AVV}(?:\\s+(?:il|el|le|o|the))?)?`;
+  const CHIUDE_SBLOCCO = `${CHIUDE_CORPO}\\s*$`;
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
+  // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung»), mai un identificativo né il verbo.
+  const NON_DOPO = `(?:${VERBO_SBLOCCO}|${AUSILIARE}|${AVVERBIO_SBLOCCO}|and|et|y|und|en|i|o|or|ou|${NOME_SBLOCCO})(?![\\p{L}])`;
+  const DOPO_APPARECCHIO = `(?:\\s+(?!${NON_DOPO})(?!${NON_APRE.source})(?:(?:di|de|da|du|of|for)\\s+)?(?:[\\p{L}][\\p{L}\\d-]*|\\d{1,3}))`
+    + '{0,2}';
+  const UN_APPARECCHIO = `${AGGETTIVO}${APPARECCHIO}(?:\\s*(?:,|e|and|et|y|und|en|i|o|or|ou)\\s+(?:${LEGAME_SBLOCCO}\\s+)*${POSSESSIVO}`
+    + `\\s+${AGGETTIVO}${APPARECCHIO})?${DOPO_APPARECCHIO}`;
   const TRA_NOME_E_APPARECCHIO = `(?:\\s+(?:${LEGAME_SBLOCCO}|${QUALIFICA_SBLOCCO}))*`;
-  const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}`
-    + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${AGGETTIVO}${APPARECCHIO}`
+  const NUCLEO = `(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${POSSESSIVO}\\s+${UN_APPARECCHIO}`
+    + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${UN_APPARECCHIO}`
     + `|${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}(?:['’]s)?(?:\\s+(?:ha|has|hat|heeft|tiene|tem|ma)(?:\\s+(?:il|un|the|a|el|o|den|einen|de))?)?`
-    + `(?:\\s+(?:(?:unlock|lock|screen|access)\\s+)?|-)?${NOME_SBLOCCO})${CHIUDE_SBLOCCO}`, 'iu');
+    + `(?:\\s+(?:(?:unlock|lock|screen|access)\\s+)?|-)?${NOME_SBLOCCO})`;
+  const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])${NUCLEO}${CHIUDE_SBLOCCO}`, 'iu');
+  // Il numero prima del nome: «4829 è il codice del mio telefono», «4829 is my phone code».
+  const DOPO_IL_NUMERO = new RegExp(`^\\s*(?:[:=-]\\s*)?${VERBO_SBLOCCO}\\s+(?:(?:il|lo|la|the|le|el|o|der|de|het)\\s+)?${NUCLEO}(?![\\p{L}])`, 'iu');
+  // «Quello del pc è 5512» dopo il codice del telefono, nella frase o in quella dopo: il pronome sta per il codice.
+  const QUELLO_DEL_MIO = new RegExp(`(?<![\\p{L}])(?:quell[oa]|celui|celle|the\\s+one|that|der|die|el|la|o|a)\\s+(?:${LEGAME_SBLOCCO}\\s+)*`
+    + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?(\\d{4,8})(?![\\d\\p{L}])`, 'giu');
+  const NUCLEO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${NUCLEO}`, 'iu');
+  // Lo sblocco detto col verbo, senza «codice»: «Per sbloccare il mio telefono uso 6118», «I unlock my phone with 6215».
+  const SBLOCCO_COL_NUMERO = new RegExp(`(?<![\\p{L}])${SBLOCCA}\\s+(?:${LEGAME_SBLOCCO}\\s+)*(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}`
+    + '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)'
+    + `\\s*[:=]?\\s*["«“]?(\\d{4,8})(?![\\d\\p{L}])`, 'giu');
+  function codiceDelMioApparecchio(s, out) {
+    for (const m of s.matchAll(QUELLO_DEL_MIO)) {
+      if (NUCLEO_NEL_TESTO.test(s.slice(Math.max(0, m.index - 200), m.index))) out.push({ valore: m[1], regola: 'codice' });
+    }
+    for (const m of s.matchAll(SBLOCCO_COL_NUMERO)) out.push({ valore: m[1], regola: 'codice' });
+  }
   // «The serial code of my phone»: un nome comune davanti a «code» ne fa un identificativo, come nell'etichetta inglese.
   const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
   const DAVANTI_AL_NOME = /^(?:il|lo|la|le|el|un|the|and|gli|una|une|uno|los|las|der|die|das|den|dem|des|het|een|ein\w*|unlock|lock|screen|access|pin|puk|sim|what|what['’]?s|here|ecco|anche|also|plus)$/i;
