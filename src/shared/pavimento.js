@@ -29,7 +29,12 @@
   const DOPPIE = [...VIRGOLETTE].filter((c) => !'\'‘’'.includes(c)).join('');
   const SINGOLE = [...VIRGOLETTE].filter((c) => '\'‘’'.includes(c)).join('');
   const VIRGOLETTA = `(?:[${APERTE}][ \\t]*)?`;
-  const CIFRE_CVV = `${VIRGOLETTA}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
+  // Davanti a un PIN, un CVV o un codice una parentesi vale una virgoletta, anche le due insieme: «il PIN è («4821»)»
+  // esce come «il PIN è 4821» (#2689). Le minori no: «pin < 1000» è un confronto nel codice.
+  const INTORNO_APERTE = `[${APERTE}([{]`;
+  const INTORNO_CHIUSE = `[${CHIUSE})\\]}]`;
+  const DAVANTI = `(?:${INTORNO_APERTE}[ \\t]*){0,3}`;
+  const CIFRE_CVV = `${DAVANTI}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
   const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
   const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*[:=|\\t]|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
@@ -39,7 +44,7 @@
   // Anche nelle lingue delle etichette (#1403.13): «le code d'accès 482913», «el código de acceso 482913».
   const CODICE_ACCESSO = /\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const CODICE_ACCESSO_EN = /\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
-  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|è|e'|is)?\\s*${VIRGOLETTA}(\\d{4,8})\\b`, 'gi');
+  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|è|e'|is)?\\s*${DAVANTI}(\\d{4,8})\\b`, 'gi');
   // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
   // posto del codice (vedi alPostoDelCodice), nella frase che lo nomina o sulla riga sotto. Col nome del codice conta, a
   // meno che la frase lo dica un identificativo che non apre niente (cliente, ordine, prenotazione) senza parole
@@ -158,8 +163,8 @@
   // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
   const CODA = 400;
   const RELATIVA = /^\s*,\s*(?:den|die|das|der|dem|welche[nmrs]?|che|which|that|que|qui|kt[óo]r\p{L}*)\s[^,;!?\n\d]{1,40},/iu;
-  const SENZA_VIRGOLETTA = new RegExp(`[${APERTE}][ \\t]*$`);
-  const DOPO_VIRGOLETTA = new RegExp(`^[ \\t]*[${CHIUSE}]`);
+  const SENZA_VIRGOLETTA = new RegExp(`(?:${INTORNO_APERTE}[ \\t]*)+$`);
+  const DOPO_VIRGOLETTA = new RegExp(`^(?:[ \\t]*${INTORNO_CHIUSE})+`);
   function alPostoDelCodice(z, m, inTesta, forte) {
     const prima = z.slice(0, m.index).replace(SENZA_VIRGOLETTA, '');
     if (inTesta) return !prima.trim();
