@@ -28,7 +28,7 @@
     + '|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?|cryptogrammes?(?:\\s+visuels?)?|code\\s+de\\s+s[ée]curit[ée]'
     + '|c[óo]digos?\\s+de\\s+(?:seguridad|seguran[çc]a)|(?:karten)?pr[üu]f(?:nummer|ziffern?|zahl|code)|sicherheits(?:code|nummer)'
     + '|beveiligingscode|kaartverificatiecode|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa)'
-    + `|код\\s+(?:безопасности|проверки)|κωδικ[οό]ς\\s+ασφαλε[ιί]ας)(?![${LETTERE}])`;
+    + `|код\\s+(?:безопасности|проверки))(?![${LETTERE}])`;
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
   const APERTE = '«"\'“‘„';
