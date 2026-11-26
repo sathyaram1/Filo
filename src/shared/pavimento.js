@@ -217,15 +217,19 @@
           const ultima = f === pezzi.length - 1;
           if (ultima && c + 1 < celle.length && !haGiaIlNumero(frase)) zona.push({ z: celle[c + 1], inTesta: true });
           const dove = righe[i].indexOf(frase);
-          if (righe[i].trim().length <= 80 && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
-            // In una conversazione la risposta è la prima riga di un altro: i solleciti di chi chiede si saltano.
-            const R = riservati();
-            const chiede = R ? R.parlaInChat(righe[i]) : null;
-            for (let j = i + 1, vuote = 0, solleciti = 0; j < righe.length && vuote <= 2; j++) {
+          const R = riservati();
+          const chiesto = !!R && R.chiede(righe[i]);
+          if ((chiesto || righe[i].trim().length <= 80) && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
+            // Sotto chi chiede il codice la risposta è il primo messaggio con un numero, come per la password: i solleciti
+            // di chi chiede, i messaggi senza numero e l'intestazione di Telegram si saltano (#2692).
+            const chi = R ? R.parlaInChat(righe[i]) : null;
+            for (let j = i + 1, vuote = 0, saltate = 0; j < righe.length && vuote <= 2 && saltate <= RIGHE_SALTATE; j++) {
               if (!righe[j].trim()) { vuote++; continue; }
-              const parla = chiede && R.parlaInChat(righe[j]);
-              if (parla && parla.chi === chiede.chi && solleciti < 3) { solleciti++; continue; }
-              zona.push({ z: righe[j], inTesta: true, risposta: { chat: !!chiede } });
+              vuote = 0;
+              const parla = R ? R.parlaInChat(righe[j]) : null;
+              if (chi && parla && parla.chi === chi.chi) { saltate++; continue; }
+              if (chiesto && !haUnCodice(parla ? parla.resto : righe[j], nome)) { saltate++; continue; }
+              zona.push({ z: righe[j], inTesta: true, risposta: { chiesto, testa: parla ? righe[j].length - parla.resto.length : 0 } });
               break;
             }
           }
