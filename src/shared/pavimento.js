@@ -190,8 +190,7 @@
     + '|codice\\s+(?:di\\s+)?(?:accesso|segreto)|mot\\s+de\\s+passe|passwort|kennwort|contrase[ñn]a|senha|wachtwoord|has[łl]o)\\b';
   const NON_ALTRO = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
   const ETICHETTA = `\\b${LATINE}${NON_ALTRO}`;
-  // Senza il confine davanti: dentro un nome di campo («login_password») o una parola più lunga. Composta dai pezzi,
-  // mai ritagliata dal testo di ETICHETTA: il ritaglio si rompeva in silenzio a ogni cambio della sua forma (#2677).
+  // Senza il confine davanti: dentro un nome di campo («login_password») o una parola più lunga.
   const ETICHETTA_DENTRO = `${LATINE}${NON_ALTRO}`;
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
