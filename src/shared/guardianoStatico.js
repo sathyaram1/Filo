@@ -327,9 +327,15 @@
   // lo precisano, mai dentro un indirizzo né dopo una virgola che apre altro. Dopo quelle parole i due
   // punti annunciano la parola che li precede: lì «1500» o «BENVENUTO10» sono altro. `stretto`: solo l'attacco,
   // e che ci sia: «Password dimenticata?» non annuncia niente.
-  // Le parole che annunciano il dato subito dopo un'etichetta: un elenco solo, che usa anche il correttore
-  // (correttoreRiservati.js). Nessuna chiede di essere protetta in una regex.
-  const ANNUNCI = Object.freeze(['è', "e'", 'e’', 'era', 'sarebbe', 'is', 'are', 'was', 'sono', 'ecco', 'here', 'vale', 'risulta']);
+  // Le parole che annunciano il dato subito dopo il suo nome, nelle lingue delle etichette (#1403.6, #1403.33): un elenco
+  // solo per il guardiano, il correttore (riservatiNelTesto.js) e il pavimento (pavimento.js). Sentinella in
+  // tests/unit/annunciUnElenco.test.mjs; nessuna chiede di essere protetta in una regex.
+  const ANNUNCI = Object.freeze(['è', "e'", 'e’', 'é', 'era', 'sarebbe', 'sarà', 'is', 'are', 'was', 'sono', 'ecco', 'here',
+    'vale', 'risulta', "c'est", 'c’est', 'est', 'était', 'etait', 'sera', 'ist', 'lautet', 'war', 'wird', 'es', 'será',
+    'serà', 'serão', 'luidt', 'jest', 'brzmi', 'będzie', 'это', 'был', 'была', 'было', 'были', 'будет', 'является',
+    'είναι', 'ήταν']);
+  // Un annuncio come parola intera, per le regex col flag `u`.
+  const ANNUNCIO = `(?<!\\p{L})(?:${ANNUNCI.join('|')})(?!\\p{L})`;
   const ATTACCO = new RegExp(`(?:^|[:=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following))$`, 'i');
   const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
