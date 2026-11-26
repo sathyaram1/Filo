@@ -188,11 +188,12 @@
   // (PRESENTA) col loro confine. ETICHETTA_NUDA vale anche attaccata a un prefisso («login_password»).
   if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
   const ALTRE_LINGUE = global.SN_URL_EXFIL && global.SN_URL_EXFIL.PRESENTA ? `|${global.SN_URL_EXFIL.PRESENTA.altreLingue}` : '';
-  const ETICHETTA_NUDA = '(?:(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
+  const NOMI = '(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
     + '|chiave\\s+(?:di\\s+)?(?:rete|sicurezza(?:\\s+di\\s+rete)?|wi-?fi|wpa2?|wlan)|(?:wpa[23]?(?:-psk)?|wi-?fi|wlan|network|security)\\s+key'
-    + `|codice\\s+(?:di\\s+)?(?:accesso|segreto))\\b${ALTRE_LINGUE})`
-    + '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
-  const ETICHETTA = `(?:\\b(?=[A-Za-z])|(?![A-Za-z]))${ETICHETTA_NUDA}`;
+    + '|codice\\s+(?:di\\s+)?(?:accesso|segreto))\\b';
+  const NON_ETICHETTA = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
+  const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE})${NON_ETICHETTA}`;
+  const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE})${NON_ETICHETTA}`;
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
