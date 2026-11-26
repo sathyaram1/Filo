@@ -81,7 +81,7 @@
     + `([\\p{Ll}][\\p{Ll}-]{2,})${SEPARA_ALTRE}`, 'u');
   const ETICHETTA_DE = new RegExp(`\\b[Cc]odes?\\s+(?:der|des|vom|zur|zum|für\\s+(?:die|den|das|(?:mein|dein|sein|ihr|Ihr|unser|eur)(?:e|en)?)`
     + `|(?:[Mm]ein|[Dd]ein|[Ss]ein|[Ii]hr|[Uu]nser|[Ee]ur)e[rs])\\s+(\\p{Lu}\\p{Ll}+)${SEPARA_ALTRE}`, 'u');
-  const UN_VERBO = new RegExp(`^(?:${VERBO}|${FUTURO}|sono|sont|son|são|sind|zijn|fue|foi|to)$`, 'iu');
+  const UN_VERBO = new RegExp(`^(?:${VERBO}|sont|son|são|sind|zijn|fue|foi|to)$`, 'iu');
   const RESTA_ALTRE = new RegExp('^(?:acc[èe]s|acceso|acesso|dost[ęe]p\\p{L}*|v[ée]rifica\\p{L}*|weryfikac\\p{L}*|s[ée]curit[ée]|seguridad|seguran[çc]a'
     + '|zabezpiecz\\p{L}*|bezpiecze\\p{L}*|beveiliging|confirma\\p{L}*|potwierdz\\p{L}*|bevestiging|activa\\p{L}*|ativa[çc][ãa]o|aktywac\\p{L}*'
     + '|connexion|sesi[óo]n|sess[ãa]o|logowani\\p{L}*|inlog\\p{L}*|autori[sz]a\\p{L}*|autoryz\\p{L}*|authentifi\\p{L}*|autentica\\p{L}*'
