@@ -306,7 +306,12 @@
     try {
       switch (page.op) {
         case 'copy': Actions?.copyToClipboard(text); break;
-        case 'cut': Actions?.cutSelection(); break;
+        case 'cut': {
+          const r = await Actions?.cutSelection();
+          if (r && r.motivo === 'coperto') return { ok: false, riga: `${label}: un campo password non si taglia` };
+          if (!r || !r.ok) return { ok: false, riga: `${label}: non riuscita` };
+          break;
+        }
         case 'search_text': return { filo: { action: { type: 'NAVIGA', url: Actions.searchUrlFor(text), cerca: text }, etichetta: label } };
         case 'read_aloud': await Tts?.readAloud(text); break;
         case 'stop_reading': Tts?.stopReading(); break;
