@@ -231,6 +231,24 @@ test('un codice usa e getta non esce in francese, tedesco, spagnolo, portoghese,
   ]) assert.equal(P.oscura(t), t, t);
 });
 
+// #1403.35 — il PIN chiamato «numero segreto», «codice confidenziale», «Geheimzahl» o «Pincode», col verbo o coi due punti.
+test('il PIN chiamato numero segreto, codice confidenziale, Geheimzahl o Pincode non esce, in tutte le lingue', () => {
+  for (const t of [
+    'Il numero segreto è 4829', 'Il codice confidenziale è 4829', 'Le numéro secret est 4829', 'El número secreto es 4829',
+    'El código confidencial es 4829', 'Meine Geheimzahl ist 4829', 'Geheimzahl: 4829', 'Der Geheimcode ist 4829',
+    'Der Pincode ist 4829', 'Numero segreto: 4829', 'Codice confidenziale: 4829', 'Il codice riservato è 4829',
+    'Le numéro confidentiel est 4829', 'O número secreto é 4829', 'The secret number is 4829',
+    'The confidential code is 4829', 'Die Geheimnummer ist 4829', 'Ihre neue Geheimzahl lautet 4829.', 'PIN-Code: 4829',
+    'Je pincode is 4829', 'De geheime code is 4829', 'Tajny numer to 4829', 'Geheimzahl\n4829', 'Numero segreto | 4829',
+    'Il numero segreto della carta, che ti abbiamo mandato, è 4829', 'Die Geheimzahl Ihrer Kundenkarte ist 4829',
+  ]) assert.ok(!P.oscura(t).includes('4829'), t);
+  // Il numero di un altro nome nella stessa frase resta: lì il PIN è solo nominato.
+  for (const t of [
+    'Codice cliente 4829, numero segreto inviato per posta', 'Il numero segreto è arrivato, codice cliente 4829',
+    'Il numero ordine è 4829', 'Il numero segreto della lotteria è uscito nel 2024',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
 // Come in italiano, nelle altre lingue un nome comune dopo il codice lo fa un identificativo, salvo quello che apre.
 test('nelle altre lingue il codice di un ordine, di una spedizione o di un errore resta; quello di una porta no', () => {
   for (const t of [

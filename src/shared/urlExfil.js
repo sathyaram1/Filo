@@ -358,7 +358,16 @@
   // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
   const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
-  const PRESENTA_CODICE = /(?<![\p{L}\p{N}_])(?:pin|codice|code|c[oó]digo|combinazione|otp)(?![\p{L}\p{N}_])/gu;
+  // I nomi del PIN senza «codice» («numero segreto», «Geheimzahl») li tiene il pavimento, che urlExfil precede nel loader.
+  let presentaCodice = null;
+  const PRESENTA_CODICE = () => {
+    if (presentaCodice) return presentaCodice;
+    if (!global.SN_PAVIMENTO && typeof require === 'function') require('./pavimento.js');
+    const pin = global.SN_PAVIMENTO ? `${global.SN_PAVIMENTO.NOMI_DEL_PIN}|` : '';
+    const re = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${pin}pin|codice|code|c[oó]digo|combinazione|otp)(?![\\p{L}\\p{N}_])`, 'giu');
+    if (pin) presentaCodice = re;
+    return re;
+  };
   const PAROLE_DOPO = 8;
   const RIEMPITIVI = new Set([
     'della', 'delle', 'dello', 'degli', 'nella', 'sulla', 'sempre', 'ancora', 'adesso', 'stessa', 'stesso', 'nuova',
@@ -392,7 +401,7 @@
       }
     };
     prendi(PRESENTA_PASSWORD, false);
-    prendi(PRESENTA_CODICE, true);
+    prendi(PRESENTA_CODICE(), true);
     return out;
   }
 
@@ -1029,7 +1038,7 @@
     DAI_SITI, testoDeiSitiComeAzione, indirizziDelComando, comandoInRete,
     taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
     // Le parole che presentano una password o un codice, come testo: una regex /g condivisa porterebbe con sé lastIndex.
-    PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, codice: PRESENTA_CODICE.source, altreLingue: NOMI_PASSWORD }),
+    PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, get codice() { return PRESENTA_CODICE().source; }, altreLingue: NOMI_PASSWORD }),
     VIRGOLETTE: Object.freeze({ caratteri: VIRGOLETTE, fra: FRA_VIRGOLETTE.source }),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
