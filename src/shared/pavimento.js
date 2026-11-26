@@ -913,6 +913,7 @@
     }
     for (const m of s.matchAll(PIN)) out.push({ valore: m[1], regola: 'codice' });
     codiciVicini(s, out);
+    codiceDelMioApparecchio(s, out);
     codiciDiRecupero(s, out);
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
