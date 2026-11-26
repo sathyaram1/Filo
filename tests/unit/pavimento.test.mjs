@@ -41,6 +41,25 @@ test('il CVV annunciato dal verbo si toglie in tutte le lingue delle etichette, 
     assert.equal(P.oscura(riga), riga);
 });
 
+test('#2681.2: il CVV con l\'articolo dopo il verbo, col trattino, al futuro e col suo nome in ogni lingua si toglie', () => {
+  for (const [riga, atteso] of [
+    ['Il CVV è il 123', `Il CVV è il ${S}`], ['El CVV es el 123', `El CVV es el ${S}`],
+    ['Le cryptogramme est le 123', `Le cryptogramme est le ${S}`], ['Die Kartenprüfnummer ist die 123', `Die Kartenprüfnummer ist die ${S}`],
+    ['CVV — 123', `CVV — ${S}`], ['Код безопасности — 444', `Код безопасности — ${S}`], ['Il CVV sarà 123', `Il CVV sarà ${S}`],
+    ['Le cryptogramme sera 123', `Le cryptogramme sera ${S}`], ['CVV - 123', `CVV - ${S}`], ['CVV → 123', `CVV → ${S}`],
+    ['Il codice di sicurezza è il 123', `Il codice di sicurezza è il ${S}`], ['Il codice CVV della carta è il 615', `Il codice CVV della carta è il ${S}`],
+    ['Le cryptogramme visuel : 123', `Le cryptogramme visuel : ${S}`], ['Le code de sécurité de la carte est le 482', `Le code de sécurité de la carte est le ${S}`],
+    ['El código de seguridad es el 123', `El código de seguridad es el ${S}`], ['O código de segurança é o 123', `O código de segurança é o ${S}`],
+    ['Sicherheitscode: 123', `Sicherheitscode: ${S}`], ['Die Prüfziffer wird 321', `Die Prüfziffer wird ${S}`],
+    ['Beveiligingscode: 123', `Beveiligingscode: ${S}`], ['Kod zabezpieczający to 123', `Kod zabezpieczający to ${S}`],
+    ['Код CVV — 123', `Код CVV — ${S}`], ['Κωδικός ασφαλείας: 123', `Κωδικός ασφαλείας: ${S}`],
+    ['The card verification value is the 123', `The card verification value is the ${S}`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const riga of ['Il CVV - 3 cifre sul retro', 'CVV-123', 'Le cryptogramme est le code à 3 chiffres', 'La cryptographie est le 123e sujet',
+    'Il CVV è il numero sul retro', 'Prüfung 123'])
+    assert.equal(P.oscura(riga), riga);
+});
+
 test('un codice usa e getta e una chiave col suo prefisso non escono', () => {
   const t = P.oscura('Il tuo codice OTP è 482913. Chiave: sk-abcdefghijklmnop1234567890');
   assert.ok(!t.includes('482913'));
