@@ -21,8 +21,8 @@
   // o la freccia fra spazi («CVV — 123», #2681.2).
   const VERBO_CVV = `(?:${VERBO}|(?<=\\bkod\\b[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
   const TRATTINO = '[-–—→](?=[ \\t])';
-  // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности», «κωδικός».
-  const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u052F';
+  // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности».
+  const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F';
   // Il nome del CVV nelle lingue delle etichette, quelle del verbo.
   const NOME_CVV = `(?<![${LETTERE}])(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:code|value|number)`
     + '|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?|cryptogrammes?(?:\\s+visuels?)?|code\\s+de\\s+s[ée]curit[ée]'
