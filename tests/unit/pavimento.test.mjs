@@ -207,6 +207,28 @@ test('un codice usa e getta non esce in francese, tedesco, spagnolo, portoghese,
   ]) assert.equal(P.oscura(t), t, t);
 });
 
+// Come in italiano, nelle altre lingue un nome comune dopo il codice lo fa un identificativo, salvo quello che apre.
+test('nelle altre lingue il codice di un ordine, di una spedizione o di un errore resta; quello di una porta no', () => {
+  for (const t of [
+    'Le code de suivi est 482913', 'Le code de la commande est 482913', "Le code d'erreur est 5003",
+    'Le code produit est 482913', 'Le code couleur est 482913', 'Le code article : 482913',
+    'El código de seguimiento es 482913', 'El código del pedido es 482913', 'Código de seguimiento: 482913',
+    'Mi pedido tiene el código 482913', 'Su código de reserva es 482913', 'El código de barras es 84123',
+    'O código do produto é 48291', 'Kod rabatowy to 4829', 'Kod produktu: 48291', 'Kod pocztowy: 00950',
+    'Der Code der Bestellung ist 482913', 'Der Code des Fehlers ist 5003', 'De code van de bestelling is 482913',
+  ]) assert.equal(P.oscura(t), t, t);
+  for (const t of [
+    'Le code de la porte est 4829', 'Le code du portail est 1990', "Le code d'entrée est 4829", 'Der Code für die Tür ist 4829',
+    'El código de la alarma es 4829', 'Kod do drzwi to 4829', 'De code van de deur is 4829',
+    'Votre code de retrait pour la commande est 482913', 'Tu código para recoger el pedido es 482913',
+    'Le code de sécurité est 482913', 'Su código de seguridad es 482913', 'Kod weryfikacyjny to 482913', 'Kod BLIK to 482913',
+    'El código secreto es 482913', 'Tu código de Netflix es 482913', 'Le code de vérification de votre commande est 482913',
+    // Il verbo al futuro o al passato, e l'articolo dopo il verbo, annunciano il valore come il presente.
+    'Votre code sera 482913', 'Tu código será 482913', 'El código era 482913', 'Il codice sarà 482913',
+    'Il codice era 482913', 'El código es el 482913',
+  ]) assert.ok(!P.oscura(t).includes(t.match(/\d{4,}/)[0]), t);
+});
+
 // Il pavimento gira su ogni chiamata a un modello, nel processo principale: una riga lunga piena di codici annunciati
 // si controlla in fretta e li toglie tutti (prima costava centinaia di unità di riferimento, ora meno di dieci).
 test('una riga di 120.000 caratteri che ripete un codice annunciato si controlla in fretta', () => {
