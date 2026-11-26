@@ -306,7 +306,10 @@
             for (const { m, v, lettere } of trovati) {
               const prima = z.slice(Math.max(0, m.index - CODA), m.index).replace(SENZA_VIRGOLETTA, '');
               const etichetta = inTesta ? frase.slice(-CODA) : prima;
-              const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
+              let chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
+              if (nome && !chiave.apre && !inTesta && DOPO_IL_NUMERO.test(z.slice(m.index + m[0].length, m.index + m[0].length + 160))) {
+                chiave = { apre: true, solo: true };
+              }
               // Il PIN conta se è lui il nome più vicino al numero: in «Codice cliente 4829, numero segreto…» il numero è del cliente.
               const ultimo = pinNellaFrase ? [...etichetta.matchAll(NOMI_CODICE)].pop() : null;
               const pin = !!ultimo && NOME_PIN.test(ultimo[0]);
