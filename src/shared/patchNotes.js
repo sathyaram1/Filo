@@ -19,6 +19,7 @@
         { testo: 'Una password, un PIN o un codice scritti fra virgolette non arrivano più a nessun modello, come quando li scrivi senza, e una password di più parole fra virgolette si toglie intera.', segnalazione: 2678 },
         { testo: 'Un campo con la password o la chiave del wifi scritta in chiaro, come nella pagina del router, resta coperto anche quando l\'etichetta è in un\'altra lingua, come «Пароль», «Hasło», «Netwerksleutel», «密码» o «暗号化キー»: quando chiedi aiuto all\'assistente il modello vede il nome del campo, non quello che c\'è dentro. La chiave del wifi chiamata «Ключ сети» o «暗号化キー» resta tua anche nel testo della pagina.', segnalazione: 1403 },
         { testo: 'Anche il CVV della carta scritto in francese, tedesco, spagnolo, portoghese, olandese o polacco, come «Le CVV est 123», non arriva più ai modelli, come già «Il CVV è 123».', segnalazione: 1403 },
+        { testo: 'Una password scritta dopo «пароль:», «κωδικός:», «密码：» o la stessa parola in arabo, ebraico, hindi, thai, giapponese o coreano resta tua come dopo «Password:»: non arriva ai modelli, e se è in un log che alleghi a un feedback Filo te lo dice prima che parta.', segnalazione: 1403 },
       ],
     },
     {
