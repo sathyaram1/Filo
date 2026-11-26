@@ -54,3 +54,21 @@ test('la frase che spiega la password arriva intera al correttore; la password d
     assert.equal(alCorrettore(frase), frase.replace(v, S), frase);
   }
 });
+
+test('ogni frase che dice com\'è la password arriva intera, anche col verbo prima della data', () => {
+  for (const frase of ['la password scade tra 30 giorni', 'la password è scaduta', 'la password è sbagliata',
+    'la tua password è debole', 'la password non funziona più', 'la password va rinnovata ogni anno',
+    'la password non va mai detta a nessuno', 'la password del wifi è sul retro del router', 'la password cambia ogni mese',
+    'the password expires in 30 days', 'la password è stata resettata', 'la password è la stessa di prima']) {
+    assert.equal(alCorrettore(frase), frase);
+  }
+});
+
+test('dopo la frase che spiega, la parola che presenta il valore lo fa togliere', () => {
+  for (const [frase, v] of [['la password da oggi diventa gattonero', 'gattonero'],
+    ['la password da oggi eccola gattonero', 'gattonero'], ['password scaduta ieri nuova gattonero', 'gattonero'],
+    ['la password del mese è Giugno', 'Giugno'], ['la password è troppo corta: usa Nyckel', 'Nyckel'],
+    ['la password è lunga gattonero', 'gattonero']]) {
+    assert.ok(!alCorrettore(frase).includes(v), frase);
+  }
+});
