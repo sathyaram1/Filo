@@ -368,6 +368,21 @@
   // Le precisazioni sono un elenco chiuso, scelto dall'owner (#810): le forme nuove le vede il guardiano.
   const MARCHIO_PASSWORD = new RegExp('\\b(?:password|passcode|passphrase)(?:\\s+(?:di\\s+accesso|per\\s+il\\s+primo\\s+accesso'
     + '|iniziale|provvisori[ao]|for\\s+your\\s+account))?\\b', 'i');
+  // Gli altri nomi («Passwort», «contraseña», «mot de passe») li tiene urlExfil.js, che si carica dopo: si leggono alla
+  // prima ricerca. Nei preload delle pagine urlExfil non c'è, e restano i nomi italiani e inglesi.
+  let marchiPassword = null;
+  function marchioPassword() {
+    if (marchiPassword) return new RegExp(marchiPassword, 'gi');
+    if (!global.SN_URL_EXFIL && typeof require === 'function' && typeof window === 'undefined') {
+      try { require('./urlExfil.js'); } catch (_) { /* restano i nomi di qui */ }
+    }
+    const P = global.SN_URL_EXFIL && global.SN_URL_EXFIL.PRESENTA;
+    if (!P || !P.altreLingue) return new RegExp(MARCHIO_PASSWORD.source, 'gi');
+    marchiPassword = `(?:${MARCHIO_PASSWORD.source})|${P.altreLingue}`;
+    return new RegExp(marchiPassword, 'gi');
+  }
+  const HASLO = /^has[łl]/i;
+  const TO_POLACCO = /^\s*to\s*$/i;
   // Una parola sola, con una lettera e una cifra o un simbolo DENTRO: «Tr7#kq29Lm», «Kx82mPq!». Il segno ai
   // bordi («dimenticata?», «(obbligatoria)», «manager:») è punteggiatura; un indirizzo o una mail non sono password.
   const FORMA_PASSWORD = /^(?=.*[A-Za-z])(?=.*[^A-Za-z])(?=(?:[^A-Za-z0-9]*[A-Za-z0-9]){6})[^\s"'«»“”<>]{6,64}$/;
