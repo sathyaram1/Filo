@@ -15,7 +15,7 @@
         { testo: 'Una password scritta in svedese, turco, russo, cinese o in un\'altra lingua, come «Lösenord: …» o la risposta a chi la chiede in chat, non arriva ai modelli, come succede già con «Password: …».', segnalazione: 2673 },
         { testo: 'Un codice di accesso scritto in francese, tedesco, spagnolo, portoghese, olandese o polacco, come «Le code est 482913» o «der Zugangscode ist 482913», non arriva a nessun modello, come già succedeva in italiano e in inglese.', segnalazione: 1403 },
         { testo: 'Se in chat qualcuno ti chiede la password in francese, tedesco, spagnolo, portoghese o russo («le mot de passe ?», «das WLAN-Passwort?»), quella che gli scrivi non arriva ai modelli di Filo, come già succedeva quando te la chiedeva in italiano o in inglese.', segnalazione: 1403 },
-        { testo: 'Una password, un PIN o un codice scritti fra virgolette, come «il pin è «4821»» o «Password: “casa mia al mare”», non arrivano più a nessun modello, come quando li scrivi senza.', segnalazione: 2678 },
+        { testo: 'Una password, un PIN o un codice scritti fra virgolette non arrivano più a nessun modello, come quando li scrivi senza, e una password di più parole fra virgolette si toglie intera.', segnalazione: 2678 },
       ],
     },
     {
