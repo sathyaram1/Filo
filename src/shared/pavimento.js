@@ -227,10 +227,13 @@
               const prima = z.slice(Math.max(0, m.index - CODA), m.index).replace(SENZA_VIRGOLETTA, '');
               const etichetta = inTesta ? frase.slice(-CODA) : prima;
               const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
+              // Il PIN conta se è lui il nome più vicino al numero: in «Codice cliente 4829, numero segreto…» il numero è del cliente.
+              const ultimo = nome ? [...etichetta.matchAll(NOMI_CODICE)].pop() : null;
+              const pin = !!ultimo && NOME_PIN.test(ultimo[0]);
               const entra = forte || pin || chiave.apre;
               if (nonApre && !(nome && entra)) continue;
               if (predefinito && chiave.pin && !forte) continue;
-              if (nome ?!(alPostoDelCodice(z, m, inTesta, forte) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
+              if (nome ? !(alPostoDelCodice(z, m, inTesta, forte || pin) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
                 : !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
               // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
               if (!lettere && !m[2] && ANNO.test(v) && !chiave.solo) continue;
