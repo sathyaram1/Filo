@@ -103,9 +103,7 @@ exec -a "$QUI/${nome}" "$QUI/${nome}${SUFFISSO}" "\${SENZA_GABBIA[@]}" "\${PIATT
 exports.default = async function afterPackLinux(context) {
   if (context.electronPlatformName !== 'linux') return;
 
-  const nome = context.packager.executableName || 'filo';
-  const programma = path.join(context.appOutDir, nome);
-  const vero = path.join(context.appOutDir, nome + SUFFISSO);
+  const { nome, programma, vero } = programmiDelPacchetto(context);
 
   // Idempotente: se il lanciatore c'è già (una seconda passata sulla stessa
   // cartella), non si sposta niente una seconda volta.
