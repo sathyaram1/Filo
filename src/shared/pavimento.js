@@ -484,8 +484,7 @@
   const descrive = (parole) => {
     const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
     const i = ARTICOLO.test(p[0]) && p.length > 1 ? 1 : 0;
-    // Misura e data solo col numero («min 8 caratteri», «2 mesi fa»): «ci vediamo ogni giorno» è una frase-password.
-    return DESCRIVE.test(p[i]) || (p.some((x) => /\d/.test(x)) && p.some((x) => MISURA.test(x) || TEMPO.test(x)));
+    return DESCRIVE.test(p[i]) || misuraODate(p);
   };
   function fraVirgolette(s, out) {
     for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE]) {
