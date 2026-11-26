@@ -477,7 +477,6 @@
   const FRA_VIRGOLETTE = `[ \\t]*(?:[${DOPPIE}](?<d>[^\\n|\\t${DOPPIE}]{1,2000})[${DOPPIE}]|[${SINGOLE}](?<s>[^\\n|\\t${SINGOLE}]{1,2000})[${SINGOLE}])`;
   const VIRGOLETTATO_DOPO = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]*(?<sep>[:=])|[ \\t]+${VERBO_PASSWORD})${FRA_VIRGOLETTE}`, 'gid');
   const VIRGOLETTATO_IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}[ \\t]${FRA_VIRGOLETTE}`, 'gid');
-  const ARTICOLO = /^(?:la|il|lo|i|le|gli|una?|the|an?|el|der|die|das|de|het)$/i;
   const DESCRIVE = /^(?:stess[aoie]|quell[aoie]|ugual[ei]|identic[aoie]|vedi|vedere|guarda|same|see|disponibil[ei]|available|scritt[ao]|indicat[ao]|riportat[ao]|fornit[ao]|inviat[ao]|stampat[ao]|vuot[ao]|nessun[ao]?|deve|devono|può|must|should|almeno|minimo|min|massimo|max)$/i;
   const descrive = (parole) => {
     const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
