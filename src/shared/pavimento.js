@@ -758,6 +758,16 @@
       out.push(k >= 0 ? { ...x, valore: s.slice(k, k + v.length) } : x);
     }
   }
+  // Una cella che descrive la password non è il valore, come la stessa riga fuori dalla tabella: lo dice l'etichetta, una
+  // sua proprietà («| Scadenza password: | 90 giorni |»), o la cella che comincia come una spiegazione («vedi sotto»).
+  const PROPRIETA = /(?:^|[^\p{L}])(?:scadenza|lunghezza|recupero|requisit[io]|reimpostazione|cambio|robustezza|complessit[aà]|durata|validit[aà]|formato|regol[ae]|politica|criteri|suggeriment[oi]|expiry|expiration|length|requirements?|rules?|dimenticat[ao]|smarrit[ao]|scadut[ao]|forgotten|expired)(?![\p{L}])/iu;
+  function cellaCheSpiega(etichetta, cella) {
+    if (PROPRIETA.test(etichetta)) return true;
+    const parole = testo(cella).trim().split(/\s+/).filter(Boolean).map((x) => x.replace(/[.,;:]+$/, ''));
+    if (parole.length < 2) return false;
+    return INIZIO_SPIEGAZIONE.test(parole[0]) || DESCRIVE.test(parole[0])
+      || (parole.some((x) => /\d/.test(x)) && parole.some((x) => MISURA.test(x) || TEMPO.test(x)));
+  }
   function etichette(s, out) {
     alPostoDelValore(s, out);
     fraseDopo(s, out);
