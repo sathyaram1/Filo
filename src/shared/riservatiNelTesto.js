@@ -379,7 +379,7 @@ const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
 // conta se ha la forma di una password, o se la presenta un annuncio o i due punti; dopo «pw» anche se viene subito.
 // Come dopo «password»: anche con un avverbio («la pass ora è …») o un verbo di cambio («pw diventa …») in mezzo.
 // L'annuncio largo, i modali e gli avverbi stanno nel guardiano, con l'elenco degli annunci.
-const PRESENTATA = new RegExp(`^\\s*(?:(?:del(?:la)?|dell['’]|di)\\s+[\\p{L}\\p{N}-]+\\s*)?(?:[:=]|(?<!\\p{L})${guardiano().ANNUNCIO_LARGO}(?!\\p{L}))\\s*$`, 'u');
+const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:[:=]|(?<!\\p{L})${guardiano().ANNUNCIO_LARGO}(?!\\p{L}))\\s*$`, 'u');
 const PONTE = new RegExp(`^(?:${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO})$`, 'u');
 const ACCANTO = /^\s*$/u;
 
