@@ -54,7 +54,7 @@ test('cronologia: stile scritto con » e HTML, annullo, ricarica, tema scuro', a
   await expect(rimesso).toBeVisible({ timeout: 10_000 });
   const pr = await pezzi(rimesso.locator('.dash-cambio-testo'));
   console.log('RIMESSO', JSON.stringify(pr));
-  expect(pr.dentro.join('')).toContain('Tono » secco');
+  expect(pr.fuori).toContain('stile dell\'agente: tolto');
 
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
   await page.reload();
