@@ -260,6 +260,8 @@
     let imgEl = null;
     let linkEl = null;
     if (spec.target === 'text') {
+      // Prima della conferma, che sposta il fuoco: tagliare e modificare tornano su questa selezione.
+      Actions?.prendiLaSelezioneDiAdesso?.();
       text = resolveActionText(page);
       if (!text && page.op !== 'edit_text') return { ok: false, nonTrovato: true, riga: `${label}: nessun testo selezionato` };
     } else if (spec.target === 'image') {
