@@ -72,3 +72,40 @@ test('dopo la frase che spiega, la parola che presenta il valore lo fa togliere'
     assert.ok(!alCorrettore(frase).includes(v), frase);
   }
 });
+
+test('una spiegazione accanto alla password, prima o dopo, non la fa partire', () => {
+  for (const frase of ['la password del wifi è gattonero ma scade a giugno', 'la password è gattonero va bene?',
+    'la password wifi è gattonero non dirla a nessuno', 'la password è gattonero prima di tutto',
+    'la password è gattonero scade domani', 'la password del wifi è sul retro gattonero',
+    'la password è nel cassetto gattonero', 'la password cambiata in gattonero', 'password del conto gattonero',
+    'la password scade tra 30 giorni gattonero', 'la password è scaduta diventa gattonero']) {
+    assert.ok(!alCorrettore(frase).includes('gattonero'), `${frase} -> ${alCorrettore(frase)}`);
+  }
+});
+
+test('le frasi comuni che spiegano la password arrivano intere al correttore', () => {
+  for (const frase of ['la password ha una maiuscola', 'cambia la password domani', 'la password scade domani',
+    'la password del conto è scritta sul foglio', 'la password deve contenere un numero',
+    'ho cambiato la password stamattina', 'la password è salvata nel portachiavi',
+    'usa una password diversa per ogni sito', 'la password è temporanea', 'la password è obbligatoria',
+    'la password è richiesta', 'la password serve per entrare', 'la password resta segreta',
+    'la password va inserita due volte', 'la password si cambia dalle impostazioni',
+    "la password dell'email è diversa da quella del conto", 'la password è bloccata dopo tre tentativi']) {
+    assert.equal(alCorrettore(frase), frase);
+  }
+});
+
+test('una cella che descrive la password resta, in tutti e due i cancelli; quella col valore no', () => {
+  for (const riga of ['| Scadenza password: | 90 giorni |', '| Lunghezza password: | 12 caratteri |',
+    '| Password: | da cambiare ogni 90 giorni |', '| Password: | scade ogni 90 giorni |', '| Password: | vedi sotto |',
+    '| Recupero password: | via email |', '| Password dimenticata: | clicca il link |', '| Password | vedi sotto |',
+    '| Scadenza password | 90 giorni |', '| Password: | cambiata ieri |']) {
+    assert.equal(P.oscura(riga), riga, 'pavimento');
+    assert.equal(alCorrettore(riga), riga, 'correttore');
+  }
+  for (const riga of ['| Password: | Nyckel!2024 |', '| Passphrase: | cavallo batteria graffetta |',
+    '| Nuova password: | gattonero |', '| Password | Mela Verde 77 |']) {
+    assert.ok(P.oscura(riga).includes(S), riga);
+    assert.ok(alCorrettore(riga).includes(S), riga);
+  }
+});
