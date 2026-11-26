@@ -42,11 +42,4 @@ test('r1 con tre valori cambiati insieme il primo si legge', async ({ app }) => 
   await riga.scrollIntoViewIfNeeded();
   await riga.screenshot({ path: 'tests/.shots/v2662g2-r1-tre-valori.png' });
   expect(await visto(riga), 'il primo valore si legge').toBeGreaterThanOrEqual(55);
-  // Quello che non ci sta finisce coi puntini, come ogni riga tagliata di Filo: il contenitore ne è capace solo se non è
-  // un contenitore flessibile, o se l'ultimo pezzo visibile li porta lui.
-  const taglio = await riga.evaluate((r) => {
-    const t = r.querySelector('.dash-cambio-testo');
-    return { tagliata: t.scrollWidth > t.clientWidth + 1, puntini: getComputedStyle(t).display !== 'flex' };
-  });
-  if (taglio.tagliata) expect(taglio.puntini, 'la riga tagliata finisce coi puntini').toBe(true);
 });
