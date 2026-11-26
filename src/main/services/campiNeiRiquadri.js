@@ -387,5 +387,5 @@ async function campiSegretiFuoriPagina(webContents) {
 
 module.exports = {
   campiSegretiFuoriPagina, campiSegretiNeiRiquadri, campiSegretiNeiComponentiChiusi, codiceMisura, radiciChiuse, componi,
-  misuraRiquadro, interseca,
+  misuraRiquadro, interseca, preambolo,
 };
