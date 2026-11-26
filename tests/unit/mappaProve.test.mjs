@@ -149,3 +149,46 @@ test('lo strumento: opzioni capite, e il testo dice i due livelli, i tempi e i f
   assert.match(t, /Nessuna prova li fa eseguire.*src\/n\.js/);
   assert.match(t, /In tutto 2 spec, circa 4 s/);
 });
+
+test('la mappa si legge da un file, JSON o registro', () => {
+  const dir = cartellaTemporanea('mappa-prove-');
+  try {
+    const m = mappa();
+    writeFileSync(join(dir, 'm.json'), JSON.stringify(m));
+    writeFileSync(join(dir, 'registro.txt'), righeDellaMappa(m).join('\n'));
+    assert.deepEqual(leggiMappa({ file: join(dir, 'm.json') }).mappa, m);
+    assert.deepEqual(leggiMappa({ file: join(dir, 'registro.txt') }).mappa, m);
+    assert.match(leggiMappa({ file: join(dir, 'manca.json') }).errore, /non leggo/);
+  } finally { togliCartella(dir); }
+});
+
+test('finish:check: coi file che la mappa conosce sceglie lei dalle righe cambiate, gli altri restano per area', () => {
+  const dir = cartellaTemporanea('mappa-finish-');
+  try {
+    const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const scrivi = (rel, testo) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), testo); };
+    g('init', '-q', '-b', 'main');
+    g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+    scrivi('src/main/x.js', SORGENTE['src/main/x.js']);
+    for (const s of ['a', 'b', 'x-area', 'y-cosa']) scrivi(`tests/${s}.spec.mjs`, '');
+    g('add', '-A'); g('commit', '-qm', 'base');
+    const commitMappa = g('rev-parse', 'HEAD');
+    // Dopo la mappa main aggiunge due righe in cima: la riga cambiata dal ramo va riportata indietro di due.
+    scrivi('src/main/x.js', `// uno\n// due\n${SORGENTE['src/main/x.js']}`);
+    g('commit', '-qam', 'main va avanti');
+    g('checkout', '-q', '-b', 'lavoro');
+    scrivi('src/main/x.js', `// uno\n// due\n${SORGENTE['src/main/x.js'].replace('return 1;', 'return 9;')}`);
+    scrivi('src/main/y.js', 'module.exports = 1;\n');
+    g('add', '-A'); g('commit', '-qm', 'lavoro');
+    const m = { ...mappa(), commit: commitMappa };
+    const scelta = specDellaScelta({ changed: ['src/main/x.js', 'src/main/y.js'], base: 'main', root: dir, mappa: m });
+    assert.deepEqual(scelta.specs.sort(), ['tests/a', 'tests/y-cosa'], 'a passa da a(); y è nuovo e va per area; x-area non serve più');
+    assert.deepEqual(scelta.mappa.soloCaricano, ['tests/b']);
+    const testo = testoDellaMappa({ letta: { mappa: m, fonte: 'corsa 7' }, daMappa: scelta.mappa });
+    assert.match(testo, /corsa 7.*1 spec passano dalle funzioni cambiate/);
+    assert.match(testo, /Altri 1 caricano soltanto i file cambiati.*suite su main/);
+    const senza = specDellaScelta({ changed: ['src/main/x.js'], base: 'main', root: dir });
+    assert.deepEqual(senza.specs.sort(), ['tests/x-area'], 'senza mappa resta la scelta per area');
+    assert.match(testoDellaMappa({ letta: { errore: 'gh non c\'è' }, daMappa: null }), /non disponibile \(gh non c'è\): scelgo gli spec per area/);
+  } finally { togliCartella(dir); }
+});
