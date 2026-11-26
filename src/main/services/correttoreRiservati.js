@@ -13,34 +13,67 @@ const SOPRA_MAX = 1500;
 const RT = () => globalThis.SN_RISERVATI_TESTO || require('../../shared/riservatiNelTesto.js');
 const PAV = () => globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
 
-// Com'è la password, non qual è: «scade», «è sbagliata», «non funziona», «la stessa di prima».
-const STATO = /^(?:scad(?:e|ono|rà|ut[aoie])|sbagliat[aoie]|errat[aoie]|corrett[aoie]|debol[ei]|fort[ei]|sicur[aoie]|valid[aoie]|bloccat[aoie]|dimenticat[aoie]|smarrit[aoie]|pers[aoie]|rinnovat[aoie]|resettat[aoie]|reimpostat[aoie]|modificat[aoie]|cambi(?:a|ano|erà|at[aoie])|stat[aoie]|funzion(?:a|ano|erà)|dett[aoie]|lung(?:a|o|he|hi)|cort[aoie]|troppo|spesso|essere|ricord(?:o|a|i|iamo)|trov(?:i|a|ate|ano)|recuper(?:a|ano|i)|prima|dopo|precedente|non|mai|va|vanno|expire[sd]?|wrong|incorrect|invalid|weak|strong|changed|forgotten|lost|works?|too|short|long|often|not|never|before|previous)$/;
+// Com'è la password, non qual è: «scade», «è sbagliata», «deve contenere», «resta segreta». Con NON_VALORE del pavimento.
+const STATO = /^(?:scad(?:e|ono|rà|ut[aoie])|sbagliat[aoie]|errat[aoie]|corrett[aoie]|debol[ei]|fort[ei]|sicur[aoie]|valid[aoie]|bloccat[aoie]|dimenticat[aoie]|smarrit[aoie]|pers[aoie]|rinnovat[aoie]|resettat[aoie]|reimpostat[aoie]|modificat[aoie]|cambi(?:a|ano|erà|are|at[aoie])|stat[aoie]|funzion(?:a|ano|erà)|dett[aoie]|lung(?:a|o|he|hi)|cort[aoie]|troppo|spesso|essere|ricord(?:o|a|i|iamo|are)|trov(?:i|a|ate|ano)|recuper(?:a|ano|i)|prima|dopo|precedente|non|mai|va|vanno|obbligatori[aoie]|richiest[aoie]|facoltativ[aoie]|temporane[aoie]|provvisori[aoie]|segret[aoie]|divers[aoie]|salvat[aoie]|inserit[aoie]|scritt[aoie]|personal[ei]|unic[aoie]|privat[aoie]|nascost[aoie]|blocc(?:a|ano)|serv(?:e|ono|irà)|contien[ei]|conten(?:ere|gono)|avere|hanno|devono|possono|viene|vengono|rest(?:a|ano)|riman(?:e|gono)|divent(?:a|ano|erà)|entrare|accedere|inserir(?:e|la)|scriver(?:e|la)|usar(?:e|la)|sceglier(?:e|la)|digitar(?:e|la)|case|sensitive|expire[sd]?|wrong|incorrect|invalid|weak|strong|changed|forgotten|lost|works?|too|short|long|often|not|never|before|previous|required|must|contain)$/;
+// Quando e quanto, oltre a quelle del pavimento: «domani», «due volte», «una maiuscola», «un numero».
+const QUANDO = /^(?:domani|dopodomani|stamattina|stasera|stanotte|luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica|volt[ae]|tomorrow|times?|maiuscol[aei]|minuscol[aei]|numer[oi]|simbol[oi]|spazi[o]?|uppercase|lowercase|numbers?)$/;
+// Dove sta («sul retro del router», «nel portachiavi») e di chi è («del conto», «dell'email»): una parola sola dopo,
+// così «sul retro gattonero» lascia fuori il valore. «in», «a», «con» no: «cambiata in gattonero» lo presenta.
+const LUOGO = /^(?:sul|sullo|sulla|sui|sugli|sulle|su|nel|nello|nella|nei|negli|nelle|dal|dallo|dalla|dai|dagli|dalle|sotto|sopra|dietro|dentro|presso|per|ogni|on|under|behind|inside|near|every)$/;
+const DI = /^(?:del|dello|della|dei|degli|delle|di|of)$/;
+const DETERMINA = /^(?:il|lo|la|i|gli|le|un|uno|una|ogni|tutti|tutte|mio|mia|tuo|tua|suo|sua|the|an?|my|your|each)$/;
+const APOSTROFATA = /^(?:dell|nell|sull|dall|all|l)['’]\p{L}+$/u;
 const pulita = (w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
 
-// La frase dopo il nome della password si divide dove una parola presenta il valore («è», «eccola», i due punti): in
-// ogni pezzo resta fino all'ultima parola che spiega (stato, misura, data), dopo c'è il valore («da oggi diventa
-// gattonero»). Una data da sola dopo l'annuncio è il valore («è giugno»); un luogo dopo l'annuncio spiega tutto il pezzo.
-function spiega(parole, k) {
+// Ogni parola dopo il nome della password conta da sola: spiega solo sé stessa (stato, data, misura), così una
+// spiegazione accanto non copre il valore («è gattonero ma scade a giugno»). Le vicine le copre solo un luogo o il nome
+// di chi è la password, per una parola. Una data da sola dopo l'annuncio è il valore («è giugno»).
+const coperteDi = new WeakMap();
+function coperte(parole) {
+  if (coperteDi.has(parole)) return coperteDi.get(parole);
   const S = PAV().SPIEGA;
   const presenta = RT().PRESENTA_DATO;
-  if (!S || !presenta) return false;
-  let da = 0;
+  const p = parole.map((w) => pulita(w).toLowerCase());
+  const annuncio = (i) => presenta.has(p[i]) || (i > 0 && /[:=：]$/.test(parole[i - 1]));
+  const out = p.map(() => false);
+  // Dopo `i`, saltati gli articoli, una parola: con «di …» dietro, anche quella («sul retro del router»).
+  const copriFrase = (i) => {
+    let j = i + 1;
+    for (;;) {
+      while (j < p.length && DETERMINA.test(p[j])) out[j++] = true;
+      if (j >= p.length || annuncio(j)) return j;
+      out[j++] = true;
+      if (j < p.length && DI.test(p[j]) && !annuncio(j)) { out[j++] = true; continue; }
+      return j;
+    }
+  };
+  let catena = 0;
   let dopoAnnuncio = false;
-  for (let i = 0; i < k; i++) {
-    if (presenta.has(pulita(parole[i]))) { da = i + 1; dopoAnnuncio = true; } else if (/[:=：]$/.test(parole[i])) { da = i + 1; dopoAnnuncio = true; }
+  let pezzo = 0;
+  for (let i = 0; i < p.length; i++) {
+    if (presenta.has(p[i])) { out[i] = true; dopoAnnuncio = true; catena = -1; continue; }
+    if (annuncio(i)) { dopoAnnuncio = true; catena = -1; }
+    if (annuncio(i)) pezzo = i;
+    const w = p[i];
+    let n = 0;
+    while (pezzo + n < p.length && !presenta.has(p[pezzo + n]) && (n === 0 || !annuncio(pezzo + n))) n++;
+    const sola = dopoAnnuncio && n === 1;
+    if (STATO.test(w) || (S && (S.descrive.test(w) || S.nonValore.test(w)))
+      || (!sola && (QUANDO.test(w) || (S && (S.tempo.test(w) || S.misura.test(w)))))) out[i] = true;
+    if (APOSTROFATA.test(w) && (i === catena || !/^l['’]/.test(w))) { out[i] = true; if (i === catena) catena = i + 1; continue; }
+    if (LUOGO.test(w) || (DI.test(w) && (i === catena || (i > 0 && S && S.descrive.test(p[i - 1]))))) {
+      out[i] = true;
+      const fine = copriFrase(i);
+      if (i === catena) catena = fine;
+      i = fine - 1;
+    }
   }
-  if (presenta.has(pulita(parole[k]))) return true;
-  let a = k + 1;
-  while (a < parole.length && !presenta.has(pulita(parole[a])) && !/[:=：]$/.test(parole[a - 1])) a++;
-  const pezzo = parole.slice(da, a).map(pulita);
-  // «usa Nyckel», «come gattonero» presentano il valore, anche se il pavimento le legge come un consiglio.
-  if (dopoAnnuncio && S.inizio.test(pezzo[0]) && !/^(?:usa|use|scegli|sceglila|come)$/.test(pezzo[0])) return true;
-  const sola = dopoAnnuncio && pezzo.length === 1;
-  let ultima = -1;
-  pezzo.forEach((p, i) => {
-    if (STATO.test(p) || S.descrive.test(p) || (!sola && (S.tempo.test(p) || S.misura.test(p)))) ultima = i;
-  });
-  return k - da <= ultima;
+  coperteDi.set(parole, out);
+  return out;
+}
+function spiega(parole, k) {
+  if (!PAV().SPIEGA || !RT().PRESENTA_DATO) return false;
+  return coperte(parole)[k];
 }
 
 function riservati(grezzo) {
