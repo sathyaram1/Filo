@@ -335,7 +335,8 @@
     'είναι', 'ήταν', 'هي', 'هو', 'היא', 'הוא']);
   // Un annuncio come parola intera, per le regex col flag `u`.
   const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
-  // Le etichette e i verbi fuori dall'alfabeto latino sono quelli dei campi segreti (#1403.8): una lingua nuova va solo lì.
+  // Le etichette fuori dall'alfabeto latino, e i verbi attaccati del cinese, giapponese, coreano e thai, sono quelli dei
+  // campi segreti (#1403.8); i verbi che sono una parola stanno in ANNUNCI qui sopra.
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
   const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
   // Cinese, giapponese e coreano scrivono anche i due punti larghi (：).
