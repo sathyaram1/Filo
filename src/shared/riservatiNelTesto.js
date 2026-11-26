@@ -52,7 +52,9 @@ const ellittica = (testa, dopo) => {
 const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|pass\\s+(?:del(?:la)?\\s+)?wi-?fi'
   + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
 const CHIESTA_IN_CHAT = `${ETICHETTE_CORTE}|(?<![\\p{L}\\p{N}])credenziali(?![\\p{L}\\p{N}])`;
-const FINE_FRASE = /[.!?]+(?=\s|$)|\n/g;
+// Il punto di domanda anche delle altre scritture: quello a tutta larghezza, l'arabo, il greco.
+const DOMANDA = '?？؟;';
+const FINE_FRASE = /[.!?;؟]+(?=\s|$)|[。！？]+|\n/g;
 const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
