@@ -125,6 +125,8 @@ test('dalle righe agli spec: prima chi passa dalla funzione cambiata, poi chi ca
   const m = mappa();
   const dentroA = proveDelCambio(m, new Map([['src/main/x.js', [3]]]));
   assert.deepEqual(dentroA.prove.map((p) => [p.spec, p.livello]), [['tests/a.spec.mjs', 'funzione']]);
+  assert.deepEqual(proveDelCambio(m, new Map([['src/main/x.js', [3]]]), { soglia: 0 }).prove.map((p) => p.livello), ['larga'],
+    'una funzione che oltre la soglia di spec eseguono vale come la suite intera');
   const fuoriDaA = proveDelCambio(m, new Map([['src/main/x.js', [8]]]));
   assert.deepEqual(fuoriDaA.prove.map((p) => [p.spec, p.livello]), [['tests/b.spec.mjs', 'file'], ['tests/a.spec.mjs', 'file']], 'stesso livello: prima il più breve');
   const insieme = proveDelCambio(m, new Map([['src/main/x.js', [3, 8]], ['src/renderer/shell.js', [3]], ['src/nuovo.js', [1]]]));
