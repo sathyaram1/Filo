@@ -514,7 +514,7 @@ export function sceltaDallaMappa({ mappa, file, base, root = ROOT }) {
   const togli = (s) => s.replace(/\.spec\.mjs$/, '');
   return {
     specs: prove.filter((p) => p.livello === 'funzione').map((p) => togli(p.spec)),
-    soloCaricano: prove.filter((p) => p.livello === 'file').map((p) => togli(p.spec)),
+    soloCaricano: prove.filter((p) => p.livello !== 'funzione').map((p) => togli(p.spec)),
     nota,
   };
 }
