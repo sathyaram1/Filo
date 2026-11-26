@@ -9,6 +9,10 @@
   // Le forme del guardiano che contano qui: l'IBAN no, si spiega, si copia e si chiede come un indirizzo. La password
   // nemmeno: il guardiano la cerca fra le parole vicine all'etichetta (indirizzi di campo, codice), qui conta il suo posto.
   const REGOLE_GUARDIANO = new Set(['chiave', 'codice', 'carta']);
+  // Il verbo che annuncia il valore, nelle lingue delle etichette (#1403.6), uno solo per password e codici: «Le mot de
+  // passe est …», «Der PIN ist …». Il futuro sta in FUTURO, il «to» polacco accanto al nome che lo regge.
+  const VERBO = '(?:è|e\'|era|is|was|c[\'’]est|est|[ée]tait|ist|lautet|war|es|é|luidt|jest|brzmi|это|был[аио]?|будет|является|είναι|ήταν)';
+  const FUTURO = '(?:sarà|sera|será|serà|serão|będzie|wird)';
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
@@ -21,7 +25,8 @@
   // falso allarme ferma un'azione; qui un falso allarme toglie un numero, e il codice di verifica non esce.
   // Le cifre in coda a una parola («Girasole2024») non sono il codice: è la password intera, e la toglie la regola delle
   // etichette; togliere solo «2024» lascerebbe il resto e cancellerebbe l'anno da tutto il messaggio.
-  const CODICE_ACCESSO = /\b(?:codice|code|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo))*\s+(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
+  // Anche nelle lingue delle etichette (#1403.13): «le code d'accès 482913», «el código de acceso 482913».
+  const CODICE_ACCESSO = /\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const CODICE_ACCESSO_EN = /\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const PIN = /\bpin\b\s*(?:[:=]|è|e'|is)?\s*(\d{4,8})\b/gi;
   // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
@@ -29,9 +34,14 @@
   // meno che la frase lo dica un identificativo che non apre niente (cliente, ordine, prenotazione) senza parole
   // dell'entrare (verifica, autorizza, accedi, sblocca); senza nome conta solo dopo «usa», «inserisci», «enter» o col
   // prefisso («Use 337164 to verify», «G-482913»), perché «Verificato da 1532 utenti» non è un codice. Un anno resta.
-  const NOME_CODICE = /\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa)\b/i;
-  const SEGNO_FORTE = /\b(?:verific\w*|verif(?:y|ied|ies|ication)\w*|autorizz\w*|authori[sz]\w*|autentic\w*|authentic\w*|sblocc\w*|unlock\w*|acced\w*|accesso|access|log-?in|log\s+in|sign-?in|sign\s+in|monouso|one-?time|usa\s+e\s+getta|otp|passcode|2fa|mfa)\b/i;
-  const NON_APRE = /\b(?:client[ei]|customer|client|ordin[ei]|orders?|prenotazion[ei]|booking|reservation|pratica|scont[oi]|discount|promo\w*|coupon|fiscale|postale|postal|zip|cap|prodott[oi]|products?|articol[oi]|items?|sku|tracking|spedizion[ei]|shipp?(?:ing|ment)|fattur[ae]|invoices?|riferimento|reference|tribut[oi]|civile|penale|strada|procedura|error[ei]?|errors?|status|http|abi|cab|ateco|ean|isbn|iban|swift|bic|ticket|bigliett[oi]|vol[oi]|flights?|ricetta|esenzione|destinatario|sdi|cig|cup|colore|colou?r|sorgente|source|paese|country|comune|catastale|matricola|tessera|socio|membro|member|telefono|phone|tel|numero\s+verde|chiam\w*|call|predefinit\w*|default|factory|fabbrica)\b/i;
+  // Il nome del codice anche nelle lingue delle etichette (#1403.13): «código», «kod», i composti tedeschi e olandesi
+  // («Zugangscode», «verificatiecode») elencati, perché «barcode» o «unicode» non annunciano un segreto.
+  const NOMI_DEL_CODICE = '\\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa|c[óo]digos?|kod(?:u|em|y)?'
+    + '|(?:zugangs|sicherheits|best[äa]tigungs|verifizierungs|verifikations|anmelde|einmal|aktivierungs|freischalt(?:ungs)?'
+    + '|entsperr|autorisierungs|authentifizierungs|tür|toegangs|verificatie|beveiligings|bevestigings|inlog|login|activatie)codes?)\\b';
+  const NOME_CODICE = new RegExp(NOMI_DEL_CODICE, 'i');
+  const SEGNO_FORTE = /\b(?:verific\w*|verif(?:y|ied|ies|ication)\w*|autorizz\w*|authori[sz]\w*|autentic\w*|authentic\w*|sblocc\w*|unlock\w*|acced\w*|accesso|access|log-?in|log\s+in|sign-?in|sign\s+in|monouso|one-?time|usa\s+e\s+getta|otp|passcode|2fa|mfa|v[ée]rif\w*|verifizier\w*|acc[èe]s|acceso|acesso|connexion|zugang\w*|anmeld\w*|best[äa]tig\w*|toegang\w*|inlog\w*|dost[ęe]p\w*)\b/i;
+  const NON_APRE = /\b(?:client[ei]|customer|client|ordin[ei]|orders?|prenotazion[ei]|booking|reservation|pratica|scont[oi]|discount|promo\w*|coupon|fiscale|postale|postal|zip|cap|prodott[oi]|products?|articol[oi]|items?|sku|tracking|spedizion[ei]|shipp?(?:ing|ment)|fattur[ae]|invoices?|riferimento|reference|tribut[oi]|civile|penale|strada|procedura|error[ei]?|errors?|status|http|abi|cab|ateco|ean|isbn|iban|swift|bic|ticket|bigliett[oi]|vol[oi]|flights?|ricetta|esenzione|destinatario|sdi|cig|cup|colore|colou?r|sorgente|source|paese|country|comune|catastale|matricola|tessera|socio|membro|member|telefono|phone|tel|numero\s+verde|chiam\w*|call|predefinit\w*|default|factory|fabbrica|commandes?|pedidos?|encomendas?|bestellung\w*|zam[óo]wieni\w*|bestelling\w*|factures?|facturas?|faturas?|rechnung\w*|faktur\w*|produits?|articles?|productos?|produtos?|produkt\w*|erreurs?|erros?|fehler\w*|b[łl][ęe]d\w*|suivi|seguimiento|rastreo|rastreamento|sendungsverfolgung|r[ée]servations?|reservas?|reservierung\w*|buchung\w*|rezerwac\w*|boeking\w*|r[ée]duction|descuentos?|descontos?|rabatt\w*|rabat\w*|remise|gutschein\w*|cup[óo]n|cupom|pocztow\w*|postleitzahl|couleurs?|farbe|kolor\w*|barres|barras|barcode|kreskow\w*|kunde\w*|klient\w*|clientes?|banques?|guichets?|communes?|douan\w*|[ée]?tablissements?|pays|pa[íi]s|kraj\w*|naf|ape|insee|siret|siren|cpv|uai|cnae|nace|cip|iata|upc|gtin)\b/i;
   const INTRODOTTO = /\b(?:use|usa|utilizza|inserisci|immetti|digita|enter|type)\s+$/i;
   const FORMA_CODICE = /(?<![\w./:€$£-])(?:([A-Z]{1,3}-)?(\d{3,4}(?:[ -]\d{3,4}){1,2}|\d{2}-\d{2}-\d{2})|([A-Z]{1,3}-)?(\d{4,8}))(?![\w/]|[.,:]\d|-\d|\s?(?:€|%|euro\b|eur\b|usd\b))/g;
   const ANNO = /^(?:19|20)\d\d$/;
@@ -41,6 +51,44 @@
   // il nome di un servizio («Telegram code», «codice Amazon») e le parole del monouso qui sotto.
   const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|è|\bn\.?|\bnr\.?)?\s*$/;
   const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
+  // Le stesse due regole nelle lingue dei nomi del codice (#1403.13): «Le code de suivi est …», «El código del pedido es …»,
+  // «Kod rabatowy to …», «Der Code der Bestellung ist …». «Code» solo col complemento, perché da solo è anche inglese.
+  const SEPARA_ALTRE = `(?:\\s*[:=#]|\\s+(?:${VERBO}|${FUTURO}|to)(?![\\p{L}]))?\\s*$`;
+  // Il possessivo vale l'articolo («Le code de mon colis», «Kod mojej paczki»). «Le code banque», senza complemento,
+  // passa dall'elenco degli identificativi: lì la parola dopo «code» può essere un aggettivo («Le code généré est …»).
+  const POSSESSIVO_ALTRE = '(?:mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leurs?|mis|mi|tus?|sus?|nuestr[oa]s?|vuestr[oa]s?'
+    + '|meus?|minhas?|teus?|tuas?|seus?|suas?|noss[oa]s?|moj\\p{L}*|mój|twoj\\p{L}*|twój|swoj\\p{L}*|swój|nasz\\p{L}*|wasz\\p{L}*)';
+  const ETICHETTA_ALTRE = new RegExp(`(?:\\b[Cc]ode\\s+(?:(?:de|du|des|van)\\s+(?:(?:la|les|le|de|het)\\s+|l['’]\\s*|${POSSESSIVO_ALTRE}\\s+)?|d['’]\\s*)`
+    + `|\\b(?:[Cc][óo]digo|[Kk]od)\\s+(?:(?:de|del|do|da|dos|das)\\s+(?:(?:la|las|los|el|o|a|os|as)\\s+)?)?(?:${POSSESSIVO_ALTRE}\\s+)?)`
+    + `([\\p{Ll}][\\p{Ll}-]{2,})${SEPARA_ALTRE}`, 'u');
+  const ETICHETTA_DE = new RegExp(`\\b[Cc]odes?\\s+(?:der|des|vom|zur|zum|für\\s+(?:die|den|das|(?:mein|dein|sein|ihr|Ihr|unser|eur)(?:e|en)?)`
+    + `|(?:[Mm]ein|[Dd]ein|[Ss]ein|[Ii]hr|[Uu]nser|[Ee]ur)e[rs])\\s+(\\p{Lu}\\p{Ll}+)${SEPARA_ALTRE}`, 'u');
+  const UN_VERBO = new RegExp(`^(?:${VERBO}|${FUTURO}|sono|sont|son|são|sind|zijn|fue|foi|to)$`, 'iu');
+  const RESTA_ALTRE = new RegExp('^(?:acc[èe]s|acceso|acesso|dost[ęe]p\\p{L}*|v[ée]rifica\\p{L}*|weryfikac\\p{L}*|s[ée]curit[ée]|seguridad|seguran[çc]a'
+    + '|zabezpiecz\\p{L}*|bezpiecze\\p{L}*|beveiliging|confirma\\p{L}*|potwierdz\\p{L}*|bevestiging|activa\\p{L}*|ativa[çc][ãa]o|aktywac\\p{L}*'
+    + '|connexion|sesi[óo]n|sess[ãa]o|logowani\\p{L}*|inlog\\p{L}*|autori[sz]a\\p{L}*|autoryz\\p{L}*|authentifi\\p{L}*|autentica\\p{L}*'
+    + '|uwierzyteln\\p{L}*|d[ée]verrouillage|desbloque\\p{L}*|odblokow\\p{L}*|r[ée]cup[ée]ration|recupera\\p{L}*|odzyskiw\\p{L}*|secours'
+    + '|emerg[êe]ncia|emergencia|respaldo|backup|secret\\p{L}*|tajn\\p{L}*|temporaire|tempor[áa]l|tempor[áa]rio|tymczasow\\p{L}*'
+    + '|nuevo|novo|nowy|[úu]nico|jednorazow\\p{L}*|sms|e-?mail|correo|envoy[ée]|enviado|recibido|re[çc]u|recebido|siguiente|seguinte'
+    + '|num[ée]ric[oa]|personnel|personal|pin|otp|blik|tan|validation|validaci[óo]n|valida[çc][ãa]o'
+    + '|din[áa]mico|dynamique|transac\\p{L}*|transa[çc][ãa]o|identifica\\p{L}*|identyfikac\\p{L}*'
+    // Le cose il cui codice è un segreto (carta, conto, telefono, app) e gli aggettivi di un codice d'accesso.
+    + '|cartes?|tarjetas?|cart[ãa]o|cart[õo]es|\\p{L}*kart\\p{L}*|comptes?|cuentas?|contas?|kont[aouy]s?|account|t[ée]l[ée]phone|portable'
+    + '|m[óo]vil|celular|tel[ée]fono|telem[óo]vel|telefon\\p{L}*|handys?|smartphone|appli\\p{L}*|app|aplicaci[óo]n|aplicativo'
+    + '|confidenti\\p{L}*|confidencial|poufn\\p{L}*|priv[ée]e?|privad[oa]|prywatn\\p{L}*|pessoal|osobist\\p{L}*|provisoire|provisional'
+    + '|provis[óo]rio|unique|num[ée]rique|suivant|ci-dessous|habituel|habitual|actuel|actual|atual|initial|inicial|parental'
+    + '|ma[îi]tre|maestro|mestre|administra\\p{L}*|admin|utilisateur|usuario|usu[áa]rio|verrouillage|bloqueo|bloqueio|blokad\\p{L}*'
+    + '|bancaire|bancari[oa]|banc[áa]ri[oa]|bankow\\p{L}*|einlog\\p{L}*|login\\p{L}*|anmeld\\p{L}*|freischalt\\p{L}*|entsperr\\p{L}*'
+    + '|puk|nip|cb|cvv|cvc|code|codes|c[óo]digo|kod)$', 'iu');
+  const APRE_ALTRE = '(?:retrait|retiro|levantamento|odbioru|abholung|ouverture|apertura|abertura|otwarcia|öffnung|recoger|retirar|abrir|ouvrir'
+    + '|entrer|entrar|öffnen|otworzy\\p{L}*|odebra\\p{L}*|r[ée]cup[ée]rer|levantar|portes?|portail|portillon|entr[ée]e|immeuble|interphone|digicode|coffre(?:-fort)?|alarme|garage|cadenas|casier|consigne'
+    + '|puertas?|portal|port[óo]n|entrada|edificio|portero|alarma|garaje|candado|cerradura|taquilla|casillero|porta|port[ãa]o|pr[ée]dio|cofre'
+    + '|fechadura|cadeado|t[üu]r|tor|haust[üu]r|eingang\\p{L}*|geb[äa]ude\\p{L}*|tresors?|safe|alarm\\p{L}*|schloss\\p{L}*|schlie(?:ß|ss)fach\\p{L}*'
+    + '|drzwi|bram[ay]?|furtk[ai]|wej[śs]ci\\p{L}*|sejfu?|domofonu?|gara[żz]u|deur|poort|ingang|kluis|wi-?fi|wlan)';
+  const APRE_ALTRE_SOLO = new RegExp(`^${APRE_ALTRE}$`, 'iu');
+  const NOME_ALTRE = /(?<![\p{L}])(?:code|c[óo]digo|kod)(?![\p{L}])/giu;
+  const LEGAMI_ALTRE = /^(?:\s+|[dl]['’]|(?:de|du|des|del|do|da|dos|das|la|las|los|le|les|el|o|a|os|as|à|al|au|aux|pour|para|f[üu]r|vom|von|der|die|das|dem|den|zur|zum|van|het|od|ton|ta|votre|tu|su|seu|sua)(?![\p{L}]))+/iu;
+  const DOPO_IL_NOME = new RegExp(`^${SEPARA_ALTRE}`, 'u');
   const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
   // Le cose che un codice apre: il loro codice è un segreto anche col nome comune davanti («Il codice del cancello è
   // 4829», «Codice di ritiro: 640385»). Contano solo come nome del codice, cioè subito dopo «codice» o subito prima di
@@ -59,13 +107,24 @@
     if (en && (!it || en.index > it.index) && NOME_CHE_APRE.test(en[1])) {
       return { apre: true, solo: /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length)) };
     }
+    const altro = [...prima.matchAll(NOME_ALTRE)].pop();
+    if (altro && (!it || altro.index > it.index)) {
+      const coda = prima.slice(altro.index + altro[0].length).replace(LEGAMI_ALTRE, '');
+      const p = /^[\p{L}-]+/u.exec(coda);
+      if (p && APRE_ALTRE_SOLO.test(p[0])) return { apre: true, solo: DOPO_IL_NOME.test(coda.slice(p[0].length)) };
+    }
     if (!it) return { apre: false, solo: false };
     const coda = prima.slice(it.index + it[0].length).replace(LEGAMI, '');
     return { apre: NOME_CHE_APRE.test(coda), solo: NOME_CHE_APRE_SOLO.test(coda) };
   };
+  // Un verbo al posto dell'etichetta («Il codice sarà 4829», «El código era 4829») annuncia il valore, non lo nomina.
   const etichettaDiUnIdentificativo = (prima) => {
     const m = ETICHETTA_IT.exec(prima) || ETICHETTA_EN.exec(prima);
-    return !!m && !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]) && !APRE.test(m[1]) && !/^port[ae]$/.test(m[1]);
+    if (m && !UN_VERBO.test(m[1])) {
+      return !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]) && !APRE.test(m[1]) && !/^port[ae]$/.test(m[1]);
+    }
+    const a = ETICHETTA_ALTRE.exec(prima) || ETICHETTA_DE.exec(prima);
+    return !!a && !UN_VERBO.test(a[1]) && !RESTA_ALTRE.test(a[1]) && !APRE_ALTRE_SOLO.test(a[1]) && !SEGNO_FORTE.test(a[1]);
   };
   // Il valore sulla riga sotto si cerca solo per un codice che non ha già il suo numero sulla sua riga, dopo di lui:
   // in «Codice evento | 739204» la riga sotto è un altro dato. Un pezzo di telefono o un anno non sono il suo numero.
@@ -78,20 +137,30 @@
   // separatore o il verbo che chiude l'etichetta («Telegram code: 48291», «il codice per autorizzare l'operazione è …»),
   // dopo un'etichetta breve in testa («Codice OTP 482913»), prima di «è il tuo codice», da solo in testa alla riga o alla
   // cella dopo l'etichetta. Un altro numero della frase («The code uses port 3000») non è il codice.
-  const NOMI_CODICE = /\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa)\b/gi;
-  const CHIUDE_ETICHETTA = /(?:[:=#]|(?:^|\s)(?:è|e'|is|was|era|sarà|will\s+be|sono|are)|\bn\.|\bnr\.?|\bno\.)\s*$/i;
-  const PRIMA_DEL_NOME = /^\s*(?:[:=-]\s*)?(?:è|e'|is|=|sarà|was)\s+(?:[\p{L}'’-]+\s+){0,4}?(?:codic[ei]|codes?|pin|otp|passcode)\b/iu;
+  const NOMI_CODICE = new RegExp(NOMI_DEL_CODICE, 'gi');
+  // L'articolo dopo il verbo («El código es el 482913») non cambia il posto del numero.
+  const CHIUDE_ETICHETTA = new RegExp(`(?:[:=#]|(?:^|\\s)(?:${VERBO}|${FUTURO}|will\\s+be|sono|are)(?:\\s+(?:il|el|le|o|the))?|\\bn\\.|\\bnr\\.?|\\bno\\.)\\s*$`, 'i');
+  // Il polacco «to» solo dopo «kod»: in inglese «code to …» è una destinazione.
+  const CHIUDE_KOD = /\sto\s*$/i;
+  const PRIMA_DEL_NOME = new RegExp(`^\\s*(?:[:=-]\\s*)?(?:${VERBO}|=|sarà)\\s+(?:[\\p{L}'’-]+\\s+){0,4}?${NOMI_DEL_CODICE}`, 'iu');
+  // Prima del numero si guarda solo la coda: il nome conta a 60 caratteri al più, e rileggere da capo la riga a ogni
+  // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
+  const CODA = 400;
+  const RELATIVA = /^\s*,\s*(?:den|die|das|der|dem|welche[nmrs]?|che|which|that|que|qui|kt[óo]r\p{L}*)\s[^,;!?\n\d]{1,40},/iu;
   function alPostoDelCodice(z, m, inTesta, forte) {
     const prima = z.slice(0, m.index);
     if (inTesta) return !prima.trim();
     if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length))) return true;
-    const n = [...prima.matchAll(NOMI_CODICE)].pop();
+    const da = Math.max(0, prima.length - CODA);
+    const n = [...prima.slice(da).matchAll(NOMI_CODICE)].pop();
     if (!n) return false;
-    const fra = prima.slice(n.index + n[0].length);
+    n.index += da;
+    // Una relativa fra virgole non chiude la frase del codice («Der Code, den du erhalten hast, ist 482913»).
+    const fra = prima.slice(n.index + n[0].length).replace(RELATIVA, ' ');
     if (!fra.trim()) return true;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
     if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
-    if (CHIUDE_ETICHETTA.test(fra)) return true;
+    if (CHIUDE_ETICHETTA.test(fra) || (/^kod/i.test(n[0]) && CHIUDE_KOD.test(fra))) return true;
     return /^[\s•*·>–-]*$/.test(prima.slice(0, n.index)) && !/\d/.test(fra) && fra.trim().split(/\s+/).length <= 4;
   }
   // Un codice usa e getta di lettere e cifre («Steam Guard code: 7K2F9», quello da scrivere sulla TV, «WDJB-MJHT»):
@@ -126,8 +195,8 @@
             const trovati = [...z.matchAll(FORMA_CODICE)].map((m) => ({ m, v: m[2] || m[4] }));
             if (nome) for (const m of z.matchAll(CODICE_ALFANUMERICO)) trovati.push({ m, v: m[0], lettere: true });
             for (const { m, v, lettere } of trovati) {
-              const prima = z.slice(0, m.index);
-              const etichetta = inTesta ? frase : prima;
+              const prima = z.slice(Math.max(0, m.index - CODA), m.index);
+              const etichetta = inTesta ? frase.slice(-CODA) : prima;
               const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
               const entra = forte || chiave.apre;
               if (nonApre && !(nome && entra)) continue;
@@ -204,10 +273,9 @@
   const ACCANTO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:|=\\t?!.,;\\[\\]«»"<>{}$]){0,40}?';
   const ACCANTO_LUNGO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:|=\\t?!.,;\\[\\]«»"<>{}$]){0,90}?';
   const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
-  // Il verbo che chiude l'etichetta, nelle lingue delle etichette («le mot de passe est …», «Das Passwort lautet …»). Il
-  // «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
-  const VERBO = '(?:è|é|e\'|is|was|era|est|[ée]tait|sera|ist|lautet|war|es|será|luidt|jest|brzmi|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)';
-  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+${VERBO}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
+  // Il «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
+  const VERBO_PASSWORD = `(?:${VERBO}|${FUTURO}|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)`;
+  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+${VERBO_PASSWORD}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
@@ -296,7 +364,7 @@
   // qualunque solo da sola: dopo di lei la riga finisce o comincia un altro campo o una parentesi. Seguita da altre
   // parole è una frase («Password: deve avere almeno otto caratteri») e resta.
   const AL_POSTO = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t\\[(]{3,64})([^\\n|\\t]*)`, 'gid');
-  const DOPO = `[ \\t]*(?:[:=|\\t]|[-–—→](?=[ \\t])|[ \\t]${VERBO}(?=[ \\t]))[ \\t]*([^\\s|\\t]{6,70})`;
+  const DOPO = `[ \\t]*(?:[:=|\\t]|[-–—→](?=[ \\t])|[ \\t]${VERBO_PASSWORD}(?=[ \\t]))[ \\t]*([^\\s|\\t]{6,70})`;
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
