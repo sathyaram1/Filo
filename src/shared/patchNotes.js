@@ -22,6 +22,7 @@
         { testo: 'Anche il CVV della carta scritto in francese, tedesco, spagnolo, portoghese, olandese o polacco, come «Le CVV est 123», non arriva più ai modelli, come già «Il CVV è 123».', segnalazione: 1403 },
         { testo: 'Una password scritta dopo «пароль:», «κωδικός:», «密码：» o la stessa parola in arabo, ebraico, hindi, thai, giapponese o coreano resta tua come dopo «Password:»: non arriva ai modelli, e se è in un log che alleghi a un feedback Filo te lo dice prima che parta.', segnalazione: 1403 },
         { testo: 'Un PIN, un CVV o un codice scritti fra parentesi, come «il PIN è (4821)», non arrivano più a nessun modello, come quando li scrivi senza.', segnalazione: 2689 },
+        { testo: 'Una password con uno spazio dentro scritta fra virgolette, come «Mela! Verde77» o una frase intera, non arriva ai modelli nemmeno a metà: Filo toglie tutto quello che sta fra le virgolette, anche a metà di un messaggio.', segnalazione: 1403 },
       ],
     },
     {

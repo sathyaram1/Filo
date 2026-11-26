@@ -446,7 +446,10 @@
   const spiegazione = (parole) => INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p) || TEMPO.test(p));
   function fraseDopo(s, out) {
     for (const m of s.matchAll(FRASE_DOPO)) {
-      const v = m[1].trim();
+      // Le virgolette intorno alla frase («Password: «casa mia al mare»») non sono della password (#1403.27).
+      const tutta = m[1].trim();
+      const q = tutta.match(SOLO_FRA_VIRGOLETTE);
+      const v = q ? q[3] : tutta;
       const parole = v.split(/\s+/);
       if (parole.length < 2 || parole.length > 6 || parole.some((p) => !/^[\p{L}\p{N}'’]+[.,;:]?$/u.test(p)) || v.startsWith('[') || NON_VALORE.test(parole[0]) || formaVicina(parole[0])) continue;
       if (spiegazione(parole)) continue;
@@ -745,12 +748,11 @@
     }
   }
 
-  // Fra virgolette con lo spazio dentro («la password è « Mela!Verde77 »», la grafia francese) il valore si legge come
-  // senza spazi: gli spazi passano fuori, e la lunghezza resta, così ogni posto trovato vale anche nel testo vero (#1403.11).
-  // L'apostrofo attaccato a una parola («dell'altra») non apre né chiude; le altre virgolette sì, anche dopo «は». Dentro
-  // il valore un apostrofo fra due lettere o cifre («« l'Albero77 »») è della password, non la chiude.
+  // Fra virgolette con lo spazio dentro il valore si legge come senza spazi: gli spazi passano fuori, e la lunghezza
+  // resta, così ogni posto trovato vale anche nel testo vero (#1403.11). La regex la definisce urlExfil.js.
   const Q = `${VIRGOLETTE}‚‹›「」『』`;
-  const CON_SPAZI_DENTRO = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${Q}](?:(?:[^\\n${Q}]|(?<=[\\p{L}\\p{N}])['’‘](?=[\\p{L}\\p{N}])){0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
+  const CON_SPAZI_DENTRO = new RegExp(global.SN_URL_EXFIL.VIRGOLETTE.fra, 'gu');
+  const SOLO_FRA_VIRGOLETTE = new RegExp(`^(?:${global.SN_URL_EXFIL.VIRGOLETTE.fra})$`, 'u');
   const HA_VIRGOLETTE = new RegExp(`[${Q}]`, 'u');
   const TESTA_VIRGOLETTE = new RegExp(`^[${Q}]+`, 'u');
   const CODA_VIRGOLETTE = new RegExp(`[${Q}]+$`, 'u');
@@ -765,6 +767,39 @@
     const y = { ...x, valore: v.slice(testa).replace(CODA_VIRGOLETTE, '') };
     if (Number.isInteger(x.inizio)) y.inizio = x.inizio + testa;
     return y;
+  }
+
+  // Le virgolette dicono dove finisce una password con gli spazi («ciao, la password è «Mela! Verde77»»): al posto del
+  // valore (dopo l'etichetta e i due punti o il verbo), o con un valore trovato in testa o in coda, vale tutto quello che
+  // sta fra loro (#1403.27). Una frase citata che nomina la password, o che spiega come sceglierla, resta.
+  // Per il pavimento e per il correttore (correttoreRiservati.js); `valori`: stringhe o `{ valore, regola }`.
+  const PAROLE_FRA_VIRGOLETTE = 8;
+  const NOMINA_CORTA = new RegExp(ETICHETTA_CORTA, 'i');
+  const PRIMA_DELLE_VIRGOLETTE = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]*[:=]|[ \\t]+${VERBO_PASSWORD})[ \\t]*$`, 'i');
+  // Senza due punti né verbo le parole fra virgolette sono spesso una voce («password «Gestisci account»», #2678).
+  const PRIMA_DELLE_VIRGOLETTE_NUDA = new RegExp(`${ETICHETTA}${QUALIFICA}[ \\t]*$`, 'i');
+  const PRIMA_DELLE_VIRGOLETTE_CORTA = new RegExp(`${ETICHETTA_CORTA}[ \\t]*[:=]?[ \\t]*$`, 'i');
+  const spiega = (parole) => NON_VALORE.test(parole[0]) || INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, ''))
+    || parole.some((p) => MISURA.test(p) || TEMPO.test(p));
+  function interiFraVirgolette(vero, valori) {
+    const s = testo(vero);
+    const nudo = (v) => String(v).replace(TESTA_VIRGOLETTE, '').replace(CODA_VIRGOLETTE, '').toLowerCase();
+    const presi = new Set((valori || []).filter((x) => typeof x === 'string' || (x && (!x.regola || x.regola === 'password')))
+      .map((x) => nudo(typeof x === 'string' ? x : x.valore)).filter((v) => v.length >= 3));
+    const out = [];
+    if (!HA_VIRGOLETTE.test(s)) return out;
+    const bordo = (p) => presi.has(nudo(p)) || presi.has(nudo(p).replace(/[.,;:!?]+$/, ''));
+    for (const m of s.matchAll(CON_SPAZI_DENTRO)) {
+      const v = m[3];
+      const parole = v.split(/\s+/);
+      if (parole.length < 2 || parole.length > PAROLE_FRA_VIRGOLETTE || NOMINA_ETICHETTA.test(v) || NOMINA_CORTA.test(v)) continue;
+      const prima = s.slice(Math.max(0, m.index - 120), m.index).split('\n').pop();
+      const alPostoDelValore = !spiega(parole)
+        && (PRIMA_DELLE_VIRGOLETTE.test(prima) || (PRIMA_DELLE_VIRGOLETTE_NUDA.test(prima) && FORMA_FORTE(v))
+          || (PRIMA_DELLE_VIRGOLETTE_CORTA.test(prima) && /[^\p{L}\s'’]/u.test(v)));
+      if (alPostoDelValore || bordo(parole[0]) || bordo(parole[parole.length - 1])) out.push({ valore: v, regola: 'password' });
+    }
+    return out;
   }
 
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
@@ -790,6 +825,7 @@
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
+    out.push(...interiFraVirgolette(s, out));
     return out.filter((x) => x.valore).map((x) => (s === vero ? x : nelTestoVero(x, vero)))
       .filter((x) => String(x.valore).length >= 3);
   }
@@ -861,6 +897,6 @@
   }
 
   // ETICHETTE: il testo della regola dei nomi della password, per i campi dei moduli (campiSegreti.js).
-  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, ETICHETTE: ETICHETTA_NUDA };
+  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, ETICHETTE: ETICHETTA_NUDA };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAVIMENTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
