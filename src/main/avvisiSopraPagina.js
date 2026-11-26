@@ -438,8 +438,7 @@ class AvvisiSopraPagina {
     this._nascondiSuggerimento();
     this._sopra(false);
     this.altezza = 0;
-    this.larghezza = 0;
-    try { this._riserva(0, 0); } catch (_) {}
+    try { this._riserva(0); } catch (_) {}
     try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(vista); } catch (_) {}
     try { if (!vista.webContents.isDestroyed()) vista.webContents.close(); } catch (_) {}
   }
