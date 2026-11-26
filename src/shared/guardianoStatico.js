@@ -486,6 +486,7 @@
     raccogli(s, out, FORMA_USCENTE);
     for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
     for (const m of s.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) out.push({ valore: m[1], regola: 'codice' });
+    for (const m of s.matchAll(PIN_CON_COMPLEMENTO)) out.push({ valore: m[1], regola: 'codice' });
     return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
   }
 
