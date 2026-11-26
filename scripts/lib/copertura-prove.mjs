@@ -78,7 +78,7 @@ export function accendiCopertura() {
   proto.__filoCopertura = true;
   const launch = proto.launch;
   proto.launch = async function launchConCopertura(options = {}) {
-    const prova = provaInCorsa(test);
+    const prova = provaInCorsa();
     const env = { ...(options.env || process.env), FILO_COPERTURA: resolve(dir), FILO_COPERTURA_PROVA: prova };
     const app = await launch.call(this, { ...options, env });
     segui(app, prova, resolve(dir));
