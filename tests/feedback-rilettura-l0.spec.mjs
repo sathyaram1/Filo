@@ -459,6 +459,59 @@ test('dall\'Aiuto: la segnalazione confermata con la parola per la password part
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
 });
 
+// #1403.2 — un file della conversazione allegato alla segnalazione scritta da Filo arriva alla rilettura dopo l'OK.
+test('dalla chat con un log della conversazione allegato: dopo l\'OK l\'avviso sul file, «Manda così» lo manda col file', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const log = join(cartellaTemporanea('filo-l0-chat-'), 'filo.log');
+  writeFileSync(log, 'avvio...\nutente = mario.rossi\npassword = hunter22\nerrore 401\n');
+  const page = await home(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ titolo: 'Login', testo: 'Il login fallisce sempre.', allegati: [log] }) }] }, { text: 'Inviata.' }]);
+  await finti(app);
+  await chiedi(page, `manda il log con la segnalazione\nFile: ${log}`);
+
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
+  await aspettaConfermaPronta(page);
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
+  expect(await confirmText(page)).toContain('In un file allegato c’è una password');
+  expect(await invii(app)).toEqual([]);
+  expect(await app.evaluate(() => JSON.stringify(globalThis.__l0)).then((s) => s.includes('hunter22')), 'il log non va a nessun modello').toBe(false);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual(['Il login fallisce sempre.']);
+  expect(await app.evaluate(() => globalThis.__invii[0].files.map((f) => f.name))).toEqual(['filo.log']);
+  await ripristina(app);
+});
+
+// #1403.2 — «Manda così» ripete la conferma della proposta: i contatori la contano una volta.
+test('una segnalazione proposta da Filo e fermata dalla rilettura: confermata e mandata così, si conta una volta', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  const TELEFONO = '333 1234567';
+  const testo = `Lo zoom non va. Richiamatemi al ${TELEFONO}.`;
+  await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'recapito', pezzo: TELEFONO }] }) });
+  await app.evaluate(() => {
+    globalThis.__proposte = [];
+    const m = globalThis.SN_CONTATORI_SERVIZIO_MAIN || (globalThis.SN_CONTATORI_SERVIZIO_MAIN = {});
+    const prima = m.proposta;
+    m.proposta = (esito) => { globalThis.__proposte.push(esito); return typeof prima === 'function' ? prima(esito) : true; };
+  });
+  const a = { type: 'INVIA_FEEDBACK', testo, titolo: 'Zoom', _proposta: true };
+  const r = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { richiesta: a.testo }), a);
+  expect(r.needsConfirm).toBeGreaterThan(0);
+  await proponiInChat(page, { ...a, _confirm: { level: r.needsConfirm, text: r.describe, parti: r.parti } }, 'prova-proposta');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  if (r.needsConfirm >= 3) await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, r.needsConfirm >= 3 ? 'danger' : 'ok');
+  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([testo]);
+  expect(await app.evaluate(() => globalThis.__proposte)).toEqual(['confermata']);
+});
+
 testSenzaFixture('Filo chiuso durante la rilettura: il feedback resta salvato e parte alla riapertura', async () => {
   testSenzaFixture.setTimeout(120_000);
   const userData = cartellaTemporanea('filo-l0-riavvio-');
