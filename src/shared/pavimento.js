@@ -221,13 +221,18 @@
           if (ultima && c + 1 < celle.length && !haGiaIlNumero(frase)) zona.push({ z: celle[c + 1], inTesta: true });
           const dove = righe[i].indexOf(frase);
           if (righe[i].trim().length <= 80 && !haGiaIlNumero(righe[i].slice(dove < 0 ? 0 : dove))) {
-            for (let j = i + 1, vuote = 0; j < righe.length && vuote <= 2; j++) {
+            // In una conversazione la risposta è la prima riga di un altro: i solleciti di chi chiede si saltano.
+            const R = riservati();
+            const chiede = R ? R.parlaInChat(righe[i]) : null;
+            for (let j = i + 1, vuote = 0, solleciti = 0; j < righe.length && vuote <= 2; j++) {
               if (!righe[j].trim()) { vuote++; continue; }
-              zona.push({ z: righe[j], inTesta: true });
+              const parla = chiede && R.parlaInChat(righe[j]);
+              if (parla && parla.chi === chiede.chi && solleciti < 3) { solleciti++; continue; }
+              zona.push({ z: righe[j], inTesta: true, risposta: { chat: !!chiede } });
               break;
             }
           }
-          for (const { z, inTesta } of zona) {
+          for (const { z, inTesta, risposta } of zona) {
             const predefinito = PREDEFINITO.test(`${frase} ${z}`);
             const nonApre = predefinito || NON_APRE.test(`${frase} ${z}`);
             const trovati = [...z.matchAll(FORMA_CODICE)].map((m) => ({ m, v: m[2] || m[4] }));
