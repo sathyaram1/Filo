@@ -5,18 +5,20 @@
 (function (global) {
   'use strict';
 
-  // `cartaValida(testo)`: il riconoscimento del numero di carta, quello di SN_GUARDIANO_STATICO. `ricorda`: solo chi
-  // resta nella pagina (il content script), non la misura usa e getta del main.
-  function crea(win, cartaValida, { ricorda = false } = {}) {
+  // `cartaValida(testo)`: il riconoscimento del numero di carta, quello di SN_GUARDIANO_STATICO. `nomeCvv`: i nomi del
+  // CVV in tutte le lingue, il NOME_CVV di SN_GUARDIANO_STATICO passato come testo (#2686). `ricorda`: solo chi resta
+  // nella pagina (il content script), non la misura usa e getta del main.
+  function crea(win, cartaValida, { ricorda = false, nomeCvv = '' } = {}) {
     const doc = win.document;
     // Da qui prende i nomi anche la ricerca del main nei componenti chiusi: un campo nuovo va aggiunto solo qui.
     const NOMI_DEI_CAMPI = ['input', 'textarea', 'select'];
     const CAMPO_CON_VALORE = new RegExp(`^(${NOMI_DEI_CAMPI.join('|')})$`, 'i');
     const INPUT_BOTTONE = /^(button|submit|reset|image|checkbox|radio|hidden|file|range|color)$/i;
     const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
+    const NOME_CVV = (() => { try { return nomeCvv ? new RegExp(nomeCvv, 'i') : null; } catch (_) { return null; } })();
     const PAROLE_SEGRETE = new RegExp(['pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code', 'passwort', 'kennwort',
-      'contrase[ñn]a', 'mot de passe', '\\bsenha\\b', 'parola d.ordine', '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)',
-      '(^|[^a-z])cc[-_ ]?(num|number|no|csc|cvv|cvc)', 'codice (di )?(sicurezza|verifica)', 'security code',
+      'contrase[ñn]a', 'mot de passe', '\\bsenha\\b', 'parola d.ordine', '(^|[^a-z])(pin|otp)([^a-z]|$)',
+      '(^|[^a-z])cc[-_ ]?(num|number|no|csc|cvv|cvc)', 'codice (di )?verifica',
       'verification code', 'carta di (credito|debito)', 'numero (della |di )?carta', 'credit ?card', 'debit ?card',
       'card ?number', 'card_number', 'cardnumber', 'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)',
       'num[eé]ro de (la )?carte', 'carte (bancaire|de cr[eé]dit)', 'kartennummer', 'kreditkarte'].join('|'), 'i');
