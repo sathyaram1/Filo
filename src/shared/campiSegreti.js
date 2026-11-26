@@ -31,14 +31,16 @@
       + '|סיסמ[הא]|पासवर्ड|รหัสผ่าน|密[码碼](?![学學])|口令|パスワード|パスフレーズ|暗証番号|비밀\\s*번호|패스워드|암호(?!화)'
       + '|পাসও(?:\\u09DF|\\u09AF\\u09BC)ার্ড|પાસવર્ડ|கடவுச்சொல்|పాస్\\u200C?వర్డ్|ಪಾಸ್\\u200C?ವರ್ಡ್|പാസ്\\u200C?വേഡ്|මුරපදය'
       + '|პაროლი|գաղտնաբառ|የይለፍ\\s?ቃል|စကားဝှက်|ពាក្យសម្ងាត់|ລະຫັດຜ່ານ';
-    // Dopo l'etichetta, il verbo che annuncia il valore come «è» (#1403.8): in cinese, giapponese, coreano e thai
-    // attaccato alle parole, negli altri alfabeti una parola fra due spazi.
+    // Dopo l'etichetta, il verbo che annuncia il valore come «è» attaccato alle parole, in cinese, giapponese, coreano e
+    // thai (#1403.8). Quelli che sono una parola, in ogni alfabeto, stanno in SN_GUARDIANO_STATICO.ANNUNCI.
     const ANNUNCI_ATTACCATI = '是|为|為|は|는|은|คือ';
-    const ANNUNCI_PAROLA = 'هي|هو|היא|הוא|είναι|это';
     // Cinese, giapponese, coreano e thai, coi loro segni larghi, non fanno mai parte di una password: chiudono il valore,
     // che in quelle lingue nessuno spazio separa dalla frase (#1403.8). Corpo di una classe di caratteri.
     const FINE_VALORE = '\\u0E00-\\u0E7F\\u1100-\\u11FF\\u3000-\\u303F\\u3040-\\u30FF\\u3130-\\u318F\\u3400-\\u4DBF'
       + '\\u4E00-\\u9FFF\\uAC00-\\uD7AF\\uF900-\\uFAFF\\uFF01-\\uFF0F\\uFF1A-\\uFF20\\uFF5B-\\uFF65';
+    // Fra quei segni le virgolette ad angolo che aprono il valore («password: 「Mela!Verde77」»): chi taglia il valore le
+    // stacca prima, o il valore resta vuoto. Corpo di una classe di caratteri.
+    const APRE_VALORE = '「『';
     // In più, le forme dei nomi di campo: «pass word», «pass_code», «parola d'ordine» con un apostrofo qualunque.
     const PAROLE_SEGRETE = new RegExp([...(etichette ? [etichette] : []), 'pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code',
       'passwort', 'kennwort', 'contrase[ñn]a', 'mot de passe', '\\bsenha\\b', 'parola d.ordine',
