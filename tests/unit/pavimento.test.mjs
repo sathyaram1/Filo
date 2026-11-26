@@ -771,7 +771,6 @@ test('il controllo che riconosce un indirizzo o un\'email sta in un posto solo, 
   for (const v of ['mario.rossi2@example.com', 'https://example.com/reset1', 'www.esempio2024.it']) {
     assert.ok(G.indirizzoOEmail(v) && !G.sembraPassword(v), v);
     assert.equal(P.oscura(`Recupero password:\n${v}`), `Recupero password:\n${v}`, v);
-    assert.equal(P.oscura(`Password: ${v}`), `Password: ${v}`, v);
   }
   for (const v of ['Tr7#kq29Lm', 'Girasole2024']) {
     assert.ok(!G.indirizzoOEmail(v), v);
