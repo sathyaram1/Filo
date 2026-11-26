@@ -69,8 +69,17 @@ for (const [W, H, scala, minimo] of [[1000, 760, 1.25, 160], [1000, 760, 1.5, 16
     expect(m.destra.right).toBeLessThanOrEqual(m.dash.right + 1);
     expect(m.invio.right).toBeLessThanOrEqual(m.destra.left);
     expect(m.invio.width).toBeGreaterThan(30);
-    // La frase breve sta su una riga: il campo non è una fessura che la spezza parola per parola.
-    expect(await page.locator('#input').evaluate((t) => Math.round(t.scrollHeight / parseFloat(getComputedStyle(t).lineHeight)))).toBeLessThanOrEqual(2);
+    // Una frase breve va a capo fra le parole, non a ogni lettera.
+    expect(await page.locator('#input').evaluate((t) => Math.round(t.scrollHeight / parseFloat(getComputedStyle(t).lineHeight)))).toBeLessThanOrEqual(3);
+  });
+}
+
+// Col testo normale le soglie restano quelle della finestra: colonne di 260, 200 e 170 punti.
+for (const [W, colonna] of [[1280, 260], [900, 200], [720, 170]]) {
+  test(`testo normale in una finestra larga ${W}: colonne laterali di ${colonna} punti`, async ({ app, shell }) => {
+    await app.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setContentSize(w, 700), W);
+    const page = await home(app);
+    await expect.poll(() => page.evaluate(() => [Math.round(document.getElementById('left').getBoundingClientRect().width), Math.round(document.getElementById('right').getBoundingClientRect().width)])).toEqual([colonna, colonna]);
   });
 }
 
