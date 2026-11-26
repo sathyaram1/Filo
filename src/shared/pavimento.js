@@ -781,7 +781,7 @@
     const out = [];
     if (!HA_VIRGOLETTE.test(s)) return out;
     const bordo = (p) => presi.has(nudo(p)) || presi.has(nudo(p).replace(/[.,;:!?]+$/, ''));
-    for (const m of s.matchAll(FRA_VIRGOLETTE)) {
+    for (const m of s.matchAll(CON_SPAZI_DENTRO)) {
       const v = m[3];
       const parole = v.split(/\s+/);
       if (parole.length < 2 || parole.length > PAROLE_FRA_VIRGOLETTE || NOMINA_ETICHETTA.test(v) || NOMINA_CORTA.test(v)) continue;
