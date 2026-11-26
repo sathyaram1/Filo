@@ -64,6 +64,46 @@ test('i nomi della carta che i moduli usano davvero', () => {
   }
 });
 
+// #2686: il CVV etichettato nelle lingue che il pavimento conosce, senza autocomplete, è segreto come «CVV».
+test('il campo del CVV si riconosce dall’etichetta in ogni lingua del pavimento', () => {
+  const s = creaIsolata();
+  const etichette = ['Cryptogramme visuel', 'Código de seguridad', 'Kartenprüfnummer', 'Código de segurança',
+    'Beveiligingscode', 'Kod bezpieczeństwa', 'Код безопасности', 'Codice di sicurezza della carta', 'CVV2'];
+  for (const testo of etichette) {
+    for (const attr of ['aria-label', 'placeholder', 'title']) {
+      assert.equal(s.campoSegreto(campo({ [attr]: testo })), true, `${attr}: ${testo}`);
+    }
+  }
+  for (const nome of ['codigo_de_seguridad', 'cryptogramme-visuel', 'cryptogrammeVisuel', 'kod_bezpieczenstwa', 'card_cvv']) {
+    assert.equal(s.campoSegreto(campo({ name: nome })), true, nome);
+  }
+  for (const testo of ['Prüfnummer des Gutachtens', 'Codice fiscale', 'Kod pocztowy', 'Código postal', 'Sicherheitsfrage']) {
+    assert.equal(s.campoSegreto(campo({ 'aria-label': testo })), false, testo);
+  }
+});
+
+// Ogni `crea` che l'app chiama riceve i nomi del CVV: senza, un campo «Cryptogramme visuel» torna un campo qualunque.
+test('ogni chiamata di crea nell’app passa i nomi del CVV del guardiano', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const radice = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../src');
+  const chiamate = [];
+  const giu = (dir) => {
+    for (const voce of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, voce.name);
+      if (voce.isDirectory()) giu(p);
+      else if (p.endsWith('.js')) {
+        const testo = fs.readFileSync(p, 'utf8');
+        for (const m of testo.matchAll(/\bcrea\)?\(window,[\s\S]{0,160}?\)[;.]/g)) chiamate.push([p, m[0]]);
+      }
+    }
+  };
+  giu(radice);
+  assert.ok(chiamate.length >= 5, `trovate ${chiamate.length} chiamate`);
+  for (const [p, c] of chiamate) assert.match(c, /nomeCvv|opzioniSegreti/, `${path.relative(radice, p)}: ${c}`);
+  assert.ok(G.NOME_CVV && new RegExp(G.NOME_CVV, 'i').test('cryptogramme visuel'), 'il guardiano dà i nomi del CVV');
+});
+
 // Caselle corte sotto lo stesso contenitore, come le scrive un modulo che divide il numero in pezzi.
 function caselle(valori, max, primo = {}) {
   const cont = { querySelectorAll: () => figli, parentElement: null };
