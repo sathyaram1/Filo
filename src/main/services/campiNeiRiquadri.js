@@ -13,18 +13,19 @@ function entro(promessa, ms) {
 
 function preambolo() {
   const G = globalThis.SN_GUARDIANO_STATICO;
-  return `const luhn = ${G.luhn}; const cartaValida = ${G.cartaValida};`;
+  return `const luhn = ${G.luhn}; const cartaValida = ${G.cartaValida};
+    const etichette = ${JSON.stringify(globalThis.SN_CAMPI_SEGRETI.etichette())};`;
 }
 
 function codiceMisura() {
   return `(function () { ${preambolo()}
-    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida).campiInVista(); } catch (_) { return []; } })()`;
+    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida, { etichette }).campiInVista(); } catch (_) { return []; } })()`;
 }
 
 // Per il protocollo d'ispezione: `this` è la radice di un componente chiuso.
 function codiceMisuraRadice() {
   return `function () { ${preambolo()}
-    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida).campiInVista(this); } catch (_) { return []; } }`;
+    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida, { etichette }).campiInVista(this); } catch (_) { return []; } }`;
 }
 
 // Dove un riquadro mostra il suo documento, nel documento che lo ospita: dentro bordo e margine interno. `sx`/`sy`:

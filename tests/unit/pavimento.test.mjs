@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
@@ -590,6 +591,10 @@ test('la colonna password di un CSV non esce: punti e virgola, esportazioni dei 
     ['"url","username","password"\n"https://a.it","mario","hunter22"\n"https://b.it","anna","con, virgola 9"', ['hunter22', 'con, virgola 9']],
     ['folder,favorite,type,name,login_uri,login_username,login_password\n,,login,Banca,https://banca.it,mario,Girasole2024', ['Girasole2024']],
     ['Utente;Password;Ruolo\n\nmario;Nuvola2023;admin', ['Nuvola2023']],
+    // #1403.5 — anche con l'etichetta fuori dall'alfabeto latino.
+    ['логин;пароль\nivan;Ключ!Зима2024', ['Ключ!Зима2024']],
+    ['用户名,密码,备注\nzhang,Mima2024!,工作', ['Mima2024!']],
+    ['url,login_пароль\nhttps://a.ru,Ключ!Зима2024', ['Ключ!Зима2024']],
   ];
   for (const [t, segreti] of casi) {
     const o = P.oscura(t);
@@ -655,4 +660,62 @@ test('#2678: la frase-password fra virgolette esce intera qualunque parola la ap
   for (const riga of ['la password è «la stessa di prima»', 'la password è «quella del wifi»',
     'nel menu password «Gestisci account» non trovo niente', 'cerca la voce Password "Accesso e sicurezza"',
     'la password "Recupera accesso" non va']) assert.equal(P.oscura(riga), riga);
+});
+
+// #1403.5 — un'etichetta fuori dall'alfabeto latino annuncia la password come «Password:». Una per ogni alternativa
+// della lista di urlExfil.js, che vale per il testo e per i campi dei moduli.
+const ETICHETTE_NON_LATINE = ['пароль', 'Пароль', 'ПАРОЛЬ', 'пароля', 'лозинка', 'κωδικός', 'ΚΩΔΙΚΟΣ',
+  'Κωδικός πρόσβασης', 'ΚΩΔΙΚΟΣ ΠΡΟΣΒΑΣΗΣ', 'κωδικός εισόδου', 'Ο κωδικός μου', 'Νέος κωδικός', 'κωδικός Wi-Fi',
+  'συνθηματικό', 'كلمة المرور', 'كلمة السر', 'رمز عبور', 'סיסמה', 'पासवर्ड', 'รหัสผ่าน', '密码', '密碼', '口令',
+  'パスワード', '비밀번호', '암호'];
+// In greco «κωδικός» è anche il codice di qualunque cosa: postale, d'errore, d'ordine, del prodotto, del coupon.
+const CODICI_GRECI = ['Ταχυδρομικός κωδικός', 'ΤΑΧΥΔΡΟΜΙΚΟΣ ΚΩΔΙΚΟΣ', 'κωδικός σφάλματος', 'κωδικός παραγγελίας',
+  'κωδικός προϊόντος', 'Κωδικός ΑΦΜ', 'Κωδικός κουπονιού', 'Κωδικός πελάτη'];
+
+test('l\'elenco delle etichette della password sta in un posto solo, per il testo e per i moduli', () => {
+  const codice = (p) => readFileSync(new URL(`../../src/shared/${p}`, import.meta.url), 'utf8').split('\n')
+    .filter((r) => !/^\s*\/\//.test(r)).join('\n');
+  assert.doesNotMatch(codice('pavimento.js'), /парол|κωδικ|密[码碼]|wachtwoord|kennwort/, 'il pavimento le prende da urlExfil.js');
+  // #1403.19: i campi dei moduli le ricevono dal pavimento, nemmeno le latine scritte a parte.
+  assert.doesNotMatch(codice('campiSegreti.js'),/парол|κωδικ|密|wachtwoord|has\[łl\]|chiave\\\\s|network\\\\s/, 'i campi le prendono dal pavimento');
+});
+
+test('un codice greco che non è la password arriva intero, e la password greca sulla riga sotto si copre', () => {
+  for (const e of CODICI_GRECI) {
+    for (const t of [`${e}: 10431`, `${e}: AB-1234x`]) assert.equal(P.oscura(t), t, t);
+  }
+  assert.equal(P.oscura('Κωδικός\nΚλειδί!2024'), `Κωδικός\n${S}`);
+});
+
+test('un\'etichetta della password in cirillico, greco, cinese e negli altri alfabeti non latini non fa uscire il valore', () => {
+  for (const e of ETICHETTE_NON_LATINE) {
+    for (const t of [`${e}: Ключ!Зима2024`, `${e}：Mima2024!`, `2026-11-20 12:00:01 INFO логин: ivan, ${e}: Ключ!Зима2024`, `${e}\nКлюч!Зима2024`]) {
+      assert.ok(!P.oscura(t).includes('Ключ!Зима2024') && !P.oscura(t).includes('Mima2024'), t);
+    }
+  }
+  assert.equal(P.oscura('пароль: Ключ!Зима2024'), `пароль: ${S}`, 'il separatore e l\'etichetta restano');
+  assert.ok(!P.oscura('Подтверждение пароля: Ключ!Зима2024').includes('Ключ'), 'con altre parole davanti');
+  assert.ok(!P.oscura('Κωδικός πρόσβασης: Κλειδί!2024').includes('Κλειδί'), 'con altre parole dopo l\'etichetta');
+  assert.ok(!P.oscura('用户名：admin 登录密码：Mima2024!').includes('Mima2024'), 'attaccata alla parola davanti');
+  assert.ok(!P.oscura('пароль Ключ!Зима2024').includes('Ключ'), 'senza i due punti, con la forma di una password');
+});
+
+test('un campo di modulo con un\'etichetta della password non latina tiene il valore lontano dai modelli', () => {
+  require('../../src/shared/campiSegreti.js');
+  const C = globalThis.SN_CAMPI_SEGRETI.crea({ document: { querySelectorAll: () => [], getElementById: () => null }, getComputedStyle: () => ({}) },
+    () => false, { etichette: globalThis.SN_CAMPI_SEGRETI.etichette() });
+  const campo = (etichetta) => ({ nodeType: 1, tagName: 'INPUT', value: 'x', type: 'text', labels: [],
+    getAttribute: (a) => (a === 'aria-label' ? etichetta : null) });
+  for (const e of ETICHETTE_NON_LATINE) assert.equal(C.campoSegreto(campo(e)), true, e);
+  for (const e of ['Имя пользователя', 'Όνομα χρήστη', '用户名', '密码学', '암호화 방식', ...CODICI_GRECI]) {
+    assert.equal(C.campoSegreto(campo(e)), false, e);
+  }
+});
+
+test('intorno alle etichette non latine restano le parole, le spiegazioni e i nomi che le contengono', () => {
+  for (const t of ['контрольная работа 2024', '2026-11-20 INFO пароль пользователя изменён', 'Неверный пароль для пользователя ivan',
+    'Пароль: должен содержать не менее 8 символов', 'Пароль: неверный', 'Пароль: не задан', 'Κωδικός: λάθος',
+    '密码学: 2024年课程', '암호화: AES256', 'Παράδειγμα κωδικοποίησης: UTF8', 'Password: deve avere almeno otto caratteri']) {
+    assert.equal(P.oscura(t), t, t);
+  }
 });

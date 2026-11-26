@@ -162,7 +162,7 @@ test('#2116.5: guardando lo schermo intero, la password resa visibile nella fine
   await servi(app, {
     'login.negozio-finto.it/login': `<!doctype html><html><head><title>Accedi</title></head><body style="margin:0">
       <div style="height:90px;background:${tinta(VERDE)}"></div>
-      <form style="padding:16px"><div>Hasło</div><input id="c" name="haslo" type="password" style="width:380px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0">
+      <form style="padding:16px"><div>Chiave</div><input id="c" name="chiave" type="password" style="width:380px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0">
       <button type="button" id="occhio" onclick="c.type = c.type === 'password' ? 'text' : 'password'">Mostra</button></form>
       </body></html>`,
   });

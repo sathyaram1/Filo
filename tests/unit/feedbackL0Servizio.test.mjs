@@ -156,6 +156,10 @@ const FORME_DI_LOG = [
   ['rete.log', '', 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdefghijklmnop'],
   ['accessi.log', '', 'GET https://example.com/reset?token=8f7d6c5b4a3928171615 200'],
   ['comandi.txt', 'text/plain', 'mysql -u root -pSegreto123'],
+  // #1403.5: l'etichetta in un alfabeto non latino.
+  ['russo.log', 'text/plain', '2026-11-20 12:00:01 INFO вход: логин ivan, пароль: Ключ!Зима2024'],
+  ['greco.log', 'text/plain', 'κωδικός: Κλειδί!2024'],
+  ['cinese.log', 'text/plain', '用户名：admin 密码：Mima2024!'],
 ];
 test('le password scritte come nei log e nelle configurazioni si segnano, negli allegati e nel testo', async () => {
   const { L0, chiamate } = servizio();
@@ -164,7 +168,8 @@ test('le password scritte come nei log e nelle configurazioni si segnano, negli 
     assert.equal(r.stato, 'trovato', name);
     assert.deepEqual(r.esito.allegati, [0], name);
   }
-  for (const testo of ['nel file ho password=hunter22 e mi dà 401', 'il PIN 4821 del bancomat non va', 'Il CVV della carta è 123 e il pagamento fallisce']) {
+  for (const testo of ['nel file ho password=hunter22 e mi dà 401', 'il PIN 4821 del bancomat non va', 'Il CVV della carta è 123 e il pagamento fallisce',
+    'nel log c\'è пароль: Ключ!Зима2024']) {
     const r = await L0.controlla({ testo });
     assert.equal(r.stato, 'trovato', testo);
     assert.deepEqual(r.esito.frasi, [globalThis.SN_FEEDBACK_L0.FRASI_TESTO.segreto], testo);

@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -23,7 +24,7 @@ function campo(attr = {}, valore = '') {
 function creaIsolata() {
   const finestra = { document: { querySelectorAll: () => [], getElementById: () => null }, getComputedStyle: () => ({}) };
   const codice = `(function () { const luhn = ${G.luhn}; const cartaValida = ${G.cartaValida};
-    return (${S.crea})(finestra, cartaValida); })()`;
+    return (${S.crea})(finestra, cartaValida, { etichette: ${JSON.stringify(S.etichette())} }); })()`;
   return vm.runInNewContext(codice, { finestra });
 }
 
@@ -51,6 +52,72 @@ test('il numero di carta si riconosce dal valore, qualunque nome abbia il campo'
   assert.equal(s.campoSegreto(campo({ id: 'n' }, '0039 333 1234567')), false);
   assert.equal(s.campoSegreto(campo({ id: 'n' }, 'via Roma 4111 1111 1111 1111')), false, 'un indirizzo non è un campo della carta');
   assert.equal(s.campoSegreto(campo({ id: 'q' }, 'biciclette rosse')), false);
+});
+
+// #1403.19: le etichette della password che il filtro del testo conosce valgono anche per i campi, nelle stesse lingue,
+// comprese la chiave del wifi di un router e le scritture fuori dall'alfabeto latino.
+const ETICHETTE_STRANIERE = ['Пароль', 'Пароль Wi-Fi', 'Hasło', 'HASŁO', 'Wachtwoord', 'Wifi-wachtwoord', '密码', '无线密码',
+  'WiFi密码', 'パスワード', '비밀번호', 'Chiave di rete', 'Chiave WPA2', 'WPA key', 'WPA2-PSK key', 'Network key', 'Passphrase'];
+
+test('un campo con l’etichetta della password in un’altra lingua è segreto, da qualunque parte arrivi il nome', () => {
+  const s = creaIsolata();
+  for (const etichetta of ETICHETTE_STRANIERE) {
+    for (const attr of ['aria-label', 'placeholder', 'title']) {
+      assert.equal(s.campoSegreto(campo({ [attr]: etichetta }, 'Gatto.Rosso.77')), true, `${attr}="${etichetta}"`);
+    }
+    const legato = { ...campo({}, 'Gatto.Rosso.77'), labels: [{ childNodes: [{ nodeType: 3, nodeValue: `${etichetta}:` }] }] };
+    assert.equal(s.campoSegreto(legato), true, `<label>${etichetta}</label>`);
+  }
+  for (const nome of ['haslo', 'user_haslo', 'wachtwoord', 'wachtwoordVeld', 'loginPassphrase']) {
+    assert.equal(s.campoSegreto(campo({ name: nome })), true, nome);
+  }
+});
+
+test('le etichette dei campi sono le stesse del filtro del testo: ognuna nasconde il valore in tutti e due', () => {
+  const P = require('../../src/shared/pavimento.js');
+  const s = creaIsolata();
+  for (const etichetta of ETICHETTE_STRANIERE) {
+    assert.ok(!P.oscura(`${etichetta}: Gatto.Rosso.77`).includes('Gatto.Rosso.77'), `testo «${etichetta}:»`);
+    assert.equal(s.campoSegreto(campo({ 'aria-label': etichetta })), true, `campo «${etichetta}»`);
+  }
+});
+
+// #1403.19 giro 1: la chiave del wifi come la chiamano i router, e le forme declinate o staccate della parola.
+const CHIAVI_E_FORME = ['Ключ сети', 'Ключ безопасности сети', 'Ключ WPA', 'Сетевой ключ', 'Klucz sieci', 'Klucz WPA',
+  'Potwierdzenie hasła', 'Zmiana hasła', 'Netwerksleutel', 'WPA-sleutel', 'Beveiligingssleutel', '无线网络密钥', 'WPA密钥',
+  '暗号化キー', 'セキュリティキー', 'ネットワークキー', '事前共有キー', 'パスフレーズ', '暗証番号', '네트워크 보안 키', '보안 키',
+  'WPA 키', '비밀 번호', '패스워드', 'Lösenord', 'Heslo'];
+
+test('la chiave del wifi e le forme della parola nelle altre lingue: il campo è segreto e il testo non porta il valore', () => {
+  const P = require('../../src/shared/pavimento.js');
+  const s = creaIsolata();
+  for (const etichetta of CHIAVI_E_FORME) {
+    assert.equal(s.campoSegreto(campo({ 'aria-label': etichetta }, 'Gatto.Rosso.77')), true, `campo «${etichetta}»`);
+    assert.ok(!P.oscura(`${etichetta}: Gatto.Rosso.77`).includes('Gatto.Rosso.77'), `testo «${etichetta}:»`);
+  }
+});
+
+test('ogni strada che crea i campi segreti riceve le etichette del pavimento', () => {
+  const src = (p) => readFileSync(new URL(`../../src/${p}`, import.meta.url), 'utf8');
+  for (const p of ['content/extractContext.js', 'content/testoDeiCampi.js', 'main/services/campiNeiRiquadri.js', 'main/services/fotoDellaPagina.js']) {
+    const chiamate = src(p).match(/\bcrea\}?\)?\((?:window|d\.win)[^;]*/g) || [];
+    assert.ok(chiamate.length > 0, `${p}: nessuna chiamata trovata`);
+    for (const c of chiamate) assert.match(c, /etichette/, `${p}: ${c}`);
+  }
+  const { codiceMisura } = require('../../src/main/services/campiNeiRiquadri.js');
+  const chiave = { ...campo({ 'aria-label': '暗号化キー' }, 'Gatto.Rosso.77'),
+    getBoundingClientRect: () => ({ left: 10, top: 20, right: 210, bottom: 50, width: 200, height: 30 }) };
+  const window = { innerWidth: 800, innerHeight: 600, getComputedStyle: () => ({ backgroundColor: 'rgb(1, 2, 3)', color: 'red', fontSize: '16px' }),
+    document: { querySelectorAll: () => [chiave], getElementById: () => null } };
+  assert.equal(vm.runInNewContext(codiceMisura(), { window }).length, 1, 'nel riquadro la chiave del wifi va coperta');
+});
+
+test('i campi qualunque in quelle lingue restano leggibili', () => {
+  const s = creaIsolata();
+  for (const etichetta of ['Имя пользователя', 'Nazwa użytkownika', 'Gebruikersnaam', '用户名', 'ユーザー名', '사용자 이름',
+    'Nome della rete', 'Network name (SSID)', 'Keyword', '密码学课程', '암호화 방식', 'Resenha', 'Escreva sua resenha', 'Desenhar']) {
+    assert.equal(s.campoSegreto(campo({ 'aria-label': etichetta }, 'mario')), false, etichetta);
+  }
 });
 
 test('i nomi della carta che i moduli usano davvero', () => {

@@ -1176,7 +1176,8 @@
   }
 
   // Le regole dei campi segreti stanno in src/shared/campiSegreti.js, le stesse che il main porta nei riquadri.
-  const Segreti = global.SN_CAMPI_SEGRETI.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t), { ricorda: true });
+  const Segreti = global.SN_CAMPI_SEGRETI.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t),
+    { ricorda: true, etichette: global.SN_CAMPI_SEGRETI.etichette?.() || '' });
   const { campoSegreto, etichettaCollegata, etichettaVicina } = Segreti;
   const CAMPO_CON_VALORE = /^(INPUT|TEXTAREA|SELECT)$/;
 
