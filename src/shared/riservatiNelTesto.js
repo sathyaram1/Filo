@@ -330,7 +330,7 @@ const LIBERE = {
   chiaveRete: /(?<![\p{L}\p{N}])(?:ssid|nome\s+(?:della\s+)?rete|network(?:\s+name)?|wi-?fi|wlan)\s*[:=][^\n]{0,64}?(?:[^\S\n]*[,;|/][^\S\n]*|[^\S\n]+|[^\S\n]*\n(?:[^\S\n]*\n)?[^\S\n]*)(?:key|chiave(?:\s+(?:di\s+rete|wpa2?))?|password|pass|pw|psk|wpa2?(?:\s+key)?)\s*[:=]\s*(\S+)/gu,
   corte: new RegExp(ETICHETTE_CORTE, 'gu'),
   // «la password su whatsapp, (comunque) è Girasole2024»: il valore dopo la virgola.
-  virgola: new RegExp(`(?<![\\p{L}\\p{N}])(${PW}|${ETICHETTE_CORTE})[^\\n.!?]{0,80}?,\\s*(?:[\\p{L}'’]+\\s+){0,2}?${ANNUNCIO}\\s+(\\S+)`, 'gu'),
+  virgola: new RegExp(`(?<![\\p{L}\\p{N}])(${PW}|${ETICHETTE_CORTE})[^\\n${PUNTI}${PUNTI_CJK}]{0,80}?,\\s*(?:[\\p{L}'’]+\\s+){0,2}?${ANNUNCIO}\\s+(\\S+)`, 'gu'),
 };
 const SOLO_CORTE = new RegExp(`^${ETICHETTE_CORTE}$`, 'u');
 const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
