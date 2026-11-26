@@ -6,14 +6,34 @@ import { home } from '../../helpers/chatFinta.mjs';
 
 const STILE = 'Rispondi in modo breve, diretto e senza giri di parole, dammi del tu';
 
-// Quanto del riquadro si vede davvero dentro la riga (in pixel CSS).
-const visto = (riga) => riga.evaluate((r) => {
-  const t = r.querySelector('.dash-cambio-testo').getBoundingClientRect();
-  const q = r.querySelector('.dash-cambio-testo .dash-altrui');
-  if (!q) return 0;
-  const b = q.getBoundingClientRect();
-  return Math.round(Math.max(0, Math.min(t.right, b.right) - b.left));
-});
+// Quante lettere del valore si leggono davvero nella riga, col riquadro o senza (sul main il valore era testo piatto):
+// una lettera conta se sta dentro ogni antenato che taglia, con un posto in meno per i puntini.
+const visto = (riga, inizio) => riga.evaluate((r, inizio) => {
+  const t = r.querySelector('.dash-cambio-testo');
+  const nodi = [];
+  const giro = (n) => { for (const c of n.childNodes) if (c.nodeType === 3) nodi.push(c); else giro(c); };
+  giro(t);
+  let testo = '';
+  const pos = [];
+  for (const n of nodi) for (let i = 0; i < n.textContent.length; i++) { pos.push([n, i]); testo += n.textContent[i]; }
+  const da = testo.indexOf(inizio);
+  if (da < 0) return 0;
+  let viste = 0;
+  for (let k = da; k < pos.length; k++) {
+    const [n, i] = pos[k];
+    const range = document.createRange();
+    range.setStart(n, i); range.setEnd(n, i + 1);
+    const b = range.getBoundingClientRect();
+    let dentro = true;
+    for (let a = n.parentElement; a && a !== r.parentElement; a = a.parentElement) {
+      if (getComputedStyle(a).overflowX === 'visible') continue;
+      if (b.right > a.getBoundingClientRect().right + 0.5) { dentro = false; break; }
+    }
+    if (!dentro) break;
+    viste++;
+  }
+  return Math.max(0, viste - 1);
+}, inizio);
 
 test('r1 il valore di una frase si legge nella riga del cambio almeno quanto prima del lavoro', async ({ app }) => {
   test.setTimeout(60_000);
