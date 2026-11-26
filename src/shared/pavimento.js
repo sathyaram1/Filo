@@ -976,7 +976,8 @@
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
     out.push(...interiFraVirgolette(s, out));
-    return out.filter((x) => x.valore).map((x) => (s === vero ? x : nelTestoVero(x, vero)))
+    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano)))
+      .map((x) => (piano === vero ? x : conGliACapoVeri(x, piano, vero)))
       .filter((x) => String(x.valore).length >= 3);
   }
 
