@@ -86,7 +86,7 @@ for (const nome of NOMI) {
     await aiuto.press('.sn-sidebar-input textarea', 'Enter');
     await expect(aiuto.locator('.sn-sidebar', { hasText: 'Premi «Paga».' })).toBeVisible({ timeout: 20_000 });
     const testo = await arrivato(app, page);
-    console.log('RIGHE', nome, testo.split('\\n').filter((r) => r.includes('#c') || r.includes('#t')).join(' || ').slice(0, 600));
+    console.log('RIGHE', nome, testo.includes('Mario Bianchi'), testo.length, testo.slice(0, 3000));
     expect(testo, 'il modello deve aver ricevuto la pagina col campo').toContain(':: #c');
     expect(testo, `il CVV scritto sotto «${nome}» è arrivato al modello`).not.toContain('8264');
   });
