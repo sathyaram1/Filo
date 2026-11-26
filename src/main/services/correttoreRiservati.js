@@ -46,7 +46,6 @@ function coperte(parole) {
       return j;
     }
   };
-  // Il pezzo di ogni parola: comincia dopo l'ultimo annuncio; `null` prima del primo.
   const pezzoDi = [];
   const lunghezza = new Map();
   for (let i = 0, da = null; i < p.length; i++) {
