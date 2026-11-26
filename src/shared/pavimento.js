@@ -936,6 +936,10 @@
     return out;
   }
 
+  // Gli a capo di Windows e quelli col solo \r (un file di testo allegato) valgono il nostro: le regole leggono le righe
+  // su una copia della stessa lunghezza, così i posti restano quelli del testo vero (#2673.6).
+  const aCapo = (s) => (s.includes('\r') ? s.replace(/\r\n/g, ' \n').replace(/\r/g, '\n') : s);
+
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   function trova(valore) {
@@ -943,7 +947,7 @@
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
     const R = global.SN_RISERVATI_TESTO;
     // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
-    const s = virgoletteStrette(R ? R.senzaEnfasi(vero) : vero);
+    const s = virgoletteStrette(R ? R.senzaEnfasi(aCapo(vero)) : aCapo(vero));
     const out = [];
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
