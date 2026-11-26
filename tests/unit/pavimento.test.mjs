@@ -410,8 +410,9 @@ test('#2678.5: senza virgolette la frase-password si toglie anche con un articol
   for (const riga of ['Password: la casa al mare', 'Password: il mio cane si chiama Fido da sempre',
     'Password: casa mia al mare sole vento pane luna', 'Password: the quick brown fox jumps over the lazy dog',
     'Password del wifi: la casa al mare 77!', 'parola d’ordine: una rondine non fa primavera', 'Passwort: der rote Hund',
-    'Utente: mario\nPassword: la casa al mare\nServer: imap.esempio.it']) {
-    assert.ok(!P.oscura(riga).includes('casa al mare') && !/Fido|vento|lazy|rondine|rote/.test(P.oscura(riga)), riga);
+    'Utente: mario\nPassword: la casa al mare\nServer: imap.esempio.it', 'Password: may the force be with you',
+    'Password: ci vediamo ogni giorno']) {
+    assert.ok(!/casa al mare|Fido|vento|lazy|rondine|rote|force|vediamo/.test(P.oscura(riga)), riga);
   }
   assert.equal(P.oscura('Password: la casa al mare'), `Password: ${S}`);
   assert.equal(P.oscura('Utente: mario\nPassword: la casa al mare\nServer: imap.esempio.it'), `Utente: mario\nPassword: ${S}\nServer: imap.esempio.it`);
