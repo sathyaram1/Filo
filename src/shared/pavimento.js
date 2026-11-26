@@ -423,9 +423,9 @@
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
   const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
   const FINE_VALORE = new RegExp(`[${NON_LATINI.FINE_VALORE}]`);
-  const ANNUNCI_NON_LATINI = `(?:${NON_LATINI.ANNUNCI_ATTACCATI})[ \\t]*|[ \\t](?:${NON_LATINI.ANNUNCI_PAROLA})(?=[ \\t])`;
-  // Le virgolette ad angolo 「『 stanno fra quei segni ma aprono il valore («la password è 「 Mela!Verde77 」»): non lo chiudono.
-  const finoAllaFrase = (v) => v.replace(/^[「『]+/, '').split(FINE_VALORE)[0];
+  const ANNUNCI_NON_LATINI = `(?:${NON_LATINI.ANNUNCI_ATTACCATI})[ \\t]*`;
+  const APRE_VALORE = new RegExp(`^[${NON_LATINI.APRE_VALORE}]+`);
+  const finoAllaFrase = (v) => v.replace(APRE_VALORE, '').split(FINE_VALORE)[0];
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
