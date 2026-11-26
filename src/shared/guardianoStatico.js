@@ -514,8 +514,8 @@
   // primo verbo chiude, così «se il pin è giusto la pagina è 2048» non conta (#2678.3).
   const PIN_CON_COMPLEMENTO = /\bpin\b(?:\s{1,8}(?!(?:è|e'|is|era|was)(?=\s))[^\s\d:=.,;!?|"'«“]{1,24}){1,5}?\s{0,8}(?:[:=]|(?:è|e'|is|era|was)(?=\s))\s{0,8}["'«“]?(\d{4,8})(?!\d)/gi;
   const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
-    + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI}|(?:${NON_LATINI.ANNUNCI_PAROLA})(?=\\s))`
-    + `\\s{0,8}["'«“]?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
+    + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI})`
+    + `\\s{0,8}(?:["'«“]|[${APRE_VALORE}]\\s{0,8})?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
   const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)[\\s:=]{0,8}(?:${ANNUNCIO}\\s{1,8})?["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
