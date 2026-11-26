@@ -17,8 +17,18 @@
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
   // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo dopo «kod».
-  const VERBO_CVV = `(?:${VERBO}|(?<=\\bkod\\b[^\\n]{0,40})to)`;
-  const NOME_CVV = '\\b(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?)\\b';
+  // Dopo il verbo anche l'articolo («Il CVV è il 123», «Die Prüfnummer ist die 123»), e come per la password il trattino
+  // o la freccia fra spazi («CVV — 123», #2681.2).
+  const VERBO_CVV = `(?:${VERBO}|(?<=\\bkod\\b[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
+  const TRATTINO = '[-–—→](?=[ \\t])';
+  // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности», «κωδικός».
+  const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u052F';
+  // Il nome del CVV nelle lingue delle etichette, quelle del verbo.
+  const NOME_CVV = `(?<![${LETTERE}])(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:code|value|number)`
+    + '|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?|cryptogrammes?(?:\\s+visuels?)?|code\\s+de\\s+s[ée]curit[ée]'
+    + '|c[óo]digos?\\s+de\\s+(?:seguridad|seguran[çc]a)|(?:karten)?pr[üu]f(?:nummer|ziffern?|zahl|code)|sicherheits(?:code|nummer)'
+    + '|beveiligingscode|kaartverificatiecode|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa)'
+    + `|код\\s+(?:безопасности|проверки)|κωδικ[οό]ς\\s+ασφαλε[ιί]ας)(?![${LETTERE}])`;
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
   const APERTE = '«"\'“‘„';
