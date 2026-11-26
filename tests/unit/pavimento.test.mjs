@@ -406,6 +406,22 @@ test('dopo «Password:» resta la frase che dice dove trovarla o come sceglierla
   assert.equal(P.oscura('Password: casa mia al mare 2019'), `Password: ${S}`);
 });
 
+test('#2678.5: senza virgolette la frase-password si toglie anche con un articolo in testa, lunga o con un simbolo', () => {
+  for (const riga of ['Password: la casa al mare', 'Password: il mio cane si chiama Fido da sempre',
+    'Password: casa mia al mare sole vento pane luna', 'Password: the quick brown fox jumps over the lazy dog',
+    'Password del wifi: la casa al mare 77!', 'parola d’ordine: una rondine non fa primavera', 'Passwort: der rote Hund',
+    'Utente: mario\nPassword: la casa al mare\nServer: imap.esempio.it']) {
+    assert.ok(!P.oscura(riga).includes('casa al mare') && !/Fido|vento|lazy|rondine|rote/.test(P.oscura(riga)), riga);
+  }
+  assert.equal(P.oscura('Password: la casa al mare'), `Password: ${S}`);
+  assert.equal(P.oscura('Utente: mario\nPassword: la casa al mare\nServer: imap.esempio.it'), `Utente: mario\nPassword: ${S}\nServer: imap.esempio.it`);
+  for (const riga of ['Password: la stessa di prima', 'Password: la trovi sul retro del modem', 'Password: la tua data di nascita',
+    'Password: the same as before', 'Password: the one on the router', 'Password: le chiedi a Mario quando arrivi',
+    'Password: deve avere almeno otto caratteri, una maiuscola, un numero e un simbolo speciale fra quelli ammessi',
+    'Password: la riceverai per email entro due giorni lavorativi dalla richiesta', 'Password: Ciao, come stai?',
+    `Password: ${'parola '.repeat(40).trim()}`]) assert.equal(P.oscura(riga), riga, riga);
+});
+
 test('una chiave o una password per nome, in un file di configurazione o sulla pagina di un servizio, non esce', () => {
   const segreti = {
     'PGPASSWORD=Girasole2024': 'Girasole2024',
