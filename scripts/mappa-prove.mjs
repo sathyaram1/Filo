@@ -174,7 +174,7 @@ function principale() {
   if (opt.comando === 'aiuto') { console.log(AIUTO); return; }
   if (opt.comando === 'unisci') {
     const { regs, rotte } = registrazioniDa(opt.registrazioni);
-    const unite = unisciRegistrazioni(regs);
+    const unite = unisciRegistrazioni(regs, ROOT);
     writeFileSync(opt.out, JSON.stringify(unite));
     console.error(`mappa-prove unisci: ${regs.length} registrazioni (${rotte} illeggibili) in ${unite.length}, in ${opt.out}`);
     return;
