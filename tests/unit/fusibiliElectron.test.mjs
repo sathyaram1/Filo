@@ -82,6 +82,25 @@ test('after-pack spegne il fusibile sull\'eseguibile di ogni sistema, e prima de
   } finally { togliCartella(dir); }
 });
 
+test('il fusibile cerca l\'eseguibile dove lo cercano la firma del Mac e il lanciatore di Linux, anche senza nome dichiarato', async () => {
+  const mac = require('../../scripts/after-pack-mac.js');
+  const linux = require('../../scripts/after-pack-linux.js');
+  const dir = cartellaTemporanea('fusibili-');
+  try {
+    for (const packager of [{ appInfo: { productFilename: 'Filo' }, executableName: 'filo' }, { appInfo: { productFilename: 'Filo' } }]) {
+      const ctxMac = { electronPlatformName: 'darwin', appOutDir: join(dir, 'mac'), packager };
+      assert.equal(F.eseguibileDelPacchetto(ctxMac), mac.appDelPacchetto(ctxMac));
+      const ctxLinux = { electronPlatformName: 'linux', appOutDir: join(dir, 'linux'), packager };
+      const { programma, vero } = linux.programmiDelPacchetto(ctxLinux);
+      assert.equal(F.eseguibileDelPacchetto(ctxLinux), programma, 'prima del lanciatore');
+      mkdirSync(ctxLinux.appOutDir, { recursive: true });
+      writeFileSync(vero, '');
+      assert.equal(F.eseguibileDelPacchetto(ctxLinux), vero, 'dopo il lanciatore');
+      togliCartella(ctxLinux.appOutDir);
+    }
+  } finally { togliCartella(dir); }
+});
+
 // Un progetto con node_modules/electron: suo, o collegato da un'altra cartella come nei cloni delle routine.
 function progetto(dir, { collegato = false } = {}) {
   const radice = join(dir, 'progetto');
