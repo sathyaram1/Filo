@@ -20,7 +20,10 @@
   const ATTESA_CAMPI_MS = 15000;
 
   let Segreti = null;
-  try { Segreti = S.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t), { ricorda: true }); } catch (_) { return; }
+  try {
+    Segreti = S.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t),
+      { ricorda: true, nomeCvv: global.SN_GUARDIANO_STATICO?.NOME_CVV });
+  } catch (_) { return; }
 
   let segui = true;
   // Scritto e non ancora spedito: il main lo sa, e la chiusura della scheda aspetta.
