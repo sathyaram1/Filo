@@ -90,6 +90,8 @@ const SEGRETI = [
   { nome: 'la password resa visibile dal sito', campo: '<label for="c">Password</label> <input id="c" type="text">', valore: 'Gatto.Rosso.77', etichetta: 'Password', avviso: true },
   { nome: 'il numero di carta senza segnaposto', campo: '<label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" inputmode="numeric">', valore: '4111 1111 1111 1111', etichetta: 'Numero della carta', avviso: true },
   { nome: 'il codice di sicurezza nella sua etichetta', campo: '<label>CVV <input id="c" inputmode="numeric"></label>', valore: '8264', etichetta: 'CVV', avviso: true },
+  // #2686: il nome del CVV in un'altra lingua, senza autocomplete né «CVV» da nessuna parte.
+  { nome: 'il codice di sicurezza con l’etichetta francese', campo: '<label>Cryptogramme visuel <input id="c" inputmode="numeric"></label>', valore: '8264', etichetta: 'Cryptogramme visuel' },
   { nome: 'un codice che il sito copre coi puntini', campo: '<label for="c">Codice</label> <input id="c" style="-webkit-text-security:disc">', valore: 'Zq7Kp2xW', etichetta: 'Codice' },
   { nome: 'il numero di carta in un campo che il sito chiama solo «cc-number»', campo: '<div>Numero della carta</div><input id="c" name="cc-number">', valore: '4111 1111 1111 1111', etichetta: '' },
   { nome: 'il numero di carta in un campo dal nome qualunque', campo: '<input id="c" name="q">', valore: '5500 0000 0000 0004', etichetta: '' },
