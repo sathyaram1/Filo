@@ -334,14 +334,21 @@
   // vede le lettere fuori dall'ASCII («şifre», «пароль»); le scritture senza spazi non ne hanno. Le desinenze sono
   // scritte, non una coda di lettere: «Lösenordshanterare» è il gestore, non l'etichetta. Prove:
   // tests/unit/passwordAltreLingue.test.mjs.
-  const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u052F\\u1E00-\\u1EFF]';
+  // Il punto di domanda greco (U+037E) e la ano teleia (U+0387) stanno fra le lettere greche ma chiudono la parola.
+  const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u037D\\u037F-\\u0386\\u0388-\\u03FF\\u0400-\\u052F\\u1E00-\\u1EFF]';
+  // «parola» è anche l'italiano: il rumeno conta con chi la possiede, col wifi o dopo chi la chiede («care e parola»).
+  // «palabra clave» è la parola chiave; «κωδικός» è ogni codice: il postale e quelli di prodotto o d'ordine restano.
   const PAROLE_PASSWORD = [
-    'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', 'claves?', 'senhas?',
-    'palavras?-passe', 'wachtwoord(?:en)?', 'has[łl](?:o|a|em|u)', 'parol(?:ă|a\\s+de|ei)', 'parool(?:i|e)?',
-    'l[öo]senord(?:et|en)?', 'passord(?:et|ene)?', 'adgangskode(?:n|r|rne)?', 'kodeord(?:et)?',
+    'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', '(?<!palabras?\\s+)claves?',
+    'senhas?', 'palavras?-passe', 'wachtwoord(?:en)?', 'has[łl](?:o|a|em|u)', 'parol(?:ă|a\\s+de|ei)',
+    'parola\\s+(?:mea|ta|noastr[ăa]|voastr[ăa]|wi-?fi|wlan|router|re[țţt]elei|contului)',
+    `(?<=(?<!${'[A-Za-z\\u00C0-\\u024F]'})(?:care\\s+(?:e|este|era)|d[ăa]-mi|trimite-mi|spune-mi|zi-mi|[șşs]tii|ai)\\s+)parola`,
+    'parool(?:i|e)?', 'l[öo]senord(?:et|en)?', 'passord(?:et|ene)?', 'adgangskode(?:n|r|rne)?', 'kodeord(?:et)?',
     'salasan(?:a|an|aa|asi|ani)', 'jelsz(?:[óo]t?|av(?:a|ad|am|ak|at)?)', 'hesl(?:o|a|em|u|e)', 'gesl(?:o|a|om|u)',
-    '[şs][iİı]\\u0307?fre(?:si|yi|n|niz|nizi|ler)?', 'lozink(?:a|e|u|om|i)', 'slapta[žz]od(?:is|į|žio|i)',
-    'm[ậa]t\\s+kh[ẩa]u', 'kata\\s+(?:sandi|laluan)', 'κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)', 'συνθηματικ[οόάαύυ]{1,2}',
+    '[şs][iİı]\\u0307?fre(?:si|yi|n|niz|nizi|ler|m|mi|min|miz|ni|nin)?', 'lozink(?:a|e|u|om|i)', 'slapta[žz]od(?:is|į|žio|i)',
+    'm[ậa]t\\s+kh[ẩa]u', 'kata\\s+(?:sandi|laluan)',
+    '(?<!ταχυδρομικ\\S{0,3}\\s+)κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)(?!\\s+(?:προ[ϊι][οό]ντ|πελ[αά]τ|παραγγελ|κρ[αά]τησ|αποστολ|παρακολο[υύ]θ|εκπτ|[εέ]κπτ|κουπον|προσφορ|ταχυδρομ|αφμ|ειδ))',
+    'συνθηματικ[οόάαύυ]{1,2}',
   ];
   // Il russo, l'ucraino, il bulgaro e il serbo declinano troppo per scriverle tutte: lì vale la radice.
   const RADICI_PASSWORD = ['парол', 'лозинк'];
