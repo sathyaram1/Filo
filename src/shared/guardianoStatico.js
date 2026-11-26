@@ -391,14 +391,15 @@
     const nucleo = v.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
     return /\d/.test(nucleo) || /[^A-Za-z0-9]/.test(nucleo);
   }
-  function passwordAnnunciata(s, fine, stretto, out) {
+  function passwordAnnunciata(s, fine, stretto, out, polacco = false) {
     const finestra = s.slice(fine, fine + RAGGIO + 64);
     const re = /\S+/g;
     let t;
     while ((t = re.exec(finestra)) && t.index <= RAGGIO) {
       const v = t[0].replace(/[.,;)»”"']+$/, '');
       if (!sembraPassword(v)) continue;
-      if (annunciato(finestra.slice(0, t.index), v, { stretto })) out.push({ valore: v, regola: 'password' });
+      const fra = finestra.slice(0, t.index);
+      if (annunciato(fra, v, { stretto }) || (polacco && TO_POLACCO.test(fra))) out.push({ valore: v, regola: 'password' });
       return;
     }
   }
