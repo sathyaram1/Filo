@@ -74,7 +74,24 @@ jobs:
         continue-on-error: true
         timeout-minutes: 150
         shell: bash
-        run: ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_BLOB_OUTPUT_NAME=parte-${{ matrix.parte }}.zip xvfb-run -a npx playwright test --shard=${{ matrix.parte }}/4 --global-timeout=8400000 --reporter=list,blob
+        # FILO_COPERTURA: ogni prova registra quali funzioni di src/ fa eseguire, per la mappa prova → file (#2502).
+        run: FILO_COPERTURA=copertura ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_BLOB_OUTPUT_NAME=parte-${{ matrix.parte }}.zip xvfb-run -a npx playwright test --shard=${{ matrix.parte }}/4 --global-timeout=8400000 --reporter=list,blob
+
+      # Un lancio di Electron per caso scrive due file: qui diventano un record per prova, e la mappa la fa il verdetto.
+      - name: Registrazioni della parte in un file
+        if: always()
+        continue-on-error: true
+        run: node scripts/mappa-prove.mjs unisci --registrazioni copertura --out copertura-parte-${{ matrix.parte }}.json
+
+      - name: Conserva le registrazioni della parte
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-copertura-${{ matrix.parte }}
+          path: copertura-parte-${{ matrix.parte }}.json
+          if-no-files-found: warn
+          retention-days: 7
 
       # Un esito che non si carica non fa verde niente: il verdetto conta la parte come senza esito.
       - name: Conserva l'esito della parte
