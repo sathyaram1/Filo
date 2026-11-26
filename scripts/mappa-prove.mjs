@@ -15,7 +15,8 @@ import { repoDaRemoto } from './rossi-della-suite.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TETTO_BYTE = 256 * 1024 * 1024;
-const CORSE_GUARDATE = 15;
+// La mappa nasce a ogni corsa: se nelle ultime cinque non c'è, il guasto è suo e cercarla più indietro costa e basta.
+const CORSE_GUARDATE = 5;
 
 const AIUTO = `Uso:
   node scripts/mappa-prove.mjs [--base <rif>] [--diff <file>] [--mappa <file>] [--corsa <id>] [--json] [file…]
