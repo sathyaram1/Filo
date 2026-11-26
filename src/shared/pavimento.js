@@ -185,10 +185,13 @@
   // Le parole senza la forma di una password («Password: hunter», la cella, la colonna) contano solo da sole al posto del
   // valore, con l'etichetta in testa alla riga o alla cella: «un campo password o carta: …» resta.
   // Le etichette: anche la password del wifi del router, il codice di accesso e sei lingue straniere.
-  const ETICHETTA = '\\b(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
+  const LATINE = '(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
     + '|chiave\\s+(?:di\\s+)?(?:rete|sicurezza(?:\\s+di\\s+rete)?|wi-?fi|wpa2?|wlan)|(?:wpa[23]?(?:-psk)?|wi-?fi|wlan|network|security)\\s+key'
-    + '|codice\\s+(?:di\\s+)?(?:accesso|segreto)|mot\\s+de\\s+passe|passwort|kennwort|contrase[ñn]a|senha|wachtwoord|has[łl]o)\\b'
-    + '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
+    + '|codice\\s+(?:di\\s+)?(?:accesso|segreto)|mot\\s+de\\s+passe|passwort|kennwort|contrase[ñn]a|senha|wachtwoord|has[łl]o)\\b';
+  const NON_ALTRO = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
+  const ETICHETTA = `\\b${LATINE}${NON_ALTRO}`;
+  // Senza il confine davanti: dentro un nome di campo («login_password») o una parola più lunga.
+  const ETICHETTA_DENTRO = `${LATINE}${NON_ALTRO}`;
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
@@ -208,8 +211,8 @@
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
   // In un CSV l'intestazione è un nome di campo, anche col prefisso delle esportazioni («login_password»): al più una
   // parola in più, perché una frase con le virgole («utente, password e premi invio») non apra una colonna.
-  const INTESTAZIONE_CSV = new RegExp(`^(?:[A-Za-z0-9]{1,20}[_.\\s-])?${ETICHETTA.slice(2)}(?:[_.\\s-]?[A-Za-z0-9()]{1,20})?$`, 'i');
-  const NOMINA_ETICHETTA = new RegExp(ETICHETTA.slice(2), 'i');
+  const INTESTAZIONE_CSV = new RegExp(`^(?:[A-Za-z0-9]{1,20}[_.\\s-])?${ETICHETTA_DENTRO}(?:[_.\\s-]?[A-Za-z0-9()]{1,20})?$`, 'i');
+  const NOMINA_ETICHETTA = new RegExp(ETICHETTA_DENTRO, 'i');
   // Le parole che una pagina mette accanto all'etichetta senza che siano la password.
   const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|chiedi|chiedila|ask|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or)$/i;
 
