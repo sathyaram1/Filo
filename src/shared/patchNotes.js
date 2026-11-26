@@ -16,7 +16,7 @@
         { testo: 'Una password sotto «Password:» in un file di testo creato su Windows non arriva più ai modelli, come in qualunque altro testo.', segnalazione: 2673 },
         { testo: 'Una password in una tabella, come «| Password: | … |», non arriva più ai modelli, e il correttore non riceve più il CVV della carta. Una frase sulla password, come «va cambiata ogni 90 giorni», arriva intera al correttore.', segnalazione: 2695 },
         { testo: 'Una pagina in russo, greco, cinese o in un altro alfabeto che ti chiede la password in un campo di testo qualunque passa dal controllo dei siti pericolosi come una in italiano. E Filo non manda fuori da sé una password scritta dopo «пароль:» o «密码：», né in una ricerca né dentro un indirizzo.', segnalazione: 1403 },
-        { testo: 'Una password scritta come «la password diventa …», «dovrebbe essere …», «è ancora …», «la password del wifi …» o «pass «…»» non arriva più a nessun modello, come quando scrivi «la password è …».', segnalazione: 2678 },
+        { testo: 'Una password scritta come «la password diventa …», «dovrebbe essere …», «è ancora …», «è stata cambiata in …», «ho cambiato la password in …», «la password del wifi …» o «pass «…»» non arriva più a nessun modello, come quando scrivi «la password è …».', segnalazione: 2678 },
       ],
     },
     {
