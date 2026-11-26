@@ -176,6 +176,27 @@ test('i dati della carta chiesti in un campo di testo contano come dati di pagam
   assert.equal(pageHints(conCampi('Card number')).hasPayment, true);
   assert.equal(pageHints(conCampi('Nome', 'Scadenza del contratto', 'Codice fiscale')).hasPayment, false);
   // Il main la esegue nei riquadri dal sorgente: deve reggere da sola, senza niente attorno.
-  const daSorgente = new Function(`return (${pageHints.toString()})`)();
+  const { PAGE_HINTS_JS } = require('../../src/content/safebrowseHints.js');
+  const daSorgente = new Function(`return ${PAGE_HINTS_JS}`)();
   assert.equal(daSorgente(conCampi('CVV')).hasPayment, true);
+});
+
+// #1403.8 — una pagina di phishing in russo o in cinese chiede la password in un campo di testo: conta, dal modulo
+// caricato e dal sorgente che il main manda nei riquadri.
+test('la password chiesta in un campo di testo con un\'etichetta non latina conta come una password', () => {
+  const { pageHints, PAGE_HINTS_JS } = require('../../src/content/safebrowseHints.js');
+  const daSorgente = new Function(`return ${PAGE_HINTS_JS}`)();
+  const campo = (t) => documento({ campi: [{ attr: { placeholder: t } }] });
+  for (const h of [pageHints, daSorgente]) {
+    for (const t of ['Пароль', 'Введите пароль', '密码', '請輸入密碼', 'パスワード', '비밀번호', 'Κωδικός πρόσβασης', 'كلمة المرور', 'סיסמה']) {
+      assert.equal(h(campo(t)).hasPassword, true, t);
+    }
+    for (const t of ['Имя пользователя', '用户名', '密码学', 'Ταχυδρομικός κωδικός', 'Κωδικός πελάτη']) {
+      assert.equal(h(campo(t)).hasPassword, false, t);
+    }
+    // Le opzioni di chi chiama (i riquadri chiusi, i campi mostrati) arrivano come prima.
+    const mostrati = [];
+    h(campo('Пароль'), { mostrati });
+    assert.equal(mostrati.length, 1);
+  }
 });

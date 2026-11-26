@@ -189,3 +189,12 @@ test('in chat la richiesta si riconosce anche senza punto di domanda e con le ab
   // L'inglese «pass» non nomina nessuna password.
   assert.equal(risposta('certo, alle 1830 al bar Gatto2024', 'Marco: I need to pass the exam').nuovo, 'certo, alle 1830 al bar Gatto2024');
 });
+
+// #1403.8 — i nomi della password fuori dall'alfabeto latino sono quelli della lista comune: la chat li riconosce.
+test('la password chiesta o detta in chat con un nome non latino non parte, e la parola attaccata resta', () => {
+  assert.equal(risposta('пароль? gattoneroferoce', '').nuovo, 'пароль? [dato riservato]');
+  assert.equal(risposta('当然，gattoneroferoce', '小明：wifi密码是多少？').nuovo, '当然，[dato riservato]');
+  assert.equal(risposta('もちろん、gattoneroferoce', '田中：wifiのパスワードは？').nuovo, 'もちろん、[dato riservato]');
+  assert.equal(risposta('certo, Gatto2024', 'Ahmed: ما هي كلمة المرور للواي فاي؟').nuovo, 'certo, [dato riservato]');
+  assert.equal(risposta('конечно, gattoneroferoce', 'Иван: как дела?').nuovo, 'конечно, gattoneroferoce');
+});

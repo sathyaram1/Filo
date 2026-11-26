@@ -883,11 +883,12 @@ test('#2689: fra parentesi PIN, CVV e codici escono come senza, con le parentesi
 });
 
 // #1403.5 — un'etichetta fuori dall'alfabeto latino annuncia la password come «Password:». Una per ogni alternativa
-// della lista di urlExfil.js, che vale per il testo e per i campi dei moduli.
+// della lista di campiSegreti.js, che vale per il testo e per i campi dei moduli.
 const ETICHETTE_NON_LATINE = ['пароль', 'Пароль', 'ПАРОЛЬ', 'пароля', 'лозинка', 'κωδικός', 'ΚΩΔΙΚΟΣ',
   'Κωδικός πρόσβασης', 'ΚΩΔΙΚΟΣ ΠΡΟΣΒΑΣΗΣ', 'κωδικός εισόδου', 'Ο κωδικός μου', 'Νέος κωδικός', 'κωδικός Wi-Fi',
   'συνθηματικό', 'كلمة المرور', 'كلمة السر', 'رمز عبور', 'סיסמה', 'पासवर्ड', 'รหัสผ่าน', '密码', '密碼', '口令',
-  'パスワード', '비밀번호', '암호'];
+  'パスワード', '비밀번호', '암호', 'گذرواژه', 'پاس ورڈ', 'পাসওয়ার্ড', 'પાસવર્ડ', 'கடவுச்சொல்', 'పాస్‌వర్డ్', 'ಪಾಸ್‌ವರ್ಡ್',
+  'പാസ്‌വേഡ്', 'මුරපදය', 'პაროლი', 'Գաղտնաբառ', 'የይለፍ ቃል', 'စကားဝှက်', 'ពាក្យសម្ងាត់', 'ລະຫັດຜ່ານ', 'Құпия сөз', 'Нууц үг', 'Сырсөз'];
 // In greco «κωδικός» è anche il codice di qualunque cosa: postale, d'errore, d'ordine, del prodotto, del coupon.
 const CODICI_GRECI = ['Ταχυδρομικός κωδικός', 'ΤΑΧΥΔΡΟΜΙΚΟΣ ΚΩΔΙΚΟΣ', 'κωδικός σφάλματος', 'κωδικός παραγγελίας',
   'κωδικός προϊόντος', 'Κωδικός ΑΦΜ', 'Κωδικός κουπονιού', 'Κωδικός πελάτη'];
@@ -896,8 +897,8 @@ test('l\'elenco delle etichette della password sta in un posto solo, per il test
   const codice = (p) => readFileSync(new URL(`../../src/shared/${p}`, import.meta.url), 'utf8').split('\n')
     .filter((r) => !/^\s*\/\//.test(r)).join('\n');
   assert.doesNotMatch(codice('pavimento.js'), /парол|κωδικ|密[码碼]|wachtwoord|kennwort/, 'il pavimento le prende da urlExfil.js');
-  // #1403.19: i campi dei moduli le ricevono dal pavimento, nemmeno le latine scritte a parte.
-  assert.doesNotMatch(codice('campiSegreti.js'),/парол|κωδικ|密|wachtwoord|has\[łl\]|chiave\\\\s|network\\\\s/, 'i campi le prendono dal pavimento');
+  // #1403.19: i campi dei moduli ricevono le latine dal pavimento; le non latine stanno qui (ETICHETTE_NON_LATINE, #1403.8).
+  assert.doesNotMatch(codice('campiSegreti.js'), /wachtwoord|has\[łl\]|chiave\\\\s|network\\\\s/, 'i campi le prendono dal pavimento');
 });
 
 // #2673.8: la regola «un indirizzo o un'email non è una password» la scrive solo il guardiano; il pavimento la chiede.
@@ -955,4 +956,31 @@ test('intorno alle etichette non latine restano le parole, le spiegazioni e i no
     '密码学: 2024年课程', '암호화: AES256', 'Παράδειγμα κωδικοποίησης: UTF8', 'Password: deve avere almeno otto caratteri']) {
     assert.equal(P.oscura(t), t, t);
   }
+});
+
+// #1403.8 — come «la password è …», anche col verbo della sua lingua; il valore finisce dove ricomincia la frase.
+test('dopo il verbo che annuncia la password nella sua lingua il valore non arriva al modello, e la frase intorno sì', () => {
+  for (const [t, atteso] of [['我的密码是Kx82mPq9', `我的密码是${S}`], ['パスワードは Kx82mPq9', `パスワードは ${S}`],
+    ['비밀번호는 Kx82mPq9', `비밀번호는 ${S}`], ['كلمة المرور هي Kx82mPq9', `كلمة المرور هي ${S}`],
+    ['הסיסמה היא Kx82mPq9', `הסיסמה היא ${S}`], ['ο κωδικός πρόσβασης είναι Kx82mPq9', `ο κωδικός πρόσβασης είναι ${S}`],
+    ['密码：Kx82mPq9，然后点击登录', `密码：${S}，然后点击登录`], ['密码是Kx82mPq9，记住它', `密码是${S}，记住它`]]) {
+    assert.equal(P.oscura(t), atteso, t);
+  }
+});
+
+test('la frase cinese, giapponese o coreana dopo l\'etichetta arriva al modello, e la ricerca che la contiene parte', () => {
+  for (const t of ['请输入密码：密码长度至少8位，包含字母和数字。忘记密码？点击这里重置。', '登录帮助\n密码：注册时设置的6到16位字符',
+    'パスワード：8文字以上で英数字を含めてください。', '비밀번호: 8자 이상, 영문과 숫자를 포함해야 합니다.']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+  for (const q of ['微信密码：忘了怎么找回', 'パスワード：忘れた場合', '비밀번호: 잊어버렸어요', 'пароль: забыл что делать']) {
+    assert.deepEqual(P.trova(q), [], q);
+  }
+});
+
+test('un testo lunghissimo senza spazi dopo l\'etichetta non ferma il pavimento', () => {
+  const lungo = `密码：${'这是一段很长的说明文字。'.repeat(6000)}`;
+  assert.equal(P.oscura(lungo), lungo);
+  const valore = `x1${'ab'.repeat(40000)}`;
+  assert.equal(P.oscura(`password: ${valore}`), `password: ${S}`);
 });

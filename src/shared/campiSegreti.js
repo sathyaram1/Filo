@@ -16,10 +16,30 @@
     const CAMPO_CON_VALORE = new RegExp(`^(${NOMI_DEI_CAMPI.join('|')})$`, 'i');
     const INPUT_BOTTONE = /^(button|submit|reset|image|checkbox|radio|hidden|file|range|color)$/i;
     const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
+    // Le etichette della password fuori dall'alfabeto latino, per i campi e per il testo (pavimento.js le prende da qui:
+    // una lingua nuova si aggiunge solo qui). \b non vede quelle lettere: il confine lo dice l'alfabeto. In greco
+    // «κωδικός» è anche il codice di qualunque cosa (#1403.5): password solo da solo, d'accesso o col possessivo.
+    const GRECO = '[\\u0370-\\u03FF\\u1F00-\\u1FFF]';
+    const ETICHETTE_NON_LATINE = '(?<![\\u0400-\\u04FF])(?:парол[ьяа]|лозинк[аеу]|құпия\\s+сөз|нууц\\s+үг|сырсөз)(?![\\u0400-\\u04FF])'
+      + `|(?<!${GRECO})(?<!ταχυδρομικ[οό]ς\\s+)κωδικ[οό]ς(?!${GRECO})`
+      + `(?![ \\t]+(?!(?:πρ[οό]σβασης|εισ[οό]δου|σ[υύ]νδεσης|μου|σου|σας|του|της|μας)(?!${GRECO}))${GRECO})`
+      + `|(?<!${GRECO})συνθηματικ[οό](?!${GRECO})`
+      + '|(?<![\\u0600-\\u06FF])(?:(?:كلمة|رمز)\\s+(?:ال)?(?:مرور|سر|عبور)|گذرواژه|پاس\\s?ورڈ)(?![\\u0600-\\u06FF])'
+      + '|סיסמ[הא]|पासवर्ड|รหัสผ่าน|密[码碼](?![学學])|口令|パスワード|비밀번호|암호(?!화)'
+      + '|পাসও(?:\\u09DF|\\u09AF\\u09BC)ার্ড|પાસવર્ડ|கடவுச்சொல்|పాస్\\u200C?వర్డ్|ಪಾಸ್\\u200C?ವರ್ಡ್|പാസ്\\u200C?വേഡ്|මුරපදය'
+      + '|პაროლი|գաղտնաբառ|የይለፍ\\s?ቃል|စကားဝှက်|ពាក្យសម្ងាត់|ລະຫັດຜ່ານ';
+    // Dopo l'etichetta, il verbo che annuncia il valore come «è» (#1403.8): in cinese, giapponese, coreano e thai
+    // attaccato alle parole, negli altri alfabeti una parola fra due spazi.
+    const ANNUNCI_ATTACCATI = '是|为|為|は|는|은|คือ';
+    const ANNUNCI_PAROLA = 'هي|هو|היא|הוא|είναι|это';
+    // Cinese, giapponese, coreano e thai, coi loro segni larghi, non fanno mai parte di una password: chiudono il valore,
+    // che in quelle lingue nessuno spazio separa dalla frase (#1403.8). Corpo di una classe di caratteri.
+    const FINE_VALORE = '\\u0E00-\\u0E7F\\u1100-\\u11FF\\u3000-\\u303F\\u3040-\\u30FF\\u3130-\\u318F\\u3400-\\u4DBF'
+      + '\\u4E00-\\u9FFF\\uAC00-\\uD7AF\\uF900-\\uFAFF\\uFF01-\\uFF0F\\uFF1A-\\uFF20\\uFF5B-\\uFF65';
     // In più, le forme dei nomi di campo: «pass word», «pass_code», «parola d'ordine» con un apostrofo qualunque.
     const PAROLE_SEGRETE = new RegExp([...(etichette ? [etichette] : []), 'pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code',
       'passwort', 'kennwort', 'contrase[ñn]a', 'mot de passe', '\\bsenha\\b', 'parola d.ordine',
-      '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)',
+      '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)', ETICHETTE_NON_LATINE,
       '(^|[^a-z])cc[-_ ]?(num|number|no|csc|cvv|cvc)', 'codice (di )?(sicurezza|verifica)', 'security code',
       'verification code', 'carta di (credito|debito)', 'numero (della |di )?carta', 'credit ?card', 'debit ?card',
       'card ?number', 'card_number', 'cardnumber', 'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)',
@@ -202,7 +222,8 @@
       return out;
     }
 
-    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti, NOMI_DEI_CAMPI };
+    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti, NOMI_DEI_CAMPI, ETICHETTE_NON_LATINE,
+      ANNUNCI_ATTACCATI, ANNUNCI_PAROLA, FINE_VALORE };
   }
 
   // Il testo della regola delle etichette del pavimento, da passare a `crea`: una lista sola per campi e testo.

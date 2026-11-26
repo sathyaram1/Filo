@@ -335,6 +335,39 @@ test('modulo Google: la password chiesta in un campo di testo fa comparire l\'av
   expect(await livelloScheda(app, 'docs.google.com')).toBe('sospetto');
 });
 
+// #1403.8 — la stessa pagina in russo, e in cinese dentro il riquadro di Google Sites: l'etichetta non latina conta.
+test('modulo Google in russo: la password chiesta in un campo di testo fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'docs.google.com/forms/d/e/1FAIpQLru/viewform': '<h1>Проверка почтового ящика</h1><form>'
+      + '<span id="i1">Электронная почта</span><input type="text" aria-labelledby="i1">'
+      + '<span id="i5">Пароль</span><input type="text" aria-labelledby="i5">'
+      + '<button>Отправить</button></form>',
+  });
+  await openTab('https://docs.google.com/forms/d/e/1FAIpQLru/viewform');
+  expect(await livelloScheda(app, 'docs.google.com')).toBe('sospetto');
+});
+
+test('Google Sites in cinese: il campo di testo «密码» nel riquadro incorporato fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'sites.google.com/view/mail-zh': '<h1>邮箱验证</h1>'
+      + '<iframe src="https://5678-atari-embeds.googleusercontent.com/embeds/zh/inner.html" width="500" height="300"></iframe>',
+    '5678-atari-embeds.googleusercontent.com': '<form><input type="text" placeholder="邮箱"><input type="text" placeholder="请输入密码"><button>登录</button></form>',
+  });
+  await openTab('https://sites.google.com/view/mail-zh');
+  expect(await livelloScheda(app, 'sites.google.com')).toBe('sospetto');
+});
+
+test('modulo Google in persiano: la password chiesta in un campo di testo fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'docs.google.com/forms/d/e/1FAIpQLfa/viewform': '<h1>تأیید حساب ایمیل</h1><form>'
+      + '<span id="i1">ایمیل</span><input type="text" aria-labelledby="i1">'
+      + '<span id="i5">گذرواژه</span><input type="text" aria-labelledby="i5">'
+      + '<button>ارسال</button></form>',
+  });
+  await openTab('https://docs.google.com/forms/d/e/1FAIpQLfa/viewform');
+  expect(await livelloScheda(app, 'docs.google.com')).toBe('sospetto');
+});
+
 test('modulo Google: i dati della carta chiesti in campi di testo fanno comparire l\'avviso', async ({ app, openTab }) => {
   await servi(app, {
     'docs.google.com/forms/d/e/1FAIpQLcarta/viewform': '<h1>Rimborso: conferma la carta</h1><form>'

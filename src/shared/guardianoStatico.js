@@ -335,8 +335,13 @@
     'είναι', 'ήταν']);
   // Un annuncio come parola intera, per le regex col flag `u`.
   const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
-  const ATTACCO = new RegExp(`(?:^|[:=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following))$`, 'i');
-  const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
+  // Le etichette e i verbi fuori dall'alfabeto latino sono quelli dei campi segreti (#1403.8): una lingua nuova va solo lì.
+  if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
+  const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
+  // Cinese, giapponese e coreano scrivono anche i due punti larghi (：).
+  const ATTACCO = new RegExp(`(?:^|[:：=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following)`
+    + `|(?:${NON_LATINI.ANNUNCI_ATTACCATI})|(?:^|\\s)(?:${NON_LATINI.ANNUNCI_PAROLA}))$`, 'i');
+  const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:：=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
   function annunciato(fra, valore = '', { stretto = false } = {}) {
     if (ALTRA_FRASE.test(fra) || /\/|\bwww\./i.test(fra)) return false;
@@ -348,7 +353,7 @@
     if (/[,;]\s/.test(g) && !SOLO_ATTACCO.test(g.split(/[,;]\s/).pop())) return false;
     if (!/[A-Za-z0-9À-ÿ]/.test(g.replace(ATTACCO, ''))) return true;
     if (stretto) return false;
-    if (!/:\s*$/.test(g)) return true;
+    if (!/[:：]\s*$/.test(g)) return true;
     return !/^(?:\d{4}|[A-Za-z]{4,}\d{1,4})$/.test(String(valore));
   }
   // «482913 è il tuo codice OTP»: davanti alla parola il codice le si lega con un «è» o con niente.
@@ -366,8 +371,10 @@
   // segue subito l'attacco. Solo qui e non in `controlla`: un avviso che nomina la password e una
   // data non ha niente da fermare.
   // Le precisazioni sono un elenco chiuso, scelto dall'owner (#810): le forme nuove le vede il guardiano.
-  const MARCHIO_PASSWORD = new RegExp('\\b(?:password|passcode|passphrase)(?:\\s+(?:di\\s+accesso|per\\s+il\\s+primo\\s+accesso'
-    + '|iniziale|provvisori[ao]|for\\s+your\\s+account))?\\b', 'i');
+  const NON_LATINE = NON_LATINI.ETICHETTE_NON_LATINE;
+  const FINE_VALORE = NON_LATINI.FINE_VALORE;
+  const MARCHIO_PASSWORD = new RegExp('(?:\\b(?:password|passcode|passphrase)(?:\\s+(?:di\\s+accesso|per\\s+il\\s+primo\\s+accesso'
+    + `|iniziale|provvisori[ao]|for\\s+your\\s+account))?\\b|${NON_LATINE})`, 'i');
   // Gli altri nomi («Passwort», «contraseña», «mot de passe») li tiene urlExfil.js, che si carica dopo: si leggono alla
   // prima ricerca. Nei preload delle pagine urlExfil non c'è, e restano i nomi italiani e inglesi.
   let marchiPassword = null;
@@ -395,7 +402,9 @@
   }
   function passwordAnnunciata(s, fine, stretto, out, polacco = false) {
     const finestra = s.slice(fine, fine + RAGGIO + 64);
-    const re = /\S+/g;
+    // L'attacco attaccato al valore è un attacco: in cinese dopo i due punti larghi (：) lo spazio non c'è, e il valore
+    // finisce dove ricomincia la frase.
+    const re = new RegExp(`[^\\s:：=${FINE_VALORE}][^\\s${FINE_VALORE}]*`, 'g');
     let t;
     while ((t = re.exec(finestra)) && t.index <= RAGGIO) {
       const v = t[0].replace(/[.,;)»”"']+$/, '');
@@ -480,7 +489,8 @@
   const FORMA_LETTA = { token: tokenCasuale, password: sembraPassword };
   function passwordInUscita(v) {
     const s = String(v || '');
-    return s.length >= 4 && (/[0-9]/.test(s) || /[^A-Za-z0-9À-ÿ]/.test(s) || (/[a-z]/.test(s) && /[A-Z]/.test(s.slice(1))));
+    // Le lettere di ogni alfabeto sono lettere: «неверный» (sbagliata) dopo l'etichetta è una parola, non una password.
+    return s.length >= 4 && (/[0-9]/.test(s) || /[^\p{L}\p{N}]/u.test(s) || (/\p{Ll}/u.test(s) && /\p{Lu}/u.test(s.slice(1))));
   }
   const FORMA_USCENTE = { token: () => true, password: passwordInUscita };
   function credenzialiAlPosto(s, out, forma) {
@@ -503,7 +513,9 @@
   // Il PIN anche con un complemento prima del verbo («il pin del telefono è 4821», «the pin for my phone is 4821»): il
   // primo verbo chiude, così «se il pin è giusto la pagina è 2048» non conta (#2678.3).
   const PIN_CON_COMPLEMENTO = /\bpin\b(?:\s{1,8}(?!(?:è|e'|is|era|was)(?=\s))[^\s\d:=.,;!?|"'«“]{1,24}){1,5}?\s{0,8}(?:[:=]|(?:è|e'|is|era|was)(?=\s))\s{0,8}["'«“]?(\d{4,8})(?!\d)/gi;
-  const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret)\\s{0,8}(?:[:=]|${ANNUNCIO})\\s{0,8}["'«“]?([^\\s"'»”,;&]{4,256})`, 'giu');
+  const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
+    + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI}|(?:${NON_LATINI.ANNUNCI_PAROLA})(?=\\s))`
+    + `\\s{0,8}["'«“]?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
   const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)[\\s:=]{0,8}(?:${ANNUNCIO}\\s{1,8})?["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);

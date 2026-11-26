@@ -358,6 +358,10 @@
   // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
   const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
+  // Senza spazi fra le parole (cinese, giapponese, thai) il valore finisce dove ricomincia la frase.
+  if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
+  const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
+  const FRA_PAROLE = new RegExp(`[\\s${NON_LATINI.FINE_VALORE}]+`);
   // I nomi del PIN senza «codice» («numero segreto», «Geheimzahl») li tiene il pavimento, che urlExfil precede nel loader.
   let presentaCodice = null;
   const PRESENTA_CODICE = () => {
@@ -394,7 +398,7 @@
     const prendi = (re, soloCifre) => {
       for (const m of testo.matchAll(re)) {
         const coda = fineFrase(testo.slice(m.index + m[0].length, m.index + m[0].length + 200));
-        const parole = coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO);
+        const parole = coda.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
         for (const [k, w] of parole.entries()) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
           const cifre = /\d/.test(t);

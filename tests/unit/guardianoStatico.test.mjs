@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -155,5 +156,56 @@ describe('gli attrezzi del confronto fra indirizzi', () => {
   });
   test('due siti diversi restano diversi', () => {
     assert.equal(G.stessoSito('banca.it', 'banca-it.invalid'), false);
+  });
+});
+
+// #1403.8 — le etichette della password fuori dall'alfabeto latino, per quello che si legge e per quello che esce.
+describe('le etichette non latine della password', () => {
+  const ETICHETTE = ['пароль', 'Пароль', 'κωδικός', '密码', '密碼', 'パスワード', '비밀번호', 'كلمة المرور', 'סיסמה'];
+  // I due punti larghi li scrivono cinese, giapponese e coreano.
+  const LARGHI = ['密码', '密碼', 'パスワード', '비밀번호'];
+  test('la password letta dopo un\'etichetta non latina entra nel registro dei letti, anche dopo i due punti larghi', () => {
+    for (const e of [...ETICHETTE, 'κωδικός πρόσβασης']) {
+      for (const t of [`${e}: Gatto2024!`, `Логин: ivan\n${e}: Gatto2024!`, ...(LARGHI.includes(e) ? [`${e}：Gatto2024!`] : [])]) {
+        assert.ok(G.segretiNelTesto(t).some((x) => x.valore === 'Gatto2024!' && x.regola === 'password'), t);
+      }
+    }
+  });
+  test('quello che un\'azione porterebbe fuori dopo un\'etichetta non latina è una password, anche codificato nell\'indirizzo', () => {
+    for (const e of ETICHETTE) {
+      for (const t of [`${e}: Gatto2024!`, `${e}=Gatto2024`, `https://x.example/?q=${encodeURIComponent(`${e}: Gatto2024`)}`,
+        ...(LARGHI.includes(e) ? [`${e}：Gatto2024`] : [])]) {
+        assert.ok(G.segretiInUscita(t).some((x) => x.regola === 'password'), t);
+      }
+    }
+  });
+  test('l\'elenco sta solo in campiSegreti.js: la pagina che chiede la password, le uscite e gli indirizzi lo prendono da lì', () => {
+    for (const f of ['content/safebrowseHints.js', 'shared/guardianoStatico.js', 'shared/urlExfil.js', 'shared/pavimento.js']) {
+      const src = readFileSync(join(__dirname, '..', '..', 'src', ...f.split('/')), 'utf8');
+      assert.doesNotMatch(src, /парол|κωδικ|密[码碼]|パスワード|비밀번호/, f);
+      assert.match(src, /ETICHETTE_NON_LATINE/, f);
+    }
+  });
+  test('una parola dopo l\'etichetta, un codice greco che non è la password e le parole che la contengono restano', () => {
+    for (const t of ['пароль: неверный', 'Пароль: Обязательно', 'Ταχυδρομικός κωδικός: 10431', 'κωδικός παραγγελίας: AB12345',
+      '密码学: 2024年课程', '암호화: AES256']) {
+      assert.deepEqual(G.segretiInUscita(t).filter((x) => x.regola === 'password'), [], t);
+      assert.deepEqual(G.segretiNelTesto(t).filter((x) => x.regola === 'password'), [], t);
+    }
+  });
+  // «la password è …» nella sua lingua vale come in italiano; il valore finisce dove ricomincia la frase senza spazi.
+  test('dopo il verbo che la annuncia nella sua lingua la password esce come password, ed è solo lei', () => {
+    for (const t of ['我的密码是Kx82mPq9', '密码是 Kx82mPq9', 'パスワードは Kx82mPq9', 'パスワードはKx82mPq9です', '비밀번호는 Kx82mPq9',
+      'كلمة المرور هي Kx82mPq9', 'הסיסמה היא Kx82mPq9', 'ο κωδικός πρόσβασης είναι Kx82mPq9', 'мой пароль это Kx82mPq9',
+      '密码：Kx82mPq9，然后点击登录']) {
+      assert.ok(G.segretiInUscita(t).some((x) => x.regola === 'password' && x.valore === 'Kx82mPq9'), t);
+      assert.ok(G.segretiNelTesto(t).every((x) => x.valore === 'Kx82mPq9'), t);
+    }
+  });
+  test('la frase cinese o giapponese dopo l\'etichetta non è una password', () => {
+    for (const t of ['请输入密码：密码长度至少8位，包含字母和数字。忘记密码？点击这里重置。', '密码是什么？', '密码为空',
+      'パスワード：8文字以上で英数字を含めてください。', 'パスワードはこちらから再設定できます', '비밀번호: 8자 이상, 영문과 숫자']) {
+      assert.deepEqual(G.segretiInUscita(t).filter((x) => x.regola === 'password'), [], t);
+    }
   });
 });

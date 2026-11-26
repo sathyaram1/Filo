@@ -1,11 +1,13 @@
 // Indizi di pagina per il rilevamento siti pericolosi: la pagina chiede una password o i dati di pagamento?
-// Autonoma di proposito, senza niente di esterno: il main la esegue anche nei riquadri incorporati, dal sorgente.
-// Un modulo ospitato non ha campi password né di carta: cosa chiede un campo di testo lo dice la sua etichetta.
+// Autonoma di proposito, senza niente di esterno: il main la esegue anche nei riquadri incorporati, dal sorgente
+// (PAGE_HINTS_JS, che le porta dentro le etichette non latine). Un modulo ospitato non ha campi password né di carta:
+// cosa chiede un campo di testo lo dice la sua etichetta.
 
 'use strict';
 
 function pageHints(doc, opz) {
-  const PASSWORD = /pass ?word|passwort|contrase[ñn]a|mot de passe|\bsenha\b|parola d.ordine|passcode|\bpin\b/i;
+  const nonLatine = opz && typeof opz.nonLatine === 'string' && opz.nonLatine ? `|${opz.nonLatine}` : '';
+  const PASSWORD = new RegExp(`pass ?word|passwort|contrase[ñn]a|mot de passe|\\bsenha\\b|parola d.ordine|passcode|\\bpin\\b${nonLatine}`, 'i');
   const CARTA = new RegExp(['carta di (credito|debito)', 'numero (della |di )?carta', 'credit ?card', 'debit ?card',
     'card ?number', 'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)', 'num[eé]ro de (la )?carte',
     'carte (bancaire|de cr[eé]dit)', 'kartennummer', 'kreditkarte', '\\bcvv2?\\b', '\\bcvc2?\\b',
@@ -157,4 +159,9 @@ function pageHints(doc, opz) {
   return { hasPassword, hasPayment, shownPassword, shownPayment, insecureForm };
 }
 
-module.exports = { pageHints };
+// Le etichette della password fuori dall'alfabeto latino sono quelle dei campi segreti: una lingua nuova va solo lì.
+if (!globalThis.SN_CAMPI_SEGRETI) require('../shared/campiSegreti.js');
+const NON_LATINE = globalThis.SN_CAMPI_SEGRETI.crea({}, () => false).ETICHETTE_NON_LATINE;
+const PAGE_HINTS_JS = `((doc, opz) => (${pageHints})(doc, Object.assign({ nonLatine: ${JSON.stringify(NON_LATINE)} }, opz)))`;
+
+module.exports = { pageHints: (doc, opz) => pageHints(doc, Object.assign({ nonLatine: NON_LATINE }, opz)), PAGE_HINTS_JS };

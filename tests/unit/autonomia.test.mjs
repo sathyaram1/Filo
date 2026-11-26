@@ -566,6 +566,10 @@ test('costo 4 nel registro: cancellare per sempre, alzare il livello, un segreto
   // Un segreto che l'utente non ha scritto non esce; uno che ha scritto lui vuole «conferma».
   assert.equal(risposta({ type: 'NAVIGA', url: 'https://x.example/?password=Gatto2024!' }), 'no');
   assert.equal(risposta({ type: 'NAVIGA', url: 'https://x.example/?password=Gatto2024!' }, { richiesta: 'entra con password=Gatto2024!' }), 'conferma');
+  // #1403.8 — anche dopo un'etichetta fuori dall'alfabeto latino.
+  assert.equal(risposta({ type: 'NAVIGA', url: `https://x.example/?${encodeURIComponent('пароль')}=Gatto2024!` }), 'no');
+  assert.equal(risposta({ type: 'CERCA_WEB', query: '我的密码：Gatto2024!' }), 'no');
+  assert.equal(risposta({ type: 'CERCA_WEB', query: 'пароль: неверный, что делать' }), 'si');
   assert.equal(risposta({ type: 'CERCA_WEB', query: 'il mio codice di verifica è 482913' }), 'no');
   assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'la mia chiave è sk-or-v1-0123456789abcdef0123456789abcdef' }), 'no');
   const iban = 'IT60X0542811101000000123456';
