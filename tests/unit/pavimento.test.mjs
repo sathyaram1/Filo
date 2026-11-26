@@ -610,6 +610,27 @@ test('la risposta sotto chi chiede la password esce come segnaposto dal paviment
   }
 });
 
+// #2692 — il PIN dato in risposta in una conversazione copiata esce come la password: dopo il nome di chi scrive,
+// dopo l'orario della copia di WhatsApp, dopo «certo,», sotto i solleciti di chi chiede.
+test('il codice dato in risposta a chi lo chiede in chat esce come segnaposto, come la password', () => {
+  const casi = [
+    ['Marco: qual è il pin della carta?\nLuc: 4821', `Marco: qual è il pin della carta?\nLuc: ${S}`],
+    ['Marco: mi mandi il codice del cancello?\nLuc: certo, 4829', `Marco: mi mandi il codice del cancello?\nLuc: certo, ${S}`],
+    ['Marco: qual è il pin?\nMarco: dai sono alla cassa\n\nLuc: eccolo: 4821', `Marco: qual è il pin?\nMarco: dai sono alla cassa\n\nLuc: eccolo: ${S}`],
+    ['[15:42, 26/11/2026] Marco: qual è il pin?\n[15:43, 26/11/2026] Luc: 4821', `[15:42, 26/11/2026] Marco: qual è il pin?\n[15:43, 26/11/2026] Luc: ${S}`],
+    ['26/11/26, 15:42 - Marco: qual è il pin?\n26/11/26, 15:43 - Luc: sì è 4821', `26/11/26, 15:42 - Marco: qual è il pin?\n26/11/26, 15:43 - Luc: sì è ${S}`],
+    ['Mark: what is the PIN?\nLuke: sure, 4821', `Mark: what is the PIN?\nLuke: sure, ${S}`],
+    ['mi mandi il pin?\ncerto, 4821', `mi mandi il pin?\ncerto, ${S}`],
+  ];
+  for (const [t, atteso] of casi) assert.equal(P.oscura(t), atteso, t);
+  // Un numero che non è la risposta, o la risposta che dà un identificativo, resta.
+  for (const t of ['Qual è il codice del cancello?\nTotale: 4821', 'Marco: qual è il codice cliente?\nLuc: 48213',
+    'Marco: qual è il pin?\nLuc: ho 1500 euro sul conto', 'Marco: come cambio il codice di Gmail?\nLuc: vai in impostazioni, ordine 1234',
+    'Qual è il codice di avviamento postale di Roma?\nÈ 00118']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+});
+
 // #1403.2 — la colonna «password» di un CSV, a virgole o a punti e virgola, come quella a barre o a tabulazioni.
 test('la colonna password di un CSV non esce: punti e virgola, esportazioni dei browser, virgolette, a capo di Windows', () => {
   const casi = [
