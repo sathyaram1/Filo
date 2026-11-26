@@ -91,12 +91,17 @@
   // Il polacco «to» solo dopo «kod»: in inglese «code to …» è una destinazione.
   const CHIUDE_KOD = /\sto\s*$/i;
   const PRIMA_DEL_NOME = new RegExp(`^\\s*(?:[:=-]\\s*)?(?:${VERBO}|=|sarà)\\s+(?:[\\p{L}'’-]+\\s+){0,4}?${NOMI_DEL_CODICE}`, 'iu');
+  // Prima del numero si guarda solo la coda: il nome conta a 60 caratteri al più, e rileggere da capo la riga a ogni
+  // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
+  const CODA = 400;
   function alPostoDelCodice(z, m, inTesta, forte) {
     const prima = z.slice(0, m.index);
     if (inTesta) return !prima.trim();
     if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length))) return true;
-    const n = [...prima.matchAll(NOMI_CODICE)].pop();
+    const da = Math.max(0, prima.length - CODA);
+    const n = [...prima.slice(da).matchAll(NOMI_CODICE)].pop();
     if (!n) return false;
+    n.index += da;
     const fra = prima.slice(n.index + n[0].length);
     if (!fra.trim()) return true;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
