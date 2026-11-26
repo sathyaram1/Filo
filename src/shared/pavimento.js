@@ -29,7 +29,12 @@
   const DOPPIE = [...VIRGOLETTE].filter((c) => !'\'‘’'.includes(c)).join('');
   const SINGOLE = [...VIRGOLETTE].filter((c) => '\'‘’'.includes(c)).join('');
   const VIRGOLETTA = `(?:[${APERTE}][ \\t]*)?`;
-  const CIFRE_CVV = `${VIRGOLETTA}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
+  // Davanti a un PIN, un CVV o un codice una parentesi vale una virgoletta, anche le due insieme: «il PIN è («4821»)»
+  // esce come «il PIN è 4821» (#2689). Le minori no: «pin < 1000» è un confronto nel codice.
+  const INTORNO_APERTE = `[${APERTE}([{]`;
+  const INTORNO_CHIUSE = `[${CHIUSE})\\]}]`;
+  const DAVANTI = `(?:${INTORNO_APERTE}[ \\t]*){0,3}`;
+  const CIFRE_CVV = `${DAVANTI}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
   const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
   const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*[:=|\\t]|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
