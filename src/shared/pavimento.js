@@ -204,6 +204,7 @@
           const frase = pezzi[f];
           const nome = NOME_CODICE.test(frase);
           const forte = SEGNO_FORTE.test(frase);
+          const pinNellaFrase = nome && NOME_PIN.test(frase);
           // Senza il nome del codice: «Per aprire il cancello digita 3958», non «Apri il file e inserisci 48291».
           const perAprire = PER_APRIRE.test(frase) && (APRE.test(frase) || /\b(?:port[ae]|entra(?:re)?)\b/i.test(frase));
           if (!nome && !forte && !perAprire) continue;
