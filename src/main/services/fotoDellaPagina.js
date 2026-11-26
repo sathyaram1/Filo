@@ -79,13 +79,12 @@ function perche(codice) {
 }
 
 function codiceMisura() {
-  const G = globalThis.SN_GUARDIANO_STATICO;
   const S = globalThis.SN_CAMPI_SEGRETI;
   return `(function () {
-  const luhn = ${G.luhn}; const cartaValida = ${G.cartaValida};
+  ${preambolo()}
   const crea = ${S.crea}; const rettangoliRipetuti = ${S.rettangoliRipetuti};
   const E = globalThis.SN_EXTRACT;
-  const qui = E && E.segreti && typeof E.segreti.valoriSegreti === 'function' ? E.segreti : crea(window, cartaValida);
+  const qui = E && E.segreti && typeof E.segreti.valoriSegreti === 'function' ? E.segreti : crea(window, cartaValida, opzioniSegreti);
   // Le stesse misure della copertura dei campi nei riquadri: i due conti non devono divergere.
   const interseca = (a, b) => (a && b ? (${interseca})(a, b) : null);
   // p: dove sta il documento nella pagina principale e a che scala la pagina lo disegna.
