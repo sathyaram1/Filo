@@ -155,7 +155,7 @@ export function testoScelta({ prove, senzaProve, nuovi, mappa, fonte, nota = '',
   if (specDelRamo.length) righe.push('', `Spec che il ramo cambia (${specDelRamo.length}): ${specDelRamo.join(', ')}`);
   const perLivello = (l) => prove.filter((p) => p.livello === l);
   const somma = (xs) => xs.reduce((s, p) => s + (p.ms || 0), 0);
-  for (const [l, titolo] of [['funzione', 'passano dalle funzioni cambiate'], ['file', 'caricano solo i file cambiati']]) {
+  for (const [l, titolo] of [['funzione', 'passano dalle funzioni cambiate'], ['larga', 'passano da funzioni cambiate che quasi tutte le prove eseguono'], ['file', 'caricano solo i file cambiati']]) {
     const xs = perLivello(l);
     if (!xs.length) continue;
     righe.push('', `Spec che ${titolo} (${xs.length}, circa ${secondi(somma(xs))}):`);
