@@ -25,9 +25,8 @@ const DETERMINA = /^(?:il|lo|la|i|gli|le|un|uno|una|ogni|tutti|tutte|mio|mia|tuo
 const APOSTROFATA = /^(?:dell|nell|sull|dall|all|l)['’]\p{L}+$/u;
 const pulita = (w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
 
-// Ogni parola dopo il nome della password conta da sola: spiega solo sé stessa (stato, data, misura), così una
-// spiegazione accanto non copre il valore («è gattonero ma scade a giugno»). Le vicine le copre solo un luogo o il nome
-// di chi è la password, per una parola. Una data da sola dopo l'annuncio è il valore («è giugno»).
+// Una parola che spiega copre solo sé stessa, non il valore accanto («è gattonero ma scade a giugno»); le vicine le
+// copre solo un luogo o il nome di chi è la password, per una parola. Una data da sola dopo l'annuncio è il valore.
 const coperteDi = new WeakMap();
 function coperte(parole) {
   if (coperteDi.has(parole)) return coperteDi.get(parole);
