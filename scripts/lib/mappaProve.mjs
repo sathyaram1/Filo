@@ -255,17 +255,21 @@ export function rigaSullaMappa(r, blocchi) {
 /**
  * Gli spec che passano dalle righe cambiate. `cambi`: Map file → righe nella numerazione della mappa, o null per il
  * file intero. Ogni riga prende la funzione più stretta che la contiene fra quelle eseguite: `funzione` se è una
- * funzione vera, `file` se è solo il caricamento del modulo. Ordine: funzione prima, poi quanto il legame è stretto
- * (insiemi piccoli pesano di più), poi i più brevi. `senzaProve` sono i file che nessuna prova fa eseguire.
+ * funzione vera eseguita da non più di `soglia` spec, `larga` se la eseguono quasi tutti (come un modulo che oltre
+ * quella soglia di spec usano: è la suite intera), `file` se è solo il caricamento del modulo. Ordine: per livello,
+ * poi quanto il legame è stretto (insiemi piccoli pesano di più), poi i più brevi. `senzaProve`: i file che nessuna
+ * prova fa eseguire.
  */
-export function proveDelCambio(mappa, cambi) {
+export function proveDelCambio(mappa, cambi, { soglia = SOGLIA_SPEC_DI_UN_MODULO } = {}) {
   const punti = new Map();
   const senzaProve = [];
-  const dai = (insieme, livello, peso) => {
-    for (const p of mappa.insiemi[insieme] || []) {
+  const dai = (insieme, livello, rel) => {
+    const chi = mappa.insiemi[insieme] || [];
+    for (const p of chi) {
       const v = punti.get(p) || { livello: 'file', peso: 0, file: new Set() };
-      if (livello === 'funzione') v.livello = 'funzione';
-      v.peso += peso;
+      if (ORDINE[livello] < ORDINE[v.livello]) v.livello = livello;
+      v.peso += 1 / Math.max(1, chi.length);
+      v.file.add(rel);
       punti.set(p, v);
     }
   };
@@ -274,7 +278,7 @@ export function proveDelCambio(mappa, cambi) {
     if (!f) { senzaProve.push(rel); continue; }
     const intero = f.funzioni.reduce((m, x) => Math.max(m, x[1]), 1);
     const prese = new Set();
-    if (!righe) dai(f.carico, 'file', 1 / Math.max(1, mappa.insiemi[f.carico].length));
+    if (!righe) dai(f.carico, 'file', rel);
     for (const r of righe || []) {
       let meglio = null;
       for (const x of f.funzioni) {
