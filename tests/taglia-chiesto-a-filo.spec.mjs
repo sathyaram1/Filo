@@ -83,7 +83,7 @@ async function selezionaNellArea(page) {
 for (const campo of ['#prima', '#segreta']) {
   test(`dopo Incolla col tasto destro in ${campo === '#prima' ? 'un campo' : 'una password'}, «taglia» chiesto a Filo taglia la selezione di adesso`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(60_000);
-    const page = await testServer.openReady(openTab, CAMPI);
+    const page = await apriCampi(app, openTab, testServer);
     await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti'));
     await incollaColTastoDestro(page, campo);
 
