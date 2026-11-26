@@ -4,6 +4,7 @@
 
 import { defineConfig } from '@playwright/test';
 import { usaSchermoDelLavoratore } from './scripts/lib/schermo-virtuale.mjs';
+import { accendiCopertura } from './tests/helpers/copertura.mjs';
 
 // Con `--workers` > 1 nel contenitore ogni lavoratore apre Electron sullo schermo virtuale suo (#2133).
 usaSchermoDelLavoratore();
