@@ -9,7 +9,7 @@ import { usaSchermoDelLavoratore } from './scripts/lib/schermo-virtuale.mjs';
 usaSchermoDelLavoratore();
 
 // La suite in GitHub registra quali file di src/ fa eseguire ogni prova (#2502): tests/helpers/copertura.mjs.
-if (process.env.FILO_COPERTURA) (await import('./tests/helpers/copertura.mjs')).accendiCopertura();
+accendiCopertura();
 
 // Finestre invisibili per TUTTA la suite (vedi src/main/test-window-mode.js).
 // Sta qui e non nella fixture perché una cinquantina di spec lancia Electron per
