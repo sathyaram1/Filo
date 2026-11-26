@@ -16,7 +16,7 @@ test('aspetto di bilanci e tetto', async ({ openTab }) => {
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   await expect(page.locator('#mgTettoVerifiche')).toHaveValue('6');
-  await page.locator('#mgCap3Block').scrollIntoViewIfNeeded();
+  await page.locator('#mgTettoVerificheBlock').scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/giro9-bilanci-chiaro.png' });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
