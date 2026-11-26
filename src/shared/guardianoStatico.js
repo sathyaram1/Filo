@@ -338,9 +338,23 @@
   const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
   // L'annuncio con un modale davanti e un avverbio prima o dopo («dovrebbe essere», «will be», «è ancora», #2678.7): il
   // valore sta dopo di lui come dopo «è». Spazi senza a capo; il confine lo mette chi lo usa.
-  const AVVERBI = 'sempre|ancora|ora|adesso|invece|attualmente|tuttora|già|anche|comunque|now|still|always|currently|also|just|actually';
+  const AVVERBI = 'sempre|ancora|ora|adesso|invece|attualmente|tuttora|già|anche|comunque|proprio|pure|di[^\\S\\n]+nuovo|now|still|always|currently|also|just|actually|again';
   const MODALI = 'dovrebbe|potrebbe|deve|dovrà|può|potrà|should|must|might|could|would|will|may|can|shall';
-  const ANNUNCIO_LARGO = `(?:(?:${AVVERBI})[^\\S\\n]+)?(?:dev['’]|(?:${MODALI})[^\\S\\n]+)?(?:${ANNUNCI.join('|')})(?:[^\\S\\n]+(?:${AVVERBI})){0,2}`;
+  // Anche al passato e nei tempi composti («è diventata», «è stata cambiata in», «has been», «was set to», #2678.7), e
+  // dopo chi l'ha cambiata («ho cambiato la password in …»): il verbo di cambio vale solo con «in», «a» o «to» dopo.
+  const SP = '[^\\S\\n]+';
+  const AUSILIARI = "è|e'|e’|é|era|sarà|sarebbe|fosse|sia|ha|aveva|avrà|has|had|have|was|is|will";
+  const PARTICIPI = 'stat[ao]|diventat[ao]|divenut[ao]|rimast[ao]|restat[ao]|been|become';
+  const PASSATI = 'diventò|divenne|rimase|restò|became|become|remained|stayed';
+  const CAMBI = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|messa|messo|changed|set|updated|reset';
+  const CAMBIO = `(?:${CAMBI})${SP}(?:in|a|to)`;
+  const AUSILIARE = `(?:${AUSILIARI})${SP}(?:(?:${AVVERBI})${SP})?`;
+  const CAMBIO_PRIMA = `(?:in|a|to)(?<=(?:ho|abbiamo|hai|have|has|had|i|we|ve)${SP}(?:${CAMBI.replace('messa|', '')})${SP}[^\\n]{1,40}(?:in|a|to))`;
+  const VERBO_LARGO = `(?:(?:${AUSILIARE})?(?:(?:${PARTICIPI})${SP})?${CAMBIO}|${AUSILIARE}(?:${PARTICIPI})|${PASSATI}|${ANNUNCI.join('|')})`;
+  const ANNUNCIO_LARGO = `(?:${CAMBIO_PRIMA}|(?:(?:${AVVERBI})${SP})?(?:dev['’]|(?:${MODALI})${SP})?${VERBO_LARGO}(?:${SP}(?:${AVVERBI})){0,2})`;
+  // Di cosa è la password, fra il nome e il valore («la password del wifi», «la pass per il router»): lo stesso per il
+  // pavimento e per il correttore. Senza spazi ai lati: li mette chi lo usa.
+  const COMPLEMENTO = "(?:(?:del(?:la|lo)?|di|per|for|of)[ \\t]+|dell['’][ \\t]*)(?:(?:il|la|lo|the|my|your|our|mio|mia|tuo|tua)[ \\t]+)?[A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F][A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F_-]{0,30}";
   // Le etichette fuori dall'alfabeto latino, e i verbi attaccati del cinese, giapponese, coreano e thai, sono quelli dei
   // campi segreti (#1403.8); i verbi che sono una parola stanno in ANNUNCI qui sopra.
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
