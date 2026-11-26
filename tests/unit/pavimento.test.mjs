@@ -562,6 +562,10 @@ test('la risposta sotto chi chiede la password esce come segnaposto dal paviment
     assert.equal(P.oscura(t), t, t);
   }
   assert.ok(P.trova(pagina).some((x) => x.valore === 'Brezza7Mare'), 'il valore si toglie com\'è scritto, maiuscole comprese');
+  // #1403.14 — anche sotto una domanda in un'altra lingua.
+  for (const d of ["Marco: tu peux m'envoyer le mot de passe ?", 'Marco: wie ist das WLAN-Passwort?']) {
+    assert.equal(P.oscura(`${d}\nLuc: Brezza7Mare`), `${d}\nLuc: ${S}`, d);
+  }
 });
 
 // #1403.2 — la colonna «password» di un CSV, a virgole o a punti e virgola, come quella a barre o a tabulazioni.
