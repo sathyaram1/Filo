@@ -5,6 +5,7 @@
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import { SOGLIA_SPEC_DI_UN_MODULO } from './spec-che-usano.mjs';
 
 const { percorsoFilo } = createRequire(import.meta.url)('../../src/main/percorsoFilo.js');
 
