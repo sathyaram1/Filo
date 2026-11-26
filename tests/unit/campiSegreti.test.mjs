@@ -21,9 +21,10 @@ function campo(attr = {}, valore = '') {
 
 // Lo stesso testo che il main manda nei riquadri, valutato in un contesto vuoto: niente SN_*, niente globali di Filo.
 function creaIsolata() {
+  const { preambolo } = require('../../src/main/services/campiNeiRiquadri.js');
   const finestra = { document: { querySelectorAll: () => [], getElementById: () => null }, getComputedStyle: () => ({}) };
-  const codice = `(function () { const luhn = ${G.luhn}; const cartaValida = ${G.cartaValida};
-    return (${S.crea})(finestra, cartaValida); })()`;
+  const codice = `(function () { ${preambolo()}
+    return (${S.crea})(finestra, cartaValida, opzioniSegreti); })()`;
   return vm.runInNewContext(codice, { finestra });
 }
 
