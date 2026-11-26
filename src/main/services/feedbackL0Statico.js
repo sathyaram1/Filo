@@ -96,7 +96,6 @@ function programmaRiposo() {
   if (riposo.unref) riposo.unref();
 }
 
-// Mentre si scrive il feedback: all'invio il processo è già pronto.
 function prepara() {
   if (!senzaFiglio && !figlio) figlio = avvia();
   if (figlio) programmaRiposo();
