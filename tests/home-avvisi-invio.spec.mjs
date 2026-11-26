@@ -70,7 +70,10 @@ for (const [W, H, scala, minimo] of [[1000, 760, 1.25, 160], [1000, 760, 1.5, 16
     expect(m.invio.right).toBeLessThanOrEqual(m.destra.left);
     expect(m.invio.width).toBeGreaterThan(30);
     // Una frase breve va a capo fra le parole, non a ogni lettera.
-    expect(await page.locator('#input').evaluate((t) => Math.round(t.scrollHeight / parseFloat(getComputedStyle(t).lineHeight)))).toBeLessThanOrEqual(3);
+    expect(await page.locator('#input').evaluate((t) => {
+      const s = getComputedStyle(t);
+      return Math.round((t.scrollHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom)) / parseFloat(s.lineHeight));
+    })).toBeLessThanOrEqual(3);
   });
 }
 
