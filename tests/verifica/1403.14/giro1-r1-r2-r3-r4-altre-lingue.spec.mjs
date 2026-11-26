@@ -18,6 +18,8 @@ for (const [domanda, chi] of [
   ["Marco: tu peux m'envoyer le mdp ?", 'Luc'],
   ['Marco: ¿me pasas la clave del wifi?', 'Luis'],
   ['Marco: wie ist der WLAN-Schlüssel?', 'Luca'],
+  ['Marco: wie ist das Wlanpasswort?', 'Luca'],
+  ['Marco: schick mir mal das Routerpasswort', 'Luca'],
 ]) {
   test(`r1 «${domanda}» e sotto «${chi}: Gatto2024»: la password si oscura nel testo`, () => {
     expect(T.trova(`${domanda}\n${chi}: Gatto2024`)).toContain('gatto2024');
