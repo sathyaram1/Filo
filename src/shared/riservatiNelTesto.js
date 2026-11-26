@@ -36,7 +36,8 @@ const RICHIESTA = new RegExp([
   '(?:(?:schick|gib|sag)\\s+mir|was\\s+ist|wie\\s+ist|envoie|donne|dis-moi|quel\\s+est|c[\'’]est\\s+quoi|mándame|pásame|dame|dime|cuál\\s+es|me\\s+passa|stuur|geef|wat\\s+is|wyślij|podaj|jakie\\s+jest)',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|')
   // Le scritture senza spazi non hanno confine fra le parole: «密码是多少».
-  + '|多少|什么|是啥|告诉我|发我|给我|教えて|何ですか|알려|뭐야|뭐예요', 'iu');
+  // 吗 e 呢 chiudono la domanda al posto del punto di domanda: «你知道wifi密码吗», «密码呢».
+  + '|多少|什么|是啥|告诉我|发我|给我|发一下|发下|请问|知道|吗|呢|教えて|何ですか|알려|뭐야|뭐예요', 'iu');
 // Un elenco solo per il saluto in testa alla risposta e per quello prima della richiesta corta (#2638.1).
 const SALUTI = 'ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera';
 const SALUTO = new RegExp(`^(?:${SALUTI})$`, 'u');
