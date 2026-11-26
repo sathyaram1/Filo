@@ -155,7 +155,7 @@
   const delMioApparecchio = (coda) => {
     const m = DEL_MIO_APPARECCHIO.exec(coda);
     if (!m || !INIZIA_COL_NOME.test(m[0])) return !!m;
-    const w = /([A-Za-z][A-Za-z'-]{2,})\s+$/.exec(coda.slice(0, m.index));
+    const w = /([A-Za-z][A-Za-z'-]{2,}|[A-Z]{2,})\s+$/.exec(coda.slice(0, m.index));
     return !w || DAVANTI_AL_NOME.test(w[1]) || RESTA_UN_CODICE.test(w[1]) || SEGNO_FORTE.test(w[1]) || UN_VERBO.test(w[1])
       || POSSESSIVO_SOLO.test(w[1]);
   };
