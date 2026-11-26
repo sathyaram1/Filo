@@ -31,7 +31,7 @@ test('il main registra le funzioni di src/ che ha eseguito, col nome della prova
     assert.equal(j.processo, 'main');
     const testo = readFileSync(join(ROOT, 'src/main/percorsoFilo.js'), 'utf8');
     const funzioni = (j.file['src/main/percorsoFilo.js'] || []).map(([da]) => testo.slice(da, da + 21));
-    assert.ok(funzioni.includes('function percorsoFil'), `la funzione chiamata è registrata: ${JSON.stringify(funzioni)}`);
+    assert.ok(funzioni.includes('function percorsoFilo'),`la funzione chiamata è registrata: ${JSON.stringify(funzioni)}`);
     assert.ok(Object.keys(j.file).every((f) => f.startsWith('src/')), 'solo file di src/');
   } finally { togliCartella(dir); }
 });
