@@ -761,6 +761,25 @@ test('l\'elenco delle etichette della password sta in un posto solo, per il test
   assert.doesNotMatch(codice('campiSegreti.js'),/парол|κωδικ|密|wachtwoord|has\[łl\]|chiave\\\\s|network\\\\s/, 'i campi le prendono dal pavimento');
 });
 
+// #2673.8: la regola «un indirizzo o un'email non è una password» la scrive solo il guardiano; il pavimento la chiede.
+test('il controllo che riconosce un indirizzo o un\'email sta in un posto solo, per il pavimento e il guardiano', () => {
+  const codice = (p) => readFileSync(new URL(`../../src/shared/${p}`, import.meta.url), 'utf8').split('\n')
+    .filter((r) => !/^\s*\/\//.test(r)).join('\n');
+  const COPIA = /\^www\\\.|@\\s\]\+\\\.|\[\^@\\s\]\+@/;
+  assert.doesNotMatch(codice('pavimento.js'), COPIA, 'il pavimento lo prende da SN_GUARDIANO_STATICO.indirizzoOEmail');
+  assert.equal(codice('guardianoStatico.js').match(new RegExp(COPIA.source, 'g')).length, 2, 'nel guardiano una volta sola');
+  const G = globalThis.SN_GUARDIANO_STATICO;
+  for (const v of ['mario.rossi2@example.com', 'https://example.com/reset1', 'www.esempio2024.it']) {
+    assert.ok(G.indirizzoOEmail(v) && !G.sembraPassword(v), v);
+    assert.equal(P.oscura(`Recupero password:\n${v}`), `Recupero password:\n${v}`, v);
+    assert.equal(P.oscura(`Password: ${v}`), `Password: ${v}`, v);
+  }
+  for (const v of ['Tr7#kq29Lm', 'Girasole2024']) {
+    assert.ok(!G.indirizzoOEmail(v), v);
+    assert.equal(P.oscura(`Recupero password:\n${v}`), `Recupero password:\n${S}`, v);
+  }
+});
+
 test('un codice greco che non è la password arriva intero, e la password greca sulla riga sotto si copre', () => {
   for (const e of CODICI_GRECI) {
     for (const t of [`${e}: 10431`, `${e}: AB-1234x`]) assert.equal(P.oscura(t), t, t);
