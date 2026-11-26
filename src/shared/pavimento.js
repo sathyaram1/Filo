@@ -951,11 +951,10 @@
   }
   function conGliACapoVeri(x, { piano, posto }, vero) {
     const v = String(x.valore);
-    const dato = Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio);
-    const k = dato ? x.inizio : piano.indexOf(v);
-    if (k < 0 || (!dato && vero.includes(v))) return x;
-    const y = { ...x, valore: vero.slice(posto[k], posto[k + v.length - 1] + 1) };
-    if (dato) y.inizio = posto[k];
+    const y = { ...x };
+    if (Number.isInteger(x.inizio) && x.inizio >= 0 && x.inizio <= piano.length) y.inizio = posto[x.inizio];
+    const k = Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio) ? x.inizio : piano.indexOf(v);
+    if (k >= 0 && !vero.includes(v)) y.valore = vero.slice(posto[k], posto[k + v.length - 1] + 1);
     return y;
   }
 
