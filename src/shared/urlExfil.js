@@ -358,7 +358,7 @@
   // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
   const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
-  const PRESENTA_CODICE = /\b(?:pin|codice|code|combinazione|otp)\b/g;
+  const PRESENTA_CODICE = /(?<![\p{L}\p{N}_])(?:pin|codice|code|c[oó]digo|combinazione|otp)(?![\p{L}\p{N}_])/gu;
   const PAROLE_DOPO = 8;
   const RIEMPITIVI = new Set([
     'della', 'delle', 'dello', 'degli', 'nella', 'sulla', 'sempre', 'ancora', 'adesso', 'stessa', 'stesso', 'nuova',
