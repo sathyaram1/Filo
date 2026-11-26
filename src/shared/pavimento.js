@@ -464,15 +464,31 @@
   }
 
   // Una frase di più parole dopo i due punti, da sola sulla riga e con l'etichetta in testa («Password: casa mia al mare
-  // 2019»): la password con gli spazi. Toglierla toglie solo quella frase, mai una parola sola altrove. Una frase che
-  // comincia come una spiegazione («disponibile alla reception», «sul retro del modem», «vedi email») o che misura la
-  // password («min. 8 caratteri») dice dove trovarla o come sceglierla, e resta.
-  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*([^\\n|\\t]{3,64}?)[ \\t]*(?=\\n|$)`, 'gi');
-  const INIZIO_SPIEGAZIONE = /^(?:a|al|allo|alla|ai|agli|alle|da|dal|dallo|dalla|dai|dagli|dalle|in|nel|nello|nella|nei|negli|nelle|su|sul|sullo|sulla|sui|sugli|sulle|presso|tra|fra|con|senza|dentro|sotto|sopra|dietro|at|on|from|under|behind|inside|with|see|ask|check|contact|available|provided|sent|printed|same|vedi|vedere|guarda|chiedere|richiedi|richiedila|contatta|rivolgiti|disponibile|disponibili|fornita|fornito|inviata|inviato|stampata|scritta|indicata|riportata|deve|devono|può|must|should|can|minimo|min|massimo|max|stessa|stesso|quella|quello|uguale|identica|come|vuota|nessuna|nessuno|scegli|sceglila|usa|use|не|нет|должен|должна|должно|см|смотрите|спросите|минимум|максимум|от|из|на|в|у|при|без|πρέπει|δείτε)$/i;
+  // 2019»): la password con gli spazi, quante che siano le parole (#2678.5). Toglierla toglie solo quella frase, mai una
+  // parola sola altrove. Una frase che comincia come una spiegazione («disponibile alla reception», «sul retro del
+  // modem», «vedi email»), anche dopo un articolo («la stessa di prima»), o che misura la password («min. 8 caratteri»)
+  // dice dove trovarla o come sceglierla, e resta. Il tetto in caratteri tiene fuori un paragrafo intero.
+  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*([^\\n|\\t]{3,160}?)[ \\t]*(?=\\n|$)`, 'gi');
+  const INIZIO_SPIEGAZIONE = /^(?:a|al|allo|alla|ai|agli|alle|da|dal|dallo|dalla|dai|dagli|dalle|in|nel|nello|nella|nei|negli|nelle|su|sul|sullo|sulla|sui|sugli|sulle|presso|tra|fra|con|senza|dentro|sotto|sopra|dietro|at|on|from|under|behind|inside|with|see|ask|check|contact|available|provided|sent|printed|same|vedi|vedere|guarda|chiedere|richiedi|richiedila|contatta|rivolgiti|disponibile|disponibili|fornita|fornito|inviata|inviato|stampata|scritta|indicata|riportata|deve|devono|può|must|should|can|minimo|min|massimo|max|stessa|stesso|quella|quello|uguale|identica|come|vuota|nessuna|nessuno|scegli|sceglila|usa|use|cambiata|cambiato|modificata|modificato|aggiornata|aggiornato|scaduta|scaduto|scade|scadrà|changed|updated|expired|expires|не|нет|должен|должна|должно|см|смотрите|спросите|минимум|максимум|от|из|на|в|у|при|без|πρέπει|δείτε)$/i;
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
   const TEMPO = /^(?:gen(?:naio)?|feb(?:braio)?|mar(?:zo)?|apr(?:ile)?|mag(?:gio)?|giu(?:gno)?|lug(?:lio)?|ago(?:sto)?|set(?:tembre)?|ott(?:obre)?|nov(?:embre)?|dic(?:embre)?|jan(?:uary)?|february|march|april|may|june?|july?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|dec(?:ember)?|fa|ago|giorn[oi]|settiman[ae]|mes[ei]|ann[oi]|or[ae]|minut[oi]|days?|weeks?|months?|years?|hours?|minutes?|ieri|oggi|yesterday|today)[.,;:]?$/i;
-  const spiegazione = (parole) => INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p) || TEMPO.test(p));
+  // Misura e data solo con un numero («min 8 caratteri», «otto caratteri», «2 mesi fa»): «ci vediamo ogni giorno», «una
+  // rondine non fa primavera», «may the force be with you» sono frasi-password.
+  const NUMERO = /\d|^(?:due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|quindici|venti|trenta|two|three|four|five|six|seven|eight|nine|ten|twelve|sixteen|twenty|thirty)$/i;
+  const misuraODate = (parole) => parole.some((x) => NUMERO.test(x)) && parole.some((x) => MISURA.test(x) || TEMPO.test(x));
+  const ARTICOLO = /^(?:la|il|lo|i|le|gli|una?|the|an?|el|der|die|das|de|het)$/i;
+  // Davanti a un verbo «la», «lo», «le» sono un pronome, e la frase dice dove trovarla: «Password: la trovi sul modem».
+  const DOPO_PRONOME = /^(?:trov[aio]|trovate|troverai|troverete|ricevi|riceve|ricevete|riceverai|riceverete|mando|mandiamo|manderò|manderemo|invio|inviamo|invierò|invieremo|chiedi|chiedete|sai|sa|sanno|conosci|conosce|ha|hai|hanno|abbiamo|avete|cambi|cambia|cambierai|scegli|sceglierai|imposti|imposterai|scrivo|scriverò|dico|dirò|diamo|daremo|do|darò|one|ones)$/i;
+  // La prima parola che conta: un articolo in testa non dice niente («Password: la casa al mare», #2678.5).
+  const spiegazione = (parole) => {
+    const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
+    const articolo = ARTICOLO.test(p[0]) && p.length > 1;
+    const prima = articolo ? p[1] : p[0];
+    return NON_VALORE.test(prima) || INIZIO_SPIEGAZIONE.test(prima) || (articolo && DOPO_PRONOME.test(prima)) || misuraODate(parole);
+  };
+  // Nelle parole anche i simboli di una password («la casa al mare 77!»), non il punto di domanda di una frase.
+  const PAROLA_DI_FRASE = /^[\p{L}\p{N}'’!@#$%^&*+=~_-]+[.,;:]?$/u;
   function fraseDopo(s, out) {
     for (const m of s.matchAll(FRASE_DOPO)) {
       // Le virgolette intorno alla frase («Password: «casa mia al mare»») non sono della password (#1403.27).
@@ -480,7 +496,7 @@
       const q = tutta.match(SOLO_FRA_VIRGOLETTE);
       const v = q ? q[3] : tutta;
       const parole = v.split(/\s+/);
-      if (parole.length < 2 || parole.length > 6 || parole.some((p) => !/^[\p{L}\p{N}'’]+[.,;:]?$/u.test(p)) || v.startsWith('[') || NON_VALORE.test(parole[0]) || formaVicina(parole[0])) continue;
+      if (parole.length < 2 || parole.some((p) => !PAROLA_DI_FRASE.test(p)) || v.startsWith('[') || formaVicina(parole[0])) continue;
       if (spiegazione(parole)) continue;
       out.push({ valore: v.replace(/[.,;:]+$/, ''), regola: 'password' });
     }
@@ -493,13 +509,11 @@
   const FRA_VIRGOLETTE = `[ \\t]*(?:[${DOPPIE}](?<d>[^\\n|\\t${DOPPIE}]{1,2000})[${DOPPIE}]|[${SINGOLE}](?<s>[^\\n|\\t${SINGOLE}]{1,2000})[${SINGOLE}])`;
   const VIRGOLETTATO_DOPO = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]*(?<sep>[:=])|[ \\t]+${VERBO_PASSWORD})${FRA_VIRGOLETTE}`, 'gid');
   const VIRGOLETTATO_IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}[ \\t]${FRA_VIRGOLETTE}`, 'gid');
-  const ARTICOLO = /^(?:la|il|lo|i|le|gli|una?|the|an?|el|der|die|das|de|het)$/i;
   const DESCRIVE = /^(?:stess[aoie]|quell[aoie]|ugual[ei]|identic[aoie]|vedi|vedere|guarda|same|see|disponibil[ei]|available|scritt[ao]|indicat[ao]|riportat[ao]|fornit[ao]|inviat[ao]|stampat[ao]|vuot[ao]|nessun[ao]?|deve|devono|può|must|should|almeno|minimo|min|massimo|max)$/i;
   const descrive = (parole) => {
     const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
     const i = ARTICOLO.test(p[0]) && p.length > 1 ? 1 : 0;
-    // Misura e data solo col numero («min 8 caratteri», «2 mesi fa»): «ci vediamo ogni giorno» è una frase-password.
-    return DESCRIVE.test(p[i]) || (p.some((x) => /\d/.test(x)) && p.some((x) => MISURA.test(x) || TEMPO.test(x)));
+    return DESCRIVE.test(p[i]) || misuraODate(p);
   };
   function fraVirgolette(s, out) {
     for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE]) {
@@ -808,8 +822,6 @@
   // Senza due punti né verbo le parole fra virgolette sono spesso una voce («password «Gestisci account»», #2678).
   const PRIMA_DELLE_VIRGOLETTE_NUDA = new RegExp(`${ETICHETTA}${QUALIFICA}[ \\t]*$`, 'i');
   const PRIMA_DELLE_VIRGOLETTE_CORTA = new RegExp(`${ETICHETTA_CORTA}[ \\t]*[:=]?[ \\t]*$`, 'i');
-  const spiega = (parole) => NON_VALORE.test(parole[0]) || INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, ''))
-    || parole.some((p) => MISURA.test(p) || TEMPO.test(p));
   function interiFraVirgolette(vero, valori) {
     const s = testo(vero);
     const nudo = (v) => String(v).replace(TESTA_VIRGOLETTE, '').replace(CODA_VIRGOLETTE, '').toLowerCase();
@@ -823,7 +835,7 @@
       const parole = v.split(/\s+/);
       if (parole.length < 2 || parole.length > PAROLE_FRA_VIRGOLETTE || NOMINA_ETICHETTA.test(v) || NOMINA_CORTA.test(v)) continue;
       const prima = s.slice(Math.max(0, m.index - 120), m.index).split('\n').pop();
-      const alPostoDelValore = !spiega(parole)
+      const alPostoDelValore = !spiegazione(parole)
         && (PRIMA_DELLE_VIRGOLETTE.test(prima) || (PRIMA_DELLE_VIRGOLETTE_NUDA.test(prima) && FORMA_FORTE(v))
           || (PRIMA_DELLE_VIRGOLETTE_CORTA.test(prima) && /[^\p{L}\s'’]/u.test(v)));
       if (alPostoDelValore || bordo(parole[0]) || bordo(parole[parole.length - 1])) out.push({ valore: v, regola: 'password' });
