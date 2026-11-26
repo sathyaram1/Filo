@@ -1597,7 +1597,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
    lo nasconderebbe intero e del valore non resterebbe niente (#2662). */
 :is(.dash-cambio-testo, .dash-activity-seg-label):has(> .dash-altrui) { display: flex; align-items: baseline; white-space: pre; }
 :is(.dash-cambio-testo, .dash-activity-seg-label) > .dash-altrui {
-  flex: 0 1 auto; min-width: 3em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 0 1 auto; min-width: 2em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
 .dash-delete-note[data-cerco="1"]::before {
