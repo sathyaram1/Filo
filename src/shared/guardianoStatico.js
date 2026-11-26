@@ -349,7 +349,7 @@
   const CAMBI = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|messa|messo|changed|set|updated|reset';
   const CAMBIO = `(?:${CAMBI})${SP}(?:in|a|to)`;
   const AUSILIARE = `(?:${AUSILIARI})${SP}(?:(?:${AVVERBI})${SP})?`;
-  const CAMBIO_PRIMA = `(?:in|a|to)(?<=(?:ho|abbiamo|hai|have|has|had|i|we|ve)${SP}(?:${CAMBI.replace('messa|', '')})${SP}[^\\n]{1,40}(?:in|a|to))`;
+  const CAMBIO_PRIMA = `(?:in|a|to)(?<=(?<![A-Za-z])(?:ho|abbiamo|hai|have|has|had|i|we|ve)${SP}(?:${CAMBI})${SP}[^\\n]{1,40}(?:in|a|to))`;
   const VERBO_LARGO = `(?:(?:${AUSILIARE})?(?:(?:${PARTICIPI})${SP})?${CAMBIO}|${AUSILIARE}(?:${PARTICIPI})|${PASSATI}|${ANNUNCI.join('|')})`;
   const ANNUNCIO_LARGO = `(?:${CAMBIO_PRIMA}|(?:(?:${AVVERBI})${SP})?(?:dev['’]|(?:${MODALI})${SP})?${VERBO_LARGO}(?:${SP}(?:${AVVERBI})){0,2})`;
   // Di cosa è la password, fra il nome e il valore («la password del wifi», «la pass per il router»): lo stesso per il
