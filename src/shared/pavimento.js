@@ -44,7 +44,7 @@
   // Anche nelle lingue delle etichette (#1403.13): «le code d'accès 482913», «el código de acceso 482913».
   const CODICE_ACCESSO = /\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const CODICE_ACCESSO_EN = /\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
-  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|è|e'|is)?\\s*${VIRGOLETTA}(\\d{4,8})\\b`, 'gi');
+  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|è|e'|is)?\\s*${DAVANTI}(\\d{4,8})\\b`, 'gi');
   // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
   // posto del codice (vedi alPostoDelCodice), nella frase che lo nomina o sulla riga sotto. Col nome del codice conta, a
   // meno che la frase lo dica un identificativo che non apre niente (cliente, ordine, prenotazione) senza parole
