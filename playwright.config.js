@@ -9,7 +9,7 @@ import { accendiCopertura } from './scripts/lib/copertura-prove.mjs';
 // Con `--workers` > 1 nel contenitore ogni lavoratore apre Electron sullo schermo virtuale suo (#2133).
 usaSchermoDelLavoratore();
 
-// La suite in GitHub registra quali file di src/ fa eseguire ogni prova (#2502): tests/helpers/copertura.mjs.
+// La suite in GitHub registra quali file di src/ fa eseguire ogni prova (#2502): scripts/lib/copertura-prove.mjs.
 accendiCopertura();
 
 // Finestre invisibili per TUTTA la suite (vedi src/main/test-window-mode.js).
