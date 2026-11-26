@@ -13,6 +13,9 @@ const FRASI = [
   ['Пароль – Gatto2024!', 'Gatto2024!'],
   ['пароль - Kx82mPq9', 'Kx82mPq9'],
   ['Паролата — Kx82mPq9', 'Kx82mPq9'],
+  // L'uguale largo del cinese e del giapponese, che il filtro verso i modelli già conosce.
+  ['密码＝Gatto2024!', 'Gatto2024!'],
+  ['パスワード＝Kx82mPq9', 'Kx82mPq9'],
 ];
 
 test('r1 un\'azione che scrive la password presentata col trattino russo viene riconosciuta', () => {
