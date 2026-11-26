@@ -206,19 +206,19 @@ class AvvisiSopraPagina {
   }
 
   // L'angolo in basso a destra è uno: gli avvisi di Filo dentro la scheda attiva salgono sopra la pila della barra
-  // (--filo-avvisi-barra), e quello che ci sta accanto si stringe a sinistra della sua larghezza (--filo-avvisi-barra-larga).
-  _riserva(h, w) {
+  // (--filo-avvisi-barra). La home non si stringe accanto alla pila (D-276): la larghezza non serve a nessuno.
+  _riserva(px) {
     const wc = this._wcAttiva();
-    if (wc) this._scriviRiserva(wc, h, w);
+    if (wc) this._scriviRiserva(wc, px);
     // Anche lo strato dei riquadri sopra la scheda (#1509.3): l'Aiuto di un sito sta lì.
     let strato = null;
     try { strato = wc ? require('./stratoDeiRiquadri').stratoDellaPagina(wc) : null; } catch (_) { strato = null; }
-    if (strato) this._scriviRiserva(strato, h, w);
+    if (strato) this._scriviRiserva(strato, px);
   }
 
   // Uno strato nato dopo gli avvisi: si mette subito al passo con la sua scheda, se è quella davanti.
   nelloStrato(v, wc) {
-    if (v && wc && this._wcAttiva() === wc) this._scriviRiserva(v, this.altezza, this.larghezza);
+    if (v && wc && this._wcAttiva() === wc) this._scriviRiserva(v, this.altezza);
   }
 
   // Un foglio inserito mentre la scheda carica può finire nel documento nuovo senza che se ne tenga la chiave, e
