@@ -444,6 +444,10 @@
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
   const TEMPO = /^(?:gen(?:naio)?|feb(?:braio)?|mar(?:zo)?|apr(?:ile)?|mag(?:gio)?|giu(?:gno)?|lug(?:lio)?|ago(?:sto)?|set(?:tembre)?|ott(?:obre)?|nov(?:embre)?|dic(?:embre)?|jan(?:uary)?|february|march|april|may|june?|july?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|dec(?:ember)?|fa|ago|giorn[oi]|settiman[ae]|mes[ei]|ann[oi]|or[ae]|minut[oi]|days?|weeks?|months?|years?|hours?|minutes?|ieri|oggi|yesterday|today)[.,;:]?$/i;
+  // Misura e data solo con un numero («min 8 caratteri», «otto caratteri», «2 mesi fa»): «ci vediamo ogni giorno», «una
+  // rondine non fa primavera», «may the force be with you» sono frasi-password.
+  const NUMERO = /\d|^(?:due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|quindici|venti|trenta|two|three|four|five|six|seven|eight|nine|ten|twelve|sixteen|twenty|thirty)$/i;
+  const misuraODate = (parole) => parole.some((x) => NUMERO.test(x)) && parole.some((x) => MISURA.test(x) || TEMPO.test(x));
   const ARTICOLO = /^(?:la|il|lo|i|le|gli|una?|the|an?|el|der|die|das|de|het)$/i;
   // Davanti a un verbo «la», «lo», «le» sono un pronome, e la frase dice dove trovarla: «Password: la trovi sul modem».
   const DOPO_PRONOME = /^(?:trov[aio]|trovate|troverai|troverete|ricevi|riceve|ricevete|riceverai|riceverete|mando|mandiamo|manderò|manderemo|invio|inviamo|invierò|invieremo|chiedi|chiedete|sai|sa|sanno|conosci|conosce|ha|hai|hanno|abbiamo|avete|cambi|cambia|cambierai|scegli|sceglierai|imposti|imposterai|scrivo|scriverò|dico|dirò|diamo|daremo|do|darò|one|ones)$/i;
