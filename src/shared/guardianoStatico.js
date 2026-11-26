@@ -373,6 +373,7 @@
   // Le precisazioni sono un elenco chiuso, scelto dall'owner (#810): le forme nuove le vede il guardiano.
   const NON_LATINE = NON_LATINI.ETICHETTE_NON_LATINE;
   const FINE_VALORE = NON_LATINI.FINE_VALORE;
+  const APRE_VALORE = NON_LATINI.APRE_VALORE;
   const MARCHIO_PASSWORD = new RegExp('(?:\\b(?:password|passcode|passphrase)(?:\\s+(?:di\\s+accesso|per\\s+il\\s+primo\\s+accesso'
     + `|iniziale|provvisori[ao]|for\\s+your\\s+account))?\\b|${NON_LATINE})`, 'i');
   // Gli altri nomi («Passwort», «contraseña», «mot de passe») li tiene urlExfil.js, che si carica dopo: si leggono alla
