@@ -20,7 +20,7 @@ test('gli indirizzi delle pagine e dei preload diventano file del repo, gli altr
   assert.equal(percorsoDaIndirizzo('/repo/Filo/src/preload/shell-preload.js', ROOT), 'src/preload/shell-preload.js');
   assert.equal(percorsoDaIndirizzo('file:///repo/Filo/src/main/tabs.js', ROOT), 'src/main/tabs.js');
   assert.equal(percorsoDaIndirizzo('C:\\repo\\Filo\\src\\main\\tabs.js', 'C:\\repo\\Filo'), 'src/main/tabs.js');
-  for (const fuori of ['node:events', 'node:electron/js2c/sandbox_bundle', '', 'filo://asset/icona.svg', '/repo/Filo-altro/src/x.js', '/repo/Filo/tests/x.mjs', 'https://example.org/a.js', 'filo://src/%2e%2e/%2e%2e/etc/passwd']) {
+  for (const fuori of ['node:events', 'node:electron/js2c/sandbox_bundle', '', 'filo://asset/icona.svg', '/repo/Filo-altro/src/x.js', '/repo/Filo/tests/x.mjs', 'https://example.org/a.js', '/repo/Filo/src/../../etc/passwd']) {
     assert.equal(percorsoDaIndirizzo(fuori, ROOT), null, fuori);
   }
 });
