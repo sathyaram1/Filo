@@ -95,7 +95,7 @@ test('la bozza che il sito rimette dopo un riavvio vero non porta la carta dellâ
     const shell = await primaFinestra(app);
     await preparaModelli(app);
     await modelloFinto(app, [['', '{"text":"Ecco.","status":"done"}']]);
-    const page = await apriScheda(app, shell, url);
+    const page = await apriScheda(app, shell, testServer.html(POSTA));
     await expect(page.locator('#ed')).toContainText(CARTA);
     const aiuto = await apriAiuto(app, shell, page);
     await scriviAllAiuto(aiuto, 'correggi il messaggio');
