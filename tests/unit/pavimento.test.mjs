@@ -289,6 +289,34 @@ test('il codice per sbloccare il proprio telefono o computer, detto col possessi
   ]) assert.equal(P.oscura(t), t, t);
 });
 
+test('il codice del proprio telefono esce nemmeno con un\'altra preposizione, la parola che dice a cosa serve, un avverbio o un refuso', () => {
+  for (const t of [
+    'The code to my phone is 5101', 'Il codice per il mio telefono è 5102', 'Il mio telefono ha il codice 4829',
+    'Le code secret de mon téléphone est 4829', 'Le code de déverrouillage de mon téléphone est 4829',
+    'El código de desbloqueo de mi teléfono es 4829', "Le code d'accès de mon ordinateur est 4829",
+    'il codice del mio telefono è: 5103', "Le code de mon téléphone, c'est 5104", 'My phone code is now 5105',
+    'Il codice del mio telefono è sempre 4829', 'Il codice del mio telefono sarebbe 4829', 'il codice del mio telefono e 5106',
+    'Le code de mon tél est 5107', 'le code de mon portable cest 4829', 'El código de mi celu es 4829', 'El código de mi compu es 4829',
+    'Mein Handycode ist 5108', 'Mijn telefooncode is 4829', 'Der Entsperrcode meines Handys ist 4829',
+  ]) assert.ok(!P.oscura(t).includes(t.match(/\d{4}/)[0]), t);
+});
+
+test('un identificativo del proprio telefono resta in ogni lingua, anche in inglese col nome davanti a «code»', () => {
+  for (const t of [
+    'The serial code of my phone is 5200', 'The IMEI code of my phone is 5201', 'The product code of my phone is 5202',
+    'The QR code of my phone is 4829', 'The model code of my phone is 4829', 'The area code of my phone is 0039',
+    'Il codice seriale del mio telefono è 4829', 'Le code IMEI de mon téléphone est 4829', 'El código de modelo de mi teléfono es 4829',
+    'My phone model code is 4829', 'Il codice di errore del mio pc è 4829', 'Il codice sorgente del mio computer è 4829',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
+test('un apparecchio fa del suo codice un segreto con l\'etichetta come col possessivo: l\'elenco è uno solo', () => {
+  for (const t of [
+    'Le code du portable est 4829', "Le code de l'ordinateur est 4829", 'El código del portátil es 4829', 'Il codice del computer è 4829',
+    'Le code de la tablette est 4829', 'Kod laptopa to 4829',
+  ]) assert.ok(!P.oscura(t).includes('4829'), t);
+});
+
 test('in tedesco il codice annunciato al futuro, dopo una relativa o con lo scopo non esce', () => {
   for (const t of [
     'Dein Code wird 482913 sein', 'Der Code, den du erhalten hast, ist 482913', 'Der Code, den ich bekommen habe, lautet 482913',
