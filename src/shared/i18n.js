@@ -336,6 +336,9 @@
     // #407 — un riquadro incorporato che il sito chiude con `sandbox`: un rettangolo intero
     // che resta in inglese in mezzo a una pagina italiana.
     toast_page_translated_partial_frame: 'Pagina tradotta, tranne un riquadro incorporato. Il sito non lascia leggere il testo lì dentro, e resta nella lingua originale.',
+    // #2656 — il riquadro viene da un sito dove l'utente ha spento Filo: resta com'è, e si dice quale.
+    toast_page_translated_except_off: 'Pagina tradotta, tranne quello che viene da %s, dove hai spento Filo.',
+    toast_page_only_off_frames: 'Il testo di questa pagina viene da %s, dove hai spento Filo: resta com\'è.',
     // Traduzione interrotta a metà (#408): quanto manca, perché si è fermata, come riprendere.
     toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dall\'icona Traduci della barra laterale senza rifare la parte già tradotta.',
     // Più lunga di quanta ne entri in un giro solo: non è un guasto, è un lavoro a tratti.

@@ -400,6 +400,7 @@
     if (!result) return;
     const framesLeft = (frames && frames.left) || 0;
     const framesApplied = (frames && frames.applied) || 0;
+    const spenti = (frames && frames.spenti) || [];
     switch (result.kind) {
       case 'batch':
         Popup.showToast(I18n.t('toast_page_translate_batch', result.applied, result.total), { duration: 7000 });
@@ -410,8 +411,9 @@
       case 'none':
         // La pagina che ospita non aveva testo proprio, ma i riquadri sì: «Non ho trovato testo»
         // davanti a uno schermo appena cambiato lingua sarebbe falso.
-        if (framesApplied) { Popup.showToast(...doneToast(0, framesLeft)); return; }
+        if (framesApplied) { Popup.showToast(...doneToast(0, framesLeft, spenti)); return; }
         if (framesLeft) { Popup.showToast(I18n.t('toast_page_translated_partial_frame'), { duration: 7000 }); return; }
+        if (spenti.length) { Popup.showToast(I18n.t('toast_page_only_off_frames', spenti.join(', ')), { duration: 7000 }); return; }
         Popup.showToast(I18n.t('toast_nothing_to_translate'));
         return;
       case 'failed':
@@ -429,7 +431,7 @@
           Popup.showToast(I18n.t('toast_page_translated_new_arrived'), { duration: 7000 });
           return;
         }
-        Popup.showToast(...doneToast(result.unreachable, framesLeft));
+        Popup.showToast(...doneToast(result.unreachable, framesLeft, spenti));
         return;
       default:
     }
@@ -643,6 +645,7 @@
     // esattamente ciò che l'avviso finale deve confessare. Quelli tradotti in sottofondo hanno un conto a parte.
     frameRuns.set(runId, {
       expected, acked: 0, ended: 0, applied: 0, left: 0, extraExpected: background.length, extraAcked: 0, extraEnded: 0,
+      spenti: new Set(),
     });
     try {
       await chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'translate', runId });
@@ -673,7 +676,7 @@
     frameRuns.delete(runId);
     // `tutti`: ogni riquadro a cui si è passata parola ha risposto, quindi ognuno stava già traducendo il suo documento.
     const tutti = !silent && st.extraAcked >= st.extraExpected;
-    return { left: silent + unfinished + st.left, applied: st.applied, tutti };
+    return { left: silent + unfinished + st.left, applied: st.applied, tutti, spenti: [...st.spenti].filter(Boolean) };
   }
 
   function onFrameReport(msg) {
@@ -690,6 +693,8 @@
     }
     if (fuori) st.extraEnded++;
     else st.ended++;
+    // Uno nascosto non si nomina: l'utente non lo vede.
+    if (!fuori && msg.spento) st.spenti.add(String(msg.sito || ''));
     st.applied += Number(msg.applied) || 0;
     st.left += Number(msg.left) || 0;
   }
@@ -703,6 +708,14 @@
     // Qui arriva solo un riquadro che chi lo ospita vede o traduce in sottofondo (il preload ha fermato gli altri): ai
     // suoi passa lo stesso giudizio, e nel "ci sono" dice quanti ne contare. Dentro uno fuori conto, tutti fuori conto.
     const fuori = !!msg.fuoriConto;
+    // Sito dove l'utente ha spento Filo (#2656, lo dice il main): il riquadro resta com'è, e chi sta dentro di lui con
+    // lui; risponde subito, così il conto non lo aspetta e l'avviso può nominare il sito.
+    if (msg.spento === true) {
+      tellFrames(runId, framesOf(document), false);
+      reportToHost(runId, { phase: 'ack', frames: 0, fuori: 0 }, fuori);
+      reportToHost(runId, { phase: 'end', applied: 0, left: 0, spento: 1 }, fuori);
+      return;
+    }
     const modo = fuori ? Extract.NASCOSTE.TRADUCI : await leggiModo();
     const { shown, skipped, background } = embeddedFrames(modo);
     tellFrames(runId, skipped, false);
@@ -859,8 +872,10 @@
 
   // «Pagina tradotta» solo se non è rimasto fuori niente: coi componenti chiusi (#439)
   // sarebbe una bugia. `framesLeft` viene prima: è un rettangolo intero, non un pezzetto.
-  function doneToast(unreachable, framesLeft) {
+  // Un riquadro di un sito dove l'utente ha spento Filo resta com'è per scelta sua: l'avviso nomina il sito (#2656).
+  function doneToast(unreachable, framesLeft, spenti) {
     if (framesLeft) return [I18n.t('toast_page_translated_partial_frame'), { duration: 7000 }];
+    if (spenti && spenti.length) return [I18n.t('toast_page_translated_except_off', spenti.join(', ')), { duration: 7000 }];
     return unreachable
       ? [I18n.t('toast_page_translated_partial'), { duration: 7000 }]
       : [I18n.t('toast_page_translated')];

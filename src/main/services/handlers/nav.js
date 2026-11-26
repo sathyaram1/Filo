@@ -4,6 +4,15 @@ const { app } = require('electron');
 const { soloFilo, filoNegatoAllaPagina, paginaNonDiFilo, daPaginaNonDiFilo } = require('./origine');
 const { azione: contata } = require('../azioniContate');
 const Strade = require('../contatoriStrade');
+const { vociCheSpengono, sitoDi } = require('./filoSpento');
+const NomiSito = require('../../../shared/nomiSito.js');
+
+function sitoDelRiquadro(sender) {
+  let url = '';
+  try { url = String((sender && sender.frame && sender.frame.url) || ''); } catch (_) { url = ''; }
+  const s = sitoDi(url);
+  return s ? (NomiSito.leggibile(s) || s) : '';
+}
 
 // Una pagina di Filo aperta da un'altra pagina di Filo (#1468): la strada la dice chi manda (un comando, una carta della
 // home, la chat), sennò è un collegamento; aperta da una strada che è anche un'icona, è anche la sua azione.
@@ -358,11 +367,21 @@ module.exports = function register(on, ctx) {
       mode: String(msg?.mode || 'translate'),
       runId: String(msg?.runId || ''),
     };
+    // #2656 — il riquadro di un sito dove l'utente ha spento Filo non si traduce: lo decide il main dall'indirizzo vero
+    // del riquadro, che il riquadro non sceglie. Riceve lo stesso la parola, per rispondere al conto e dire perché.
+    let elenco = [];
+    if (payload.mode !== 'restore') {
+      try { elenco = ((await globalThis.SN_STORAGE.getSettings()).blocklist || []).filter((x) => typeof x === 'string'); } catch (_) {}
+    }
+    const spento = (f) => {
+      if (!elenco.length) return false;
+      try { return vociCheSpengono(elenco, [f.url]).length > 0; } catch (_) { return false; }
+    };
     let frames = 0;
     try {
       for (const f of mainFrame.framesInSubtree || []) {
         if (f === mainFrame || f.detached) continue;
-        try { f.send('filo:broadcast', payload); frames++; } catch (_) {}
+        try { f.send('filo:broadcast', spento(f) ? { ...payload, spento: true } : payload); frames++; } catch (_) {}
       }
     } catch (e) {
       return { ok: false, error: e.message || String(e) };
@@ -380,6 +399,8 @@ module.exports = function register(on, ctx) {
     applied: Number(msg?.applied) || 0,
     left: Number(msg?.left) || 0,
     fuoriConto: msg?.fuoriConto ? 1 : 0,
+    // Il nome del sito spento lo legge il main dal mittente: l'avviso della pagina lo nomina.
+    ...(msg?.spento ? { spento: 1, sito: sitoDelRiquadro(sender) } : {}),
   }));
 
   on(MSG.REPLACE_MISSPELLING, async (msg, sender) => {
