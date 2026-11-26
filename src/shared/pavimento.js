@@ -990,7 +990,7 @@
     scritteAMano(s, out);
     out.push(...interiFraVirgolette(s, out));
     return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano)))
-      .map((x) => (piano === vero ? x : conGliACapoVeri(x, piano, vero)))
+      .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
       .filter((x) => String(x.valore).length >= 3);
   }
 
