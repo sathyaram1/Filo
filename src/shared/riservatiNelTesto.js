@@ -222,12 +222,10 @@ function parlaInChat(riga) {
   const m = s.match(PARLA);
   return m ? { chi: m[1].trim().toLowerCase(), resto: s.slice(m[0].length) } : null;
 }
-// Come apre una risposta prima del dato, sulla sua riga: «certo, 4821», «eccolo: 4821», «sì è 4821», «ciao! 4821».
-const ASSENSI = new Set(['sì', 'si', 'yes', 'yep', 'ok', 'oui', 'ja', 'sí', 'sim', 'да', 'tak']);
-function apreLaRisposta(testa) {
-  const parole = minuscolo(testa).split(/\s+/u).map((w) => w.replace(/^[^\p{L}\p{N}=]+|[^\p{L}\p{N}=’']+$/gu, '')).filter(Boolean);
-  return parole.length <= 4
-    && parole.every((w) => AVVII.has(w) || PRESENTA_DATO.has(w) || SALUTO.test(w) || ASSENSI.has(w));
+// La riga chiede una password o un codice («qual è il pin?», «mandami il codice del cancello»), con le regole della
+// richiesta di questo file: il pavimento legge la risposta sotto come quella a chi chiede la password (#2692).
+function chiede(riga) {
+  try { return richieste(minuscolo(riga)).some((r) => r.chiesta); } catch (_) { return false; }
 }
 // Chi scrive il campo si firma così nelle conversazioni copiate; le pagine di chat non mettono nomi, e un altro nome
 // può essere chiunque del gruppo.
