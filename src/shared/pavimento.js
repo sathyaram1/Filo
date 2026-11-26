@@ -71,6 +71,9 @@
     + '|fechadura|cadeado|t[üu]r|tor|haust[üu]r|eingang\\p{L}*|geb[äa]ude\\p{L}*|tresors?|safe|alarm\\p{L}*|schloss\\p{L}*|schlie(?:ß|ss)fach\\p{L}*'
     + '|drzwi|bram[ay]?|furtk[ai]|wej[śs]ci\\p{L}*|sejfu?|domofonu?|gara[żz]u|deur|poort|ingang|kluis|wi-?fi|wlan)';
   const APRE_ALTRE_SOLO = new RegExp(`^${APRE_ALTRE}$`, 'iu');
+  const NOME_ALTRE = /(?<![\p{L}])(?:code|c[óo]digo|kod)(?![\p{L}])/giu;
+  const LEGAMI_ALTRE = /^(?:\s+|[dl]['’]|(?:de|du|des|del|do|da|dos|das|la|las|los|le|les|el|o|a|os|as|à|al|au|aux|pour|para|f[üu]r|vom|von|der|die|das|dem|den|zur|zum|van|het|od|ton|ta|votre|tu|su|seu|sua)(?![\p{L}]))+/iu;
+  const DOPO_IL_NOME = new RegExp(`^${SEPARA_ALTRE}`, 'u');
   const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
   // Le cose che un codice apre: il loro codice è un segreto anche col nome comune davanti («Il codice del cancello è
   // 4829», «Codice di ritiro: 640385»). Contano solo come nome del codice, cioè subito dopo «codice» o subito prima di
