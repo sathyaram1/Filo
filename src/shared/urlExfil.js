@@ -355,8 +355,6 @@
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
   const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
   // Senza spazi fra le parole (cinese, giapponese, thai) il valore finisce dove ricomincia la frase.
-  if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
-  const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
   const FRA_PAROLE = new RegExp(`[\\s${NON_LATINI.FINE_VALORE}]+`);
   // I nomi del PIN senza «codice» («numero segreto», «Geheimzahl») li tiene il pavimento, che urlExfil precede nel loader.
   let presentaCodice = null;
