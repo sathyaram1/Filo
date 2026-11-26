@@ -787,7 +787,7 @@
       if (parole.length < 2 || parole.length > PAROLE_FRA_VIRGOLETTE || NOMINA_ETICHETTA.test(v) || NOMINA_CORTA.test(v)) continue;
       const prima = s.slice(Math.max(0, m.index - 120), m.index).split('\n').pop();
       const alPostoDelValore = !spiega(parole)
-        && (DOPO_ETICHETTA.test(prima) || (DOPO_CORTA.test(prima) && /[^\p{L}\s'’]/u.test(v)));
+        && (PRIMA_DELLE_VIRGOLETTE.test(prima) || (PRIMA_DELLE_VIRGOLETTE_CORTA.test(prima) && /[^\p{L}\s'’]/u.test(v)));
       if (alPostoDelValore || bordo(parole[0]) || bordo(parole[parole.length - 1])) out.push({ valore: v, regola: 'password' });
     }
     return out;
