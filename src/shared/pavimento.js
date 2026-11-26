@@ -630,7 +630,7 @@
         const v = m.groups[k].trim();
         if (!v || v.startsWith('[') || v.includes(SEGNAPOSTO)) continue;
         const parole = v.split(/\s+/);
-        const separato = re === VIRGOLETTATO_DOPO;
+        const separato = re === VIRGOLETTATO_DOPO && !UNA_FRECCIA.test(m.groups.sep || '');
         if (parole.length > 1) {
           if (separato ? !descrive(parole) : FORMA_FORTE(v)) out.push({ valore: v, regola: 'password' });
           continue;
