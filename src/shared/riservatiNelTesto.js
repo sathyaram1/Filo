@@ -30,7 +30,7 @@ const RICHIESTA = new RegExp([
   // Come in italiano anche chi ricorda, chi può, chi ce l'ha e chi sa («напомни», «можешь», «есть», «θυμάσαι», «έχεις»).
   '(?:скинь(?:те)?|кинь(?:те)?|дай(?:те)?|скажи(?:те)?|напиши(?:те)?|пришли(?:те)?|отправь(?:те)?|подскажи(?:те)?|надішли(?:ть)?|какой|какая|какое|який|яка|нужен|нужна|кажи|прати|пошаљи|реци)',
   '(?:напомни(?:те)?|нагадай(?:те)?|підкажи(?:ть)?|скажіть|можешь|можете|можно|може(?:ш|те)?|есть|знаешь|знаете|знаєш|скинуть|кинуть|дать|сказать|прислать|написать|отправить|подсказать)',
-  '(?:πες|πείτε|δώσε|δώστε|στείλε|στείλτε|ποιος|ποια|ποιο|χρειάζομαι|ξέρεις|ξέρετε|θυμάσαι|θυμάστε|λες|λέτε|έχεις|έχετε|μπορείς|μπορείτε|τι)',
+  '(?:πες|πείτε|δώσε|δώστε|στείλε|στείλτε|ποιος|ποια|ποιο|χρειάζομαι|ξέρεις|ξέρετε|θυμάσαι|θυμάστε|λες|λέτε|έχεις|έχετε|μπορείς|μπορείτε|τι\\s+(?:κωδικ|συνθηματικ)\\p{L}*)',
   '(?:skicka|ge\\s+mig|säg|vad\\s+är|gi\\s+meg|hva\\s+er|hvad\\s+er|giv\\s+mig|lähetä|kerro|mikä|küldd?|küldj|add\\s+meg|mondd|pošli|pošlete|dej|dejte|řekni|daj|reci|pošalji|koja\\s+je|gönder|söyle|nedir|trimite|spune|dă-mi|care\\s+este|gửi|cho\\s+(?:mình|tôi|em|anh)|là\\s+gì|kirim|kasih|minta|berapa)',
   '(?:kan\\s+(?:du|jeg|jag|i)|send|sende|sänd|atar\\s+m[ıi]s[ıi]n|m[ıi]s[ıi]n|musun|müsün|kaç|ne(?=[^\\p{L}]*$)|care\\s+e|da-mi|zi-mi|[șşs]tii)',
   '(?:(?:schick|gib|sag)\\s+mir|was\\s+ist|wie\\s+ist|envoie|donne|dis-moi|quel\\s+est|c[\'’]est\\s+quoi|mándame|pásame|dame|dime|cuál\\s+es|me\\s+passa|stuur|geef|wat\\s+is|wyślij|podaj|jakie\\s+jest)',
