@@ -136,6 +136,10 @@
     return somma % 10 === 0;
   }
 
+  // I nomi del CVV, come testo di un'espressione: li usano il pavimento nel testo e i campi segreti nelle etichette
+  // (#2686), anche dentro i riquadri di un altro sito, dove arrivano scritti nel codice che parte.
+  const NOME_CVV = '\\b(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?)\\b';
+
   // Una carta ha la forma del suo circuito: prefisso e lunghezza, oltre alla cifra di controllo. Quella da
   // sola la passa un numero lungo su dieci: un video, un ordine, un istante nei log.
   function cartaValida(raw) {
