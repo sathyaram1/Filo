@@ -1992,10 +1992,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   box-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.02 * var(--sn-ombra, 1)));
   /* Centrato fino a 720px. Non si stringe per gli avvisi della barra (D-276, #2390): nella home un avviso sta
      nell'angolo il tempo di leggerlo e poi vola nella colonna di sinistra. */
-  --dash-centro: max(0px, (100% - 720px) / 2);
-  margin: var(--dash-gap) var(--dash-centro) 0 var(--dash-centro);
+  margin: var(--dash-gap) auto 0;
+  width: 100%;
   max-width: 720px;
-  min-width: 0;
   box-sizing: border-box;
 }
 /* Un file trascinato sopra la home (#1623): il campo si accende, è lì che andrà a finire. */
