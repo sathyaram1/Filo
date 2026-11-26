@@ -804,6 +804,7 @@
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
+    out.push(...interiFraVirgolette(s, out));
     return out.filter((x) => x.valore).map((x) => (s === vero ? x : nelTestoVero(x, vero)))
       .filter((x) => String(x.valore).length >= 3);
   }
