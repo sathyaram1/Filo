@@ -74,7 +74,7 @@ const POSTA = `<!doctype html><html><head><title>Posta</title></head><body style
 <script>var ed=document.getElementById('ed');ed.textContent=localStorage.getItem('bozza')||'';
 ed.addEventListener('input',function(){localStorage.setItem('bozza',ed.textContent);});</script></body></html>`;
 
-test('la bozza che il sito rimette dopo un riavvio vero non porta la carta dell’utente fra i segreti letti', async ({ testServer }) => {
+for (const [come, attesa] of [['', 3000], [', chiuso Filo appena scritto', 300]]) test(`la bozza che il sito rimette dopo un riavvio vero non porta la carta dell’utente fra i segreti letti${come}`, async ({ testServer }) => {
   test.setTimeout(180_000);
   const userData = cartellaTemporanea('filo-verifica-810-24-');
   const url = testServer.html(POSTA);
