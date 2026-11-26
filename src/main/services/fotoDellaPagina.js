@@ -5,7 +5,7 @@
 
 const { mittenteInVista } = require('./appuntiDaiSiti');
 const { riquadroArrivato } = require('./riquadroArrivato');
-const { campiSegretiFuoriPagina, misuraRiquadro, interseca } = require('./campiNeiRiquadri');
+const { campiSegretiFuoriPagina, misuraRiquadro, interseca, preambolo } = require('./campiNeiRiquadri');
 
 function framePrincipale(sender) {
   const f = sender && sender.frame;
