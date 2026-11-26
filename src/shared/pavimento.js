@@ -185,10 +185,14 @@
   // Le parole senza la forma di una password («Password: hunter», la cella, la colonna) contano solo da sole al posto del
   // valore, con l'etichetta in testa alla riga o alla cella: «un campo password o carta: …» resta.
   // Le etichette: anche la password del wifi del router, il codice di accesso e sei lingue straniere.
-  const ETICHETTA = '\\b(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
+  const LATINE = '(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
     + '|chiave\\s+(?:di\\s+)?(?:rete|sicurezza(?:\\s+di\\s+rete)?|wi-?fi|wpa2?|wlan)|(?:wpa[23]?(?:-psk)?|wi-?fi|wlan|network|security)\\s+key'
-    + '|codice\\s+(?:di\\s+)?(?:accesso|segreto)|mot\\s+de\\s+passe|passwort|kennwort|contrase[ñn]a|senha|wachtwoord|has[łl]o)\\b'
-    + '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
+    + '|codice\\s+(?:di\\s+)?(?:accesso|segreto)|mot\\s+de\\s+passe|passwort|kennwort|contrase[ñn]a|senha|wachtwoord|has[łl]o)\\b';
+  const NON_ALTRO = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
+  const ETICHETTA = `\\b${LATINE}${NON_ALTRO}`;
+  // Senza il confine davanti: dentro un nome di campo («login_password») o una parola più lunga. Composta dai pezzi,
+  // mai ritagliata dal testo di ETICHETTA: il ritaglio si rompeva in silenzio a ogni cambio della sua forma (#2677).
+  const ETICHETTA_DENTRO = `${LATINE}${NON_ALTRO}`;
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
