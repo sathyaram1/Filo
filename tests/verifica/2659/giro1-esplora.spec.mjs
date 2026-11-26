@@ -1,7 +1,6 @@
 // Verifica #2659 giro 1: la finestra di un altro sito tenuta dalla pagina, chiusa, non lascia schede morte.
 import { test, expect } from '../../fixtures/electron.mjs';
 
-const tm = 'BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs';
 const schede = (app) => app.evaluate(({ BrowserWindow }) => {
   const m = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
   return m.tabs.map((t) => {
