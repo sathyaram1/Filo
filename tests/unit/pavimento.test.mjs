@@ -52,7 +52,7 @@ test('#2681.2: il CVV con l\'articolo dopo il verbo, col trattino, al futuro e c
     ['El código de seguridad es el 123', `El código de seguridad es el ${S}`], ['O código de segurança é o 123', `O código de segurança é o ${S}`],
     ['Sicherheitscode: 123', `Sicherheitscode: ${S}`], ['Die Prüfziffer wird 321', `Die Prüfziffer wird ${S}`],
     ['Beveiligingscode: 123', `Beveiligingscode: ${S}`], ['Kod zabezpieczający to 123', `Kod zabezpieczający to ${S}`],
-    ['Код CVV — 123', `Код CVV — ${S}`], ['Κωδικός ασφαλείας: 123', `Κωδικός ασφαλείας: ${S}`],
+    ['Код CVV — 123', `Код CVV — ${S}`], ['Ο κωδικός CVV είναι 123', `Ο κωδικός CVV είναι ${S}`],
     ['The card verification value is the 123', `The card verification value is the ${S}`],
   ]) assert.equal(P.oscura(riga), atteso, riga);
   for (const riga of ['Il CVV - 3 cifre sul retro', 'CVV-123', 'Le cryptogramme est le code à 3 chiffres', 'La cryptographie est le 123e sujet',
