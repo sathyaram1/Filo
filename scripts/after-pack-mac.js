@@ -37,6 +37,10 @@ const { execFileSync } = require('node:child_process');
 const COPIA_INTERMEDIA = /-(?:x64|arm64)-temp$/;
 exports.COPIA_INTERMEDIA = COPIA_INTERMEDIA;
 
+// L'app dentro il pacchetto: la firma qui e il fusibile (lib/fusibili-electron.js) la cercano con questo conto solo.
+const appDelPacchetto = (context) => path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+exports.appDelPacchetto = appDelPacchetto;
+
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return;
   if (COPIA_INTERMEDIA.test(context.appOutDir)) {
@@ -44,8 +48,7 @@ exports.default = async function afterPack(context) {
     return;
   }
 
-  const appName = context.packager.appInfo.productFilename;
-  const appPath = path.join(context.appOutDir, `${appName}.app`);
+  const appPath = appDelPacchetto(context);
 
   // --force: sovrascrive un'eventuale firma parziale già presente.
   // --deep: firma anche i pezzi annidati (helper, framework).
