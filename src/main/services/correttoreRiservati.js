@@ -33,10 +33,11 @@ function riservati(grezzo) {
 }
 
 // Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
-// Una parola di sole lettere vale intera: il «camera» di una risposta non tocca «cameraman»; un numero anche, così il CVV
-// «123» non tocca l'ordine «81234».
+// Una parola di sole lettere vale intera: il «camera» di una risposta non tocca «cameraman». Così un numero corto (CVV,
+// PIN): «123» non tocca l'ordine «81234». Uno lungo no, perché nei pezzi incollati due carte stanno attaccate.
 function formaDi(valore) {
-  if (/^\d+$/.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore.split('').join('[\\s-]?')}(?![\\p{L}\\p{N}])`, 'giu');
+  if (/^\d{1,7}$/.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore.split('').join('[\\s-]?')}(?![\\p{L}\\p{N}])`, 'giu');
+  if (/^\d+$/.test(valore)) return new RegExp(valore.split('').join('[\\s-]?'), 'gi');
   if (/^\p{L}+$/u.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore}(?![\\p{L}\\p{N}])`, 'giu');
   return new RegExp(esc(valore), 'gi');
 }
