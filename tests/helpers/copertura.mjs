@@ -2,7 +2,7 @@
 // prova al suo processo main (src/main/copertura.js) e qui si registrano le funzioni di src/ eseguite dalle sue pagine.
 // Acceso solo da FILO_COPERTURA (playwright.config.js); il formato lo legge scripts/lib/mappaProve.mjs.
 
-import { _electron, test } from '@playwright/test';
+import { createRequire } from 'node:module';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
