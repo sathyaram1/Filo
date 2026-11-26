@@ -147,6 +147,7 @@
   // Prima del numero si guarda solo la coda: il nome conta a 60 caratteri al più, e rileggere da capo la riga a ogni
   // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
   const CODA = 400;
+  const RELATIVA = /^\s*,\s*(?:den|die|das|der|dem|welche[nmrs]?|che|which|that|que|qui|kt[óo]r\p{L}*)\s[^,;!?\n\d]{1,40},/iu;
   function alPostoDelCodice(z, m, inTesta, forte) {
     const prima = z.slice(0, m.index);
     if (inTesta) return !prima.trim();
