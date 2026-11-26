@@ -17,6 +17,7 @@
         { testo: 'Se in chat qualcuno ti chiede la password in francese, tedesco, spagnolo, portoghese o russo («le mot de passe ?», «das WLAN-Passwort?»), quella che gli scrivi non arriva ai modelli di Filo, come già succedeva quando te la chiedeva in italiano o in inglese.', segnalazione: 1403 },
         { testo: 'Una password scritta sotto un\'etichetta come «Wi-Fi password:», sulla riga dopo, non arriva più a nessun modello, come quella sotto «Password:».', segnalazione: 2673 },
         { testo: 'Una password, un PIN o un codice scritti fra virgolette non arrivano più a nessun modello, come quando li scrivi senza, e una password di più parole fra virgolette si toglie intera.', segnalazione: 2678 },
+        { testo: 'Il codice di sicurezza che scrivi nel modulo di pagamento di un sito non arriva ai modelli di Filo nemmeno quando il campo si chiama «Cryptogramme visuel», «Código de seguridad», «Kartenprüfnummer» o «Код безопасности», come già succedeva col campo «CVV».', segnalazione: 2686 },
       ],
     },
     {
