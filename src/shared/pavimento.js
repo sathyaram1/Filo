@@ -266,7 +266,8 @@
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
-  // circondati da spazi; il valore sotto l'etichetta anche dopo una riga vuota (due paragrafi), ma da solo sulla riga.
+  // circondati da spazi; il valore sotto l'etichetta anche dopo una riga vuota (due paragrafi), ma da solo sulla riga,
+  // coi due punti o senza: «Wi-Fi password:» a capo vale quanto «Password:» a capo (#2673.3).
   const PRIMA = '(?:^|[\\n|\\t])[^\\n|\\t:=.!?;,]{0,30}?';
   // Fra etichetta e separatore niente virgolette, uguali o parentesi di codice: in `"Password" :: #c` o in
   // `password" id="pwd1"` quello che segue è di un altro campo.
