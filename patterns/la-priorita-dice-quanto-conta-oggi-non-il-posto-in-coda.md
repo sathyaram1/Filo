@@ -29,8 +29,11 @@ non può sapere quali siano i più importanti fra tutti.
   realismo per la sicurezza vive solo nel prompt di quel giudice (#2332). La
   lacuna di copertura di un filtro già presente (una lingua, una grafia, una
   forma della frase in più) non è mai 3: 2 se il dato privato arriva ai
-  modelli, se no 1; il buco (il filtro non parte su un cammino) resta 3
-  (#2700: quaranta 3 di una famiglia avevano riempito le urgenze). Una
+  modelli, se no 1; il buco (il filtro non parte su un cammino, o la forma
+  che sfugge la sceglie un attaccante e l'attacco riesce oggi) resta 3
+  (#2700: quaranta 3 di una famiglia avevano riempito le urgenze). Vale
+  anche per i rilievi esterni nati dalle verifiche, che nascono senza
+  priorità e prendono quella del giudice. Una
   priorità scritta dal manutentore non la riscrive a un rientro in coda.
 - **Niente tetti per priorità.** Le 3 partono sempre; il resto fino al
   parallelismo N del manutentore, sotto il freno d'emergenza dell'owner (il
