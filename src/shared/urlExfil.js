@@ -345,7 +345,7 @@
   ];
   const RADICI_PASSWORD = [
     'l[öo]senord', 'passord', 'adgangskode', 'kodeord', 'salasan', 'jelsz[óo]', 'jelszav', 'hesl[oaeu]', 'gesl[oaeu]',
-    '[şs]ifre', 'lozink', 'slapta[žz]od', 'парол', 'лозинк',
+    '[şs][iİı]\\u0307?fre', 'lozink', 'slapta[žz]od', 'парол', 'лозинк',
   ];
   const NOMI_PASSWORD = `(?:(?<!${LETTERA})(?:(?:${PAROLE_PASSWORD.join('|')})(?!${LETTERA})|(?:${RADICI_PASSWORD.join('|')})${LETTERA}*)`
     + '|密码|密碼|口令|パスワード|暗証番号|비밀번호|패스워드|암호|كلمة\\s+(?:المرور|السر)|סיסמ[הא]|पासवर्ड|รหัสผ่าน|رمز\\s+عبور)';
