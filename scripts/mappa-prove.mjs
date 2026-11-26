@@ -179,6 +179,7 @@ export function testoScelta({ prove, senzaProve, nuovi, mappa, fonte, nota = '',
 }
 
 function principale() {
+  absolutizeOutput(ROOT);
   const opt = leggiArgomenti(process.argv.slice(2));
   if (opt.errore) { console.error(opt.errore); process.exit(2); }
   if (opt.comando === 'aiuto') { console.log(AIUTO); return; }
