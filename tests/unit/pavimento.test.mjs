@@ -420,6 +420,7 @@ test('#2678.5: senza virgolette la frase-password si toglie anche con un articol
     'Password: the same as before', 'Password: the one on the router', 'Password: le chiedi a Mario quando arrivi',
     'Password: deve avere almeno otto caratteri, una maiuscola, un numero e un simbolo speciale fra quelli ammessi',
     'Password: la riceverai per email entro due giorni lavorativi dalla richiesta', 'Password: Ciao, come stai?',
+    'Password: otto caratteri minimo', 'Password: cambiata ieri', 'Password: scade tra trenta giorni',
     `Password: ${'parola '.repeat(40).trim()}`]) assert.equal(P.oscura(riga), riga, riga);
 });
 
