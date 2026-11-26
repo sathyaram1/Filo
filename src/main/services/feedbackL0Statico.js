@@ -102,10 +102,16 @@ function prepara() {
   if (figlio) programmaRiposo();
 }
 
+// Fin qui si legge nel processo principale: qualche decina di millisecondi, meno di quanto costa avviare l'altro.
+const SOGLIA_QUI = 256 * 1024;
+function dimensione({ testo = '', allegati = [] } = {}) {
+  return String(testo || '').length + (Array.isArray(allegati) ? allegati : []).reduce((n, u) => n + (typeof u === 'string' ? u.length : 0), 0);
+}
+
 // Come leggiQui, o null se il lettore non ha risposto entro TEMPO_MAX_MS. Non rifiuta mai.
-async function leggi(dati, { tempoMaxMs = TEMPO_MAX_MS } = {}) {
-  prepara();
-  if (!figlio) {
+async function leggi(dati, { tempoMaxMs = TEMPO_MAX_MS, sogliaQui = SOGLIA_QUI } = {}) {
+  if (dimensione(dati) > sogliaQui) prepara();
+  if (!figlio || dimensione(dati) <= sogliaQui) {
     try { return leggiQui(dati); } catch (_) { return null; }
   }
   const f = figlio;
