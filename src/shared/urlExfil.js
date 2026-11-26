@@ -337,12 +337,17 @@
   // vede le lettere fuori dall'ASCII («şifre», «пароль»); le scritture senza spazi non ne hanno. Prove:
   // tests/unit/passwordAltreLingue.test.mjs.
   const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u052F\\u1E00-\\u1EFF]';
-  const NOMI_PASSWORD = `(?:(?<!${LETTERA})(?:${[
-    'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]a', 'contrasenya', 'clave', 'senha', 'palavra-passe',
-    'wachtwoord', 'has[łl]o', 'l[öo]senord', 'passord', 'adgangskode', 'kodeord', 'salasan', 'jelsz[óo]', 'jelszav',
-    'hesl[oaeu]', 'gesl[oaeu]', '[şs]ifre', 'parol(?:ă|ei)', 'parool', 'lozink', 'slapta[žz]od', 'm[ậa]t\\s+kh[ẩa]u',
-    'kata\\s+(?:sandi|laluan)', 'парол', 'лозинк', 'κωδικ', 'συνθηματικ',
-  ].join('|')})${LETTERA}*`
+  // Le parole intere, poi le radici che si declinano («lösenordet», «şifreyi», «пароля»).
+  const PAROLE_PASSWORD = [
+    'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', 'claves?', 'senhas?',
+    'palavras?-passe', 'wachtwoord(?:en)?', 'has[łl](?:o|a|em|u)', 'parol(?:ă|a\\s+de|ei)', 'parool(?:i|e)?',
+    'm[ậa]t\\s+kh[ẩa]u', 'kata\\s+(?:sandi|laluan)', 'κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)', 'συνθηματικ[οόάαύυ]{1,2}',
+  ];
+  const RADICI_PASSWORD = [
+    'l[öo]senord', 'passord', 'adgangskode', 'kodeord', 'salasan', 'jelsz[óo]', 'jelszav', 'hesl[oaeu]', 'gesl[oaeu]',
+    '[şs]ifre', 'lozink', 'slapta[žz]od', 'парол', 'лозинк',
+  ];
+  const NOMI_PASSWORD = `(?:(?<!${LETTERA})(?:(?:${PAROLE_PASSWORD.join('|')})(?!${LETTERA})|(?:${RADICI_PASSWORD.join('|')})${LETTERA}*)`
     + '|密码|密碼|口令|パスワード|暗証番号|비밀번호|패스워드|암호|كلمة\\s+(?:المرور|السر)|סיסמ[הא]|पासवर्ड|รหัสผ่าน|رمز\\s+عبور)';
   const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
   const PRESENTA_CODICE = /\b(?:pin|codice|code|combinazione|otp)\b/g;
