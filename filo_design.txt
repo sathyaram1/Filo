@@ -22,6 +22,7 @@ corsivo con spiegazione: una parola che merita una spiegazione si scrive in cors
 L'ATTESA è ATTRITO
 minimizza l'attesa il più possibile: pre calcola/carica tutto ciò che puoi: se degli elementi hanno delle immagini o testo di un LLM (o qualunque altra cosa richieda tempo) come hover/click appena gli elementi sono visibili filo deve iniziare a caricarli iniziando da quello che più probabilmente l'utente cliccherà (in una lista scrollabile l'utente vorrà presumibilmente vedere prima il primo elemento). 
 mostra il caricamento: se ci sono dati di progresso mostrabili mostrali il più fedelmente possibile (es percentuale e barra per un download). se ci sono progressi mostrabili di una task aperta mostrali (es: il reasoning di un modello in una sezione compressa espandibile, le azioni di un agente). se il caricamento è molto rapito o è impossibile stimare il tempo e vedere dei progressi usa una rotella di caricamento.
+l'attesa si misura: le prove di un lavoro misurano il tempo di risposta delle azioni toccate, anche quando chiamano un modello.
 
 GESTIONE DEI MODELLI
 ogni modello deve essere modificabile sia dall'utente finale che dal owner nella schermata modelli predefiniti. 
