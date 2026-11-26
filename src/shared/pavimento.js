@@ -746,6 +746,7 @@
   // resta, così ogni posto trovato vale anche nel testo vero (#1403.11). La regex la definisce urlExfil.js.
   const Q = `${VIRGOLETTE}‚‹›「」『』`;
   const CON_SPAZI_DENTRO = new RegExp(global.SN_URL_EXFIL.VIRGOLETTE.fra, 'gu');
+  const SOLO_FRA_VIRGOLETTE = new RegExp(`^(?:${global.SN_URL_EXFIL.VIRGOLETTE.fra})$`, 'u');
   const HA_VIRGOLETTE = new RegExp(`[${Q}]`, 'u');
   const TESTA_VIRGOLETTE = new RegExp(`^[${Q}]+`, 'u');
   const CODA_VIRGOLETTE = new RegExp(`[${Q}]+$`, 'u');
