@@ -731,6 +731,6 @@
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
     segretiNelTesto, segretiInUscita, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
-    sembraPassword, ANNUNCI,
+    sembraPassword, indirizzoOEmail, ANNUNCI,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
