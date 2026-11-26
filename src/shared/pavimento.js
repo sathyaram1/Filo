@@ -265,21 +265,29 @@
   // Le parole senza la forma di una password («Password: hunter», la cella, la colonna) contano solo da sole al posto del
   // valore, con l'etichetta in testa alla riga o alla cella: «un campo password o carta: …» resta.
   // Le etichette: anche la password del wifi del router, il codice di accesso e le altre lingue, che porta urlExfil.js
-  // (PRESENTA) col loro confine. ETICHETTA_NUDA vale anche attaccata a un prefisso («login_password»).
+  // (PRESENTA) col loro confine. ETICHETTA_NUDA vale anche attaccata a un prefisso («login_password»). Le stesse
+  // riconoscono i campi dei moduli (campiSegreti.js le prende da ETICHETTE, #1403.19).
   if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
   const ALTRE_LINGUE = global.SN_URL_EXFIL && global.SN_URL_EXFIL.PRESENTA ? `|${global.SN_URL_EXFIL.PRESENTA.altreLingue}` : '';
   const NOMI = '(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
     + '|chiave\\s+(?:di\\s+)?(?:rete|sicurezza(?:\\s+di\\s+rete)?|wi-?fi|wpa2?|wlan)|(?:wpa[23]?(?:-psk)?|wi-?fi|wlan|network|security)\\s+key'
     + '|codice\\s+(?:di\\s+)?(?:accesso|segreto))\\b';
+  // La chiave del wifi come la chiamano i router nelle altre lingue (#1403.19): «Ключ сети», «暗号化キー». Il confine
+  // come in urlExfil.js: \b non vede le lettere fuori dall'ASCII.
+  const FUORI = '(?![A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F])';
+  const CHIAVI_DI_RETE = '|(?<![A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F])(?:'
+    + '(?:ключ(?:а|ом|у)?|klucz(?:a|em|u)?)\\s+(?:сети|безопасности(?:\\s+сети)?|шифрования|sieci(?:\\s+bezprzewodowej)?|zabezpiecze[ńn]|wi-?fi|wlan|wpa[23]?(?:-psk)?)'
+    + '|сетевой\\s+ключ|(?:netwerk|beveiligings|wpa[23]?(?:-psk)?-?|wi-?fi-?|wlan-?)sleutel'
+    + `)${FUORI}|密[钥鑰]|暗号化キー|セキュリティ\\s*キー|ネットワーク\\s*キー|事前共有キー|(?:네트워크\\s*)?보안\\s*키|(?:네트워크|무선|wpa[23]?(?:-psk)?|wi-?fi)\\s*키`;
   const NON_ETICHETTA = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
-  const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE})${NON_ETICHETTA}`;
-  const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE})${NON_ETICHETTA}`;
+  const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
+  const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
   // circondati da spazi; il valore sotto l'etichetta anche dopo una riga vuota (due paragrafi), ma da solo sulla riga,
   // coi due punti o senza: «Wi-Fi password:» a capo vale quanto «Password:» a capo (#2673.3).
-  const PRIMA = '(?:^|[\\n|\\t])[^\\n|\\t:=.!?;,]{0,30}?';
+  const PRIMA = '(?:^|[\\n|\\t])[^\\n|\\t:：=.!?;,]{0,30}?';
   // Fra etichetta e separatore niente virgolette, uguali o parentesi di codice: in `"Password" :: #c` o in
   // `password" id="pwd1"` quello che segue è di un altro campo.
   const ACCANTO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:|=\\t?!.,;\\[\\]«»"<>{}$]){0,40}?';
@@ -293,14 +301,14 @@
   // parola, con lettere e cifre o un simbolo da password.
   const QUALIFICA = '(?:[ \\t]+(?:provvisori[ao]|temporane[ao]|iniziale|nuova|attuale|new|temporary|initial|current))?';
   const IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}[ \\t]+${VIRGOLETTA}([^\\s|\\[${VIRGOLETTE}(),;]{6,64})`, 'gi');
-  const FORMA_FORTE = (v) => /[A-Za-zÀ-ÿ]/.test(v) && (/[0-9]/.test(v) || /[!@#$%^&*+=?~_]/.test(v));
+  const FORMA_FORTE = (v) => /\p{L}/u.test(v) && (/[0-9]/.test(v) || /[!@#$%^&*+=?~_]/.test(v));
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
   // In un CSV l'intestazione è un nome di campo, anche col prefisso delle esportazioni («login_password»): al più una
   // parola in più, perché una frase con le virgole («utente, password e premi invio») non apra una colonna.
   const INTESTAZIONE_CSV = new RegExp(`^(?:[A-Za-z0-9]{1,20}[_.\\s-])?${ETICHETTA_NUDA}(?:[_.\\s-]?[A-Za-z0-9()]{1,20})?$`, 'i');
   const NOMINA_ETICHETTA = new RegExp(ETICHETTA_NUDA, 'i');
   // Le parole che una pagina mette accanto all'etichetta senza che siano la password.
-  const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|chiedi|chiedila|ask|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or)$/i;
+  const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|chiedi|chiedila|ask|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or|не|нет|неверн(?:ый|ая|о)|неправильн(?:ый|ая|о)|обязательн(?:ый|ая|о)|изменён|изменен|скрыт|нов(?:ый|ая)|текущ(?:ий|ая)|введите|подтвердите|λάθος|λανθασμένος|υποχρεωτικός|νέος|错误|錯誤|不正确|不正確|必填|已修改|已更改|必須|필수)$/i;
 
   function testo(v) {
     return String(v == null ? '' : v);
@@ -339,7 +347,7 @@
   function valorePassword(grezzo, { forma = false } = {}) {
     const v = testo(grezzo).trim().replace(TESTA_VALORE, '').replace(CODA_VALORE, '');
     if (v.length < 3 || v.startsWith('[') || NON_VALORE.test(v.split(/\s/)[0]) || CODICE_SORGENTE.test(v) || NOME_DI_TIPO.test(v)) return '';
-    if (forma && !(/[0-9]/.test(v) || /[^A-Za-zÀ-ÿ]/.test(v) || /[a-zà-ÿ][A-Z]/.test(v))) return '';
+    if (forma && SENZA_FORMA(v)) return '';
     return v;
   }
 
@@ -385,7 +393,7 @@
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
-  const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*:?[ \\t]*$`, 'i');
+  const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*$`, 'i');
   const TESTA_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}`, 'i');
   function alPostoDelValore(s, out) {
     const righe = s.split('\n');
@@ -405,7 +413,7 @@
       const sotto = riga.trim().split(/\s+/);
       // Oltre i bottoni o i puntini (la password mostrata coperta) la riga dopo è spesso un altro campo («Telefono»):
       // lì conta solo la forma di una password, anche coi puntini o il bottone sulla riga dell'etichetta.
-      const accanto = righe[i].replace(TESTA_ETICHETTA, '').replace(/:/g, '');
+      const accanto = righe[i].replace(TESTA_ETICHETTA, '').replace(/[:：]/g, '');
       if (sotto.length === 1 && !saltate && !(accanto.trim() && SOLO_BOTTONI.test(accanto))) {
         const v = valorePassword(sotto[0]);
         if (v) out.push(alPosto(v, inizi[j], riga));
@@ -417,9 +425,9 @@
   // 2019»): la password con gli spazi. Toglierla toglie solo quella frase, mai una parola sola altrove. Una frase che
   // comincia come una spiegazione («disponibile alla reception», «sul retro del modem», «vedi email») o che misura la
   // password («min. 8 caratteri») dice dove trovarla o come sceglierla, e resta.
-  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\n|\\t]{3,64}?)[ \\t]*(?=\\n|$)`, 'gi');
-  const INIZIO_SPIEGAZIONE = /^(?:a|al|allo|alla|ai|agli|alle|da|dal|dallo|dalla|dai|dagli|dalle|in|nel|nello|nella|nei|negli|nelle|su|sul|sullo|sulla|sui|sugli|sulle|presso|tra|fra|con|senza|dentro|sotto|sopra|dietro|at|on|from|under|behind|inside|with|see|ask|check|contact|available|provided|sent|printed|same|vedi|vedere|guarda|chiedere|richiedi|richiedila|contatta|rivolgiti|disponibile|disponibili|fornita|fornito|inviata|inviato|stampata|scritta|indicata|riportata|deve|devono|può|must|should|can|minimo|min|massimo|max|stessa|stesso|quella|quello|uguale|identica|come|vuota|nessuna|nessuno|scegli|sceglila|usa|use)$/i;
-  const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?)[.,;:]?$/i;
+  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*([^\\n|\\t]{3,64}?)[ \\t]*(?=\\n|$)`, 'gi');
+  const INIZIO_SPIEGAZIONE = /^(?:a|al|allo|alla|ai|agli|alle|da|dal|dallo|dalla|dai|dagli|dalle|in|nel|nello|nella|nei|negli|nelle|su|sul|sullo|sulla|sui|sugli|sulle|presso|tra|fra|con|senza|dentro|sotto|sopra|dietro|at|on|from|under|behind|inside|with|see|ask|check|contact|available|provided|sent|printed|same|vedi|vedere|guarda|chiedere|richiedi|richiedila|contatta|rivolgiti|disponibile|disponibili|fornita|fornito|inviata|inviato|stampata|scritta|indicata|riportata|deve|devono|può|must|should|can|minimo|min|massimo|max|stessa|stesso|quella|quello|uguale|identica|come|vuota|nessuna|nessuno|scegli|sceglila|usa|use|не|нет|должен|должна|должно|см|смотрите|спросите|минимум|максимум|от|из|на|в|у|при|без|πρέπει|δείτε)$/i;
+  const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
   const TEMPO = /^(?:gen(?:naio)?|feb(?:braio)?|mar(?:zo)?|apr(?:ile)?|mag(?:gio)?|giu(?:gno)?|lug(?:lio)?|ago(?:sto)?|set(?:tembre)?|ott(?:obre)?|nov(?:embre)?|dic(?:embre)?|jan(?:uary)?|february|march|april|may|june?|july?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|dec(?:ember)?|fa|ago|giorn[oi]|settiman[ae]|mes[ei]|ann[oi]|or[ae]|minut[oi]|days?|weeks?|months?|years?|hours?|minutes?|ieri|oggi|yesterday|today)[.,;:]?$/i;
   const spiegazione = (parole) => INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p) || TEMPO.test(p));
@@ -609,7 +617,7 @@
       // qualunque conta solo da solo in coda («Password: hunter»), non in testa a una frase.
       // Dopo un trattino il titolo di una sezione («Password - Guida») è comune: conta solo la forma di una password.
       let v = '';
-      if (m[1] === ':' || m[1] === '=') {
+      if (m[1] === ':' || m[1] === '：' || m[1] === '=') {
         const pezzi = m[2].trim().split(/\s+/);
         v = MISURA.test(pezzi[1] || '') ? '' : valorePassword(pezzi[0], { forma: pezzi.length > 1 });
       } else if (/^[-–—→]$/.test(m[1])) v = valorePassword(m[2].trim().split(/\s+/)[0], { forma: true });
@@ -839,6 +847,7 @@
     return giro(valore, 0);
   }
 
-  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto };
+  // ETICHETTE: il testo della regola dei nomi della password, per i campi dei moduli (campiSegreti.js).
+  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, ETICHETTE: ETICHETTA_NUDA };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAVIMENTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

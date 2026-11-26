@@ -322,7 +322,7 @@ test('#2116.1: guardando dalla chat un’altra finestra di Filo, la password res
   test.setTimeout(120_000);
   const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso al negozio</title></head><body style="margin:0">
     <div style="height:120px;background:${tinta(VERDE)}"></div>
-    <form style="padding:20px"><div>Hasło</div><input id="c" name="haslo" type="password" style="width:420px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0">
+    <form style="padding:20px"><div>Chiave</div><input id="c" name="chiave" type="password" style="width:420px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0">
     <button type="button" id="occhio" onclick="c.type = c.type === 'password' ? 'text' : 'password'">Mostra</button></form>
     </body></html>`);
   await superaAvvisoSeCe(app);

@@ -347,13 +347,13 @@
     'salasan(?:a|an|aa|asi|ani)', 'jelsz(?:[óo]t?|av(?:a|ad|am|ak|at)?)', 'hesl(?:o|a|em|u|e)', 'gesl(?:o|a|om|u)',
     '[şs][iİı]\\u0307?fre(?:si|yi|n|niz|nizi|ler|m|mi|min|miz|ni|nin)?', 'lozink(?:a|e|u|om|i)', 'slapta[žz]od(?:is|į|žio|i)',
     'm[ậa]t\\s+kh[ẩa]u', 'kata\\s+(?:sandi|laluan)',
-    '(?<!ταχυδρομικ\\S{0,3}\\s+)κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)(?!\\s+(?:προ[ϊι][οό]ντ|πελ[αά]τ|παραγγελ|κρ[αά]τησ|αποστολ|παρακολο[υύ]θ|εκπτ|[εέ]κπτ|κουπον|προσφορ|ταχυδρομ|αφμ|ειδ))',
+    '(?<!ταχυδρομικ\\S{0,3}\\s+)κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)(?!\\s+(?:προ[ϊι][οό]ντ|πελ[αά]τ|παραγγελ|κρ[αά]τησ|αποστολ|παρακολο[υύ]θ|εκπτ|[εέ]κπτ|κουπον|προσφορ|ταχυδρομ|αφμ|ειδ|σφ[αά]λμ))',
     'συνθηματικ[οόάαύυ]{1,2}',
   ];
   // Il russo, l'ucraino, il bulgaro e il serbo declinano troppo per scriverle tutte: lì vale la radice.
   const RADICI_PASSWORD = ['парол', 'лозинк'];
   const NOMI_PASSWORD = `(?:(?<!${LETTERA})(?:(?:${PAROLE_PASSWORD.join('|')})(?!${LETTERA})|(?:${RADICI_PASSWORD.join('|')})${LETTERA}*)`
-    + '|密码|密碼|口令|パスワード|暗証番号|비밀번호|패스워드|암호|كلمة\\s+(?:المرور|السر)|סיסמ[הא]|पासवर्ड|รหัสผ่าน|رمز\\s+عبور)';
+    + '|密[码碼](?![学學])|口令|パスワード|パスフレーズ|暗証番号|비밀\\s*번호|패스워드|암호(?!화)|كلمة\\s+(?:المرور|السر)|סיסמ[הא]|पासवर्ड|รหัสผ่าน|رمز\\s+عبور)';
   // Una password di sole lettere o un PIN di quattro cifre sono parole qualunque: li riconosce la parola che li
   // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.

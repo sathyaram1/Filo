@@ -84,8 +84,9 @@ function codiceMisura() {
   return `(function () {
   const luhn = ${G.luhn}; const cartaValida = ${G.cartaValida};
   const crea = ${S.crea}; const rettangoliRipetuti = ${S.rettangoliRipetuti};
+  const etichette = ${JSON.stringify(S.etichette())};
   const E = globalThis.SN_EXTRACT;
-  const qui = E && E.segreti && typeof E.segreti.valoriSegreti === 'function' ? E.segreti : crea(window, cartaValida);
+  const qui = E && E.segreti && typeof E.segreti.valoriSegreti === 'function' ? E.segreti : crea(window, cartaValida, { etichette });
   // Le stesse misure della copertura dei campi nei riquadri: i due conti non devono divergere.
   const interseca = (a, b) => (a && b ? (${interseca})(a, b) : null);
   // p: dove sta il documento nella pagina principale e a che scala la pagina lo disegna.
@@ -126,7 +127,7 @@ function codiceMisura() {
   visita(window, { dx: 0, dy: 0, sx: 1, sy: 1 }, { left: 0, top: 0, width: innerWidth, height: innerHeight }, 0);
   out.campi = qui.campiInVista();
   const valori = [];
-  for (const d of documenti) valori.push(...(d.win === window ? qui : crea(d.win, cartaValida)).valoriSegreti());
+  for (const d of documenti) valori.push(...(d.win === window ? qui : crea(d.win, cartaValida, { etichette })).valoriSegreti());
   if (valori.length) {
     for (const d of documenti) {
       if (!d.clip) continue;

@@ -117,6 +117,38 @@ for (const caso of SEGRETI) {
   });
 }
 
+// #1403.19: la pagina di un router mostra la chiave del wifi in chiaro, con l'etichetta nella lingua del sito. Nel
+// testo un campo con un nome non porta il valore: lo portava l'immagine, dove il campo arrivava scoperto.
+test('la chiave del wifi in chiaro con l’etichetta in russo, polacco, olandese, cinese, giapponese o coreano non si legge nell’immagine', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const etichette = ['Пароль Wi-Fi', 'Ключ сети', 'Hasło', 'Potwierdzenie hasła', 'Wachtwoord', 'Netwerksleutel', '无线密码', '无线网络密钥',
+    'パスワード', '暗号化キー', '비밀번호', '네트워크 보안 키', 'SSID'];
+  const stile = 'width:260px;font-size:18px;outline:0;caret-color:transparent';
+  const righe = etichette.map((e, i) => `<div><label for="w${i}">${e}</label> <input id="w${i}" type="text" style="${stile}"></div>`);
+  const page = await testServer.openReady(openTab, modulo(righe.join('')));
+  await superaAvviso(app, { obbligatorio: false });
+  await preparaModelli(app);
+  await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
+  const aiuto = await apriAiuto(app, shell, page);
+  const immagini = [];
+  for (const [giro, valore] of ['Gatto.Rosso.77', 'Mela.Verde.42'].entries()) {
+    for (const i of etichette.keys()) await page.fill(`#w${i}`, `${valore}${i}`);
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await scriviAllAiuto(aiuto, 'aiutami a cambiare la rete');
+    immagini.push(await fotoDelTurno(app, 'aiutami a cambiare la rete', giro));
+  }
+  expect(immagini[1], 'al modello deve arrivare l’immagine della pagina').toMatch(/^data:image\//);
+  const testo = await arrivato(app, page);
+  expect(testo, 'una chiave è arrivata al modello nel testo').not.toMatch(/Gatto\.Rosso|Mela\.Verde/);
+  for (const [i, etichetta] of etichette.entries()) {
+    const b = await page.locator(`#w${i}`).boundingBox();
+    const diversi = await pixelDiversi(page, immagini, { left: b.x + 3, top: b.y + 3, width: b.width - 6, height: b.height - 6 });
+    // SSID è il campo qualunque: se lì l'immagine non cambia, la prova non vede niente.
+    if (etichetta === 'SSID') expect(diversi, 'il nome della rete deve restare leggibile').toBeGreaterThan(0);
+    else expect(diversi, `la chiave sotto «${etichetta}» si legge nell’immagine`).toBe(0);
+  }
+});
+
 test('un campo qualunque senza nome continua a farsi riconoscere da quello che c’è scritto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<input id="c">'));
@@ -419,7 +451,7 @@ test('nell’immagine è coperto il numero di carta del componente chiuso anche 
 // accanto non è legata né dice «password» in una lingua che Filo conosce.
 test('la password resa visibile dal sito non arriva al modello, né nella descrizione né nell’immagine', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, modulo('<div>Hasło</div><input id="c" name="haslo" type="password" '
+  const page = await testServer.openReady(openTab, modulo('<div>Chiave</div><input id="c" name="chiave" type="password" '
     + 'style="width:300px;font-size:18px;outline:0;caret-color:transparent"> '
     + '<button type="button" id="occhio" onclick="c.type = c.type === \'password\' ? \'text\' : \'password\'">Mostra</button>'));
   await superaAvvisoSeCe(app);
@@ -438,7 +470,7 @@ test('la password resa visibile dal sito non arriva al modello, né nella descri
   }
   const testo = await arrivato(app, page);
   expect(testo, 'la password è arrivata al modello').not.toMatch(/Gatto\.Rosso|Mela\.Verde/);
-  expect(rigaDelCampo(testo), 'il modello deve sapere quale campo è').toContain('"Hasło"');
+  expect(rigaDelCampo(testo), 'il modello deve sapere quale campo è').toContain('"Chiave"');
   expect(immagini[1]).toMatch(/^data:image\//);
   const b = await page.locator('#c').boundingBox();
   expect(await pixelDiversi(page, immagini, { left: b.x + 3, top: b.y + 3, width: b.width - 6, height: b.height - 6 }),

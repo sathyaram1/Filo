@@ -6,16 +6,20 @@
   'use strict';
 
   // `cartaValida(testo)`: il riconoscimento del numero di carta, quello di SN_GUARDIANO_STATICO. `ricorda`: solo chi
-  // resta nella pagina (il content script), non la misura usa e getta del main.
-  function crea(win, cartaValida, { ricorda = false } = {}) {
+  // resta nella pagina (il content script), non la misura usa e getta del main. `etichette`: i nomi della password e
+  // della chiave del wifi in tutte le lingue, quelli del testo (vedi etichette() qui sotto): `crea` gira anche dove
+  // pavimento.js non c'è, e li riceve come testo.
+  function crea(win, cartaValida, { ricorda = false, etichette = '' } = {}) {
     const doc = win.document;
     // Da qui prende i nomi anche la ricerca del main nei componenti chiusi: un campo nuovo va aggiunto solo qui.
     const NOMI_DEI_CAMPI = ['input', 'textarea', 'select'];
     const CAMPO_CON_VALORE = new RegExp(`^(${NOMI_DEI_CAMPI.join('|')})$`, 'i');
     const INPUT_BOTTONE = /^(button|submit|reset|image|checkbox|radio|hidden|file|range|color)$/i;
     const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
-    const PAROLE_SEGRETE = new RegExp(['pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code', 'passwort', 'kennwort',
-      'contrase[ñn]a', 'mot de passe', '\\bsenha\\b', 'parola d.ordine', '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)',
+    // In più, le forme dei nomi di campo: «pass word», «pass_code», «parola d'ordine» con un apostrofo qualunque.
+    const PAROLE_SEGRETE = new RegExp([...(etichette ? [etichette] : []), 'pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code',
+      'passwort', 'kennwort', 'contrase[ñn]a', 'mot de passe', '\\bsenha\\b', 'parola d.ordine',
+      '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)',
       '(^|[^a-z])cc[-_ ]?(num|number|no|csc|cvv|cvc)', 'codice (di )?(sicurezza|verifica)', 'security code',
       'verification code', 'carta di (credito|debito)', 'numero (della |di )?carta', 'credit ?card', 'debit ?card',
       'card ?number', 'card_number', 'cardnumber', 'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)',
@@ -201,6 +205,12 @@
     return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti, NOMI_DEI_CAMPI };
   }
 
+  // Il testo della regola delle etichette del pavimento, da passare a `crea`: una lista sola per campi e testo.
+  function etichette() {
+    if (!global.SN_PAVIMENTO && typeof require === 'function') { try { require('./pavimento.js'); } catch (_) {} }
+    return (global.SN_PAVIMENTO && global.SN_PAVIMENTO.ETICHETTE) || '';
+  }
+
   // Il testo a schermo che ripete il valore di un campo segreto (#810.16), come l'anteprima della carta che si compone
   // mentre si scrive: sei cifre consecutive del valore lo identificano, un valore più corto solo se una sequenza di
   // cifre del testo è lui intero («•••• 1234» resta). Autosufficiente come `crea`. Rettangoli nella finestra di `win`.
@@ -293,5 +303,5 @@
     return out;
   }
 
-  global.SN_CAMPI_SEGRETI = { crea, rettangoliRipetuti };
+  global.SN_CAMPI_SEGRETI = { crea, rettangoliRipetuti, etichette };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
