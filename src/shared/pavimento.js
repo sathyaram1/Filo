@@ -595,7 +595,7 @@
     }
   }
 
-  // I due punti e l'uguale a tutta larghezza («密码：…», «パスワード＝…») valgono i nostri: le regole leggono una copia
+  // I due punti e l'uguale a tutta larghezza («パスワード：…», «パスワード＝…») valgono i nostri: le regole leggono una copia
   // della stessa lunghezza, e il valore torna com'è scritto nel testo.
   function passwordAccanto(s, out) {
     const n = s.replace(/：/g, ':').replace(/＝/g, '=');
