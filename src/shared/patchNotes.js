@@ -28,6 +28,7 @@
         { testo: 'Il PIN della carta chiamato «numero segreto», «codice confidenziale», «Geheimzahl» o «Pincode», in qualunque lingua, non arriva più ai modelli, come già succedeva con «Il PIN è …».', segnalazione: 1403 },
         { testo: 'Se in una conversazione che fai leggere a Filo qualcuno chiede il PIN o il codice del cancello e l\'altro lo scrive sotto, come «Luc: 4821», quel numero non arriva ai modelli, come già la password. Vale anche quando la risposta arriva dopo altri messaggi, e per le chat copiate da WhatsApp o Telegram.', segnalazione: 2692 },
         { testo: 'Una password che una pagina ti dà in un\'altra lingua, come «das Passwort ist …» o «la contraseña es …», non esce più da Filo verso un indirizzo o un messaggio, come succede già con «la password è …».', segnalazione: 1403 },
+        { testo: 'Una password, un PIN o un CVV dopo un\'etichetta in grassetto o in corsivo, come «**Password:** …» negli appunti scritti in Markdown o in una risposta copiata da un modello, non arrivano più a nessun modello, come quando l\'etichetta è scritta senza formattazione.', segnalazione: 2673 },
       ],
     },
     {
