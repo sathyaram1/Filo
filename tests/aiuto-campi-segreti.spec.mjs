@@ -149,6 +149,41 @@ test('la chiave del wifi in chiaro con l’etichetta in russo, polacco, olandese
   }
 });
 
+// #2681.1: il CVV col nome nella lingua del sito, senza autocompletamento della carta, arrivava al modello nel testo e
+// scoperto nell'immagine. Il codice postale è il campo qualunque che deve restare leggibile.
+test('il CVV chiamato in francese, spagnolo, portoghese, tedesco, olandese o polacco non arriva al modello, né nel testo né nell’immagine', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const etichette = ['Cryptogramme visuel', 'Code de sécurité', 'Código de seguridad', 'Código de segurança', 'Kartenprüfnummer',
+    'Sicherheitscode', 'Beveiligingscode', 'Kod bezpieczeństwa', 'Code postal'];
+  const stile = 'width:260px;font-size:18px;outline:0;caret-color:transparent';
+  const righe = etichette.map((e, i) => `<div><label for="v${i}">${e}</label> <input id="v${i}" inputmode="numeric" style="${stile}"></div>`);
+  const page = await testServer.openReady(openTab, modulo(righe.join('')));
+  await superaAvviso(app, { obbligatorio: false });
+  await preparaModelli(app);
+  await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Paga».', status: 'done' })]]);
+  const aiuto = await apriAiuto(app, shell, page);
+  const valori = (giro) => etichette.map((_e, i) => (giro ? `5${i}9${i}` : `7${i}3${i}`));
+  const immagini = [];
+  for (const giro of [0, 1]) {
+    for (const [i, v] of valori(giro).entries()) await page.fill(`#v${i}`, v);
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await scriviAllAiuto(aiuto, 'aiutami a pagare');
+    immagini.push(await fotoDelTurno(app, 'aiutami a pagare', giro));
+  }
+  expect(immagini[1], 'al modello deve arrivare l’immagine della pagina').toMatch(/^data:image\//);
+  const testo = await arrivato(app, page);
+  for (const [i, etichetta] of etichette.entries()) {
+    const b = await page.locator(`#v${i}`).boundingBox();
+    const diversi = await pixelDiversi(page, immagini, { left: b.x + 3, top: b.y + 3, width: b.width - 6, height: b.height - 6 });
+    if (etichetta === 'Code postal') {
+      expect(diversi, 'il codice postale deve restare leggibile').toBeGreaterThan(0);
+      continue;
+    }
+    for (const giro of [0, 1]) expect(testo, `il CVV sotto «${etichetta}» è arrivato al modello nel testo`).not.toContain(valori(giro)[i]);
+    expect(diversi, `il CVV sotto «${etichetta}» si legge nell’immagine`).toBe(0);
+  }
+});
+
 test('un campo qualunque senza nome continua a farsi riconoscere da quello che c’è scritto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<input id="c">'));
