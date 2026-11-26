@@ -6,6 +6,7 @@
 const MAX_LETTI = 50000;
 // Quanto un segreto letto resta ricordato fra un avvio e l'altro: ben oltre la vita di un codice e delle azioni recenti.
 const GIORNI_RICORDO = 30;
+const inizioRicordo = (ora = Date.now()) => ora - GIORNI_RICORDO * 24 * 3600 * 1000;
 
 // Pieno, il registro toglie dalla lettura che ha portato più voci: una pagina che nasconde migliaia di codici finti
 // consuma solo il proprio posto, e il codice vero letto altrove resta. Prova: tests/unit/usciteSegreti.test.mjs.
@@ -67,7 +68,7 @@ function registro(max = MAX_LETTI, { cambiato = () => {}, saturo = () => {} } = 
     esporta: () => [...voci.values()].map(({ valore, regola, fonte, lotto, at }) => ({ valore, regola, fonte, lotto, at })),
     // Le voci salvate, meno quelle più vecchie del ricordo: tornano coi loro lotti, così lo sfoltimento resta giusto.
     ripristina(lista, ora = Date.now()) {
-      const limite = ora - GIORNI_RICORDO * 24 * 3600 * 1000;
+      const limite = inizioRicordo(ora);
       for (const x of Array.isArray(lista) ? lista : []) {
         const lotto = Number(x && x.lotto) || 0;
         const at = Number(x && x.at) || 0;
@@ -110,7 +111,8 @@ let inAttesa = null;
 function salvaOra() {
   if (inAttesa) { clearTimeout(inAttesa); inAttesa = null; }
   if (!deposito) return;
-  try { deposito.scrivi(JSON.stringify(letti.esporta())); } catch (e) { console.warn('[Filo] segreti letti non salvati', e?.message || e); }
+  const voci = [...letti.esporta(), ...(suoi.size ? [{ sale }] : []), ...[...suoi].map(([suo, at]) => ({ suo, at }))];
+  try { deposito.scrivi(JSON.stringify(voci)); } catch (e) { console.warn('[Filo] segreti letti non salvati', e?.message || e); }
 }
 
 function salvaPresto() {
@@ -129,12 +131,20 @@ function carica() {
   caricato = true;
   if (deposito === undefined) {
     deposito = depositoDiSistema();
-    if (deposito) process.once('exit', () => { if (inAttesa) salvaOra(); });
+    if (deposito) process.once('exit', () => { ricordaSuoi(); if (inAttesa) salvaOra(); });
   }
   if (!deposito) return;
   let lista = null;
   try { lista = JSON.parse(deposito.leggi() || 'null'); } catch (_) { lista = null; }
-  if (Array.isArray(lista)) letti.ripristina(lista);
+  if (!Array.isArray(lista)) return;
+  letti.ripristina(lista.filter((x) => x && typeof x.regola === 'string'));
+  const s = lista.find((x) => x && typeof x.sale === 'string' && x.sale);
+  if (!s) return;
+  sale = s.sale;
+  const limite = inizioRicordo();
+  for (const x of lista) {
+    if (x && typeof x.suo === 'string' && Number(x.at) >= limite && !suoi.has(x.suo)) suoi.set(x.suo, Number(x.at));
+  }
 }
 
 function ricorda(testo, fonte) {
@@ -154,10 +164,57 @@ const compatto = (t) => String(t || '').replace(/[\s-]/g, '').toLowerCase();
 // Chi compone la provenienza di una pagina e chi la riconosce sono la stessa regola, in src/shared/urlExfil.js.
 const daPagina = (fonte) => !!globalThis.SN_URL_EXFIL?.fonteDiPagina?.(fonte);
 const copre = (r, x) => { const v = compatto(x && x.valore); return !!v && r.includes(v); };
+
+// Dei segreti che l'utente ha immesso resta, fra un avvio e l'altro e quanto i letti, solo un'impronta col sale di
+// questa cartella dati: una bozza o un modulo che il sito gli rimette davanti dopo un riavvio non li fa letti (#810.24).
+const MAX_SUOI = 20000;
+const ATTESA_SUOI_MS = 2000;
+const suoi = new Map();
+let sale = '';
+const daRicordare = new Map();
+let ricordoInAttesa = null;
+function impronta(v) {
+  const crypto = require('node:crypto');
+  if (!sale) sale = crypto.randomBytes(16).toString('hex');
+  return crypto.createHash('sha256').update(`${sale}\u0000${v}`).digest('hex').slice(0, 32);
+}
+// Fuori dal giro dei tasti: cercare i segreti in un documento lungo costa decine di millisecondi.
+function ricordaSuoi() {
+  if (ricordoInAttesa) { clearTimeout(ricordoInAttesa); ricordoInAttesa = null; }
+  const G = globalThis.SN_GUARDIANO_STATICO;
+  const testi = [...daRicordare.values()];
+  daRicordare.clear();
+  if (!G || !testi.length) return;
+  carica();
+  let giaLetti = null;
+  const ora = Date.now();
+  let cambiato = false;
+  for (const t of testi) {
+    let trovati = [];
+    try { trovati = G.segretiNelTesto(t.replace(/\u0001/g, '\n')); } catch (_) {}
+    for (const x of trovati) {
+      const v = compatto(x && x.valore);
+      if (!v) continue;
+      // Un codice letto prima che l'utente lo scrivesse resta letto, anche dopo un riavvio.
+      if (!giaLetti) giaLetti = new Set(letti.tutti().map((y) => compatto(y.valore)));
+      if (giaLetti.has(v)) continue;
+      const k = impronta(v);
+      const at = suoi.get(k);
+      if (at !== undefined && ora - at < 24 * 3600 * 1000) continue;
+      suoi.delete(k);
+      suoi.set(k, ora);
+      cambiato = true;
+    }
+  }
+  while (suoi.size > MAX_SUOI) suoi.delete(suoi.keys().next().value);
+  if (cambiato) salvaPresto();
+}
+
 function dellUtente(x, fonte) {
-  if (!immessi.size || !daPagina(fonte)) return false;
+  if ((!immessi.size && !suoi.size) || !daPagina(fonte)) return false;
   for (const r of immessi.values()) if (copre(r, x)) return true;
-  return false;
+  const v = compatto(x && x.valore);
+  return !!v && suoi.size > 0 && suoi.has(impronta(v));
 }
 // `desde`: quando è partito il pezzo che l'utente ha appena immesso. Un codice letto prima resta letto: riscriverlo non
 // lo fa diventare suo (giri 5 e 6).
@@ -180,7 +237,13 @@ function tieni(chiave, r, desde = 0) {
 // `chiave` è l'elemento della pagina: il suo testo cresce mentre l'utente scrive, e sostituisce il precedente.
 function immessoDallUtente(chiave, testo, desde) {
   const r = compatto(testo);
-  if (r) tieni(`immesso:${chiave}`, r, Number(desde));
+  if (!r) return;
+  tieni(`immesso:${chiave}`, r, Number(desde));
+  daRicordare.set(chiave, String(testo));
+  if (!ricordoInAttesa) {
+    ricordoInAttesa = setTimeout(ricordaSuoi, ATTESA_SUOI_MS);
+    if (typeof ricordoInAttesa.unref === 'function') ricordoInAttesa.unref();
+  }
 }
 // Chi legge una scheda lo chiama prima: quello che l'utente ha appena immesso, fermo nell'attesa del preload, parte e
 // arriva qui prima della lettura, che viaggia dopo sullo stesso canale di ogni frame (#2641).
@@ -226,15 +289,19 @@ function ricordaBuste(valore) {
 }
 
 function tutti() { carica(); return letti.tutti(); }
-function aggiungi(x, fonte) { if (dellUtente(x, fonte)) return; carica(); letti.aggiungi(x, fonte); }
+function aggiungi(x, fonte) { carica(); if (dellUtente(x, fonte)) return; letti.aggiungi(x, fonte); }
 function aggiungiTutti(lista, fonte) {
   carica();
-  letti.aggiungiTutti(immessi.size && Array.isArray(lista) ? lista.filter((x) => !dellUtente(x, fonte)) : lista, fonte);
+  letti.aggiungiTutti((immessi.size || suoi.size) && Array.isArray(lista) ? lista.filter((x) => !dellUtente(x, fonte)) : lista, fonte);
 }
 // Come a un riavvio: la memoria si svuota e alla prossima lettura torna quello che era salvato.
-function svuota() { if (inAttesa) salvaOra(); letti.svuota(); caricato = false; }
-// Per gli unit test: un deposito finto (null = nessuno).
-function usaDeposito(d) { deposito = d; caricato = false; letti.svuota(); immessi.clear(); caratteriImmessi = 0; }
+function svuota() { ricordaSuoi(); if (inAttesa) salvaOra(); letti.svuota(); suoi.clear(); sale = ''; caricato = false; }
+// Per gli unit test, come un avvio nuovo su un deposito finto (null = nessuno).
+function usaDeposito(d) {
+  if (ricordoInAttesa) { clearTimeout(ricordoInAttesa); ricordoInAttesa = null; }
+  deposito = d; caricato = false; letti.svuota(); immessi.clear(); caratteriImmessi = 0;
+  suoi.clear(); sale = ''; daRicordare.clear();
+}
 
 module.exports = {
   ricorda, ricordaBuste, registro, aggiungi, aggiungiTutti, tutti, svuota, usaDeposito, immessoDallUtente,

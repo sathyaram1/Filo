@@ -10,7 +10,10 @@ import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs
 import { _electron as electron } from '@playwright/test';
 import { cartellaInCasa, cartellaTemporanea } from './helpers/percorsi.mjs';
 import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
-import { writeFileSync, rmSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { paginaDellaScheda } from './helpers/schede.mjs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuDi } from './helpers/menuContestuale.mjs';
@@ -1605,6 +1608,79 @@ for (const [nome, nuova] of [['una chat nuova', true], ['lo scambio che la home 
     }
   });
 }
+
+// #810.24 — la bozza che il sito tiene sul suo server torna nel messaggio dopo un riavvio: la carta che l'utente ci aveva
+// scritto non diventa un segreto letto quando l'assistente legge la pagina, e sul disco non c'è; il codice del sito sì.
+test('dopo un riavvio vero, la carta che l’utente aveva scritto nella bozza non diventa un segreto letto', async () => {
+  test.setTimeout(150_000);
+  let bozza = '';
+  const server = createServer((req, res) => {
+    if (req.method === 'POST') {
+      let corpo = '';
+      req.on('data', (c) => { corpo += c; });
+      req.on('end', () => { bozza = corpo; res.end('ok'); });
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><html><head><title>Posta</title></head><body style="padding:40px;font:16px sans-serif">
+      <h1>Nuovo messaggio</h1>${campoDelSito('264087')}<br><label for="m">Messaggio</label>
+      <textarea id="m" rows="4" cols="60">${bozza.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</textarea>
+      <script>document.getElementById('m').addEventListener('input', (e) => fetch('/bozza', { method: 'POST', body: e.target.value }));</script>
+      </body></html>`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${server.address().port}/posta`;
+  const userData = cartellaTemporanea('filo-bozza-');
+  const fileLetti = join(userData, 'segreti-letti.bin');
+  const carta = CARTA_UTENTE.replace(/ /g, '');
+  const launch = () => electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_TEST_ACCOLTO: '1', NODE_ENV: 'test' },
+  });
+  // Ogni apertura col suo indirizzo: la scheda di prima, che Filo rimette dopo il riavvio, non si confonde con questa.
+  const apri = async (app, volta) => {
+    const shell = await primaFinestra(app);
+    const qui = `${url}?volta=${volta}`;
+    const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), qui);
+    let page = null;
+    await expect.poll(async () => Boolean(page = await paginaDellaScheda(app, aperta.id, (w) => w.url() === qui)), { timeout: 20_000 }).toBe(true);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+    return { shell, page };
+  };
+  let app = await launch();
+  try {
+    const { page } = await apri(app, 1);
+    await page.locator('#m').pressSequentially(`Ciao Marco, la carta è ${CARTA_UTENTE}.`);
+    await expect.poll(() => bozza, { timeout: 10_000 }).toContain(CARTA_UTENTE);
+    // Chi chiude Filo lo fa qualche secondo dopo aver smesso di scrivere.
+    await page.waitForTimeout(3000);
+  } finally {
+    await chiudiApp(app);
+  }
+  expect(existsSync(fileLetti) && readFileSync(fileLetti).includes(carta), 'il numero della carta dell’utente è scritto sul disco').toBe(false);
+  app = await launch();
+  try {
+    await preparaModelli(app);
+    await modelloFinto(app, { aiuto: '{"text":"Ho corretto il messaggio.","status":"done"}' });
+    const { shell, page } = await apri(app, 2);
+    await expect(page.locator('#m'), 'il sito non ha rimesso la bozza').toHaveValue(`Ciao Marco, la carta è ${CARTA_UTENTE}.`);
+    const aiuto = await apriAiuto(app, shell, page);
+    await scriviAllAiuto(aiuto, 'correggi il messaggio');
+    await expect(aiuto.locator('.sn-sidebar').getByText('Ho corretto il messaggio.')).toBeVisible({ timeout: 20_000 });
+    await expect.poll(() => lettiSalvati(app), { timeout: 10_000 }).toContain('264087');
+    expect(await lettiSalvati(app), 'la carta della bozza è fra i segreti letti').not.toContain(carta);
+    const dopo = await lettiDopoUnRiavvio(app);
+    expect(dopo).toContain('264087');
+    expect(dopo, 'la carta della bozza è rimasta nel file dei segreti letti').not.toContain(carta);
+    await page.screenshot({ path: 'tests/.shots/uscite-segreti-bozza-dopo-riavvio.png' });
+  } finally {
+    await chiudiApp(app);
+    server.closeAllConnections?.();
+    await new Promise((r) => server.close(r));
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
 
 // Dentro una pagina web i collegamenti scritti dall'assistente li apre il main, dopo la porta: con ogni gesto quello col
 // codice letto dalla pagina non esce, e la riga lo dice; quello che non porta niente si apre come prima.

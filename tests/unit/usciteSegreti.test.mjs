@@ -1440,6 +1440,39 @@ test('riscrivere un codice già letto non lo toglie dai segreti letti', () => {
   SL.usaDeposito(null);
 });
 
+// #810.24 — dopo un riavvio la bozza o il modulo che il sito rimette davanti all'utente non fa letti i segreti che lui ci
+// aveva scritto: ne resta un'impronta, mai il valore, quanto i letti. Un codice letto prima che lui lo scrivesse resta letto.
+test('i segreti scritti dall’utente restano suoi dopo un riavvio, e sul disco non c’è il loro valore', () => {
+  const d = { testo: null, leggi: () => d.testo, scrivi: (t) => { d.testo = t; } };
+  d.testo = JSON.stringify([{ valore: '482913', regola: 'codice', fonte: 'dalla pagina banca.example', lotto: 1, at: Date.now() - 60_000 }]);
+  SL.usaDeposito(d);
+  SL.immessoDallUtente('1:1-1:1:3', 'Ciao Marco, la carta è 4111 1111 1111 1111.\u0001Ciao Marco', Date.now());
+  SL.immessoDallUtente('1:1-1:1:4', 'il codice monouso è 482913', Date.now());
+  SL.svuota();
+  assert.ok(d.testo && !/4111/.test(d.testo), 'il numero della carta scritto dall’utente è sul disco');
+  const valori = () => SL.tutti().map((x) => x.valore);
+  const posta = X.fonteDallaPagina('posta.example');
+  const riavvio = (cambia = (l) => l) => { d.testo = JSON.stringify(cambia(JSON.parse(d.testo))); SL.usaDeposito(d); };
+
+  riavvio();
+  SL.ricorda('Bozza: Ciao Marco, la carta è 4111 1111 1111 1111.', posta);
+  SL.ricorda('Carta salvata 5555 5555 5555 4444', posta);
+  assert.ok(!valori().includes('4111111111111111'), 'la carta della bozza rimessa dal sito è fra i segreti letti');
+  assert.ok(valori().includes('5555555555554444'), 'una carta che l’utente non ha scritto non è più letta');
+  SL.ricorda('Carta 4111-1111-1111-1111', "dall'output di un comando");
+  assert.ok(valori().includes('4111111111111111'), 'la carta stampata da un comando non è letta');
+
+  riavvio((l) => l.filter((x) => !x.regola));
+  SL.ricorda('Il tuo codice monouso è 482913', posta);
+  assert.ok(valori().includes('482913'), 'il codice letto prima che l’utente lo scrivesse è diventato suo');
+
+  const vecchio = Date.now() - (SL.GIORNI_RICORDO + 1) * 24 * 3600 * 1000;
+  riavvio((l) => l.filter((x) => !x.regola).map((x) => (x.suo ? { ...x, at: vecchio } : x)));
+  SL.ricorda('Bozza: la carta è 4111 1111 1111 1111.', posta);
+  assert.ok(valori().includes('4111111111111111'), 'l’impronta resta oltre il ricordo dei segreti letti');
+  SL.usaDeposito(null);
+});
+
 // #2641 — un invio dallo strato (l'Aiuto, un Accetta) la pagina non lo vede: prima di leggere una scheda il main chiede
 // a ogni suo frame quello che l'utente ha appena immesso, e chi legge lo fa prima di leggere.
 test('prima di leggere una scheda il main chiede a ogni frame quello che l’utente ha appena immesso', () => {

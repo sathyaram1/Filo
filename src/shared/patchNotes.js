@@ -16,6 +16,7 @@
         { testo: 'Quando un sito chiude da sé la finestra che aveva aperto su un altro sito, come quella di un pagamento o di una chat, se ne va anche la sua scheda, senza lasciarne una vuota.', segnalazione: 2659 },
         { testo: 'Nelle righe dei cambi della home e nel segno di spunta sul tuo messaggio, il valore di un\'impostazione scritto da te o scelto da Filo per te sta nel suo riquadro, così non si confonde con le parole di Filo.', segnalazione: [2655, 2657] },
         { testo: 'Quando traduci la pagina, i riquadri incorporati da un sito dove hai spento Filo, come un blocco di commenti, restano com\'erano, e l\'avviso finale dice quale sito è rimasto fuori.', segnalazione: 2656 },
+        { testo: 'Il numero di carta o il codice che hai scritto in una bozza resta tuo anche dopo aver chiuso e riaperto Filo: se il sito te la rimette davanti e chiedi aiuto all\'assistente, Filo non lo tratta più come un segreto letto dalla pagina e non lo tiene per un mese fra quelli da non far uscire.', segnalazione: 810 },
       ],
     },
     {
