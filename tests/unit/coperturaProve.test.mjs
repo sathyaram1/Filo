@@ -69,7 +69,8 @@ test('il lancio dalle prove passa cartella e prova al main, e alla chiusura scri
     const { accendiCopertura } = await import('../../scripts/lib/copertura-prove.mjs');
     accendiCopertura();
     try {
-      const app = await _electron.launch({ env: { ALTRO: '1' } });
+      // Il lancio patchato col lancio vero sostituito: qui Electron non parte.
+      const app = await proto.launch.call(_electron, { env: { ALTRO: '1' } });
       assert.equal(opzioni.env.ALTRO, '1', 'l\'ambiente della prova resta');
       assert.equal(opzioni.env.FILO_COPERTURA, resolve(dir));
       assert.equal(opzioni.env.FILO_COPERTURA_PROVA, '', 'fuori da una prova il nome è vuoto');
