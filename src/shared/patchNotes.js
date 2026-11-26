@@ -25,6 +25,7 @@
         { testo: 'Una password con uno spazio dentro scritta fra virgolette, come «Mela! Verde77» o una frase intera, non arriva ai modelli nemmeno a metà: Filo toglie tutto quello che sta fra le virgolette, anche a metà di un messaggio.', segnalazione: 1403 },
         { testo: 'Una password o un codice scritti come «la password é …», «sarebbe …», «risulta …» o «der PIN wird …» non arrivano ai modelli e non partono verso un sito senza che tu lo confermi, come quando scrivi «è».', segnalazione: 1403 },
         { testo: 'Il PIN della carta chiamato «numero segreto», «codice confidenziale», «Geheimzahl» o «Pincode», in qualunque lingua, non arriva più ai modelli, come già succedeva con «Il PIN è …».', segnalazione: 1403 },
+        { testo: 'Una password che una pagina ti dà in un\'altra lingua, come «das Passwort ist …» o «la contraseña es …», non esce più da Filo verso un indirizzo o un messaggio, come succede già con «la password è …».', segnalazione: 1403 },
       ],
     },
     {
