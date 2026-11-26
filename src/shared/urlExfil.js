@@ -358,7 +358,15 @@
   // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
   const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
-  const PRESENTA_CODICE = /(?<![\p{L}\p{N}_])(?:pin|codice|code|c[oó]digo|combinazione|otp)(?![\p{L}\p{N}_])/gu;
+  // I nomi del PIN senza «codice» («numero segreto», «Geheimzahl») li tiene il pavimento, che urlExfil precede nel loader.
+  let presentaCodice = null;
+  const PRESENTA_CODICE = () => {
+    if (presentaCodice) return presentaCodice;
+    if (!global.SN_PAVIMENTO && typeof require === 'function') require('./pavimento.js');
+    const pin = global.SN_PAVIMENTO ? `${global.SN_PAVIMENTO.NOMI_DEL_PIN}|` : '';
+    presentaCodice = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${pin}pin|codice|code|c[oó]digo|combinazione|otp)(?![\\p{L}\\p{N}_])`, 'giu');
+    return presentaCodice;
+  };
   const PAROLE_DOPO = 8;
   const RIEMPITIVI = new Set([
     'della', 'delle', 'dello', 'degli', 'nella', 'sulla', 'sempre', 'ancora', 'adesso', 'stessa', 'stesso', 'nuova',
