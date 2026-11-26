@@ -598,9 +598,9 @@
   function nelTestoVero(x, vero) {
     const v = String(x.valore);
     if (vero.includes(v)) return x;
-    const k = v.length - v.replace(/^[«»“”„‚‘’‹›"'「」『』]+/u, '').length;
-    const y = { ...x, valore: v.replace(BORDI_VIRGOLETTE, '') };
-    if (Number.isInteger(x.inizio)) y.inizio = x.inizio + k;
+    const testa = (v.match(TESTA_VIRGOLETTE) || [''])[0].length;
+    const y = { ...x, valore: v.slice(testa).replace(CODA_VIRGOLETTE, '') };
+    if (Number.isInteger(x.inizio)) y.inizio = x.inizio + testa;
     return y;
   }
 
