@@ -129,3 +129,27 @@ test('«taglia» chiesto a Filo con una password selezionata non la porta negli 
   expect(await appunti(app)).toBe('come prima');
   await expect(page.locator('#segreta')).toHaveValue('segreta123');
 });
+
+// Sulle pagine di Filo l'Aiuto sta nel documento e scrivergli toglie il fuoco al campo: vale il campo lasciato per lui.
+test('su una pagina di Filo, «taglia» chiesto all\'Aiuto taglia il campo lasciato per scrivergli, non quello del tasto destro', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 8000 });
+  await page.evaluate((stile) => {
+    window.SN_SIDEBAR.open();
+    document.body.insertAdjacentHTML('afterbegin', `<input id="prima" value="testo di prima" style="${stile}">`
+      + `<textarea id="area" style="${stile};height:50px">tieni taglia questo resta</textarea>`);
+  }, `position:fixed;left:40px;z-index:2147480000;top:40px;${CAMPO}`.replace('margin-top:16px', ''));
+  await page.evaluate(() => { document.getElementById('area').style.top = '90px'; });
+  await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti'));
+  await incollaColTastoDestro(page, '#prima');
+
+  await selezionaNellArea(page);
+  await page.locator('.sn-sidebar-input textarea').click();
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).not.toBe('area');
+  expect(await page.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'cut', text: 'taglia questo' }))).toBe(true);
+
+  await expect.poll(() => appunti(app), { timeout: 10_000 }).toBe('taglia questo');
+  await expect(page.locator('#area')).toHaveValue('tieni  resta');
+  await expect(page.locator('#prima')).toHaveValue('dagli appunti');
+});
