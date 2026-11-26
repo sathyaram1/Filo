@@ -940,7 +940,10 @@
   // 'carta' | 'cvv' | 'token'.
   function trova(valore) {
     const vero = testo(valore);
-    const s = virgoletteStrette(vero);
+    if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
+    const R = global.SN_RISERVATI_TESTO;
+    // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
+    const s = virgoletteStrette(R ? R.senzaEnfasi(vero) : vero);
     const out = [];
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');

@@ -154,6 +154,32 @@ test('un\'etichetta preceduta da altre parole, coi due punti e il valore sulla r
     'Wi-Fi password:\nchiedi al bancone']) assert.equal(P.oscura(t), t);
 });
 
+// #2673.5 — l'enfasi del Markdown coi due punti dentro («**Password:** …») stava fra etichetta e valore.
+test('un\'etichetta in grassetto o corsivo Markdown coi due punti dentro copre il valore, sulla riga e sotto', () => {
+  for (const [t, segreto] of [
+    ['**Password:** Nyckel!2024', 'Nyckel!2024'],
+    ['- **Wi-Fi password:** Nyckel!2024', 'Nyckel!2024'],
+    ['__Password:__ Nyckel!2024', 'Nyckel!2024'],
+    ['*Password:* Nyckel!2024', 'Nyckel!2024'],
+    ['_Password:_ Nyckel!2024', 'Nyckel!2024'],
+    ['***Password:*** Nyckel!2024', 'Nyckel!2024'],
+    ['**Password :** Nyckel!2024', 'Nyckel!2024'],
+    ['**Password:** gattonero', 'gattonero'],
+    ['**Password:** `Nyckel!2024`', 'Nyckel!2024'],
+    ['**Password:**\nNyckel!2024', 'Nyckel!2024'],
+    ['- **Wi-Fi password:**\n\nNyckel!2024', 'Nyckel!2024'],
+    ['**Utente:** mario  \n**Password:** Faro#Blu55', 'Faro#Blu55'],
+    ['**Lösenord:** Nyckel!2024', 'Nyckel!2024'],
+    ['**PIN:** 4821', '4821'],
+    ['**CVV:** 123', '123'],
+    ['**Codice di verifica:** 482193', '482193'],
+  ]) assert.ok(!P.oscura(t).includes(segreto), t);
+  assert.equal(P.oscura('**Password:** Nyckel!2024\n**SSID:** Casa'), `**Password:** ${S}\n**SSID:** Casa`, 'la forma resta');
+  for (const t of ['**Nota:** la password va cambiata ogni 90 giorni', 'Usa *.js e *.ts, poi 2*3*4 e __init__']) {
+    assert.equal(P.oscura(t), t);
+  }
+});
+
 test('un codice di accesso con le lettere esce intero, non solo le sue cifre; l\'anno altrove resta', () => {
   const t = P.oscura('Codice di accesso: Girasole2024. Contratto firmato nel 2024.');
   assert.ok(!t.includes('Girasole'));

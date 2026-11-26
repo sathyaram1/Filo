@@ -13,7 +13,9 @@ const SOPRA_MAX = 1500;
 const RT = () => globalThis.SN_RISERVATI_TESTO || require('../../shared/riservatiNelTesto.js');
 const PAV = () => globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
 
-function riservati(testo) {
+function riservati(grezzo) {
+  // L'enfasi del Markdown fra etichetta e valore («__Password:__ …») si legge come spazi, come nel pavimento.
+  const testo = RT().senzaEnfasi(grezzo);
   const G = globalThis.SN_GUARDIANO_STATICO;
   const X = globalThis.SN_URL_EXFIL;
   const out = [];
