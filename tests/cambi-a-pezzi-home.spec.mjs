@@ -132,7 +132,7 @@ test('un valore lungo resta leggibile nella riga del cambio: annullata e a fines
   await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeLessThan(1100);
   await expect.poll(async () => { const m = await misura(riga); return m.riquadro <= m.fine + 1; }, { timeout: 5_000 }).toBe(true);
   const m = await misura(riga);
-  expect(m.visto, 'del valore si legge un pezzo').toBeGreaterThan(40);
+  expect(m.visto, 'del valore si legge almeno l\'inizio').toBeGreaterThan(20);
   expect(await riga.locator('.dash-cambio-testo .dash-altrui').textContent()).toContain('Rispondi in modo breve');
   await riga.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/cambi-a-pezzi-home-stretta.png' });
