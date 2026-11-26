@@ -97,5 +97,6 @@ window.addEventListener('load', () => {
   esito.fine = 1; segna();
 });
 </script></body>`);
+  expect(e.mio, 'uno script vero accanto alla pagina gira').toBe('gira');
   expect({ env: e.env, py: e.py, toml: e.toml, senza: e.senza, ini: e.ini }).toEqual({ env: 'NO', py: 'NO', toml: 'NO', senza: 'NO', ini: 'NO' });
 });
