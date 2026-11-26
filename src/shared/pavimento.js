@@ -764,8 +764,9 @@
   function cellaCheSpiega(etichetta, cella) {
     if (PROPRIETA.test(etichetta)) return true;
     const parole = testo(cella).trim().split(/\s+/).filter(Boolean).map((x) => x.replace(/[.,;:]+$/, ''));
+    if (parole.length && DESCRIVE.test(parole[0])) return true;
     if (parole.length < 2) return false;
-    return INIZIO_SPIEGAZIONE.test(parole[0]) || DESCRIVE.test(parole[0])
+    return INIZIO_SPIEGAZIONE.test(parole[0]) || /^(?:(?:cambiat|modificat|aggiornat|scadut|reimpostat|resettat)[aoie]|scad(?:e|ono)|clicca|premi|click)$/i.test(parole[0])
       || (parole.some((x) => /\d/.test(x)) && parole.some((x) => MISURA.test(x) || TEMPO.test(x)));
   }
   function etichette(s, out) {
