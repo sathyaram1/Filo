@@ -52,7 +52,13 @@
   // prefisso («Use 337164 to verify», «G-482913»), perché «Verificato da 1532 utenti» non è un codice. Un anno resta.
   // Il nome del codice anche nelle lingue delle etichette (#1403.13): «código», «kod», i composti tedeschi e olandesi
   // («Zugangscode», «verificatiecode») elencati, perché «barcode» o «unicode» non annunciano un segreto.
-  const NOMI_DEL_CODICE = '\\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa|c[óo]digos?|kod(?:u|em|y)?'
+  // I nomi del PIN senza «codice» (#1403.35): «numero segreto», «Geheimzahl» (il PIN della carta per le banche tedesche),
+  // «Pincode». Dicono da soli che il numero apre qualcosa, anche accanto a un cliente o a un ordine.
+  const NOMI_DEL_PIN = '(?:pin-?(?:codes?|nummern?)|geheim(?:zahl(?:en)?|nummern?|codes?)|geheime?\\s+(?:nummer|code)'
+    + '|n[uú]m[eé]r[oi]s?\\s+(?:segret[oi]|secret[oa]?s?|confidenzial[ei]|confidentiels?|confidencial(?:es)?|riservat[oi])'
+    + '|secret\\s+(?:numbers?|pins?)|confidential\\s+(?:numbers?|pins?)|tajn(?:y|ego|ym)\\s+numer(?:u|em)?)';
+  const NOME_PIN = new RegExp(`\\b${NOMI_DEL_PIN}\\b`, 'i');
+  const NOMI_DEL_CODICE = `\\b(?:${NOMI_DEL_PIN}|codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa|c[óo]digos?|kod(?:u|em|y)?`
     + '|(?:zugangs|sicherheits|best[äa]tigungs|verifizierungs|verifikations|anmelde|einmal|aktivierungs|freischalt(?:ungs)?'
     + '|entsperr|autorisierungs|authentifizierungs|tür|toegangs|verificatie|beveiligings|bevestigings|inlog|login|activatie)codes?)\\b';
   const NOME_CODICE = new RegExp(NOMI_DEL_CODICE, 'i');
