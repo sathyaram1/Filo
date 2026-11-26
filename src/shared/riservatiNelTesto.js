@@ -44,11 +44,18 @@ const SALUTO = new RegExp(`^(?:${SALUTI})$`, 'u');
 // La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
 // sulla riga, prima, chi parla o un'altra frase, poi al più un articolo o un saluto; dopo il nome solo di cosa è e la
 // fine della riga. «Password del wifi» da sola è l'etichetta di una pagina, «password dimenticata» non chiede (#2638.1).
-const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|${SALUTI}|wi-?fi|router|home)\\s+))*$`, 'u');
-const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|per|for|of)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
+// Le altre lingue come l'italiano: «Marco: пароль от wifi», «τον κωδικό του wifi», «wifi密码» (attaccato, senza spazio).
+const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|${SALUTI}|wi-?fi|router|home|а|и|τον|το|την|τη|ο|η)(?:\\s+|$)))*的?$`, 'u');
+const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|per|for|of|от|для|к|від|του|της|των|til|till|för|af|na|za|pentru|untuk)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua|το)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
 const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:grazie|thanks|thx))?[^\\p{L}\\p{N}]*$`, 'u');
+// La fine di una frase, un elenco solo per tutto il file: i punti che vogliono lo spazio dopo e quelli delle scritture
+// senza spazi. Il punto di domanda greco qui è già «?» (minuscolo()).
+const PUNTI = '.!?؟;';
+const PUNTI_CJK = '。！？';
+const SPEZZA_FRASE = new RegExp(`[${PUNTI}]+\\s|[${PUNTI_CJK}]+|\\n`, 'u');
+const CHIUDE_PAROLA = new RegExp(`[${PUNTI}${PUNTI_CJK}]$`, 'u');
 const ellittica = (testa, dopo) => {
-  const pezzi = testa.split(/[,;:]|[.!?]+\s|\s[-–—]\s/);
+  const pezzi = testa.split(new RegExp(`[,;:，；：、]|[${PUNTI}]+\\s|[${PUNTI_CJK}]+|\\s[-–—]\\s`, 'u'));
   return pezzi.length > 1 && /[\p{L}\p{N}]/u.test(pezzi.slice(0, -1).join(''))
     && ELLITTICA_PRIMA.test(pezzi[pezzi.length - 1]) && ELLITTICA_DOPO.test(dopo);
 };
