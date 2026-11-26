@@ -612,3 +612,47 @@ test('una frase con le virgole che nomina la password non apre una colonna, e la
   assert.ok(trovati.includes('hunter22'));
   assert.ok(!trovati.includes('gattino'), 'dopo la riga che non è della tabella la colonna non vale più');
 });
+
+test('#2678: fra virgolette il valore esce come senza, con le virgolette intorno al segnaposto', () => {
+  for (const [riga, atteso] of [
+    ['il pin è «4821»', `il pin è «${S}»`], ['il pin è « 4821 »', `il pin è « ${S} »`], ["il PIN è '4821'", `il PIN è '${S}'`],
+    ['CVV: «123»', `CVV: «${S}»`], ['il CVV è "123"', `il CVV è "${S}"`],
+    ['Il codice del cancello è «4829»', `Il codice del cancello è «${S}»`], ['Inserisci il codice «615204»', `Inserisci il codice «${S}»`],
+    ['Telegram code: “48291”', `Telegram code: “${S}”`], ['«482913» è il tuo codice', `«${S}» è il tuo codice`],
+    ['password «Mela!Verde77», utente «mario»', `password «${S}», utente «mario»`], ["password 'Mela!Verde77'", `password '${S}'`],
+    ['Password: “casa mia al mare”', `Password: “${S}”`], ['Password: «casa mia al mare»', `Password: «${S}»`],
+    ['Password: "casa mia al mare".', `Password: "${S}".`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const riga of ['Password: “vedi email”', 'Password: «disponibile alla reception»', 'Password: «min 8 caratteri»',
+    'il pin è «sul retro»', 'Codice abbonamento: «4829»', 'Ordine «4829» confermato', 'password «manager»',
+    'la password «deve avere otto caratteri»']) assert.equal(P.oscura(riga), riga);
+});
+
+test('#2678: fra virgolette il valore finisce alla virgoletta che chiude, qualunque forma lo introduca', () => {
+  for (const [riga, atteso] of [
+    ['Password: “casa mia al mare”, grazie', `Password: “${S}”, grazie`], ['Password: «casa mia al mare», grazie', `Password: «${S}», grazie`],
+    ['password: “casa mia al mare” (non dirla)', `password: “${S}” (non dirla)`],
+    ['la password è “casa mia al mare”', `la password è “${S}”`], ['la password è «casa mia al mare»', `la password è «${S}»`],
+    ['Password: „casa mia al mare“', `Password: „${S}“`], ['Password: “casa mia al mare“', `Password: “${S}“`],
+    ['password: « Mela!Verde77 »', `password: « ${S} »`], ['la password è « Mela!Verde77 »', `la password è « ${S} »`],
+    ['parola d’ordine: “l’albero di casa”', `parola d’ordine: “${S}”`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const riga of ['il film «Password» è bello', 'ho scritto la password «sbagliata»', 'la password «non funziona più»',
+    'il campo password «Mostra»']) assert.equal(P.oscura(riga), riga);
+});
+
+test('#2678: la frase-password fra virgolette esce intera qualunque parola la apra, lunga e in ogni lingua', () => {
+  const lunga = 'casa mia al mare sole vento pane luna fiume rosso verde blu notte giorno';
+  for (const [riga, atteso] of [
+    ['Password: “la casa al mare”', `Password: “${S}”`], ['Password: “il mio cane Fido”', `Password: “${S}”`],
+    ['Password: "non ti scordar di me"', `Password: "${S}"`], ['password: «con te partirò», ciao', `password: «${S}», ciao`],
+    ['Password: “the quick brown fox”', `Password: “${S}”`], ['Password: «la casa al mare 77!»', `Password: «${S}»`],
+    ['la password è «in bocca al lupo»', `la password è «${S}»`], [`Password: “${lunga}”`, `Password: “${S}”`],
+    ['Password: “precipitevolissimevolmente straordinariamente indubitabilmente bellissime”', `Password: “${S}”`],
+    ['le mot de passe est «chat noir»', `le mot de passe est «${S}»`], ['Passwort ist „Hund Katze“', `Passwort ist „${S}“`],
+    ['la contraseña es «perro azul»', `la contraseña es «${S}»`], ['password «la casa al mare 77!»', `password «${S}»`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const riga of ['la password è «la stessa di prima»', 'la password è «quella del wifi»',
+    'nel menu password «Gestisci account» non trovo niente', 'cerca la voce Password "Accesso e sicurezza"',
+    'la password "Recupera accesso" non va']) assert.equal(P.oscura(riga), riga);
+});

@@ -18,7 +18,16 @@
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
   const NOME_CVV = '\\b(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?)\\b';
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
-  const CIFRE_CVV = '(\\d{3,4})(?![\\d/]|[.,:-]\\d)';
+  // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
+  const APERTE = '«"\'“‘„';
+  // Anche la chiusa tedesca («„casa“») e quella sbagliata («“casa“»).
+  const CHIUSE = '»"\'”’“‘';
+  const VIRGOLETTE = [...new Set(APERTE + CHIUSE)].join('');
+  // Doppie e singole si separano perché l'apostrofo dentro un valore fra doppie («“l’albero”») non lo chiude.
+  const DOPPIE = [...VIRGOLETTE].filter((c) => !'\'‘’'.includes(c)).join('');
+  const SINGOLE = [...VIRGOLETTE].filter((c) => '\'‘’'.includes(c)).join('');
+  const VIRGOLETTA = `(?:[${APERTE}][ \\t]*)?`;
+  const CIFRE_CVV = `${VIRGOLETTA}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
   const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|è|e'|is)?\\s*${CIFRE_CVV}`, 'gi');
   const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*[:=|\\t]|\\s+(?:è|e'|is|was)(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
@@ -28,7 +37,7 @@
   // Anche nelle lingue delle etichette (#1403.13): «le code d'accès 482913», «el código de acceso 482913».
   const CODICE_ACCESSO = /\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const CODICE_ACCESSO_EN = /\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
-  const PIN = /\bpin\b\s*(?:[:=]|è|e'|is)?\s*(\d{4,8})\b/gi;
+  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|è|e'|is)?\\s*${VIRGOLETTA}(\\d{4,8})\\b`, 'gi');
   // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
   // posto del codice (vedi alPostoDelCodice), nella frase che lo nomina o sulla riga sotto. Col nome del codice conta, a
   // meno che la frase lo dica un identificativo che non apre niente (cliente, ordine, prenotazione) senza parole
@@ -147,10 +156,12 @@
   // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
   const CODA = 400;
   const RELATIVA = /^\s*,\s*(?:den|die|das|der|dem|welche[nmrs]?|che|which|that|que|qui|kt[óo]r\p{L}*)\s[^,;!?\n\d]{1,40},/iu;
+  const SENZA_VIRGOLETTA = new RegExp(`[${APERTE}][ \\t]*$`);
+  const DOPO_VIRGOLETTA = new RegExp(`^[ \\t]*[${CHIUSE}]`);
   function alPostoDelCodice(z, m, inTesta, forte) {
-    const prima = z.slice(0, m.index);
+    const prima = z.slice(0, m.index).replace(SENZA_VIRGOLETTA, '');
     if (inTesta) return !prima.trim();
-    if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length))) return true;
+    if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length).replace(DOPO_VIRGOLETTA, ''))) return true;
     const da = Math.max(0, prima.length - CODA);
     const n = [...prima.slice(da).matchAll(NOMI_CODICE)].pop();
     if (!n) return false;
@@ -195,7 +206,7 @@
             const trovati = [...z.matchAll(FORMA_CODICE)].map((m) => ({ m, v: m[2] || m[4] }));
             if (nome) for (const m of z.matchAll(CODICE_ALFANUMERICO)) trovati.push({ m, v: m[0], lettere: true });
             for (const { m, v, lettere } of trovati) {
-              const prima = z.slice(Math.max(0, m.index - CODA), m.index);
+              const prima = z.slice(Math.max(0, m.index - CODA), m.index).replace(SENZA_VIRGOLETTA, '');
               const etichetta = inTesta ? frase.slice(-CODA) : prima;
               const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
               const entra = forte || chiave.apre;
@@ -280,7 +291,8 @@
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*:?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
-  const IN_FRASE = new RegExp(`${ETICHETTA}(?:[ \\t]+(?:provvisori[ao]|temporane[ao]|iniziale|nuova|attuale|new|temporary|initial|current))?[ \\t]+([^\\s|\\[«»"'(),;]{6,64})`, 'gi');
+  const QUALIFICA = '(?:[ \\t]+(?:provvisori[ao]|temporane[ao]|iniziale|nuova|attuale|new|temporary|initial|current))?';
+  const IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}[ \\t]+${VIRGOLETTA}([^\\s|\\[${VIRGOLETTE}(),;]{6,64})`, 'gi');
   const FORMA_FORTE = (v) => /[A-Za-zÀ-ÿ]/.test(v) && (/[0-9]/.test(v) || /[!@#$%^&*+=?~_]/.test(v));
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
   // In un CSV l'intestazione è un nome di campo, anche col prefisso delle esportazioni («login_password»): al più una
@@ -322,8 +334,10 @@
     }
   }
 
+  const TESTA_VALORE = new RegExp(`^[${APERTE}(]+`);
+  const CODA_VALORE = new RegExp(`[.,;:)${CHIUSE}]+$`);
   function valorePassword(grezzo, { forma = false } = {}) {
-    const v = testo(grezzo).trim().replace(/^[«"'(]+/, '').replace(/[.,;:)»"']+$/, '');
+    const v = testo(grezzo).trim().replace(TESTA_VALORE, '').replace(CODA_VALORE, '');
     if (v.length < 3 || v.startsWith('[') || NON_VALORE.test(v.split(/\s/)[0]) || CODICE_SORGENTE.test(v) || NOME_DI_TIPO.test(v)) return '';
     if (forma && !(/[0-9]/.test(v) || /[^A-Za-zÀ-ÿ]/.test(v) || /[a-zà-ÿ][A-Z]/.test(v))) return '';
     return v;
@@ -408,13 +422,47 @@
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
   const TEMPO = /^(?:gen(?:naio)?|feb(?:braio)?|mar(?:zo)?|apr(?:ile)?|mag(?:gio)?|giu(?:gno)?|lug(?:lio)?|ago(?:sto)?|set(?:tembre)?|ott(?:obre)?|nov(?:embre)?|dic(?:embre)?|jan(?:uary)?|february|march|april|may|june?|july?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|dec(?:ember)?|fa|ago|giorn[oi]|settiman[ae]|mes[ei]|ann[oi]|or[ae]|minut[oi]|days?|weeks?|months?|years?|hours?|minutes?|ieri|oggi|yesterday|today)[.,;:]?$/i;
+  const spiegazione = (parole) => INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p) || TEMPO.test(p));
   function fraseDopo(s, out) {
     for (const m of s.matchAll(FRASE_DOPO)) {
       const v = m[1].trim();
       const parole = v.split(/\s+/);
       if (parole.length < 2 || parole.length > 6 || parole.some((p) => !/^[\p{L}\p{N}'’]+[.,;:]?$/u.test(p)) || v.startsWith('[') || NON_VALORE.test(parole[0]) || formaVicina(parole[0])) continue;
-      if (INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p) || TEMPO.test(p))) continue;
+      if (spiegazione(parole)) continue;
       out.push({ valore: v.replace(/[.,;:]+$/, ''), regola: 'password' });
+    }
+  }
+
+  // Fra virgolette il valore finisce alla virgoletta che chiude, qualunque cosa segua e con gli spazi dentro (#2678):
+  // «la password è « Mela!Verde77 »». Niente filtri sulla prima parola né sulla lunghezza: «“la casa al mare”». Dopo i
+  // due punti o il verbo è il valore salvo che la descriva («la stessa di prima», «vedi email»); senza nessuno dei due
+  // più parole contano solo con la forma di una password, perché lì sono spesso una voce («password «Gestisci account»»).
+  const FRA_VIRGOLETTE = `[ \\t]*(?:[${DOPPIE}](?<d>[^\\n|\\t${DOPPIE}]{1,2000})[${DOPPIE}]|[${SINGOLE}](?<s>[^\\n|\\t${SINGOLE}]{1,2000})[${SINGOLE}])`;
+  const VIRGOLETTATO_DOPO = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]*(?<sep>[:=])|[ \\t]+${VERBO_PASSWORD})${FRA_VIRGOLETTE}`, 'gid');
+  const VIRGOLETTATO_IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}[ \\t]${FRA_VIRGOLETTE}`, 'gid');
+  const ARTICOLO = /^(?:la|il|lo|i|le|gli|una?|the|an?|el|der|die|das|de|het)$/i;
+  const DESCRIVE = /^(?:stess[aoie]|quell[aoie]|ugual[ei]|identic[aoie]|vedi|vedere|guarda|same|see|disponibil[ei]|available|scritt[ao]|indicat[ao]|riportat[ao]|fornit[ao]|inviat[ao]|stampat[ao]|vuot[ao]|nessun[ao]?|deve|devono|può|must|should|almeno|minimo|min|massimo|max)$/i;
+  const descrive = (parole) => {
+    const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
+    const i = ARTICOLO.test(p[0]) && p.length > 1 ? 1 : 0;
+    // Misura e data solo col numero («min 8 caratteri», «2 mesi fa»): «ci vediamo ogni giorno» è una frase-password.
+    return DESCRIVE.test(p[i]) || (p.some((x) => /\d/.test(x)) && p.some((x) => MISURA.test(x) || TEMPO.test(x)));
+  };
+  function fraVirgolette(s, out) {
+    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE]) {
+      for (const m of s.matchAll(re)) {
+        const k = m.groups.d !== undefined ? 'd' : 's';
+        const v = m.groups[k].trim();
+        if (!v || v.startsWith('[') || v.includes(SEGNAPOSTO)) continue;
+        const parole = v.split(/\s+/);
+        const separato = re === VIRGOLETTATO_DOPO;
+        if (parole.length > 1) {
+          if (separato ? !descrive(parole) : FORMA_FORTE(v)) out.push({ valore: v, regola: 'password' });
+          continue;
+        }
+        const p = valorePassword(v);
+        if (p && (separato || FORMA_FORTE(p))) out.push(alPosto(p, m.indices.groups[k][0], m.groups[k]));
+      }
     }
   }
 
@@ -553,6 +601,7 @@
   function etichette(s, out) {
     alPostoDelValore(s, out);
     fraseDopo(s, out);
+    fraVirgolette(s, out);
     chiaviDiConfigurazione(s, out);
     chiaviInChiaro(s, out);
     for (const m of s.matchAll(ACCANTO_FORTE)) {
@@ -679,14 +728,14 @@
   // senza spazi: gli spazi passano fuori, e la lunghezza resta, così ogni posto trovato vale anche nel testo vero (#1403.11).
   // L'apostrofo attaccato a una parola («dell'altra») non apre né chiude; le altre virgolette sì, anche dopo «は». Dentro
   // il valore un apostrofo fra due lettere o cifre («« l'Albero77 »») è della password, non la chiude.
-  const Q = '«»“”„‚‘’‹›"\'「」『』';
-  const FRA_VIRGOLETTE = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${Q}](?:(?:[^\\n${Q}]|(?<=[\\p{L}\\p{N}])['’‘](?=[\\p{L}\\p{N}])){0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
+  const Q = `${VIRGOLETTE}‚‹›「」『』`;
+  const CON_SPAZI_DENTRO = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${Q}](?:(?:[^\\n${Q}]|(?<=[\\p{L}\\p{N}])['’‘](?=[\\p{L}\\p{N}])){0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
   const HA_VIRGOLETTE = new RegExp(`[${Q}]`, 'u');
   const TESTA_VIRGOLETTE = new RegExp(`^[${Q}]+`, 'u');
   const CODA_VIRGOLETTE = new RegExp(`[${Q}]+$`, 'u');
   const spazi = (w) => ' '.repeat(w.length);
   const virgoletteStrette = (s) => (HA_VIRGOLETTE.test(s)
-    ? s.replace(FRA_VIRGOLETTE, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
+    ? s.replace(CON_SPAZI_DENTRO, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
   // Un valore preso con le virgolette attaccate («»Mela!Verde77«») nel testo vero le ha staccate: si cerca senza.
   function nelTestoVero(x, vero) {
     const v = String(x.valore);
