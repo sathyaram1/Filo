@@ -126,7 +126,7 @@ test('con spec scelti, i file tolti perché cambiano solo nei commenti si nomina
 test('finish:check sceglie gli spec con la stessa catena che provano questi test', () => {
   const testo = readFileSync(join(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
   const main = testo.slice(testo.indexOf('async function main()'));
-  assert.ok(main.includes('specDellaScelta({ changed, base, root: albero.dir })'));
+  assert.ok(main.includes('specDellaScelta({ changed, base, root: albero.dir, mappa: letta?.mappa || null })'));
   assert.ok(main.includes('motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length })'));
   assert.ok(!/specsForChangedFiles\(/.test(main), 'nessuna seconda scelta degli spec dentro main()');
 });
