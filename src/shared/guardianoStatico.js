@@ -479,6 +479,9 @@
   // «conferma» o lascia fare a mano; nel registro dei letti fermerebbe per un mese ogni uscita con quel valore.
   const PAROLA_PASSWORD = /(?:password|passwd|pwd|passphrase|parola\s{1,8}d['’]ordine|chiave\s{1,8}segreta|secret)\s{0,8}(?:[:=]|\bè\b|\bis\b|\bera\b)\s{0,8}["'«“]?([^\s"'»”,;&]{4,256})/gi;
   const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s{1,8}(?:di\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s{1,8}codes?\b)[\s:=]{0,8}(?:(?:è|e'|is|era|was)\s{1,8})?["'«“]?(\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\s][A-Za-z0-9]{4,64}){1,9})/gi;
+  // Il PIN anche con un complemento prima del verbo («il pin del telefono è 4821», «the pin for my phone is 4821»): il
+  // primo verbo chiude, così «se il pin è giusto la pagina è 2048» non conta (#2678.3).
+  const PIN_CON_COMPLEMENTO = /\bpin\b(?:\s{1,8}(?!(?:è|e'|is|era|was)(?=\s))[^\s\d:=.,;!?|"'«“]{1,24}){1,5}?\s{0,8}(?:[:=]|(?:è|e'|is|era|was)(?=\s))\s{0,8}["'«“]?(\d{4,8})(?!\d)/gi;
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
     try { s = `${s}\n${decodeURIComponent(s.replace(/\+/g, ' '))}`; } catch (_) { /* un % che non codifica niente */ }
