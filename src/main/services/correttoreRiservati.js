@@ -13,14 +13,33 @@ const SOPRA_MAX = 1500;
 const RT = () => globalThis.SN_RISERVATI_TESTO || require('../../shared/riservatiNelTesto.js');
 const PAV = () => globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
 
-// Le parole di una frase che spiega la password («va cambiata ogni 90 giorni») restano, con la regola del pavimento;
-// quella che un annuncio presenta («la password ora è gattonero») è il valore anche se «ora» sembra un orario.
-function spiega(parole) {
-  const G = globalThis.SN_GUARDIANO_STATICO;
-  const prima = String(parole[parole.length - 2] || '');
-  const annunci = (G && G.ANNUNCI) || [];
-  if (prima.endsWith(':') || prima === '=' || annunci.includes(prima)) return false;
-  return PAV().spiegazione(parole);
+// Com'è la password, non qual è: «scade», «è sbagliata», «non funziona», «la stessa di prima».
+const STATO = /^(?:scad(?:e|ono|rà|ut[aoie])|sbagliat[aoie]|errat[aoie]|corrett[aoie]|debol[ei]|fort[ei]|sicur[aoie]|valid[aoie]|bloccat[aoie]|dimenticat[aoie]|smarrit[aoie]|pers[aoie]|rinnovat[aoie]|resettat[aoie]|reimpostat[aoie]|modificat[aoie]|cambi(?:a|ano|erà|at[aoie])|stat[aoie]|funzion(?:a|ano|erà)|dett[aoie]|prima|dopo|precedente|non|mai|va|vanno|expire[sd]?|wrong|incorrect|invalid|weak|strong|changed|forgotten|lost|works?|not|never|before|previous)$/;
+const pulita = (w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+
+// La frase dopo il nome della password si divide dove una parola presenta il valore («è», «eccola», i due punti): in
+// ogni pezzo resta fino all'ultima parola che spiega (stato, misura, data), dopo c'è il valore («da oggi diventa
+// gattonero»). Una data da sola dopo l'annuncio è il valore («è giugno»); un luogo dopo l'annuncio spiega tutto il pezzo.
+function spiega(parole, k) {
+  const S = PAV().SPIEGA;
+  const presenta = RT().PRESENTA_DATO;
+  if (!S || !presenta) return false;
+  let da = 0;
+  let dopoAnnuncio = false;
+  for (let i = 0; i < k; i++) {
+    if (presenta.has(pulita(parole[i]))) { da = i + 1; dopoAnnuncio = true; } else if (/[:=：]$/.test(parole[i])) { da = i + 1; dopoAnnuncio = true; }
+  }
+  if (presenta.has(pulita(parole[k]))) return true;
+  let a = k + 1;
+  while (a < parole.length && !presenta.has(pulita(parole[a])) && !/[:=：]$/.test(parole[a - 1])) a++;
+  const pezzo = parole.slice(da, a).map(pulita);
+  if (dopoAnnuncio && S.inizio.test(pezzo[0])) return true;
+  const sola = dopoAnnuncio && pezzo.length === 1;
+  let ultima = -1;
+  pezzo.forEach((p, i) => {
+    if (STATO.test(p) || S.descrive.test(p) || (!sola && (S.tempo.test(p) || S.misura.test(p)))) ultima = i;
+  });
+  return k - da <= ultima;
 }
 
 function riservati(grezzo) {
