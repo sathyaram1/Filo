@@ -18,7 +18,11 @@
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
   const NOME_CVV = '\\b(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?)\\b';
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
-  const CIFRE_CVV = '(\\d{3,4})(?![\\d/]|[.,:-]\\d)';
+  // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
+  const APERTE = '«"\'“‘„';
+  const CHIUSE = '»"\'”’';
+  const VIRGOLETTA = `(?:[${APERTE}][ \\t]*)?`;
+  const CIFRE_CVV = `${VIRGOLETTA}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
   const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|è|e'|is)?\\s*${CIFRE_CVV}`, 'gi');
   const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*[:=|\\t]|\\s+(?:è|e'|is|was)(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
