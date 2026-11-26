@@ -86,7 +86,7 @@ for (const [come, attesa] of [['', 3000], [', chiuso Filo appena scritto', 300]]
     await page.locator('#ed').click();
     await page.keyboard.type(`Ciao Marco, la carta è ${CARTA}.`);
     await expect.poll(() => page.evaluate(() => localStorage.getItem('bozza'))).toContain(CARTA);
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(attesa);
   } finally {
     await chiudiApp(app);
   }
