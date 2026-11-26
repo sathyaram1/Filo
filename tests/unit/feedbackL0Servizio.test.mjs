@@ -204,6 +204,49 @@ test('un allegato in UTF-16, con o senza segno d\'ordine, si legge come testo', 
   assert.equal(utf8.stato, 'pulito');
 });
 
+// #1403.2: i byte si leggono come li legge il lettore dei documenti, anche in un alfabeto non latino e nella tabella di Windows.
+test('un log in UTF-16 senza firma scritto in cirillico e uno nella tabella di Windows si leggono come testo', async () => {
+  const b64 = (b) => `data:text/plain;base64,${b.toString('base64')}`;
+  const cirillico = `${'Журнал входа в систему: пользователь мария вошла успешно. '.repeat(20)}\r\npassword = hunter22\r\n`;
+  const r = await servizio().L0.controlla({ testo: 'vedi log', allegati: [{ name: 'output.txt', type: 'text/plain', dataUrl: b64(Buffer.from(cirillico, 'utf16le')) }] });
+  assert.equal(r.stato, 'trovato', 'UTF-16 senza firma in cirillico');
+
+  const custodita = 'Caffè2024!';
+  const cp1252 = Buffer.from(`Note del giorno\r\nla chiave del portale: ${custodita}\r\n`, 'latin1');
+  const w = await servizio({ segreti: [{ valore: custodita, password: true }] }).L0
+    .controlla({ testo: 'vedi log', allegati: [{ name: 'note.txt', type: 'text/plain', dataUrl: b64(cp1252) }] });
+  assert.equal(w.stato, 'trovato', 'la password custodita con la lettera accentata si riconosce');
+});
+
+// #1403.2: un CSV con la colonna password, nel formato normale e in quello delle esportazioni dei browser.
+test('un CSV allegato con la colonna password dà l\'avviso: punti e virgola, virgole, virgolette, ogni riga', async () => {
+  const { L0, chiamate } = servizio();
+  for (const [name, csv] of [
+    ['utenti.csv', 'utente;password\nmario.rossi;hunter22\n'],
+    ['Chrome Passwords.csv', 'name,url,username,password,note\nGmail,https://mail.google.com,mario,gattino,\nBanca,https://banca.it,mario.rossi,Xk9#pQ2v,\n'],
+    ['export.csv', '"user","password"\r\n"mario","Hunter22!"\r\n'],
+    ['righe.csv', 'utente;password;ruolo\nanna;;ospite\nluca;;ospite\nmario;hunter22;admin\n'],
+  ]) {
+    const r = await L0.controlla({ testo: 'Allego l\'esportazione: il login fallisce sempre', allegati: [{ name, type: 'text/csv', dataUrl: dataUrl(csv) }] });
+    assert.equal(r.stato, 'trovato', name);
+    assert.deepEqual(r.esito.allegati, [0], name);
+    assert.deepEqual(r.esito.frasi, [globalThis.SN_FEEDBACK_L0.FRASI_ALLEGATO.segreto], name);
+  }
+  assert.ok(!JSON.stringify(chiamate).includes('hunter22'), 'l\'allegato non va al modello');
+  const senza = await L0.controlla({ testo: 'vedi allegato', allegati: [{ name: 'a.csv', type: 'text/csv', dataUrl: dataUrl('utente;ruolo\nmario;admin\n') }] });
+  assert.equal(senza.stato, 'pulito');
+});
+
+test('il controllo senza modello che non risponde: niente avviso inventato, e la rilettura vale come saltata', async () => {
+  const L0 = crea({
+    gate: { async complete() { return { text: '{"trovati":[]}' }; } }, azioni: AZ, log: muto,
+    impostazioni: async () => ({}), statico: { leggi: async () => null },
+  });
+  const r = await L0.controlla({ testo: 'vedi log', allegati: [{ name: 'a.log', type: 'text/plain', dataUrl: dataUrl('password = hunter22') }] });
+  assert.deepEqual(r, { stato: 'saltato' });
+  assert.deepEqual(await L0.controlla({ testo: 'niente allegati' }), { stato: 'pulito' }, 'il testo l\'ha riletto il modello');
+});
+
 // #2645 — la password che l'utente ha appena lasciato uscire con la parola «conferma» non si ripropone; il resto sì.
 test('un segreto già confermato con la parola non torna nell\'avviso, gli altri casi sì', async () => {
   require(join(ROOT, 'src', 'shared', 'autonomia.js'));

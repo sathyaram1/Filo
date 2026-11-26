@@ -4,13 +4,14 @@
 
 import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
 import { _electron as electron, test as testSenzaFixture } from '@playwright/test';
-import { rmSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { rmSync, writeFileSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { nelMondoDiFilo, statoDi, clicca, paginaDelloStrato } from './helpers/riquadri.mjs';
-import { CONFIRM_HOST, confirmText, clickConfirm, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm, fillConfirmInput, scrollConfirmToEnd, aspettaConfermaPronta } from './helpers/confirm.mjs';
+import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = 'tests/.shots';
@@ -241,6 +242,54 @@ test('un log allegato con una password: il riquadro si riapre con l\'avviso e il
   expect(await app.evaluate(() => globalThis.__invii.map((p) => (p.files || []).map((f) => f.name)))).toEqual([['note.txt', 'filo.log']]);
 });
 
+// #1403.2 — la colonna «password» di un CSV, nel formato normale, dà l'avviso come quella a tabulazioni.
+test('un CSV allegato con la colonna password a punti e virgola: il riquadro si riapre con l\'avviso e il file segnato', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-text').fill('Allego l\'esportazione: il login fallisce sempre');
+  await page.locator('.sn-fb-file').setInputFiles([{ name: 'utenti.csv', mimeType: 'text/csv', buffer: Buffer.from('utente;password\nmario.rossi;hunter22\n') }]);
+  await expect(page.locator('.sn-fb-file-chip')).toHaveCount(1);
+  await page.locator('.sn-fb-send').click();
+  const avviso = page.locator('.sn-fb-l0');
+  await expect(avviso).toBeVisible({ timeout: 12_000 });
+  await expect(avviso).toContainText('In un file allegato c’è una password');
+  await expect(page.locator('.sn-fb-file-chip--l0')).toContainText('utenti.csv');
+  expect(await invii(app)).toEqual([]);
+});
+
+// #1403.2 — il controllo senza modello legge gli allegati fuori dal processo che tiene finestre e schede.
+test('un log da 4 MB allegato: mentre si rilegge Filo risponde, e la password in fondo al log dà l\'avviso', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  const righe = [];
+  let n = 0;
+  for (let i = 0; n < 4 * 1024 * 1024 - 2_000; i++) {
+    const r = `2026-11-20T10:00:00.123Z INFO [net] GET https://example.com/api/v1/items?page=${i} status=200 durata=${i % 997}ms\n`;
+    righe.push(r);
+    n += r.length;
+  }
+  righe.push('utente = mario.rossi\npassword = hunter22\n');
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await page.locator('.sn-fb-text').fill('Allego il log: il login fallisce sempre.');
+  await page.locator('.sn-fb-file').setInputFiles([{ name: 'filo.log', mimeType: 'text/plain', buffer: Buffer.from(righe.join('')) }]);
+  await expect(page.locator('.sn-fb-file-chip')).toHaveCount(1);
+  // Il passo più lungo fra due giri del processo principale, dall'invio all'avviso.
+  await app.evaluate(() => {
+    const l = { max: 0, ultimo: performance.now() };
+    l.t = setInterval(() => { const ora = performance.now(); l.max = Math.max(l.max, ora - l.ultimo); l.ultimo = ora; }, 10);
+    globalThis.__fermo = l;
+  });
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-l0')).toContainText('In un file allegato c’è una password', { timeout: 30_000 });
+  const fermo = await app.evaluate(() => { clearInterval(globalThis.__fermo.t); return globalThis.__fermo.max; });
+  test.info().annotations.push({ type: 'fermo', description: `${Math.round(fermo)} ms` });
+  expect(fermo, 'il processo di finestre e schede non resta fermo mentre si rilegge il log').toBeLessThan(250);
+});
+
 test('testo che scorre: lo sfondo delle evidenze va a capo come la casella, barra di scorrimento compresa', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
@@ -409,6 +458,62 @@ test('dall\'Aiuto: la segnalazione confermata con la parola per la password part
   await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([TESTO]);
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('fatto');
+});
+
+// #1403.2 — un file della conversazione allegato alla segnalazione scritta da Filo arriva alla rilettura dopo l'OK.
+test('dalla chat con un log della conversazione allegato: dopo l\'OK l\'avviso sul file, «Manda così» lo manda col file', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const log = join(cartellaTemporanea('filo-l0-chat-'), 'filo.log');
+  writeFileSync(log, 'avvio...\nutente = mario.rossi\npassword = hunter22\nerrore 401\n');
+  const page = await home(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ titolo: 'Login', testo: 'Il login fallisce sempre.', allegati: [log] }) }] }, { text: 'Inviata.' }]);
+  await finti(app);
+  await chiedi(page, `manda il log con la segnalazione\nFile: ${log}`);
+
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
+  await aspettaConfermaPronta(page);
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
+  expect(await confirmText(page)).toContain('In un file allegato c’è una password');
+  expect(await invii(app)).toEqual([]);
+  expect(await app.evaluate(() => JSON.stringify(globalThis.__l0)).then((s) => s.includes('hunter22')), 'il log non va a nessun modello').toBe(false);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual(['Il login fallisce sempre.']);
+  expect(await app.evaluate(() => globalThis.__invii[0].files.map((f) => f.name))).toEqual(['filo.log']);
+  await ripristina(app);
+});
+
+// #1403.2 — «Manda così» ripete la conferma della proposta: i contatori la contano una volta.
+test('una segnalazione proposta da Filo e fermata dalla rilettura: confermata e mandata così, si conta una volta', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await finti(app);
+  const TELEFONO = '333 1234567';
+  const testo = `Lo zoom non va. Richiamatemi al ${TELEFONO}.`;
+  await imposta(app, { testo: JSON.stringify({ trovati: [{ tipo: 'recapito', pezzo: TELEFONO }] }) });
+  await app.evaluate(() => {
+    globalThis.__proposte = [];
+    const m = globalThis.SN_CONTATORI_SERVIZIO_MAIN || (globalThis.SN_CONTATORI_SERVIZIO_MAIN = {});
+    const prima = m.proposta;
+    m.proposta = (esito) => { globalThis.__proposte.push(esito); return typeof prima === 'function' ? prima(esito) : true; };
+  });
+  const a = { type: 'INVIA_FEEDBACK', testo, titolo: 'Zoom', _proposta: true };
+  const r = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { richiesta: a.testo }), a);
+  expect(r.needsConfirm).toBeGreaterThan(0);
+  const proposta = { ...a, _confirm: { level: r.needsConfirm, text: r.describe, parti: r.parti } };
+  // Sotto la parola il riquadro si apre da solo; con la parola, dal clic sul bottone.
+  if (r.needsConfirm >= 3) await proponiInChat(page, proposta, 'prova-proposta');
+  else await page.evaluate((a) => window.__filoDashActions.renderActions(document.body.appendChild(document.createElement('div')), [a], { autoConfirm: true }), proposta);
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  if (r.needsConfirm >= 3) await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, r.needsConfirm >= 3 ? 'danger' : 'ok');
+  await expect.poll(() => confirmText(page), { timeout: 12_000 }).toContain('Prima che parta, ricontrolla.');
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => invii(app), { timeout: 12_000 }).toEqual([testo]);
+  expect(await app.evaluate(() => globalThis.__proposte)).toEqual(['confermata']);
 });
 
 testSenzaFixture('Filo chiuso durante la rilettura: il feedback resta salvato e parte alla riapertura', async () => {
