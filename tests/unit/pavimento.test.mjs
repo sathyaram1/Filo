@@ -130,6 +130,19 @@ test('una password con la sua forma vicino a qualunque etichetta di credenziale 
   assert.equal(P.oscura('Password:Girasole2024'), `Password:${S}`, 'il separatore resta');
 });
 
+// #2673.3 — dopo altre parole l'etichetta coi due punti e il valore a capo valeva meno di quella da sola.
+test('un\'etichetta preceduta da altre parole, coi due punti e il valore sulla riga sotto, copre il valore', () => {
+  for (const [t, segreto] of [
+    ['Wi-Fi password:\nNyckel!2024', 'Nyckel!2024'],
+    ['Router Wi-Fi password:\n\nFaro#Blu55', 'Faro#Blu55'],
+    ['La mia password:\n  Girasole2024  ', 'Girasole2024'],
+    ['Wi-Fi password\nNyckel!2024', 'Nyckel!2024'],
+  ]) assert.ok(!P.oscura(t).includes(segreto), t);
+  assert.equal(P.oscura('Wi-Fi password:\nNyckel!2024\nSSID: Casa'), `Wi-Fi password:\n${S}\nSSID: Casa`);
+  for (const t of ['Reset your password:\nhttps://example.com/reset', 'Recupero password:\nmario.rossi@example.com',
+    'Wi-Fi password:\nchiedi al bancone']) assert.equal(P.oscura(t), t);
+});
+
 test('un codice di accesso con le lettere esce intero, non solo le sue cifre; l\'anno altrove resta', () => {
   const t = P.oscura('Codice di accesso: Girasole2024. Contratto firmato nel 2024.');
   assert.ok(!t.includes('Girasole'));
