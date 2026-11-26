@@ -583,10 +583,18 @@
     }
   }
 
+  // Fra virgolette con lo spazio dentro («la password è « Mela!Verde77 »», la grafia francese) il valore si legge come
+  // senza spazi: gli spazi passano fuori, e la lunghezza resta, così ogni posto trovato vale anche nel testo vero (#1403.11).
+  const Q = '«»“”„‚‘’‹›"\'「」『』';
+  const FRA_VIRGOLETTE = new RegExp(`(?<![\\p{L}\\p{N}])([«»“„‚‘‹›"'「『])([^\\S\\n]*)([^\\s${Q}](?:[^\\n${Q}]{0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“‘’›‹"'」』])(?![\\p{L}\\p{N}])`, 'gu');
+  const spazi = (w) => ' '.repeat(w.length);
+  const virgoletteStrette = (s) => (/[«»“”„‚‘’‹›"'「」『』]/.test(s)
+    ? s.replace(FRA_VIRGOLETTE, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
+
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   function trova(valore) {
-    const s = testo(valore);
+    const s = virgoletteStrette(testo(valore));
     const out = [];
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
