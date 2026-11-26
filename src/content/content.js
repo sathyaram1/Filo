@@ -1519,16 +1519,18 @@
   // del menu, perché il click sul bottone del menu sposta il focus altrove.
   let pasteContext = null;
   function capturePasteContext(target) {
-    if (!target) { pasteContext = null; return; }
+    pasteContext = contestoDelCampoDi(target);
+  }
+  function contestoDelCampoDi(target) {
+    if (!target) return null;
     const inputEl = target.closest?.('input, textarea');
     if (inputEl && inputEl.matches('input, textarea')) {
-      pasteContext = {
+      return {
         kind: 'input',
         el: inputEl,
         start: inputEl.selectionStart ?? inputEl.value.length,
         end: inputEl.selectionEnd ?? inputEl.value.length,
       };
-      return;
     }
     const ceEl = target.closest?.('[contenteditable=""], [contenteditable="true"]');
     if (ceEl) {
@@ -1538,10 +1540,23 @@
         const r = sel.getRangeAt(0);
         if (ceEl.contains(r.startContainer)) range = r.cloneRange();
       }
-      pasteContext = { kind: 'ce', el: ceEl, range };
-      return;
+      return { kind: 'ce', el: ceEl, range };
     }
-    pasteContext = null;
+    return null;
+  }
+
+  // Una richiesta a Filo parte dalla selezione di adesso (#1434.3). Se il fuoco è in un riquadro di Filo nel documento
+  // (l'Aiuto delle sue pagine), la selezione è quella del campo che l'utente ha lasciato per entrarci.
+  let campoLasciatoPerFilo = null;
+  document.addEventListener('focusout', (e) => {
+    const el = e.target;
+    if (!el || self.SN_FILO_UI?.inside?.(el) || !isEditable(el)) return;
+    campoLasciatoPerFilo = e.relatedTarget && self.SN_FILO_UI?.inside?.(e.relatedTarget) ? contestoDelCampoDi(el) : null;
+  }, true);
+  function prendiLaSelezioneDiAdesso(el) {
+    if (el && self.SN_FILO_UI?.inside?.(el)) {
+      pasteContext = campoLasciatoPerFilo && campoLasciatoPerFilo.el.isConnected ? campoLasciatoPerFilo : null;
+    } else pasteContext = el && isEditable(el) ? contestoDelCampoDi(el) : null;
   }
 
   function restorePasteContext() {
