@@ -58,10 +58,17 @@
     + '|n[uú]m[eé]r[oi]s?\\s+(?:segret[oi]|secret[oa]?s?|confidenzial[ei]|confidentiels?|confidencial(?:es)?|riservat[oi])'
     + '|secret\\s+(?:numbers?|pins?)|confidential\\s+(?:numbers?|pins?)|tajn(?:y|ego|ym)\\s+numer(?:u|em)?)';
   const NOME_PIN = new RegExp(`\\b${NOMI_DEL_PIN}\\b`, 'i');
+  // L'elenco degli apparecchi il cui codice li sblocca è uno solo (#1403.44): la frase col possessivo, l'etichetta senza
+  // e il nome attaccato a «code» («Handycode», «Gerätecode») lo leggono da qui.
+  const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
+    + '|t[ée]l|celus?|compus?|gsms?|smartphones?'
+    + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
+    + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
+    + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
+    + '|devices?|appareils?|ger[äa]te?s?|urz[ąa]dzeni[ea]|apparaats?)';
   const NOMI_DEL_CODICE = `\\b(?:${NOMI_DEL_PIN}|codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa|c[óo]digos?|kod(?:u|em|y)?`
     + '|(?:zugangs|sicherheits|best[äa]tigungs|verifizierungs|verifikations|anmelde|einmal|aktivierungs|freischalt(?:ungs)?'
-    + '|entsperr|autorisierungs|authentifizierungs|tür|toegangs|verificatie|beveiligings|bevestigings|inlog|login|activatie'
-    + '|handy|telefoon|telefon|computer|laptop|tablet|smartphone|iphone|ipad|gsm|rechner)codes?)\\b';
+    + `|entsperr|autorisierungs|authentifizierungs|tür|toegangs|verificatie|beveiligings|bevestigings|inlog|login|activatie|${APPARECCHIO})-?codes?)\\b`;
   const NOME_CODICE = new RegExp(NOMI_DEL_CODICE, 'i');
   const SEGNO_FORTE = /\b(?:verific\w*|verif(?:y|ied|ies|ication)\w*|autorizz\w*|authori[sz]\w*|autentic\w*|authentic\w*|sblocc\w*|unlock\w*|acced\w*|accesso|access|log-?in|log\s+in|sign-?in|sign\s+in|monouso|one-?time|usa\s+e\s+getta|otp|passcode|2fa|mfa|v[ée]rif\w*|verifizier\w*|acc[èe]s|acceso|acesso|connexion|zugang\w*|anmeld\w*|best[äa]tig\w*|toegang\w*|inlog\w*|dost[ęe]p\w*)\b/i;
   const NON_APRE = /\b(?:client[ei]|customer|client|ordin[ei]|orders?|prenotazion[ei]|booking|reservation|pratica|scont[oi]|discount|promo\w*|coupon|fiscale|postale|postal|zip|cap|prodott[oi]|products?|articol[oi]|items?|sku|tracking|spedizion[ei]|shipp?(?:ing|ment)|fattur[ae]|invoices?|riferimento|reference|tribut[oi]|civile|penale|strada|procedura|error[ei]?|errors?|status|http|abi|cab|ateco|ean|isbn|iban|swift|bic|ticket|bigliett[oi]|vol[oi]|flights?|ricetta|esenzione|destinatario|sdi|cig|cup|colore|colou?r|sorgente|source|paese|country|comune|catastale|matricola|tessera|socio|membro|member|telefono|phone|tel|numero\s+verde|chiam\w*|call|commandes?|pedidos?|encomendas?|bestellung\w*|zam[óo]wieni\w*|bestelling\w*|factures?|facturas?|faturas?|rechnung\w*|faktur\w*|produits?|articles?|productos?|produtos?|produkt\w*|erreurs?|erros?|fehler\w*|b[łl][ęe]d\w*|suivi|seguimiento|rastreo|rastreamento|sendungsverfolgung|r[ée]servations?|reservas?|reservierung\w*|buchung\w*|rezerwac\w*|boeking\w*|r[ée]duction|descuentos?|descontos?|rabatt\w*|rabat\w*|remise|gutschein\w*|cup[óo]n|cupom|pocztow\w*|postleitzahl|couleurs?|farbe|kolor\w*|barres|barras|barcode|kreskow\w*|kunde\w*|klient\w*|clientes?|banques?|guichets?|communes?|douan\w*|[ée]?tablissements?|pays|pa[íi]s|kraj\w*|naf|ape|insee|siret|siren|cpv|uai|cnae|nace|cip|iata|upc|gtin)\b/i;
