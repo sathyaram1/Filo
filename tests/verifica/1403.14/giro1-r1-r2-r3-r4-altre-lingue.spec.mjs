@@ -34,6 +34,11 @@ test('r1 «me pasas el código del portal?» e sotto «4821»: il codice si oscu
   expect(T.trova('Marco: me pasas el código del portal?\nLuis: 4821')).toContain('4821');
 });
 
+test('r1 «скинь пароль от wifi» senza punto di domanda, come «какой пароль от wifi?»: la risposta si oscura nel testo', () => {
+  expect(T.trova('Marco: какой пароль от wifi?\nLuca: Gatto2024')).toContain('gatto2024');
+  expect(T.trova('Marco: скинь пароль от wifi\nLuca: Gatto2024')).toContain('gatto2024');
+});
+
 for (const domanda of [
   "Marco: le mot de passe du wifi s'il te plaît",
   'Marco: le mot de passe du wifi stp',
