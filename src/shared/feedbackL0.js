@@ -231,18 +231,13 @@
 
   // Tolti i segreti del testo che l'utente ha già lasciato uscire con la parola «conferma» (#2645): un secondo riquadro
   // per lo stesso motivo è solo attrito. Restano gli altri tipi, gli allegati, le immagini e ogni segreto non confermato.
+  // Le posizioni le dà daValori, che sa ritrovare i valori normalizzati: due ricerche divergerebbero (#2645.1).
   function senzaConfermati(trovati, testo, valori) {
     const lista = Array.isArray(trovati) ? trovati : [];
-    const t = String(testo == null ? '' : testo);
-    const tratti = [];
-    for (const v of Array.isArray(valori) ? valori : []) {
-      const s = String(v == null ? '' : v);
-      if (!s) continue;
-      for (let i = t.indexOf(s); i >= 0; i = t.indexOf(s, i + 1)) tratti.push([i, i + s.length]);
-    }
+    const tratti = daValori(testo, valori);
     if (!tratti.length) return lista;
     return lista.filter((x) => !(x && x.dove === 'testo' && x.tipo === 'segreto'
-      && tratti.some(([a, b]) => x.inizio < b && a < x.fine)));
+      && tratti.some((y) => x.inizio < y.fine && y.inizio < x.fine)));
   }
 
   // Le frasi dell'avviso, una per caso e nell'ordine dei tipi: mai un punteggio, mai una cifra.
