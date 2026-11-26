@@ -44,6 +44,7 @@ test('il processo a parte, con le regole caricate da sé, trova quello che trova
   const { leggiQui } = require(join(ROOT, 'src', 'main', 'services', 'feedbackL0Statico.js'));
   assert.deepEqual(m.r, leggiQui(dati));
   assert.ok(m.r.testo.valori.some((x) => x.valore === 'Tr7#kq29Lm'), 'la password del testo');
+  assert.equal(m.r.testo.tratti.length, 1, 'il segreto custodito, anche spezzato');
   assert.equal(m.r.allegati[0], null);
   assert.ok(m.r.allegati[1].valori.some((x) => x.valore === 'hunter22'), 'la colonna del CSV');
   assert.ok(!m.r.allegati[2].valori.length);
