@@ -401,7 +401,6 @@
     return k >= 0 ? { valore: v, regola: 'password', inizio: inizioGrezzo + k } : { valore: v, regola: 'password' };
   }
 
-  const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
   // Un'espressione di codice («form.password.value», «process.env.DB_PASSWORD», «input(», «getpass.getpass()») sta al
   // posto di un valore ma non lo è; così il nome di un tipo («password: str», «password: string»).
   const CODICE_SORGENTE = /^(?:[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?|[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\(.*)$/;
