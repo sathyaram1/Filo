@@ -218,7 +218,8 @@ export function rigaSullaMappa(r, blocchi) {
     const fine = b.nuovoDa + Math.max(b.nuovoN, 1) - 1;
     if (b.nuovoN === 0 ? r <= b.nuovoDa : r < b.nuovoDa) break;
     if (b.nuovoN > 0 && r <= fine) return b.da + Math.min(r - b.nuovoDa, Math.max(b.n - 1, 0));
-    scarto = (b.da + b.n) - (b.nuovoDa + b.nuovoN);
+    // Un lato vuoto conta dalla riga dopo quella che git nomina.
+    scarto = (b.da + b.n + (b.n === 0 ? 1 : 0)) - (b.nuovoDa + b.nuovoN + (b.nuovoN === 0 ? 1 : 0));
   }
   return r + scarto;
 }
