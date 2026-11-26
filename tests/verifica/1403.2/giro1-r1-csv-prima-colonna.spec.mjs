@@ -1,5 +1,5 @@
 // #1403.2 giro 1 — un CSV con la colonna «password» per prima, senza virgolette: nessun avviso, né a punti e virgola
-// né a virgole; e cinque log da 4 MB allegati insieme: Filo risponde e l'avviso arriva.
+// né a virgole.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function newtab(app) {
