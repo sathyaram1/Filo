@@ -459,10 +459,10 @@
       for (const c of presi) for (const v of c.pezzi) out.push({ valore: v, regola });
       if (regola === 'password') passwordAnnunciata(s, fine, false, out);
     }
-    const pw = new RegExp(MARCHIO_PASSWORD.source, 'gi');
+    const pw = marchioPassword();
     while ((parola = pw.exec(s)) && !out.saturo) {
       const fine = parola.index + parola[0].length;
-      if (!dentroUnNome(s, parola.index, fine)) passwordAnnunciata(s, fine, true, out);
+      if (!dentroUnNome(s, parola.index, fine)) passwordAnnunciata(s, fine, true, out, HASLO.test(parola[0]));
     }
   }
 
