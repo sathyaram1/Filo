@@ -14,21 +14,26 @@ const CAMPI = `<!doctype html><html><head><title>Campi</title></head><body style
   <textarea id="area" style="${CAMPO};height:50px">tieni taglia questo resta</textarea>
   </body></html>`;
 
-// L'Aiuto risponde con l'azione della pagina che gli si dà, come farebbe il modello davanti a «taglia».
+// L'Aiuto risponde con l'azione della pagina che gli si dà, come farebbe il modello davanti a «taglia»; la Modifica
+// riscrive sempre allo stesso modo.
 async function aiutoCheTaglia(app, pagina) {
   await app.evaluate(async (_electron, pagina) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash', [C.ACTIONS.EDIT_TEXT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     const P = globalThis.SN_PROVIDERS;
-    const risposta = async ({ attempts }) => ({
-      model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [], finishReason: 'stop',
-      text: JSON.stringify({ action: 'page', page: pagina, text: 'Ecco.', status: 'done' }),
-    });
+    const risposta = async ({ attempts, messages }) => {
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      const aiuto = sistema.includes('# Protocollo di risposta');
+      return {
+        model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [], finishReason: 'stop',
+        text: aiuto ? JSON.stringify({ action: 'page', page: pagina, text: 'Ecco.', status: 'done' }) : 'Testo riscritto.',
+      };
+    };
     P.completeWithFallback = risposta;
     P.streamCompleteWithFallback = risposta;
   }, pagina);
