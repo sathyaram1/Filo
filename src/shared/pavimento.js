@@ -12,7 +12,7 @@
   // Il verbo che annuncia il valore, nelle lingue delle etichette (#1403.6), uno solo per password e codici: «Le mot de
   // passe est …», «Der PIN ist …». Il futuro sta in FUTURO, il «to» polacco accanto al nome che lo regge.
   const VERBO = '(?:è|e\'|era|is|was|c[\'’]est|est|[ée]tait|ist|lautet|war|es|é|luidt|jest|brzmi|это|был[аио]?|будет|является|είναι|ήταν)';
-  const FUTURO = '(?:sarà|sera|será|serà|serão|będzie)';
+  const FUTURO = '(?:sarà|sera|será|serà|serão|będzie|wird)';
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
