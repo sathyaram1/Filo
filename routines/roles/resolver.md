@@ -152,6 +152,13 @@ Quando il lavoro è quasi chiuso lancia `npm run finish:check`, in sottofondo:
 un rosso lì ti tornerebbe indietro come rilievo grave. Il suo esito lo leggi
 prima di consegnare, e il rilascio aspetta che sia finito.
 
+`node scripts/mappa-prove.mjs` (pochi secondi) elenca gli spec che passano
+dalle righe che il ramo cambia, letti dalla mappa che la suite di main rifà a
+ogni corsa: prima quelli che eseguono le funzioni cambiate, poi quelli che
+caricano soltanto i file, ognuno col suo tempo. `finish:check` lancia i primi;
+fra i secondi lancia tu quelli del comportamento che hai cambiato, e aggiorna
+quelli rimasti indietro.
+
 **La prova che tiene chiuso il difetto va dove verrà rilanciata per sempre**:
 `tests/<feature>.spec.mjs`, o `tests/unit/` per la logica pura. Non in
 `tests/verifica/<numero>/`: quella è la memoria dei giri di verifica, la scrive
