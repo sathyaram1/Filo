@@ -16,6 +16,8 @@
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
+  // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo dopo «kod».
+  const VERBO_CVV = `(?:${VERBO}|${FUTURO}|(?<=\\bkod\\b[^\\n]{0,40})to)`;
   const NOME_CVV = '\\b(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?)\\b';
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
@@ -28,8 +30,8 @@
   const SINGOLE = [...VIRGOLETTE].filter((c) => '\'‘’'.includes(c)).join('');
   const VIRGOLETTA = `(?:[${APERTE}][ \\t]*)?`;
   const CIFRE_CVV = `${VIRGOLETTA}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
-  const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|è|e'|is)?\\s*${CIFRE_CVV}`, 'gi');
-  const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*[:=|\\t]|\\s+(?:è|e'|is|was)(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
+  const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
+  const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*[:=|\\t]|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
   // falso allarme ferma un'azione; qui un falso allarme toglie un numero, e il codice di verifica non esce.
   // Le cifre in coda a una parola («Girasole2024») non sono il codice: è la password intera, e la toglie la regola delle
