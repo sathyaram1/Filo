@@ -94,7 +94,7 @@ window.addEventListener('error', (ev) => { esito.errori.push(String(ev.message |
 <script src="progetto/credenziali"></script><script src="progetto/chiavi.ini"></script><script src="progetto/mio.js"></script><script>
 window.addEventListener('load', () => {
   const g = (n) => { try { return eval(n); } catch (_) { return 'NO'; } };
-  esito.env = g('TOKEN'); esito.py = g('SECRET_KEY'); esito.toml = g('api_key'); esito.senza = g('PASSWORD'); esito.ini = g('CHIAVE_INI');
+  esito.mio = g('MIO'); esito.env = g('TOKEN'); esito.py = g('SECRET_KEY'); esito.toml = g('api_key'); esito.senza = g('PASSWORD'); esito.ini = g('CHIAVE_INI');
   esito.fine = 1; segna();
 });
 </script></body>`);
