@@ -589,7 +589,8 @@
   const Q = '«»“”„‚‘’‹›"\'「」『』';
   const FRA_VIRGOLETTE = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${Q}](?:[^\\n${Q}]{0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
   const HA_VIRGOLETTE = new RegExp(`[${Q}]`, 'u');
-  const BORDI_VIRGOLETTE = new RegExp(`^[${Q}]+|[${Q}]+$`, 'gu');
+  const TESTA_VIRGOLETTE = new RegExp(`^[${Q}]+`, 'u');
+  const CODA_VIRGOLETTE = new RegExp(`[${Q}]+$`, 'u');
   const spazi = (w) => ' '.repeat(w.length);
   const virgoletteStrette = (s) => (HA_VIRGOLETTE.test(s)
     ? s.replace(FRA_VIRGOLETTE, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
