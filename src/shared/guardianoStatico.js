@@ -332,9 +332,15 @@
   const ANNUNCI = Object.freeze(['è', "e'", 'e’', 'é', 'era', 'sarebbe', 'sarà', 'is', 'are', 'was', 'sono', 'ecco', 'here',
     'vale', 'risulta', "c'est", 'c’est', 'est', 'était', 'etait', 'sera', 'ist', 'lautet', 'war', 'wird', 'es', 'será',
     'serà', 'serão', 'luidt', 'jest', 'brzmi', 'będzie', 'это', 'был', 'была', 'было', 'были', 'будет', 'является',
-    'είναι', 'ήταν', 'هي', 'هو', 'היא', 'הוא']);
+    'είναι', 'ήταν', 'هي', 'هو', 'היא', 'הוא', 'diventa', 'diventerà', 'resta', 'resterà', 'rimane', 'rimarrà', 'sia',
+    'fosse', 'essere', 'becomes', 'remains', 'stays', 'be']);
   // Un annuncio come parola intera, per le regex col flag `u`.
   const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
+  // L'annuncio con un modale davanti e un avverbio prima o dopo («dovrebbe essere», «will be», «è ancora», #2678.7): il
+  // valore sta dopo di lui come dopo «è». Spazi senza a capo; il confine lo mette chi lo usa.
+  const AVVERBI = 'sempre|ancora|ora|adesso|invece|attualmente|tuttora|già|anche|comunque|now|still|always|currently|also|just|actually';
+  const MODALI = 'dovrebbe|potrebbe|deve|dovrà|può|potrà|should|must|might|could|would|will|may|can|shall';
+  const ANNUNCIO_LARGO = `(?:(?:${AVVERBI})[^\\S\\n]+)?(?:dev['’]|(?:${MODALI})[^\\S\\n]+)?(?:${ANNUNCI.join('|')})(?:[^\\S\\n]+(?:${AVVERBI})){0,2}`;
   // Le etichette fuori dall'alfabeto latino, e i verbi attaccati del cinese, giapponese, coreano e thai, sono quelli dei
   // campi segreti (#1403.8); i verbi che sono una parola stanno in ANNUNCI qui sopra.
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
