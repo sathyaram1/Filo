@@ -86,10 +86,22 @@ test('il CVV col suo nome nelle lingue delle etichette si toglie; la frase che l
     ['Ihr Sicherheitscode lautet 555', '555'], ['De beveiligingscode is 222', '222'], ['Kod bezpieczeństwa karty to 333', '333'],
     ['Код безопасности: 444', '444'], ['Κωδικός ασφαλείας: 666', '666'], ['Card verification value: 777', '777'],
     ['Il CVV era 615', '615'],
+    ['Kod CVV to 123', '123'], ['Mój CVV to 124', '124'], ['Kod CVC2 to 125 z tyłu karty', '125'],
+    ['El código de verificación es 126', '126'], ['El código de verificación de la tarjeta: 127', '127'],
+    ['O código de verificação é 128', '128'], ['Le code de vérification de la carte est 129', '129'],
+    ['Kartenpruefnummer: 131', '131'], ['Kreditkartenprüfnummer: 132', '132'], ['Kreditkartensicherheitscode: 133', '133'],
+    ['El codi de seguretat és 134', '134'], ['Security code: 135', '135'], ['Card security code is 136', '136'],
   ]) assert.ok(!P.oscura(riga).includes(v), riga);
   for (const riga of ['Le cryptogramme est un code à 3 chiffres', 'El código de seguridad tiene 3 dígitos',
     'Die Prüfziffer der IBAN ist 89', 'Kod bezpieczeństwa to trzy cyfry', 'Send the CVV to 123 Main St',
-    'Cryptogrammeur 123']) assert.equal(P.oscura(riga), riga);
+    'Cryptogrammeur 123', 'Die Prüfnummer des Gutachtens ist 2024', 'Der Prüfcode des Produkts ist 456',
+    'Prüfziffer 1234 im Bericht', 'Prüfnummer 123 des TÜV']) assert.equal(P.oscura(riga), riga);
+});
+
+test('il nome del CVV con un errore di battitura si riconosce lo stesso (#2681)', () => {
+  for (const riga of ['Le crytogramme est 123', 'Le cryptograme est 123', 'El codigo de seguirdad es 123',
+    'Die Kartenprüfnumer ist 123']) assert.ok(!P.oscura(riga).includes('123'), riga);
+  for (const riga of ['Le cryptogrammeur est 123', 'La securite est 123 fois mieux']) assert.equal(P.oscura(riga), riga);
 });
 
 test('un codice usa e getta e una chiave col suo prefisso non escono', () => {
