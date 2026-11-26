@@ -208,4 +208,20 @@ describe('le etichette non latine della password', () => {
       assert.deepEqual(G.segretiInUscita(t).filter((x) => x.regola === 'password'), [], t);
     }
   });
+  // 「『 stanno fra i segni larghi che chiudono il valore, ma lo aprono: staccate prima del taglio (giro 8).
+  test('la password fra le virgolette ad angolo esce come password ed entra nel registro dei letti', () => {
+    for (const [t, v] of [['password: 「Mela!Verde77」', 'Mela!Verde77'], ['la password è 「 Mela!Verde77 」', 'Mela!Verde77'],
+      ['password: 『Mela!Verde77』', 'Mela!Verde77'], ['パスワードは「Kx82mPq9」です', 'Kx82mPq9'], ['パスワード：「Kx82mPq9」', 'Kx82mPq9'],
+      ['密码：『Kx82mPq9』', 'Kx82mPq9']]) {
+      assert.ok(G.segretiInUscita(t).some((x) => x.regola === 'password' && x.valore === v), `uscita: ${t}`);
+      assert.ok(G.segretiNelTesto(t).some((x) => x.regola === 'password' && x.valore === v), `letti: ${t}`);
+    }
+  });
+  // In arabo «e», «con», «per» si attaccano alla parola che segue: «وكلمة المرور» è «e la password».
+  test('l\'etichetta araba con la congiunzione o la preposizione attaccata resta un\'etichetta', () => {
+    for (const t of ['اسم المستخدم: ahmed وكلمة المرور: Gatto2024!', 'بكلمة المرور: Gatto2024!', 'ولكلمة المرور هي Gatto2024!']) {
+      assert.ok(G.segretiInUscita(t).some((x) => x.regola === 'password' && x.valore === 'Gatto2024!'), `uscita: ${t}`);
+      assert.ok(G.segretiNelTesto(t).some((x) => x.regola === 'password' && x.valore === 'Gatto2024!'), `letti: ${t}`);
+    }
+  });
 });
