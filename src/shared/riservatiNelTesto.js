@@ -237,7 +237,8 @@ function chiede(riga) {
 // Chi scrive il campo si firma così nelle conversazioni copiate; le pagine di chat non mettono nomi, e un altro nome
 // può essere chiunque del gruppo.
 const CHI_SCRIVE = new Set(['io', 'tu', 'me', 'you', 'i']);
-const pulito = (v) => String(v || '').replace(/[.,;:!?)\]»”"']+$/u, '');
+// Anche le virgolette davanti: «pass «Mela!Verde77»» ha il valore fra loro (#2678.7).
+const pulito = (v) => String(v || '').replace(/^[«“„‘"'(\[]+/u, '').replace(/[.,;:!?)\]»”"'’]+$/u, '');
 // La riga porta già il dato: in testa («Gatto2024 (con la G maiuscola)», «certo, Gatto2024») o dopo una parola che lo
 // presenta («è gattonero tutto minuscolo», «eccola: gattonero»). Il nome di chi parla non presenta. Una domanda non porta,
 // ma solo nel suo inciso: «è gattonero?» no, «Gatto2024. Tu a che ora arrivi?» e «sì: Gatto2024 ma…, ok?» sì.
