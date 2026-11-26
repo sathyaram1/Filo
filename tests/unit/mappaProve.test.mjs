@@ -123,7 +123,8 @@ test('dalle righe agli spec: prima chi passa dalla funzione cambiata, poi chi ca
   const fuoriDaA = proveDelCambio(m, new Map([['src/main/x.js', [8]]]));
   assert.deepEqual(fuoriDaA.prove.map((p) => [p.spec, p.livello]), [['tests/b.spec.mjs', 'file'], ['tests/a.spec.mjs', 'file']], 'stesso livello: prima il più breve');
   const insieme = proveDelCambio(m, new Map([['src/main/x.js', [3, 8]], ['src/renderer/shell.js', [3]], ['src/nuovo.js', [1]]]));
-  assert.deepEqual(insieme.prove.map((p) => [p.spec, p.livello]), [['tests/c.spec.mjs', 'funzione'], ['tests/a.spec.mjs', 'funzione'], ['tests/b.spec.mjs', 'file']]);
+  // a passa dalla funzione cambiata e carica il file cambiato, c solo dalla funzione: a pesa di più.
+  assert.deepEqual(insieme.prove.map((p) => [p.spec, p.livello]), [['tests/a.spec.mjs', 'funzione'], ['tests/c.spec.mjs', 'funzione'], ['tests/b.spec.mjs', 'file']]);
   assert.deepEqual(insieme.senzaProve, ['src/nuovo.js']);
   const interoIife = proveDelCambio(m, new Map([['src/renderer/shell.js', [5]]]));
   assert.deepEqual(interoIife.prove.map((p) => p.livello), ['file'], 'la IIFE che avvolge il file vale come il caricamento');
