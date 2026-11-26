@@ -2,6 +2,7 @@ nel file filo_filosofia.txt è descritta la filosofia generale di filo, qui è s
 
 INTERATTIVITA
 per ogni nuovo elemento (un elemento può essere un titolo, una voce, un'icona, un elemento cliccabile...) che crei chiediti cosa l'utente ci potrebbe voler fare. pensa espressamente ad ogni tipo di azione, ovviamente non sempre serviranno tutte le azioni.
+per ogni lavoro si elencano gli elementi nuovi, e per ognuno si dice cosa fanno clic, tasto destro, trascinamento e hover, o perché non servono.
 
 tasto destro:
 sarà la più comune, molto probabilmente ci sarà qualcosa di specifico che l'utente vorrebbe fare con quell'elemento. pensaci accuratamente e crea un box personalizzato per quel tipo di componente, il box può contenere sia informazioni (possono essere statiche o dinamiche (generate ad un LLM in base a delle info) come ad esempio la spiegazione di una voce delle impostazioni, o la traduzione/conversione di una parola o unità di misura straniera quando selezionata) o voci (con azioni puntuali o che aprono un altro box per azioni più complesse se necessario).
