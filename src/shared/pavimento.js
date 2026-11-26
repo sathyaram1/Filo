@@ -212,8 +212,8 @@
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
   // In un CSV l'intestazione è un nome di campo, anche col prefisso delle esportazioni («login_password»): al più una
   // parola in più, perché una frase con le virgole («utente, password e premi invio») non apra una colonna.
-  const INTESTAZIONE_CSV = new RegExp(`^(?:[A-Za-z0-9]{1,20}[_.\\s-])?${ETICHETTA.slice(2)}(?:[_.\\s-]?[A-Za-z0-9()]{1,20})?$`, 'i');
-  const NOMINA_ETICHETTA = new RegExp(ETICHETTA.slice(2), 'i');
+  const INTESTAZIONE_CSV = new RegExp(`^(?:[A-Za-z0-9]{1,20}[_.\\s-])?${ETICHETTA_DENTRO}(?:[_.\\s-]?[A-Za-z0-9()]{1,20})?$`, 'i');
+  const NOMINA_ETICHETTA = new RegExp(ETICHETTA_DENTRO, 'i');
   // Le parole che una pagina mette accanto all'etichetta senza che siano la password.
   const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|chiedi|chiedila|ask|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or)$/i;
 
