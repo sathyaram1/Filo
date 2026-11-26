@@ -184,10 +184,12 @@
   const etichettaDiUnIdentificativo = (prima) => {
     const m = ETICHETTA_IT.exec(prima) || ETICHETTA_EN.exec(prima);
     if (m && !UN_VERBO.test(m[1])) {
-      return !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]) && !APRE.test(m[1]) && !/^port[ae]$/.test(m[1]);
+      return !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]) && !APRE.test(m[1]) && !/^port[ae]$/.test(m[1])
+        && !APPARECCHIO_SOLO.test(m[1]);
     }
     const a = ETICHETTA_ALTRE.exec(prima) || ETICHETTA_DE.exec(prima);
-    return !!a && !UN_VERBO.test(a[1]) && !RESTA_ALTRE.test(a[1]) && !APRE_ALTRE_SOLO.test(a[1]) && !SEGNO_FORTE.test(a[1]);
+    return !!a && !UN_VERBO.test(a[1]) && !RESTA_ALTRE.test(a[1]) && !APRE_ALTRE_SOLO.test(a[1]) && !SEGNO_FORTE.test(a[1])
+      && !APPARECCHIO_SOLO.test(a[1]);
   };
   // Il valore sulla riga sotto si cerca solo per un codice che non ha già il suo numero sulla sua riga, dopo di lui:
   // in «Codice evento | 739204» la riga sotto è un altro dato. Un pezzo di telefono o un anno non sono il suo numero.
