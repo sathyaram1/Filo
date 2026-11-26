@@ -18,6 +18,11 @@ test('r1 la frase-password fra virgolette seguita da altro testo sulla riga', ()
   nascosto('password: “casa mia al mare” (non dirla)', 'casa mia al mare');
 });
 
+test('r1 la frase-password fra virgolette tedesche o chiuse con la virgoletta di un altro tipo', () => {
+  nascosto('Password: „casa mia al mare“', 'casa mia al mare');
+  nascosto('Password: “casa mia al mare“', 'casa mia al mare');
+});
+
 test('r1 la frase-password fra virgolette dopo il verbo', () => {
   nascosto('la password è “casa mia al mare”', 'casa mia al mare');
   nascosto('la password è «casa mia al mare»', 'casa mia al mare');
