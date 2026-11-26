@@ -343,6 +343,7 @@
     + `|(?:${NON_LATINI.ANNUNCI_ATTACCATI}))$`, 'i');
   const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:：=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
+  const APRE_IN_CODA = new RegExp(`(?:\\s*(?:\\d{1,3}[.)]|[•·*"«»“”(${NON_LATINI.APRE_VALORE}-]|(?<![A-Za-zÀ-ÿ])'))*\\s*$`);
   function annunciato(fra, valore = '', { stretto = false } = {}) {
     if (ALTRA_FRASE.test(fra) || /\/|\bwww\./i.test(fra)) return false;
     // L'apostrofo dopo una lettera è di «e'», non una virgoletta che apre il valore.
