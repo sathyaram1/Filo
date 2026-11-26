@@ -41,7 +41,7 @@ in un'app normale questo sarebbe inutile in quanto l'utente non può scartabella
 
 
 ESTETICA
-l'obiettivo principale è la chiarezza e l'intuitività. quindi la cosa migliore è uno stile minimale con meno elementi superflui possibili. non mettere sottotitoli o spiegazioni dell'ui dell' UI stessa.
+l'obiettivo principale è la chiarezza e l'intuitività. quindi la cosa migliore è uno stile minimale con meno elementi superflui possibili. non mettere sottotitoli o spiegazioni dell'ui dell' UI stessa. ogni elemento nuovo (titolo, sottotitolo, bottone, riquadro) ha un motivo: senza motivo si toglie.
 ogni schermata ha il minimo di oggetti possibile, e soprattutto di tipi diversi (titolo, testo, riquadro, tasto pieno, tasto vuoto, icona, link…). prima di aggiungere un oggetto chiediti cosa perde l'utente senza: se non sai dirlo, non lo metti. un tipo in più si tiene solo se dice qualcosa che l'utente altrimenti non saprebbe. la stessa cosa ha la stessa forma in tutto filo. una funzione che serve di rado non diventa un oggetto: sta nel tasto destro o si chiede a filo.
 Ogni azione dell'utente deve ricevere feedback, quando clicco o faccio hover su un elemento se è possibile deve succedere qualcosa (nulla di fastidioso o appariscente ma l'utente deve avere conferma che il sistema risponde).
 una sempre tutto lo spazio a disposizione, non mettere il contenuto della pagina in un box, non usare tutta la riga in alto per 2 icone sulla destra… 
