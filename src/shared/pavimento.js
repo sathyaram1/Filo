@@ -938,7 +938,14 @@
 
   // Gli a capo di Windows e quelli col solo \r (un file di testo allegato) valgono il nostro: le regole leggono le righe
   // su una copia della stessa lunghezza, così i posti restano quelli del testo vero (#2673.6).
+  // Un valore di più righe (il corpo di una chiave) torna con gli a capo del testo vero; il \r in coda non è del valore.
   const aCapo = (s) => (s.includes('\r') ? s.replace(/\r\n/g, ' \n').replace(/\r/g, '\n') : s);
+  function conGliACapoVeri(x, piano, vero) {
+    const v = String(x.valore);
+    if (vero.includes(v)) return x;
+    const k = Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio) ? x.inizio : piano.indexOf(v);
+    return k < 0 ? x : { ...x, valore: vero.slice(k, k + v.length).replace(/\r$/, '') };
+  }
 
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
@@ -946,8 +953,9 @@
     const vero = testo(valore);
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
     const R = global.SN_RISERVATI_TESTO;
+    const piano = aCapo(vero);
     // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
-    const s = virgoletteStrette(R ? R.senzaEnfasi(aCapo(vero)) : aCapo(vero));
+    const s = virgoletteStrette(R ? R.senzaEnfasi(piano) : piano);
     const out = [];
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
