@@ -335,7 +335,7 @@
     'serà', 'serão', 'luidt', 'jest', 'brzmi', 'będzie', 'это', 'был', 'была', 'было', 'были', 'будет', 'является',
     'είναι', 'ήταν']);
   // Un annuncio come parola intera, per le regex col flag `u`.
-  const ANNUNCIO = `(?<!\\p{L})(?:${ANNUNCI.join('|')})(?!\\p{L})`;
+  const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
   const ATTACCO = new RegExp(`(?:^|[:=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following))$`, 'i');
   const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
