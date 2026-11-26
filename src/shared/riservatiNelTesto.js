@@ -34,6 +34,13 @@ const RICHIESTA = new RegExp([
   '(?:skicka|ge\\s+mig|säg|vad\\s+är|gi\\s+meg|hva\\s+er|hvad\\s+er|giv\\s+mig|lähetä|kerro|mikä|küldd?|küldj|add\\s+meg|mondd|pošli|pošlete|dej|dejte|řekni|daj|reci|pošalji|koja\\s+je|gönder|söyle|nedir|trimite|spune|dă-mi|care\\s+este|gửi|cho\\s+(?:mình|tôi|em|anh)|là\\s+gì|kirim|kasih|minta|berapa)',
   '(?:kan\\s+(?:du|jeg|jag|i)|sende|sänd|atar\\s+m[ıi]s[ıi]n|m[ıi]s[ıi]n|musun|müsün|kaç|ne(?=[^\\p{L}]*$)|care\\s+e|da-mi|zi-mi|[șşs]tii)',
   '(?:(?:schick|gib|sag)\\s+mir|was\\s+ist|wie\\s+ist|envoie|donne|dis-moi|quel\\s+est|c[\'’]est\\s+quoi|mándame|pásame|dame|dime|cuál\\s+es|me\\s+passa|stuur|geef|wat\\s+is|wyślij|podaj|jakie\\s+jest)',
+  // In francese, tedesco, spagnolo e portoghese: «envoie-moi le mot de passe», «gib mir das Passwort» (#1403.14).
+  '(?:(?:envoie|donne|dis|file|passe)[-\\s]?moi|tu\\s+(?:peux|pourrais|as|aurais|connais)|vous\\s+(?:pouvez|pourriez|avez)'
+    + '|t[\'’]as|c[\'’]est\\s+quoi|quel\\s+est|j[\'’]ai\\s+besoin|(?:schick|gib|sag|nenn)(?:e|st)?\\s+mir'
+    + '|(?:kannst|könntest|hast|weißt|weisst)\\s+du|wie\\s+(?:ist|lautet|war)|was\\s+ist|ich\\s+brauche'
+    + '|(?:m[aá]nda|p[aá]sa|env[ií]a|d[aá]|di)me(?:l[ao])?|me\\s+(?:pasas|mandas|das|dices|env[ií]as|passa|manda|diz|envia)'
+    // «preciso» da solo è anche italiano («preciso che la password scade…»): conta col «da/do/de» del portoghese.
+    + '|puedes|podr[ií]as|tienes|sabes|necesito|pode|podes|poderia|tem|preciso\\s+d[aoe]s?|cu[aá]l\\s+es)',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|')
   // Le scritture senza spazi non hanno confine fra le parole: «密码是多少».
   // 吗 e 呢 chiudono la domanda al posto del punto di domanda: «你知道wifi密码吗», «密码呢».
@@ -44,10 +51,13 @@ const SALUTO = new RegExp(`^(?:${SALUTI})$`, 'u');
 // La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
 // sulla riga, prima, chi parla o un'altra frase, poi al più un articolo o un saluto; dopo il nome solo di cosa è e la
 // fine della riga. «Password del wifi» da sola è l'etichetta di una pagina, «password dimenticata» non chiede (#2638.1).
-// Le altre lingue come l'italiano: «Marco: пароль от wifi», «τον κωδικό του wifi», «wifi密码» (attaccato, senza spazio).
-const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|${SALUTI}|wi-?fi|router|home|а|и|τον|το|την|τη|ο|η)(?:\\s+|(?=的?$))))*的?$`, 'u');
-const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|per|for|of|от|для|к|від|του|της|των|til|till|för|af|na|za|pentru|untuk)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua|το)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
-const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:grazie|thanks|thx))?[^\\p{L}\\p{N}]*$`, 'u');
+// Le altre lingue come l'italiano: «Marco: пароль от wifi», «τον κωδικό του wifi», «wifi密码» (attaccato, senza spazio),
+// «le mot de passe du wifi stp», «das WLAN-Passwort bitte» (#1403.14).
+const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|les|i|the|your|tua|vostra|el|tu|o|a|teu|das|der|die|dein|deine|ton|ta|votre|${SALUTI}|wi-?fi|wlan|router|home|а|и|τον|το|την|τη|ο|η)(?:\\s+|-|(?=的?$))))*的?$`, 'u');
+const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|du|des|do|da|per|for|of|vom|von|für|fürs|от|для|к|від|του|της|των|til|till|för|af|na|za|pentru|untuk)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua|le|el|o|a|das|dem|den|der|ton|ta|mon|ma|tu|teu|mi|το)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
+const CORTESIA = "grazie|thanks|thx|please|pls|plz|per\\s+favore|stp|svp|s['’]il\\s+(?:te|vous)\\s+pla[iî]t|merci|bitte|danke"
+  + '|por\\s+favor|porfa|gracias|obrigad[oa]|пожалуйста|спасибо';
+const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:${CORTESIA}))?[^\\p{L}\\p{N}]*$`, 'u');
 // La fine di una frase, un elenco solo per tutto il file: i punti che vogliono lo spazio dopo e quelli delle scritture
 // senza spazi. Il punto di domanda greco qui è già «?» (minuscolo()).
 const PUNTI = '.!?؟;';
@@ -61,8 +71,12 @@ const ellittica = (testa, dopo) => {
     && ELLITTICA_PRIMA.test(pezzi[pezzi.length - 1]) && ELLITTICA_DOPO.test(dopo);
 };
 // In chat la password si chiama anche così: «pass» solo con l'articolo o col wifi, da solo è anche l'inglese «to pass».
+// Nelle altre lingue (#1403.14): «mdp», «la clave del wifi», «WLAN-Schlüssel», e i composti attaccati del tedesco
+// («Wlanpasswort», «Routerpasswort»).
 const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|pass\\s+(?:del(?:la)?\\s+)?wi-?fi'
-  + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
+  + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router)|mdp'
+  + '|clave\\s+(?:(?:del|de\\s+la|de)\\s+)?(?:wi-?fi|red|router)|(?:wlan|wi-?fi|router|netzwerk)-?schlüssel'
+  + '|\\p{L}{2,20}(?:passwort|kennwort))(?![\\p{L}\\p{N}])';
 const CHIESTA_IN_CHAT = `${ETICHETTE_CORTE}|(?<![\\p{L}\\p{N}])credenziali(?![\\p{L}\\p{N}])`;
 // Il punto di domanda anche delle altre scritture: quello a tutta larghezza, l'arabo, il greco.
 const DOMANDA = new RegExp('[?？؟\\u037E]', 'u');
@@ -75,12 +89,15 @@ const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
-  'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks', 'ecco']);
+  'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks', 'ecco',
+  'volontiers', 'voilà', 'voila', 'tiens', 'natürlich', 'gerne', 'bitte', 'claro', 'aquí', 'aqui']);
 // Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero»): l'elenco del filtro delle
 // pagine, che il correttore chiama nello stesso giro.
 const ANNUNCI = guardiano().ANNUNCI;
 const ANNUNCIO = `(?:${ANNUNCI.map(esc).join('|')})(?!\\p{L})`;
-const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo']);
+// «c'est», «ist», «es»: come «è» nelle altre lingue della richiesta (#1403.14).
+const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo',
+  "c'est", 'c’est', 'est', 'ist', 'lautet', 'es', 'é', 'это']);
 // Dentro una risposta queste aprono quasi sempre altro («sono stanco», «vale poco», «sono arrivato»): non presentano
 // la parola dopo, né fanno di una riga la risposta.
 const NON_IN_RISPOSTA = new Set(['sono', 'are', 'vale', 'risulta', 'here']);
@@ -167,13 +184,18 @@ function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
   let soloForma = data;
   let dopoPresenta = false;
   let n = 0;
-  for (const [, w, spazio] of risposta.matchAll(/(\S+)(\s*)/g)) {
+  // Le parole di un nome in più parole («le mot de passe est …») sono il nome, non il dato.
+  const nomi = menzioni(risposta);
+  for (const m of risposta.matchAll(/(\S+)(\s*)/g)) {
+    const [, w, spazio] = m;
     n += 1;
     const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    const da = m.index + w.length - w.replace(/^[^\p{L}\p{N}]+/u, '').length;
+    const nelNome = nomi.some((x) => da >= x.i && da + t.length <= x.j);
     // «Ciao Marco!» non è la password: la frase del saluto non conta per le parole di sole lettere.
     if (!trovato && SALUTO.test(t)) saluto = true;
     // «Marco:», «eccola:» presentano, non sono il dato.
-    const candidata = t && !w.endsWith(':') && !AVVII.has(t) && !PRESENTA_DATO.has(t) && !presentata.some((re) => re.test(t));
+    const candidata = t && !nelNome && !w.endsWith(':') && !AVVII.has(t) && !PRESENTA_DATO.has(t) && !presentata.some((re) => re.test(t));
     const segni = /[^\p{L}'’]/u.test(t);
     const qualunque = tipo === 'password' && !saluto && !forte && ((lettere && n <= PAROLE_RISPOSTA) || dopoPresenta);
     if (soloForma) {

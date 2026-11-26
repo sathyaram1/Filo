@@ -92,6 +92,48 @@ test('un pin chiesto parte senza le sue cifre; per un codice le parole senza cif
   assert.equal(risposta('certo, domani mattina', 'Luca: mi mandi il codice?').nuovo, 'certo, domani mattina');
 });
 
+// #1403.14 — la domanda che nomina la password in un'altra lingua la chiede come quella in italiano.
+test('la password data a chi la chiede in francese, tedesco, spagnolo, portoghese o russo non parte', () => {
+  const domande = [
+    "Marco: tu peux m'envoyer le mot de passe ?", 'Marco: envoie-moi le mot de passe du wifi',
+    'Marco: wie ist das WLAN-Passwort?', 'Marco: gib mir das Passwort', 'Ana: ¿me pasas la contraseña del wifi?',
+    'Ana: mándame la contraseña', 'Ana: qual é a senha do wifi?', 'Ana: какой пароль от wifi?',
+  ];
+  for (const sopra of domande) {
+    assert.equal(R.oscura(`${sopra}\nLuc: Gatto2024`), `${sopra}\nLuc: [dato riservato]`, sopra);
+    assert.equal(risposta('Gatto2024', sopra).nuovo, '[dato riservato]', sopra);
+    assert.equal(risposta('certo, gattonero', sopra).nuovo, 'certo, [dato riservato]', sopra);
+  }
+  assert.equal(risposta('volontiers, gattonero', domande[0]).nuovo, 'volontiers, [dato riservato]');
+  assert.equal(risposta('natürlich: Gatto2024', domande[2]).nuovo, 'natürlich: [dato riservato]');
+  // Senza il nome della password la stessa frase non chiede niente.
+  assert.equal(R.oscura('Marco: tu peux venir demain ?\nLuc: Gatto2024'), 'Marco: tu peux venir demain ?\nLuc: Gatto2024');
+  assert.equal(risposta('certo, gattonero', 'Marco: gib mir das Buch').nuovo, 'certo, gattonero');
+});
+
+// #1403.14 — anche coi nomi corti, le richieste senza punto di domanda e le parole che presentano il dato.
+test('nelle altre lingue valgono i nomi di chat, la cortesia in fondo e le parole che presentano la password', () => {
+  const T = require('../../src/shared/riservatiNelTesto.js');
+  for (const sopra of [
+    'Marco: le mdp du wifi ?', "Marco: tu peux m'envoyer le mdp ?", 'Ana: ¿me pasas la clave del wifi?',
+    'Ana: cuál es la clave del wifi', 'Marco: wie ist der WLAN-Schlüssel?', 'Marco: wie ist das Wlanpasswort?',
+    'Marco: schick mir mal das Routerpasswort',
+  ]) {
+    assert.equal(R.oscura(`${sopra}\nLuc: Gatto2024`), `${sopra}\nLuc: [dato riservato]`, sopra);
+    assert.equal(risposta('Gatto2024', sopra).nuovo, '[dato riservato]', sopra);
+  }
+  for (const sopra of [
+    "Marco: le mot de passe du wifi s'il te plaît", 'Marco: le mot de passe du wifi stp', 'Marco: das WLAN-Passwort bitte',
+    'Ana: la contraseña del wifi por favor', 'Ana: скинь пароль от wifi', 'Ana: me passa a senha do wifi',
+    'Ana: pode me mandar a senha', 'Ana: preciso da senha',
+  ]) assert.deepEqual(T.trova(`${sopra}\nLuc: Gatto2024`, { sotto: true }), ['gatto2024'], sopra);
+  assert.ok(T.trova('Marco: me pasas el código del portal?\nLuis: 4821').includes('4821'));
+  // «preciso» italiano non chiede niente: il numero d'ordine sotto resta.
+  assert.deepEqual(T.trova('Preciso che la password del portale scade ogni 90 giorni\nOrdine ABCD5678 spedito', { sotto: true }), []);
+  assert.deepEqual(T.trova("Marco: tu peux m'envoyer le mot de passe ?\nLuc: oui, c'est Gatto2024"), ['gatto2024']);
+  assert.deepEqual(T.trova("Marco: tu peux m'envoyer le mot de passe ?\nLuc: le mot de passe est Gatto2024"), ['gatto2024']);
+});
+
 test('domanda e risposta nello stesso testo: nel campo e nella conversazione che parte', () => {
   const campo = 'mi hai chiesto la password? eccola: Gatto2024';
   assert.ok(!risposta(campo, '').nuovo.includes('Gatto2024'));

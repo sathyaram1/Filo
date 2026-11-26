@@ -14,6 +14,7 @@
         { testo: 'Una password scritta fra virgolette con lo spazio dentro, come « Mela!Verde77 » alla francese, non arriva più ai modelli: Filo la toglie come quando le virgolette sono attaccate. Lo stesso in francese, tedesco, spagnolo, portoghese, olandese e polacco quando scrivi «le mot de passe est …» invece dei due punti.', segnalazione: 1403 },
         { testo: 'Una password scritta in svedese, turco, russo, cinese o in un\'altra lingua, come «Lösenord: …» o la risposta a chi la chiede in chat, non arriva ai modelli, come succede già con «Password: …».', segnalazione: 2673 },
         { testo: 'Un codice di accesso scritto in francese, tedesco, spagnolo, portoghese, olandese o polacco, come «Le code est 482913» o «der Zugangscode ist 482913», non arriva a nessun modello, come già succedeva in italiano e in inglese.', segnalazione: 1403 },
+        { testo: 'Se in chat qualcuno ti chiede la password in francese, tedesco, spagnolo, portoghese o russo («le mot de passe ?», «das WLAN-Passwort?»), quella che gli scrivi non arriva ai modelli di Filo, come già succedeva quando te la chiedeva in italiano o in inglese.', segnalazione: 1403 },
       ],
     },
     {
