@@ -291,11 +291,13 @@ export function proveDelCambio(mappa, cambi, { soglia = SOGLIA_SPEC_DI_UN_MODULO
       const insieme = meglio ? meglio[2] : f.carico;
       // Il modulo intero, o l'IIFE che lo avvolge, gira a ogni caricamento: vale come il file, non come una funzione.
       const vera = Boolean(meglio) && (meglio[1] - meglio[0] + 1) < 0.9 * intero;
-      dai(insieme, vera ? 'funzione' : 'file', 1 / Math.max(1, mappa.insiemi[insieme].length));
+      const livello = !vera ? 'file' : mappa.insiemi[insieme].length > soglia ? 'larga' : 'funzione';
+      dai(insieme, livello, rel);
     }
-    for (const p of mappa.insiemi[f.carico] || []) punti.get(p)?.file.add(rel);
   }
   const prove = [...punti].map(([p, v]) => ({ spec: mappa.prove[p].spec, ms: mappa.prove[p].ms, livello: v.livello, peso: v.peso, file: [...v.file] }));
-  prove.sort((a, b) => (a.livello === b.livello ? 0 : a.livello === 'funzione' ? -1 : 1) || b.peso - a.peso || a.ms - b.ms || a.spec.localeCompare(b.spec));
+  prove.sort((a, b) => ORDINE[a.livello] - ORDINE[b.livello] || b.peso - a.peso || a.ms - b.ms || a.spec.localeCompare(b.spec));
   return { prove, senzaProve };
 }
+
+const ORDINE = { funzione: 0, larga: 1, file: 2 };
