@@ -25,10 +25,7 @@
   Actions.init({
     getPasteContext: () => pasteContext,
     restorePasteContext: () => restorePasteContext(),
-    prendiLaSelezioneDiAdesso: (el) => {
-      if (el && !self.SN_FILO_UI?.inside?.(el) && isEditable(el)) capturePasteContext(el);
-      else pasteContext = null;
-    },
+    prendiLaSelezioneDiAdesso: (el) => prendiLaSelezioneDiAdesso(el),
     isBlocked: () => isBlocked(),
     isIncognito: () => inIncognito,
     getLastMouseEvent: () => lastMouseEvent,
