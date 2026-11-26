@@ -26,18 +26,37 @@ const RICHIESTA = new RegExp([
   '(?:send|give|tell|share|what|need|can\\s+you|could\\s+you|do\\s+you)',
   // «ti ricordi la password», «come è la password», «che password ha il wifi», «e la password del wifi».
   '(?:(?:ti|vi)\\s+ricord(?:i|ate)|ricordi\\s+(?:la|il)|come\\s+(?:è|e[\'’]|era)|che\\s+(?:password|pw|pass|pin|codice)|(?<=^|:\\s*)e\\s+(?:la|il))',
-].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
+  // Le lingue dei nomi della password (urlExfil.js, PRESENTA): «скинь пароль от wifi», «vad är lösenordet».
+  // Come in italiano anche chi ricorda, chi può, chi ce l'ha e chi sa («напомни», «можешь», «есть», «θυμάσαι», «έχεις»).
+  '(?:скинь(?:те)?|кинь(?:те)?|дай(?:те)?|скажи(?:те)?|напиши(?:те)?|пришли(?:те)?|отправь(?:те)?|подскажи(?:те)?|надішли(?:ть)?|какой|какая|какое|який|яка|нужен|нужна|кажи|прати|пошаљи|реци)',
+  '(?:напомни(?:те)?|нагадай(?:те)?|підкажи(?:ть)?|скажіть|можешь|можете|можно|може(?:ш|те)?|у\\s+(?:тебя|вас)\\s+есть|(?<!(?:меня|нас|него|неё|них)\\s+)есть(?=\\s+(?:ли\\s+)?парол)|знаешь|знаете|знаєш|скинуть|кинуть|дать|сказать|прислать|написать|отправить|подсказать)',
+  '(?:πες|πείτε|δώσε|δώστε|στείλε|στείλτε|ποιος|ποια|ποιο|χρειάζομαι|ξέρεις|ξέρετε|θυμάσαι|θυμάστε|λες|λέτε|έχεις|έχετε|μπορείς|μπορείτε|τι\\s+(?:κωδικ|συνθηματικ)\\p{L}*)',
+  '(?:skicka|ge\\s+mig|säg|vad\\s+är|gi\\s+meg|hva\\s+er|hvad\\s+er|giv\\s+mig|lähetä|kerro|mikä|küldd?|küldj|add\\s+meg|mondd|pošli|pošlete|dej|dejte|řekni|daj|reci|pošalji|koja\\s+je|gönder|söyle|nedir|trimite|spune|dă-mi|care\\s+este|gửi|cho\\s+(?:mình|tôi|em|anh)|là\\s+gì|kirim|kasih|minta|berapa)',
+  '(?:kan\\s+(?:du|jeg|jag|i)|sende|sänd|atar\\s+m[ıi]s[ıi]n|m[ıi]s[ıi]n|musun|müsün|kaç|ne(?=[^\\p{L}]*$)|care\\s+e|da-mi|zi-mi|[șşs]tii)',
+  '(?:(?:schick|gib|sag)\\s+mir|was\\s+ist|wie\\s+ist|envoie|donne|dis-moi|quel\\s+est|c[\'’]est\\s+quoi|mándame|pásame|dame|dime|cuál\\s+es|me\\s+passa|stuur|geef|wat\\s+is|wyślij|podaj|jakie\\s+jest)',
+].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|')
+  // Le scritture senza spazi non hanno confine fra le parole: «密码是多少».
+  // 吗 e 呢 chiudono la domanda al posto del punto di domanda: «你知道wifi密码吗», «密码呢».
+  + '|多少|什么|是啥|告诉我|发我|给我|发一下|发下|请问|知道|吗|呢|教えて|何ですか|알려|뭐야|뭐예요', 'iu');
 // Un elenco solo per il saluto in testa alla risposta e per quello prima della richiesta corta (#2638.1).
 const SALUTI = 'ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera';
 const SALUTO = new RegExp(`^(?:${SALUTI})$`, 'u');
 // La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
 // sulla riga, prima, chi parla o un'altra frase, poi al più un articolo o un saluto; dopo il nome solo di cosa è e la
 // fine della riga. «Password del wifi» da sola è l'etichetta di una pagina, «password dimenticata» non chiede (#2638.1).
-const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|${SALUTI}|wi-?fi|router|home)\\s+))*$`, 'u');
-const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|per|for|of)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
+// Le altre lingue come l'italiano: «Marco: пароль от wifi», «τον κωδικό του wifi», «wifi密码» (attaccato, senza spazio).
+const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|${SALUTI}|wi-?fi|router|home|а|и|τον|το|την|τη|ο|η)(?:\\s+|(?=的?$))))*的?$`, 'u');
+const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|per|for|of|от|для|к|від|του|της|των|til|till|för|af|na|za|pentru|untuk)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua|το)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
 const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:grazie|thanks|thx))?[^\\p{L}\\p{N}]*$`, 'u');
+// La fine di una frase, un elenco solo per tutto il file: i punti che vogliono lo spazio dopo e quelli delle scritture
+// senza spazi. Il punto di domanda greco qui è già «?» (minuscolo()).
+const PUNTI = '.!?؟;';
+const PUNTI_CJK = '。！？';
+const SPEZZA_FRASE = new RegExp(`[${PUNTI}]+\\s|[${PUNTI_CJK}]+|\\n`, 'u');
+const CHIUDE_PAROLA = new RegExp(`[${PUNTI}${PUNTI_CJK}]$`, 'u');
+const INCISO = new RegExp(`[,;]\\s|[，；、]|[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'u');
 const ellittica = (testa, dopo) => {
-  const pezzi = testa.split(/[,;:]|[.!?]+\s|\s[-–—]\s/);
+  const pezzi = testa.split(new RegExp(`[,;:，；：、]|[${PUNTI}]+\\s|[${PUNTI_CJK}]+|\\s[-–—]\\s`, 'u'));
   return pezzi.length > 1 && /[\p{L}\p{N}]/u.test(pezzi.slice(0, -1).join(''))
     && ELLITTICA_PRIMA.test(pezzi[pezzi.length - 1]) && ELLITTICA_DOPO.test(dopo);
 };
@@ -45,7 +64,13 @@ const ellittica = (testa, dopo) => {
 const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|pass\\s+(?:del(?:la)?\\s+)?wi-?fi'
   + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
 const CHIESTA_IN_CHAT = `${ETICHETTE_CORTE}|(?<![\\p{L}\\p{N}])credenziali(?![\\p{L}\\p{N}])`;
-const FINE_FRASE = /[.!?]+(?=\s|$)|\n/g;
+// Il punto di domanda anche delle altre scritture: quello a tutta larghezza, l'arabo, il greco.
+const DOMANDA = new RegExp('[?？؟\\u037E]', 'u');
+const FINE_FRASE = new RegExp(`[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'gu');
+// Il testo come lo leggono le regole: minuscolo, i due punti a tutta larghezza come i nostri, e il punto e virgola di
+// una riga in greco come punto di domanda (in greco è quello). Stessa lunghezza: le posizioni restano.
+const minuscolo = (t) => String(t == null ? '' : t).toLowerCase().replace(/：/g, ':')
+  .replace(/^.*\p{Script=Greek}.*$/gmu, (riga) => riga.replace(new RegExp('[;\\u037E]', 'gu'), '?'));
 const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
@@ -91,7 +116,7 @@ function refusoDiPassword(w) {
 let soloNomePassword = null;
 function nomeDiPassword(w) {
   const P = exfil() && exfil().PRESENTA;
-  if (!soloNomePassword && P) soloNomePassword = new RegExp(`^(?:${P.password.replace(/^\\b|\\b$/g, '')}|pw|pass)$`, 'u');
+  if (!soloNomePassword && P) soloNomePassword = new RegExp(`^(?:${P.password}|pw|pass)$`, 'u');
   return (soloNomePassword ? soloNomePassword.test(w) : w === 'password') || refusoDiPassword(w);
 }
 
@@ -113,12 +138,12 @@ function richieste(l, tutte = false) {
     // La frase si cerca in un tratto corto: un testo lungo senza punti, con la parola ripetuta, non diventa quadratico.
     const f = new RegExp(FINE_FRASE.source, 'g').exec(l.slice(m.j, m.j + FRASE_MAX));
     const a = f ? m.j + f.index + f[0].length : Math.min(l.length, m.j + FRASE_MAX);
-    const prima = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop();
+    const prima = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(SPEZZA_FRASE).pop();
     const riga = l.slice(m.j, m.j + FRASE_MAX).split('\n')[0];
     const testa = l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split('\n').pop();
     // Il punto di domanda conta nell'inciso che nomina la password: «la password è gattonero, tu quando arrivi?» la dà.
-    const inciso = /[,;]\s|[.!?]+(?=\s|$)|\n/.exec(l.slice(m.j, a));
-    const chiesta = !!((inciso && inciso[0].includes('?')) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(testa, riga));
+    const inciso = INCISO.exec(l.slice(m.j, a));
+    const chiesta = !!((inciso && DOMANDA.test(inciso[0])) || RICHIESTA.test(prima() + l.slice(m.i, a)) || ellittica(testa, riga));
     if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, nome: m.j, fine: a, tipo: m.tipo, chiesta });
   }
   return out;
@@ -159,7 +184,7 @@ function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
       out.push(...v);
     }
     dopoPresenta = w.endsWith(':') || PRESENTA_RISPOSTA.has(t);
-    if (/[.!?]$/.test(w) || spazio.includes('\n')) {
+    if (CHIUDE_PAROLA.test(w) || spazio.includes('\n')) {
       if (saluto) saluto = false;
       else if (forte) soloForma = true;
       else if (trovato) lettere = false;
@@ -189,7 +214,7 @@ function portaIlDato(riga, tipo, inTesta, dopoIlNome = false) {
   let q = false;
   for (let k = parole.length - 1; k >= 0; k--) {
     const p = parole[k].replace(/[)\]»”"'’]+$/u, '');
-    if (/[.!?,;]$/.test(p)) q = p.endsWith('?');
+    if (CHIUDE_PAROLA.test(p) || /[,;，；]$/u.test(p)) q = DOMANDA.test(p.slice(-1));
     inDomanda[k] = q;
   }
   let testa = inTesta;
@@ -259,7 +284,7 @@ function chiusaDavvero(l, r) {
 // Il messaggio sopra il campo a cui il campo risponde: { tipo, chiesta, data } o null. Con la risposta già sopra
 // (`data`) il campo perde solo le parole con la forma di una password: una seconda password sì, le parole normali no.
 function richiestaAperta(sopra) {
-  const l = sopra.toLowerCase();
+  const l = minuscolo(sopra);
   const tutte = richieste(l, true);
   let ultima = null;
   for (const r of tutte) {
@@ -305,7 +330,7 @@ const LIBERE = {
   chiaveRete: /(?<![\p{L}\p{N}])(?:ssid|nome\s+(?:della\s+)?rete|network(?:\s+name)?|wi-?fi|wlan)\s*[:=][^\n]{0,64}?(?:[^\S\n]*[,;|/][^\S\n]*|[^\S\n]+|[^\S\n]*\n(?:[^\S\n]*\n)?[^\S\n]*)(?:key|chiave(?:\s+(?:di\s+rete|wpa2?))?|password|pass|pw|psk|wpa2?(?:\s+key)?)\s*[:=]\s*(\S+)/gu,
   corte: new RegExp(ETICHETTE_CORTE, 'gu'),
   // «la password su whatsapp, (comunque) è Girasole2024»: il valore dopo la virgola.
-  virgola: new RegExp(`(?<![\\p{L}\\p{N}])(${PW}|${ETICHETTE_CORTE})[^\\n.!?]{0,80}?,\\s*(?:[\\p{L}'’]+\\s+){0,2}?${ANNUNCIO}\\s+(\\S+)`, 'gu'),
+  virgola: new RegExp(`(?<![\\p{L}\\p{N}])(${PW}|${ETICHETTE_CORTE})[^\\n${PUNTI}${PUNTI_CJK}]{0,80}?,\\s*(?:[\\p{L}'’]+\\s+){0,2}?${ANNUNCIO}\\s+(\\S+)`, 'gu'),
 };
 const SOLO_CORTE = new RegExp(`^${ETICHETTE_CORTE}$`, 'u');
 const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
@@ -322,7 +347,7 @@ function formeLibere(testo) {
   const X = exfil();
   const G = guardiano();
   if (!X || !X.segretiDetti) return [];
-  const l = String(testo || '').toLowerCase();
+  const l = minuscolo(testo);
   const valore = (v) => X.segretiDetti(`password ${pulito(v)}`);
   const forma = (v) => (G && G.sembraPassword && formaDiPassword(pulito(v)) ? [{ valore: pulito(v) }] : []);
   const out = [];
@@ -365,7 +390,7 @@ const lunghi = (vs) => vs.map(valoreDi).filter((v) => v.length >= 4);
 // risposta a chi chiede una password, sulle righe dopo la domanda: «Come cambio la password di Gmail? Ordine 1234…» resta.
 function trova(testo, { sotto = false } = {}) {
   const out = [];
-  const l = String(testo == null ? '' : testo).toLowerCase();
+  const l = minuscolo(testo);
   if (!l.trim()) return [];
   try { out.push(...formeLibere(l)); } catch (_) {}
   try {
@@ -381,6 +406,6 @@ function trova(testo, { sotto = false } = {}) {
   return lunghi(out);
 }
 
-global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi };
+global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, minuscolo, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi };
 if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

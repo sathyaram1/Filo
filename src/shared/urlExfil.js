@@ -329,10 +329,35 @@
     return out;
   }
 
+  // I nomi della password nelle altre lingue, con le loro desinenze: un posto solo per la chat (qui e
+  // riservatiNelTesto.js) e per le etichette del pavimento (pavimento.js). Il confine lo porta la lista, perché \b non
+  // vede le lettere fuori dall'ASCII («şifre», «пароль»); le scritture senza spazi non ne hanno. Le desinenze sono
+  // scritte, non una coda di lettere: «Lösenordshanterare» è il gestore, non l'etichetta. Prove:
+  // tests/unit/passwordAltreLingue.test.mjs.
+  // Il punto di domanda greco (U+037E) e la ano teleia (U+0387) stanno fra le lettere greche ma chiudono la parola.
+  const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u037D\\u037F-\\u0386\\u0388-\\u03FF\\u0400-\\u052F\\u1E00-\\u1EFF]';
+  // «parola» è anche l'italiano: il rumeno conta con chi la possiede, col wifi o dopo chi la chiede («care e parola»).
+  // «palabra clave» è la parola chiave; «κωδικός» è ogni codice: il postale e quelli di prodotto o d'ordine restano.
+  const PAROLE_PASSWORD = [
+    'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', '(?<!palabras?\\s+)claves?',
+    'senhas?', 'palavras?-passe', 'wachtwoord(?:en)?', 'has[łl](?:o|a|em|u)', 'parol(?:ă|a\\s+de|ei)',
+    'parola\\s+(?:mea|ta|noastr[ăa]|voastr[ăa]|wi-?fi|wlan|router|re[țţt]elei|contului)',
+    '(?<=(?<![A-Za-z\\u00C0-\\u024F])(?:care\\s+(?:e|este|era)|d[ăa]-mi|trimite-mi|spune-mi|zi-mi|[șşs]tii|ai)\\s+)parola',
+    'parool(?:i|e)?', 'l[öo]senord(?:et|en)?', 'passord(?:et|ene)?', 'adgangskode(?:n|r|rne)?', 'kodeord(?:et)?',
+    'salasan(?:a|an|aa|asi|ani)', 'jelsz(?:[óo]t?|av(?:a|ad|am|ak|at)?)', 'hesl(?:o|a|em|u|e)', 'gesl(?:o|a|om|u)',
+    '[şs][iİı]\\u0307?fre(?:si|yi|n|niz|nizi|ler|m|mi|min|miz|ni|nin)?', 'lozink(?:a|e|u|om|i)', 'slapta[žz]od(?:is|į|žio|i)',
+    'm[ậa]t\\s+kh[ẩa]u', 'kata\\s+(?:sandi|laluan)',
+    '(?<!ταχυδρομικ\\S{0,3}\\s+)κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)(?!\\s+(?:προ[ϊι][οό]ντ|πελ[αά]τ|παραγγελ|κρ[αά]τησ|αποστολ|παρακολο[υύ]θ|εκπτ|[εέ]κπτ|κουπον|προσφορ|ταχυδρομ|αφμ|ειδ))',
+    'συνθηματικ[οόάαύυ]{1,2}',
+  ];
+  // Il russo, l'ucraino, il bulgaro e il serbo declinano troppo per scriverle tutte: lì vale la radice.
+  const RADICI_PASSWORD = ['парол', 'лозинк'];
+  const NOMI_PASSWORD = `(?:(?<!${LETTERA})(?:(?:${PAROLE_PASSWORD.join('|')})(?!${LETTERA})|(?:${RADICI_PASSWORD.join('|')})${LETTERA}*)`
+    + '|密码|密碼|口令|パスワード|暗証番号|비밀번호|패스워드|암호|كلمة\\s+(?:المرور|السر)|סיסמ[הא]|पासवर्ड|รหัสผ่าน|رمز\\s+عبور)';
   // Una password di sole lettere o un PIN di quattro cifre sono parole qualunque: li riconosce la parola che li
   // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
-  const PRESENTA_PASSWORD = /\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\b/g;
+  const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
   const PRESENTA_CODICE = /\b(?:pin|codice|code|combinazione|otp)\b/g;
   const PAROLE_DOPO = 8;
   const RIEMPITIVI = new Set([
@@ -992,6 +1017,6 @@
     DAI_SITI, testoDeiSitiComeAzione, indirizziDelComando, comandoInRete,
     taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
     // Le parole che presentano una password o un codice, come testo: una regex /g condivisa porterebbe con sé lastIndex.
-    PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, codice: PRESENTA_CODICE.source }),
+    PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, codice: PRESENTA_CODICE.source, altreLingue: NOMI_PASSWORD }),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

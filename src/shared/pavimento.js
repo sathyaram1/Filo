@@ -184,14 +184,16 @@
   // Office365», un nome utente, un indirizzo di campo o una riga di codice vicini all'etichetta non sono il valore.
   // Le parole senza la forma di una password («Password: hunter», la cella, la colonna) contano solo da sole al posto del
   // valore, con l'etichetta in testa alla riga o alla cella: «un campo password o carta: …» resta.
-  // Le etichette: anche la password del wifi del router, il codice di accesso e sei lingue straniere.
-  const LATINE = '(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
+  // Le etichette: anche la password del wifi del router, il codice di accesso e le altre lingue, che porta urlExfil.js
+  // (PRESENTA) col loro confine. ETICHETTA_NUDA vale anche attaccata a un prefisso («login_password»).
+  if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
+  const ALTRE_LINGUE = global.SN_URL_EXFIL && global.SN_URL_EXFIL.PRESENTA ? `|${global.SN_URL_EXFIL.PRESENTA.altreLingue}` : '';
+  const NOMI = '(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
     + '|chiave\\s+(?:di\\s+)?(?:rete|sicurezza(?:\\s+di\\s+rete)?|wi-?fi|wpa2?|wlan)|(?:wpa[23]?(?:-psk)?|wi-?fi|wlan|network|security)\\s+key'
-    + '|codice\\s+(?:di\\s+)?(?:accesso|segreto)|mot\\s+de\\s+passe|passwort|kennwort|contrase[ñn]a|senha|wachtwoord|has[łl]o)\\b';
-  const NON_ALTRO = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
-  const ETICHETTA = `\\b${LATINE}${NON_ALTRO}`;
-  // Senza il confine davanti: dentro un nome di campo («login_password») o una parola più lunga.
-  const ETICHETTA_DENTRO = `${LATINE}${NON_ALTRO}`;
+    + '|codice\\s+(?:di\\s+)?(?:accesso|segreto))\\b';
+  const NON_ETICHETTA = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
+  const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE})${NON_ETICHETTA}`;
+  const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE})${NON_ETICHETTA}`;
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
@@ -214,8 +216,8 @@
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
   // In un CSV l'intestazione è un nome di campo, anche col prefisso delle esportazioni («login_password»): al più una
   // parola in più, perché una frase con le virgole («utente, password e premi invio») non apra una colonna.
-  const INTESTAZIONE_CSV = new RegExp(`^(?:[A-Za-z0-9]{1,20}[_.\\s-])?${ETICHETTA_DENTRO}(?:[_.\\s-]?[A-Za-z0-9()]{1,20})?$`, 'i');
-  const NOMINA_ETICHETTA = new RegExp(ETICHETTA_DENTRO, 'i');
+  const INTESTAZIONE_CSV = new RegExp(`^(?:[A-Za-z0-9]{1,20}[_.\\s-])?${ETICHETTA_NUDA}(?:[_.\\s-]?[A-Za-z0-9()]{1,20})?$`, 'i');
+  const NOMINA_ETICHETTA = new RegExp(ETICHETTA_NUDA, 'i');
   // Le parole che una pagina mette accanto all'etichetta senza che siano la password.
   const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|chiedi|chiedila|ask|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or)$/i;
 
@@ -464,7 +466,20 @@
     }
   }
 
+  // I due punti e l'uguale a tutta larghezza («密码：…», «パスワード＝…») valgono i nostri: le regole leggono una copia
+  // della stessa lunghezza, e il valore torna com'è scritto nel testo.
   function passwordAccanto(s, out) {
+    const n = s.replace(/：/g, ':').replace(/＝/g, '=');
+    if (n === s) return etichette(s, out);
+    const qui = [];
+    etichette(n, qui);
+    for (const x of qui) {
+      const v = String(x.valore);
+      const k = Number.isInteger(x.inizio) ? x.inizio : n.indexOf(v);
+      out.push(k >= 0 ? { ...x, valore: s.slice(k, k + v.length) } : x);
+    }
+  }
+  function etichette(s, out) {
     alPostoDelValore(s, out);
     fraseDopo(s, out);
     chiaviDiConfigurazione(s, out);

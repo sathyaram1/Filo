@@ -57,7 +57,7 @@ function pezziOscurati(pezzi, campo, campoDa, sopra = '') {
   const valori = [...new Set([
     ...[base, ...pezzi].flatMap(valoriDi),
     ...(s ? valoriDi(s) : []),
-    ...(aperta ? R.lunghi(R.valoriRisposta(base.slice(0, R.RISPOSTA_MAX).toLowerCase(), aperta.tipo, aperta.chiesta, aperta.data)) : []),
+    ...(aperta ? R.lunghi(R.valoriRisposta(R.minuscolo(base.slice(0, R.RISPOSTA_MAX)),aperta.tipo, aperta.chiesta, aperta.data)) : []),
   ])].sort((x, y) => y.length - x.length);
   const coperti = [];
   for (const valore of valori) for (const m of base.matchAll(formaDi(valore))) coperti.push([m.index - scarto, m.index - scarto + m[0].length]);
