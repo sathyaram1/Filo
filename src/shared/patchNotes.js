@@ -18,6 +18,7 @@
         { testo: 'Nelle righe dei cambi della home e nel segno di spunta sul tuo messaggio, il valore di un\'impostazione scritto da te o scelto da Filo per te sta nel suo riquadro, così non si confonde con le parole di Filo.', segnalazione: [2655, 2657] },
         { testo: 'Quando traduci la pagina, i riquadri incorporati da un sito dove hai spento Filo, come un blocco di commenti, restano com\'erano, e l\'avviso finale dice quale sito è rimasto fuori.', segnalazione: 2656 },
         { testo: 'Il numero di carta o il codice che hai scritto in una bozza resta tuo anche dopo aver chiuso e riaperto Filo: se il sito te la rimette davanti e chiedi aiuto all\'assistente, Filo non lo tratta più come un segreto letto dalla pagina e non lo tiene per un mese fra quelli da non far uscire.', segnalazione: 810 },
+        { testo: 'Con il testo grande o enorme delle Preferenze, il campo in fondo alla home resta largo abbastanza da scriverci: le colonne ai lati si fanno più strette e tutto resta dentro la finestra.', segnalazione: 1551 },
       ],
     },
     {
