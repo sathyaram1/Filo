@@ -138,22 +138,37 @@
     return window.getSelection()?.toString() || '';
   }
 
+  function campoAttivo() {
+    let el = document.activeElement;
+    for (let i = 0; el?.shadowRoot?.activeElement && i < 8; i++) el = el.shadowRoot.activeElement;
+    return el;
+  }
+
   // Come il Taglia del sistema (#1434.2): il testo va negli appunti e lascia il campo con una cancellazione vera, che
-  // Ctrl+Z annulla, in ogni tipo di casella. La selezione è quella catturata all'apertura del menu.
+  // Ctrl+Z annulla, in ogni tipo di casella. La selezione è quella catturata all'apertura del menu, o da Filo alla
+  // richiesta. Un campo coperto (una password) non si taglia da nessuna strada (#1434.3). `{ ok, motivo }`.
   async function cutSelection() {
     deps.restorePasteContext();
+    if (Extract?.segretezza?.(null, campoAttivo())?.coperto) return { ok: false, motivo: 'coperto' };
     const text = testoSelezionatoQui();
-    if (!text) return;
-    if (!(await scriviNegliAppunti(text, htmlDellaSelezione()))) { Popup.showToast(I18n.t('toast_cut_failed')); return; }
+    if (!text) return { ok: false, motivo: 'vuoto' };
+    if (!(await scriviNegliAppunti(text, htmlDellaSelezione()))) { Popup.showToast(I18n.t('toast_cut_failed')); return { ok: false, motivo: 'appunti' }; }
     deps.restorePasteContext();
     let tolto = false;
     try { tolto = document.execCommand('delete'); } catch (_) { tolto = false; }
     const el = document.activeElement;
-    if (tolto || !el?.matches?.('input, textarea') || el.selectionStart == null) return;
+    if (tolto || !el?.matches?.('input, textarea') || el.selectionStart == null) return { ok: true };
     // Un campo che execCommand non tocca: si toglie a mano, senza annullo, piuttosto che lasciare il testo due volte.
     const start = el.selectionStart;
     scriviNellaCasella(el, { start, end: el.selectionEnd }, '', 'deleteByCut');
     try { el.setSelectionRange(start, start); } catch (_) {}
+    return { ok: true };
+  }
+
+  // Una richiesta a Filo agisce su quello che è selezionato adesso: il campo dell'ultimo tasto destro resta in memoria
+  // anche a menu chiuso, e tagliare o modificare lì toglierebbe il testo da un altro campo (#1434.3).
+  function prendiLaSelezioneDiAdesso() {
+    deps.prendiLaSelezioneDiAdesso?.(campoAttivo());
   }
 
   // Il testo che Filo mette nella casella di un sito lo deve contare anche il sito: la regola sta nel correttore (#2052).
