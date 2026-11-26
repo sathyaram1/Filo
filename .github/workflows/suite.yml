@@ -207,6 +207,7 @@ jobs:
             rossi-errori.txt
             verdetto.log
             chiavi-allarme.txt
+            mappa-prove.json
           if-no-files-found: warn
           retention-days: 7
 
