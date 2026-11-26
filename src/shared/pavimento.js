@@ -155,7 +155,8 @@
     const n = [...prima.slice(da).matchAll(NOMI_CODICE)].pop();
     if (!n) return false;
     n.index += da;
-    const fra = prima.slice(n.index + n[0].length);
+    // Una relativa fra virgole non chiude la frase del codice («Der Code, den du erhalten hast, ist 482913»).
+    const fra = prima.slice(n.index + n[0].length).replace(RELATIVA, ' ');
     if (!fra.trim()) return true;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
     if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
