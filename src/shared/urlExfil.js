@@ -336,7 +336,7 @@
   // latino le tiene campiSegreti.js (ETICHETTE_NON_LATINE). Prove: tests/unit/passwordAltreLingue.test.mjs.
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
   const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
-  const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u037D\\u037F-\\u0386\\u0388-\\u03FF\\u0400-\\u052F\\u1E00-\\u1EFF]';
+  const LETTERA = NON_LATINI.LETTERA;
   // «parola» è anche l'italiano: il rumeno conta con chi la possiede, col wifi o dopo chi la chiede («care e parola»).
   // «palabra clave» è la parola chiave.
   const PAROLE_PASSWORD = [
