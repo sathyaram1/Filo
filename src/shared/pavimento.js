@@ -494,13 +494,12 @@
     return k >= 0 ? { valore: v, regola: 'password', inizio: inizioGrezzo + k } : { valore: v, regola: 'password' };
   }
 
-  const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
   // Un'espressione di codice («form.password.value», «process.env.DB_PASSWORD», «input(», «getpass.getpass()») sta al
   // posto di un valore ma non lo è; così il nome di un tipo («password: str», «password: string»).
   const CODICE_SORGENTE = /^(?:[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?|[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\(.*)$/;
   const NOME_DI_TIPO = /^(?:str|string|int|integer|bool|boolean|number|bytes|any|object|char|varchar|text|unknown|void)(?:\[\])?$/i;
   // Un indirizzo o un'email sotto «Reset your password:» ha la forma di una password ma è il link per cambiarla.
-  const INDIRIZZO_O_EMAIL = (v) => /:\/\/|^www\./i.test(v) || EMAIL.test(v);
+  const INDIRIZZO_O_EMAIL = global.SN_GUARDIANO_STATICO.indirizzoOEmail;
   function formaVicina(pezzo) {
     const v = pezzo.replace(/^[:=\-–—→«"'“‘(\[]+/, '').replace(/[.,;:!?)»"'”’\]]+$/, '');
     if (v.length < 6 || v.length > 64 || v.includes(SEGNAPOSTO) || INDIRIZZO_O_EMAIL(v) || CODICE_SORGENTE.test(v)) return '';
@@ -658,7 +657,7 @@
   // Un segreto che non porta il prefisso di un servizio: almeno dodici caratteri senza spazi, con lettere e cifre.
   function formaDiSegreto(grezzo) {
     const v = valoreDiChiave(grezzo);
-    if (!v || v.length < 12 || /\s/.test(v) || /:\/\/|^www\./i.test(v) || EMAIL.test(v)) return '';
+    if (!v || v.length < 12 || /\s/.test(v) || INDIRIZZO_O_EMAIL(v)) return '';
     return /[A-Za-z]/.test(v) && /[0-9]/.test(v) ? v : '';
   }
   function valorePerNome(nome, grezzo) {

@@ -386,8 +386,10 @@
   // Una parola sola, con una lettera e una cifra o un simbolo DENTRO: «Tr7#kq29Lm», «Kx82mPq!». Il segno ai
   // bordi («dimenticata?», «(obbligatoria)», «manager:») è punteggiatura; un indirizzo o una mail non sono password.
   const FORMA_PASSWORD = /^(?=.*[A-Za-z])(?=.*[^A-Za-z])(?=(?:[^A-Za-z0-9]*[A-Za-z0-9]){6})[^\s"'«»“”<>]{6,64}$/;
+  // L'unico posto: anche il pavimento lo chiede qui, così i due cammini non danno esiti diversi sullo stesso testo.
+  const indirizzoOEmail = (v) => /:\/\/|^www\./i.test(v) || /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v);
   function sembraPassword(v) {
-    if (!FORMA_PASSWORD.test(v) || /:\/\/|^www\./i.test(v) || /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v)) return false;
+    if (!FORMA_PASSWORD.test(v) || indirizzoOEmail(v)) return false;
     const nucleo = v.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
     return /\d/.test(nucleo) || /[^A-Za-z0-9]/.test(nucleo);
   }
@@ -745,6 +747,6 @@
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
     segretiNelTesto, segretiInUscita, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
-    sembraPassword, ANNUNCI,
+    sembraPassword, indirizzoOEmail, ANNUNCI,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
