@@ -436,8 +436,12 @@
   // `password" id="pwd1"` quello che segue è di un altro campo.
   const ACCANTO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:：|=\\t?!.,;\\[\\]«»"<>{}$]){0,40}?';
   const ACCANTO_LUNGO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:：|=\\t?!.,;\\[\\]«»"<>{}$]){0,90}?';
+  // La freccia scritta a mano («password -> x», «=>») vale il trattino: anche lei dice il valore solo con la sua forma,
+  // perché «Account -> Password -> Cambia» è un percorso di menu (#2678.7).
+  const FRECCIA = '(?:-{1,2}>|=>|[⇒➔➜])';
+  const UNA_FRECCIA = new RegExp(`^(?:${FRECCIA}|[-–—→])$`);
   // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra.
-  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
+  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*(${FRECCIA}|[:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
   // Il «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
   const VERBO_PASSWORD = `(?:${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO}|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)`;
   const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:[ \\t]+${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
