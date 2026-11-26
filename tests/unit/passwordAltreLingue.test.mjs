@@ -110,6 +110,6 @@ test('il codice postale, quelli di prodotto e la parola chiave spagnola non sono
 
 test('dopo il punto cinese o il punto di domanda greco la frase della risposta è finita', () => {
   // Una parola di sole lettere conta solo nella frase del dato: dopo il punto è il resto del messaggio.
-  assert.equal(risposta('Nyckel2024。明天见', 'Marco: 密码是多少'), `${S}。明天见`);
-  assert.equal(risposta('Nyckel2024. αύριο', 'Marco: πες μου τον κωδικό'), `${S}. αύριο`);
+  assert.equal(risposta('gattonero。 domani arrivo', 'Marco: 密码是多少'), `${S}。 domani arrivo`);
+  assert.equal(risposta('gattonero; αύριο έρχομαι', 'Marco: πες μου τον κωδικό'), `${S}; αύριο έρχομαι`);
 });
