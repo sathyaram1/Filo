@@ -1244,8 +1244,61 @@ export const SOTTOCOMANDI = Object.freeze([
   'contesto', 'sveglia', 'stato', 'schede', 'leggi', 'rapporti', 'rami', 'incroci', 'ordine', 'accendi', 'parallelo',
   'priorita', 'attesa', 'pacchetto', 'nota', 'sblocca', 'archivia', 'taccuino', 'indicazione', 'sveglia-tra',
   'sveglia-togli', 'segnali-letti', 'account', 'routine', 'recap', 'novita', 'chat', 'transizione',
-  'feedback', 'compito', 'domanda', 'domanda-fine', 'registro', 'spesa',
+  'feedback', 'compito', 'domanda', 'domanda-fine', 'registro', 'spesa', 'l5', 'l4', 'bilanci', 'passa',
 ]);
+
+const CAMPI_BILANCI = Object.freeze({ '--cap3': 'cap3', '--cap2': 'cap2', '--cap1': 'cap1', '--tetto': 'tettoVerifiche' });
+
+/** I bilanci da scrivere dalla riga di comando: { dati } (vuoto = lettura) o { errore }. PURA. */
+export function datiBilanci(argv) {
+  const dati = {};
+  for (const [flag, campo] of Object.entries(CAMPI_BILANCI)) {
+    const v = opzione(argv, flag);
+    if (v === undefined) continue;
+    if (!/^\d+$/.test(String(v))) return { errore: `${flag} vuole un numero intero, non «${v}»` };
+    dati[campo] = Number(v);
+  }
+  return { dati };
+}
+
+/** Bilanci e tetto in una riga, con quello che è cambiato. PURA. */
+export function rigaBilanci(x) {
+  const b = (x && x.bilanci) || {};
+  const v = (k) => (b[k] === null || b[k] === undefined ? 'non scritto' : b[k]);
+  const riga = `Bilanci: 3 → ${v('cap3')}, 2 → ${v('cap2')}, 1 → ${v('cap1')}; tetto totale delle verifiche ${v('tettoVerifiche')}.`;
+  if (!Array.isArray(x && x.cambi)) return riga;
+  return x.cambi.length ? `${riga} Cambiati: ${x.cambi.join(', ')} (scritto nel recap).` : `${riga} Niente da cambiare.`;
+}
+
+/** Le richieste L5 dei lavori fidati, una per riga coi file; quelle che restano all'owner lo dicono. PURA. */
+export function righeL5(x) {
+  const righe = [];
+  for (const r of (x && x.richieste) || []) {
+    righe.push(`${r.id}  #${String(r.numero || '').replace(/^#/, '')} (${r.repo}) ${String(r.sha || '').slice(0, 12)} ${r.ramo}: ${(r.controlli || []).join(', ')}`);
+    for (const f of r.file || []) righe.push(`    ${f}`);
+    if (r.fileOltre) righe.push(`    … e altri ${r.fileOltre}`);
+    if (r.allOwner) righe.push(`    resta all'owner: ${r.allOwner.join('; ')}`);
+  }
+  if (!righe.length) righe.push('Nessuna richiesta L5 su lavori fidati a catena pulita.');
+  if (x && x.nonFidate) righe.push(`(${x.nonFidate} su lavori non fidati o a catena sporca: restano all'owner)`);
+  return righe;
+}
+
+/** I controlli di sicurezza bocciati sui lavori fidati, col perché. PURA. */
+export function righeL4(x) {
+  const righe = [];
+  for (const b of (x && x.bocciature) || []) {
+    righe.push(`#${String(b.num || '').replace(/^#/, '')} ${String(b.sha || '(senza commit)').slice(0, 40)} «${b.titolo || ''}»`);
+    if (b.motivo) righe.push(...String(b.motivo).split('\n').map((l) => `    ${l}`));
+  }
+  if (!righe.length) righe.push('Nessun controllo bocciato su lavori fidati a catena pulita.');
+  // La nota l'ha scritta un controllo non fidato: il server manda solo il fatto, e su quei lavori decide l'owner.
+  for (const b of (x && x.soloFatti) || []) {
+    righe.push(`#${String(b.num || '').replace(/^#/, '')}${b.branch ? ` ${b.branch}` : ''}: bocciato, nota scritta da un controllo non fidato, decide l'owner`);
+  }
+  if (x && x.nonFidate) righe.push(`(${x.nonFidate} su lavori non fidati o a catena sporca: restano all'owner)`);
+  return righe;
+}
 
 const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   contesto | sveglia | stato | schede | leggi <N>
@@ -1265,6 +1318,8 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   novita | novita consegna <file.json> | chat [--stampa]
   feedback "<titolo>" - [--priorita P] [--server]   (testo da stdin; --server: il codice sta nel server) | domanda <file.json> | domanda-fine <ruolo> - | --togli
   registro [parole] | spesa
+  l5 | l5 approva <id> | l4 | l4 salta <N> <sha>   (L5 e controllo bocciato: solo lavori fidati a catena pulita)
+  bilanci [--cap3 N] [--cap2 N] [--cap1 N] [--tetto N] | passa <N> [perché]   (giri finiti: fallo passare con un figlio)
   transizione [--applica]                  (solo l'owner: le priorità 2 scendono a 1; senza --applica conta e basta)`;
 
 async function leggiStdin() {
@@ -1283,7 +1338,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
   if (daNpm.nota) console.error(daNpm.nota);
   const argv = daNpm.args.length ? [...argvIn, ...daNpm.args] : argvIn;
   const [cmd, arg] = argv;
-  if (!SOTTOCOMANDI.includes(cmd) || (['leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'compito', 'domanda', 'domanda-fine'].includes(cmd) && !arg)) {
+  if (!SOTTOCOMANDI.includes(cmd) || (['leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'compito', 'domanda', 'domanda-fine', 'passa'].includes(cmd) && !arg)) {
     console.error(USO);
     return 1;
   }
@@ -1613,6 +1668,37 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       return 0;
     }
     case 'spesa': { const r = await chiama(cred, 'spesa'); return esito(r, (x) => righeSpesa(x).join('\n')); }
+    // L4, L5 e giri finiti (#2338): il server li accetta solo da un biglietto pulito, su un lavoro fidato a catena pulita.
+    case 'l5': {
+      if (arg === 'approva') {
+        if (!argv[2]) { console.error('RIFIUTATO: l5 approva <id della richiesta> (l5 la elenca). Non ho scritto niente.'); return 1; }
+        const r = await chiama(cred, 'l5.approva', { id: String(argv[2]) });
+        return esito(r, (x) => `#${String(x.numero || '').replace(/^#/, '')} (${x.repo}): L5 approvata, esito ${x.result || x.esito || 'registrato'}.`);
+      }
+      const r = await chiama(cred, 'l5.elenco');
+      return esito(r, (x) => righeL5(x).join('\n'));
+    }
+    case 'l4': {
+      if (arg === 'salta') {
+        const num = numeroDi(argv[2]);
+        if (!num || !argv[3]) { console.error('RIFIUTATO: l4 salta <N> <sha del commit bocciato> (l4 li elenca). Non ho scritto niente.'); return 1; }
+        const r = await chiama(cred, 'l4.salta', { numero: num, sha: String(argv[3]) });
+        return esito(r, (x) => `#${x.numero}: controllo saltato, esito ${x.esito || 'registrato'}.`);
+      }
+      const r = await chiama(cred, 'l4.elenco');
+      return esito(r, (x) => righeL4(x).join('\n'));
+    }
+    case 'bilanci': {
+      const d = datiBilanci(argv);
+      if (d.errore) { console.error(`RIFIUTATO: ${d.errore}. Non ho scritto niente.`); return 1; }
+      const r = await chiama(cred, 'bilanci', d.dati);
+      return esito(r, rigaBilanci);
+    }
+    case 'passa': {
+      const testo = senzaOpzioni(argv.slice(2)).join(' ').trim();
+      const r = await chiama(cred, 'passa', { numero: numeroDi(arg), ...(testo ? { testo } : {}) });
+      return esito(r, (x) => `#${x.numero} passa al controllo di sicurezza${x.figli && x.figli.length ? `; quello che resta va in ${x.figli.join(', ')}` : ''}.`);
+    }
     default: console.error(USO); return 1;
   }
 }

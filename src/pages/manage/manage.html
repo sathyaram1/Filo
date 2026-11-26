@@ -2861,7 +2861,7 @@
                   Quante volte torna indietro un lavoro che non risolve il problema
                   nella maggior parte dei casi, o che ne porta uno più grave. Finito il
                   bilancio, usa quelli dei livelli sotto; finiti anche quelli, il
-                  lavoro si ferma e decidi tu.
+                  lavoro si ferma e decide il manutentore (tu, se è spento).
                 </p>
                 <div class="mg-auto-field-row">
                   <input type="number" id="mgCap3" class="mg-auto-number"
@@ -2903,6 +2903,21 @@
                     min="0" max="10" step="1" inputmode="numeric" />
                   <button type="button" class="sn-btn" id="mgCap1Save">Salva</button>
                   <span class="mg-action-msg" id="mgCap1Msg" role="status"></span>
+                </div>
+              </section>
+
+              <section class="mg-auto-block" id="mgTettoVerificheBlock">
+                <label class="mg-auto-field-label" for="mgTettoVerifiche">Verifiche in tutto per un lavoro</label>
+                <p class="mg-auto-block-desc">
+                  Contano tutte: quelle passate, quelle dopo un riallineamento e i
+                  verificatori morti. Superato il tetto, il lavoro si ferma come coi
+                  bilanci finiti. Lo cambia anche il manutentore, e lo scrive nel recap.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgTettoVerifiche" class="mg-auto-number"
+                    min="1" max="50" step="1" inputmode="numeric" />
+                  <button type="button" class="sn-btn" id="mgTettoVerificheSave">Salva</button>
+                  <span class="mg-action-msg" id="mgTettoVerificheMsg" role="status"></span>
                 </div>
               </section>
 

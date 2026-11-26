@@ -600,9 +600,19 @@ async function setLavoriServer(on, idToken) {
 const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1'];
 /** La forma di risposta coi bilanci tutti a `null`: un campo che nel documento non c'è resta vuoto. */
 function capsVuoti() {
-  const out = { fixInstructions: '', giroStretto: false };
+  const out = { fixInstructions: '', giroStretto: false, tettoVerifiche: null };
   for (const k of CAP_KEYS) out[k] = null;
   return out;
+}
+
+/** Il tetto totale delle verifiche nel suo intervallo, o null se non è un numero (#2338). */
+function clampTetto(n) {
+  // L'intervallo è quello che il server incorpora (verifierRound.js): un posto solo.
+  if (!globalThis.SN_VERIFIER_ROUND) require('../../shared/verifierRound.js');
+  const { TETTO_MIN: min, TETTO_MAX: max } = globalThis.SN_VERIFIER_ROUND;
+  const v = Math.round(Number(n));
+  if (n === '' || n === null || n === undefined || !Number.isFinite(v)) return null;
+  return Math.min(max, Math.max(min, v));
 }
 const FIX_INSTRUCTIONS_MAX = Number(globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION && globalThis.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
 
@@ -632,6 +642,7 @@ async function getRoutineCaps(idToken) {
   for (const k of CAP_KEYS) {
     if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
   }
+  if (doc && doc.tettoVerifiche != null) out.tettoVerifiche = clampTetto(doc.tettoVerifiche);
   // Spento di serie: solo un true esplicito nel documento lo accende.
   out.giroStretto = !!doc && doc.giroStretto === true;
   if (doc && typeof doc.fixInstructions === 'string') out.fixInstructions = doc.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX);
@@ -652,6 +663,12 @@ async function setRoutineCaps(patch, idToken) {
     fields[k] = toFsValue(v);
     mask.push(k);
   }
+  if (p.tettoVerifiche != null) {
+    const v = clampTetto(p.tettoVerifiche);
+    if (v === null) throw new Error(`tettoVerifiche: serve un numero, non «${String(p.tettoVerifiche)}».`);
+    fields.tettoVerifiche = toFsValue(v);
+    mask.push('tettoVerifiche');
+  }
   if (typeof p.fixInstructions === 'string') {
     fields.fixInstructions = toFsValue(p.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX));
     mask.push('fixInstructions');
@@ -667,7 +684,7 @@ async function setRoutineCaps(patch, idToken) {
     // Scritto ma non riletto: un salvataggio riuscito non deve sembrare fallito. Tornano i soli campi scritti.
     if (!mask.length) throw e;
     const scritto = capsVuoti();
-    for (const k of mask) scritto[k] = k === 'fixInstructions' ? p[k].slice(0, FIX_INSTRUCTIONS_MAX) : (k === 'giroStretto' ? p[k] : clampCap(p[k]));
+    for (const k of mask) scritto[k] = k === 'fixInstructions' ? p[k].slice(0, FIX_INSTRUCTIONS_MAX) : (k === 'giroStretto' ? p[k] : k === 'tettoVerifiche' ? clampTetto(p[k]) : clampCap(p[k]));
     return scritto;
   }
 }

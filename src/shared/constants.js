@@ -160,6 +160,7 @@
     AUTOMATION_CAP3: 'filo_automation_cap3', // giri per i rilievi di livello 3
     AUTOMATION_CAP2: 'filo_automation_cap2', // giri per i rilievi di livello 2
     AUTOMATION_CAP1: 'filo_automation_cap1', // giri per i rilievi di livello 1
+    AUTOMATION_TETTO_VERIFICHE: 'filo_automation_tetto_verifiche', // verifiche in tutto prima che si decida (#2338)
   };
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
@@ -174,6 +175,9 @@
     // ferma subito la pratica.
     CAP_MIN: 0,
     CAP_MAX: 10,
+    // Il tetto totale delle verifiche di un lavoro (`tettoVerifiche`, #2338): almeno una; lo stesso intervallo del server.
+    TETTO_VERIFICHE_MIN: 1,
+    TETTO_VERIFICHE_MAX: 50,
     // Quante sessioni delle routine possono lavorare insieme (config/routines,
     // campo `maxSessions`). Intervallo SUO, non quello dei bilanci qui sopra:
     // uno zero sarebbe un interruttore master di nascosto, e quello esiste già.

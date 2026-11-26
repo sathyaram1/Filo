@@ -697,6 +697,42 @@ test('un feedback a priorità 3 non si archivia come doppione, se non di un\'alt
   assert.deepEqual(s.corpi.filter((c) => c.op === 'archivia').map((c) => c.dati), [{ numero: '815', doppioneDi: '700' }, { numero: '812', doppioneDi: '701' }]);
 });
 
+test('#2338: l5, l4, bilanci e passa chiamano le operazioni del server coi campi loro, e gli storti non partono', async (t) => {
+  const s = serverFinto(t, {
+    'l5.elenco': [200, { ok: true, richieste: [{ id: 'r1', numero: '#900', repo: 'server', ramo: 'worker/x', sha: 'a'.repeat(40), controlli: ['guard_the_guards'], file: ['functions/src/routine/deliver.js'], allOwner: ['.github/workflows/deploy.yml (le automazioni di filo-security)'] }], nonFidate: 2 }],
+    'l5.approva': [200, { ok: true, numero: '#900', repo: 'app', result: 'merged' }],
+    'l4.elenco': [200, { ok: true, bocciature: [{ num: '#901', sha: 'b'.repeat(40), titolo: 'Un titolo', motivo: 'Riga uno.\nRiga due.' }], soloFatti: [{ num: '#903', branch: 'worker/y', nonFidato: true }] }],
+    'l4.salta': [200, { ok: true, numero: '901', esito: 'attesa_unit' }],
+    bilanci: (b) => [200, { ok: true, bilanci: Object.assign({ cap3: 3, cap2: 1, cap1: 0, tettoVerifiche: 6 }, b.dati), ...(Object.keys(b.dati || {}).length ? { cambi: Object.keys(b.dati) } : {}) }],
+    passa: [200, { ok: true, numero: '902', figli: ['#902.1'] }],
+  });
+  assert.equal(await M.main(['l5'], CHIAVE), 0);
+  assert.equal(await M.main(['l5', 'approva', 'r1'], CHIAVE), 0);
+  assert.equal(await M.main(['l4'], CHIAVE), 0);
+  assert.equal(await M.main(['l4', 'salta', '901', 'b'.repeat(40)], CHIAVE), 0);
+  assert.equal(await M.main(['bilanci'], CHIAVE), 0);
+  assert.equal(await M.main(['bilanci', '--cap3', '4', '--tetto', '8'], CHIAVE), 0);
+  assert.equal(await M.main(['passa', '902', 'resta', 'un', 'caso', 'raro'], CHIAVE), 0);
+  assert.deepEqual(s.corpi.map((c) => [c.op, c.dati]), [
+    ['l5.elenco', {}], ['l5.approva', { id: 'r1' }], ['l4.elenco', {}], ['l4.salta', { numero: '901', sha: 'b'.repeat(40) }],
+    ['bilanci', {}], ['bilanci', { cap3: 4, tettoVerifiche: 8 }], ['passa', { numero: '902', testo: 'resta un caso raro' }],
+  ]);
+  const out = s.out.join('\n');
+  assert.match(out, /r1 {2}#900 \(server\) aaaaaaaaaaaa worker\/x: guard_the_guards\n {4}functions\/src\/routine\/deliver\.js\n {4}resta all'owner: \.github/);
+  assert.match(out, /\(2 su lavori non fidati o a catena sporca: restano all'owner\)/);
+  assert.match(out, /#901 b{40} «Un titolo»\n {4}Riga uno\.\n {4}Riga due\./);
+  // Una bocciatura con la nota di un controllo non fidato: il fatto soltanto, e decide l'owner.
+  assert.match(out, /#903 worker\/y: bocciato, nota scritta da un controllo non fidato, decide l'owner/);
+  assert.match(out, /Bilanci: 3 → 4, 2 → 1, 1 → 0; tetto totale delle verifiche 8\. Cambiati: cap3, tettoVerifiche \(scritto nel recap\)\./);
+  assert.match(out, /#902 passa al controllo di sicurezza; quello che resta va in #902\.1\./);
+  const n = s.corpi.length;
+  assert.equal(await M.main(['l5', 'approva'], CHIAVE), 1);
+  assert.equal(await M.main(['l4', 'salta', '901'], CHIAVE), 1);
+  assert.equal(await M.main(['bilanci', '--tetto', 'tanti'], CHIAVE), 1);
+  assert.equal(await M.main(['passa'], CHIAVE), 1);
+  assert.equal(s.corpi.length, n);
+});
+
 test('i comandi scrivono le operazioni del server coi campi suoi', async (t) => {
   const s = serverFinto(t, {
     ordine: (b) => [200, { ok: true, ...b.dati, parallelismoEffettivo: 4 }],
@@ -825,7 +861,7 @@ test('il redattore: una riga tiene la segnalazione delle righe lette, e la conse
 });
 
 test('il ruolo nomina solo sottocomandi che lo script accetta, e lo script li elenca tutti nel ruolo', () => {
-  const nominati = [...RUOLO.matchAll(/npm run manutentore -- ([a-z-]+)/g)].map((m) => m[1]);
+  const nominati = [...RUOLO.matchAll(/npm run manutentore -- ([a-z0-9-]+)/g)].map((m) => m[1]);
   const fuori = nominati.filter((c) => !M.SOTTOCOMANDI.includes(c));
   assert.deepEqual([...new Set(fuori)], [], 'sottocomandi nel ruolo che lo script non conosce');
   const strumenti = RUOLO.slice(RUOLO.indexOf('## Gli strumenti'));

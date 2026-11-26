@@ -50,6 +50,10 @@
   const mgCap1     = document.getElementById('mgCap1');
   const mgCap1Save = document.getElementById('mgCap1Save');
   const mgCap1Msg  = document.getElementById('mgCap1Msg');
+  // Il tetto totale delle verifiche di un lavoro (#2338): superato, decide il manutentore come coi bilanci finiti.
+  const mgTettoVerifiche     = document.getElementById('mgTettoVerifiche');
+  const mgTettoVerificheSave = document.getElementById('mgTettoVerificheSave');
+  const mgTettoVerificheMsg  = document.getElementById('mgTettoVerificheMsg');
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
@@ -379,6 +383,7 @@
   const CAP3_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP3) || 'filo_automation_cap3';
   const CAP2_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP2) || 'filo_automation_cap2';
   const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
+  const TETTO_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_TETTO_VERIFICHE) || 'filo_automation_tetto_verifiche';
   const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10 };
   // Nessun default dei bilanci nel codice: i numeri stanno solo nel documento del server; un
   // campo che lì non c'è si mostra vuoto, e lo si dice.
@@ -680,7 +685,7 @@
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgRiservatiSwitch) mgRiservatiSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
-    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save,
+    for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgTettoVerifiche, mgTettoVerificheSave,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgRiservati, mgRiservatiTetto, mgRiservatiTettoSave,
       mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...mgUnitWindowsRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
@@ -698,11 +703,11 @@
   // Li applica il SERVER quando registra la critica; chrome.storage.local è
   // solo una CACHE per mostrare subito un valore (e un ripiego offline).
   // Nel range, o null se non è un numero (un campo vuoto non è uno zero).
-  function clampCap(n, min = AUTOMATION.CAP_MIN) {
+  function clampCap(n, min = AUTOMATION.CAP_MIN, max = AUTOMATION.CAP_MAX) {
     if (n === '' || n === null || n === undefined) return null;
     n = Math.round(Number(n));
     if (!Number.isFinite(n)) return null;
-    return Math.min(AUTOMATION.CAP_MAX, Math.max(min, n));
+    return Math.min(max, Math.max(min, n));
   }
 
   const CAPS_GET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_GET) || 'automation_caps_get';
@@ -714,6 +719,11 @@
     cap3: { input: mgCap3, save: mgCap3Save, msg: mgCap3Msg, cacheKey: CAP3_KEY, min: AUTOMATION.CAP_MIN },
     cap2: { input: mgCap2, save: mgCap2Save, msg: mgCap2Msg, cacheKey: CAP2_KEY, min: AUTOMATION.CAP_MIN },
     cap1: { input: mgCap1, save: mgCap1Save, msg: mgCap1Msg, cacheKey: CAP1_KEY, min: AUTOMATION.CAP_MIN },
+    // Il tetto totale accanto ai bilanci (#2338): stesso meccanismo, intervallo suo.
+    tettoVerifiche: {
+      input: mgTettoVerifiche, save: mgTettoVerificheSave, msg: mgTettoVerificheMsg, cacheKey: TETTO_KEY,
+      min: AUTOMATION.TETTO_VERIFICHE_MIN, max: AUTOMATION.TETTO_VERIFICHE_MAX,
+    },
   };
 
   function setCapMsg(field, text, kind) {
@@ -743,19 +753,19 @@
       if (!f.input) continue;
       let val = null;
       if (remote[field] != null) {
-        val = clampCap(remote[field], f.min);
+        val = clampCap(remote[field], f.min, f.max);
         if (val !== null) chrome.storage.local.set({ [f.cacheKey]: val }).catch(() => {});
       } else if (!lettoDalServer) {
         // Ripiego sulla cache locale (non admin / offline).
         try {
           const data = await chrome.storage.local.get(f.cacheKey);
-          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.min);
+          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.min, f.max);
         } catch (_) {}
       }
       // Sul server manca: si mostra vuoto e si dice. Senza questo numero la
       // verifica (server e locale) si ferma con un errore, non usa un default.
       f.input.value = val === null ? '' : String(val);
-      if (val === null && lettoDalServer) setCapMsg(field, 'Non impostato sul server: scrivi un numero (0 compreso) e salva.', 'err');
+      if (val === null && lettoDalServer) setCapMsg(field, `Non impostato sul server: scrivi un numero${f.min === 0 ? ' (0 compreso)' : ''} e salva.`, 'err');
       else if (val !== null) setCapMsg(field, '', null);
     }
     if (mgFixInstructions && typeof remote.fixInstructions === 'string') mgFixInstructions.value = remote.fixInstructions;
@@ -774,9 +784,9 @@
     // Un campo vuoto non è uno zero (per il livello 3 lo 0 ferma il lavoro
     // al primo rilievo) e non è nemmeno «torno al default»: un default non
     // c'è più (2026-09-16). Vuoto = non si salva, e la scritta lo dice.
-    const val = clampCap(f.input.value, f.min);
+    const val = clampCap(f.input.value, f.min, f.max);
     if (val === null) {
-      setCapMsg(field, 'Vuoto o non numerico: non salvato. Scrivi un numero, 0 compreso.', 'err');
+      setCapMsg(field, `Vuoto o non numerico: non salvato. Scrivi un numero${f.min === 0 ? ', 0 compreso' : ''}.`, 'err');
       return;
     }
     f.input.value = String(val); // normalizza eventuali fuori-range
@@ -789,7 +799,7 @@
         if (r?.error) console.error(`[manage] salvataggio ${field}:`, r.error);
         return;
       }
-      const confermato = clampCap(r[field] != null ? r[field] : val, f.min);
+      const confermato = clampCap(r[field] != null ? r[field] : val, f.min, f.max);
       const saved = confermato === null ? val : confermato;
       f.input.value = String(saved);
       chrome.storage.local.set({ [f.cacheKey]: saved }).catch(() => {});
@@ -1408,7 +1418,7 @@
   for (const f of Object.values(CAP_FIELDS)) {
     if (!f.input) continue;
     f.input.min = String(Number.isFinite(f.min) ? f.min : AUTOMATION.CAP_MIN);
-    f.input.max = String(AUTOMATION.CAP_MAX);
+    f.input.max = String(Number.isFinite(f.max) ? f.max : AUTOMATION.CAP_MAX);
   }
   function clampJudgeTimeoutS(n) {
     const v = Math.round(Number(n));

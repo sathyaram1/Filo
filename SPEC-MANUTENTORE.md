@@ -32,9 +32,17 @@ assente o senza l'elenco dopo aver scritto, ritira la fiducia a tutto quello
 che la sessione ha scritto), anche quando la sessione chiude senza un rilascio
 vivo o non chiude affatto. La tenuta la prova
 `functions/test/manutentore-tenuta-2337.test.js` di filo-security, che chiama
-ogni sua operazione con dati non fidati. Non scrive codice, non fonde, non
-approva L5. Scrive ordini che il server applica e apre feedback che le routine
-lavorano.
+ogni sua operazione con dati non fidati. Non scrive codice e non fonde. Scrive
+ordini che il server applica e apre feedback che le routine lavorano. Dal #2338
+(decisione dell'owner dell'08/11) approva L5 e salta un controllo di sicurezza
+bocciato sui lavori fidati a catena pulita, solo dal suo biglietto pulito; i
+workflow di filo-security, i segreti e le regole dei rami, gli ambienti e i
+prompt delle sessioni, le chiavi e i lavori a catena sporca restano all'owner.
+Una regola sola su chi decide, per le quattro operazioni (L5, L4, `passa`,
+bilanci e tetto) e per i loro elenchi: il biglietto pulito del manutentore, mai
+un biglietto sporco né una chiave. La nota di un controllo bocciato porta la
+fiducia di chi l'ha scritta: scritta da un non fidato, al manutentore arriva il
+solo fatto (numero e ramo) e su quel lavoro decide l'owner.
 
 Modello: **Opus** a sforzo high (scelta dell'owner del 4 novembre: Fable
 consuma più in fretta il limite settimanale, quello che ferma le routine, e ha
@@ -104,11 +112,19 @@ Può, da solo e senza passare dall'owner:
 - fare **esperimenti** dal vivo entro i paletti del § 6;
 - chiedere ai worker **dati nuovi** (registrazioni al rilascio), via feedback;
 - riscrivere le **novità** prima di un rilascio (§ 8);
-- cambiare la domanda di fine turno dei ruoli.
+- cambiare la domanda di fine turno dei ruoli;
+- approvare **L5** e saltare un **controllo di sicurezza bocciato** (L4) su un
+  lavoro fidato a catena pulita, dal suo biglietto pulito (#2338);
+- scrivere i **bilanci** per livello e il **tetto totale delle verifiche**
+  (`tettoVerifiche` in `config/routines`, si parte da 6): ogni cambio il server
+  lo scrive nel recap;
+- decidere sui lavori coi **giri finiti** (bilanci finiti o tetto superato):
+  riaprirli con una nota, farli passare con un figlio per ciò che resta
+  (`passa`), o, come ultima risorsa, una domanda all'owner. Col manutentore
+  spento decide l'owner, come prima.
 
-Non può: scrivere codice, fondere, approvare L5, rispondere alle domande
-dell'owner (quelle di processo dei worker sì: § 4), alzare il freno
-d'emergenza.
+Non può: scrivere codice, fondere, rispondere alle domande dell'owner (quelle
+di processo dei worker sì: § 4), alzare il freno d'emergenza.
 
 ## 4. Ritmo: una decisione al giorno, e sveglie
 
@@ -144,7 +160,8 @@ giorno. Si accende:
   deploy, suite, domande di processo;
 - a una **sveglia del server** al segnale, senza aspettare il battito: guasto
   dichiarato, deploy del server rosso, suite rossa su main, accensione nata
-  morta, domanda di processo di un worker, richiesta dell'owner dalla chat;
+  morta, domanda di processo di un worker, richiesta dell'owner dalla chat,
+  richiesta L5 o controllo bocciato su un lavoro fidato a catena pulita;
 - **quando segue un problema**, più spesso: chiede lui al server la prossima
   sveglia (minimo 5 minuti), e il pacemaker la rispetta con un tetto suo,
   separato da quello del lavoro.
