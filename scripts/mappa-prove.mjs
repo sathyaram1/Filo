@@ -113,7 +113,10 @@ export function leggiMappa({ file = '', corsa = '', root = ROOT } = {}) {
     let registro = '';
     try { registro = gh(['api', `repos/${repo}/actions/jobs/${verdetto.id}/logs`]); } catch (_) { continue; }
     const m = mappaDaRegistro(registro);
-    if (m.errore) continue;
+    if (m.errore) {
+      try { mkdirSync(cache, { recursive: true }); writeFileSync(senza, m.errore); } catch (_) {}
+      continue;
+    }
     try { mkdirSync(cache, { recursive: true }); writeFileSync(copia, JSON.stringify(m.mappa)); } catch (_) {}
     return { mappa: m.mappa, fonte: `corsa ${id}` };
   }
