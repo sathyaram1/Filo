@@ -231,10 +231,12 @@
       LETTERA, ANNUNCI_ATTACCATI, FINE_VALORE, APRE_VALORE };
   }
 
-  // Il testo della regola delle etichette del pavimento, da passare a `crea`: una lista sola per campi e testo.
+  // Il testo delle regole delle etichette e dei nomi del CVV del pavimento, da passare a `crea`: una lista sola per
+  // campi e testo.
   function etichette() {
     if (!global.SN_PAVIMENTO && typeof require === 'function') { try { require('./pavimento.js'); } catch (_) {} }
-    return (global.SN_PAVIMENTO && global.SN_PAVIMENTO.ETICHETTE) || '';
+    const P = global.SN_PAVIMENTO || {};
+    return [P.ETICHETTE, P.CVV_ALTRE_LINGUE].filter(Boolean).join('|');
   }
 
   // Il testo a schermo che ripete il valore di un campo segreto (#810.16), come l'anteprima della carta che si compone
