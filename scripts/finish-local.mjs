@@ -483,14 +483,38 @@ export function motivoDellaScelta({ changed = [], soloCommenti = [], troppoLargh
  * lanciano un modulo cambiato (#2551). Con loro i file che non scelgono perché cambiano solo nei commenti, e i moduli
  * usati da troppi spec per lanciarli tutti.
  */
-export function specDellaScelta({ changed, base, root = ROOT }) {
+export function specDellaScelta({ changed, base, root = ROOT, mappa = null }) {
   // `ls-files` e filtro in memoria: `--error-unmatch` stampava un errore per ogni spec inesistente, e sembrava un guasto.
   const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: root }).out.split('\n').filter(Boolean));
   const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root });
   const veri = changed.filter((f) => !soloCommenti.includes(f));
   const perUso = specCheUsano(veri, leggiSorgenti(root));
-  const specs = [...new Set([...specsForChangedFiles(veri, [...tracked]), ...perUso.specs])].filter((s) => tracked.has(`${s}.spec.mjs`));
-  return { specs, soloCommenti, troppoLarghi: perUso.troppoLarghi };
+  // Coi file che la mappa della suite conosce sceglie lei, dalle righe cambiate (#2502); gli altri (nuovi, test,
+  // script) restano alla scelta per area e nome.
+  const dallaMappa = mappa ? sceltaDallaMappa({ mappa, file: veri.filter((f) => mappa.file[f]), base, root }) : null;
+  const perArea = veri.filter((f) => !(dallaMappa && mappa.file[f]));
+  const esatte = dallaMappa ? veri.flatMap((f) => (mappa.file[f] ? PROVE_DI_CHI_DECIDE.get(f) || [] : [])).map((p) => `tests/${p}`) : [];
+  const specs = [...new Set([...specsForChangedFiles(perArea, [...tracked]), ...esatte, ...(dallaMappa?.specs || []), ...perUso.specs])].filter((s) => tracked.has(`${s}.spec.mjs`));
+  return { specs, soloCommenti, troppoLarghi: perUso.troppoLarghi, mappa: dallaMappa };
+}
+
+/**
+ * Gli spec della mappa per le righe che il ramo cambia in `file`: si lanciano quelli che passano dalle funzioni
+ * cambiate; quelli che caricano soltanto i file si elencano, e li corre la suite su main (#2502).
+ */
+export function sceltaDallaMappa({ mappa, file, base, root = ROOT }) {
+  if (!file.length) return { specs: [], soloCaricano: [], nota: '' };
+  const mb = git(['merge-base', base, 'HEAD'], { cwd: root });
+  const primaDi = mb.ok ? mb.out.trim() : base;
+  const diff = git(['diff', '-U0', '--no-color', '--no-ext-diff', primaDi, '--', ...file], { cwd: root }).out;
+  const { cambi, nota } = cambiDelDiff({ diff, primaDi, commitMappa: mappa.commit, root });
+  const { prove } = proveDelCambio(mappa, cambi);
+  const togli = (s) => s.replace(/\.spec\.mjs$/, '');
+  return {
+    specs: prove.filter((p) => p.livello === 'funzione').map((p) => togli(p.spec)),
+    soloCaricano: prove.filter((p) => p.livello === 'file').map((p) => togli(p.spec)),
+    nota,
+  };
 }
 
 /**
