@@ -104,6 +104,8 @@ test('la password data a chi la chiede in francese, tedesco, spagnolo, portoghes
     assert.equal(risposta('Gatto2024', sopra).nuovo, '[dato riservato]', sopra);
     assert.equal(risposta('certo, gattonero', sopra).nuovo, 'certo, [dato riservato]', sopra);
   }
+  assert.equal(risposta('volontiers, gattonero', domande[0]).nuovo, 'volontiers, [dato riservato]');
+  assert.equal(risposta('natürlich: Gatto2024', domande[2]).nuovo, 'natürlich: [dato riservato]');
   // Senza il nome della password la stessa frase non chiede niente.
   assert.equal(R.oscura('Marco: tu peux venir demain ?\nLuc: Gatto2024'), 'Marco: tu peux venir demain ?\nLuc: Gatto2024');
   assert.equal(risposta('certo, gattonero', 'Marco: gib mir das Buch').nuovo, 'certo, gattonero');
