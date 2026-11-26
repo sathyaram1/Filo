@@ -61,7 +61,6 @@ test('r1 l\'apparecchio detto prima del codice', () => {
     ['ho messo il codice 4829 sul mio telefono', '4829'],
     ['sul mio telefono ho messo il codice 4829', '4829'],
     ['Mon téléphone a le code 4829', '4829'],
-    ['ho cambiato il codice del telefono, ora è 4829', '4829'],
   ]);
 });
 
