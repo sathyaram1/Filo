@@ -11,6 +11,7 @@ const GRUPPI_DI_CARTA = /(?<![\p{L}\p{N}])\d{4}(?: \d{4})+(?![\p{L}\p{N}])/gu;
 const SOPRA_MAX = 1500;
 
 const RT = () => globalThis.SN_RISERVATI_TESTO || require('../../shared/riservatiNelTesto.js');
+const PAV = () => globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
 
 function riservati(testo) {
   const G = globalThis.SN_GUARDIANO_STATICO;
