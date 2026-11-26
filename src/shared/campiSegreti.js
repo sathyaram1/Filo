@@ -6,8 +6,8 @@
   'use strict';
 
   // `cartaValida(testo)`: il riconoscimento del numero di carta, quello di SN_GUARDIANO_STATICO. `ricorda`: solo chi
-  // resta nella pagina (il content script), non la misura usa e getta del main. `etichette`: i nomi della password e
-  // della chiave del wifi in tutte le lingue, quelli del testo (vedi etichette() qui sotto): `crea` gira anche dove
+  // resta nella pagina (il content script), non la misura usa e getta del main. `etichette`: i nomi della password,
+  // della chiave del wifi e del CVV in tutte le lingue, quelli del testo (vedi etichette() qui sotto): `crea` gira anche dove
   // pavimento.js non c'è, e li riceve come testo.
   function crea(win, cartaValida, { ricorda = false, etichette = '' } = {}) {
     const doc = win.document;
