@@ -163,8 +163,8 @@
   // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
   const CODA = 400;
   const RELATIVA = /^\s*,\s*(?:den|die|das|der|dem|welche[nmrs]?|che|which|that|que|qui|kt[óo]r\p{L}*)\s[^,;!?\n\d]{1,40},/iu;
-  const SENZA_VIRGOLETTA = new RegExp(`[${APERTE}][ \\t]*$`);
-  const DOPO_VIRGOLETTA = new RegExp(`^[ \\t]*[${CHIUSE}]`);
+  const SENZA_VIRGOLETTA = new RegExp(`(?:${INTORNO_APERTE}[ \\t]*)+$`);
+  const DOPO_VIRGOLETTA = new RegExp(`^(?:[ \\t]*${INTORNO_CHIUSE})+`);
   function alPostoDelCodice(z, m, inTesta, forte) {
     const prima = z.slice(0, m.index).replace(SENZA_VIRGOLETTA, '');
     if (inTesta) return !prima.trim();
