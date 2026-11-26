@@ -627,7 +627,8 @@
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
-    return out.filter((x) => x.valore && String(x.valore).length >= 3);
+    return out.filter((x) => x.valore).map((x) => (s === vero ? x : nelTestoVero(x, vero)))
+      .filter((x) => String(x.valore).length >= 3);
   }
 
   // Le password scritte a mano (la risposta sotto chi la chiede, «Utente / Password: mario / …», dopo il nome della rete):
