@@ -81,7 +81,8 @@ const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
-  'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks', 'ecco']);
+  'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks', 'ecco',
+  'volontiers', 'voilà', 'voila', 'tiens', 'natürlich', 'gerne', 'bitte', 'claro', 'aquí', 'aqui']);
 // Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero»): l'elenco del filtro delle
 // pagine, che il correttore chiama nello stesso giro.
 const ANNUNCI = guardiano().ANNUNCI;
