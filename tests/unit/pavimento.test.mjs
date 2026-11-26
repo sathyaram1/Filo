@@ -358,7 +358,7 @@ test('il codice del proprio telefono non esce con le parole in più che si metto
     'Il prezzo del mio telefono è 300 euro, quello del mio pc è 1200 euro', 'Ho sbloccato il mio telefono nel 2019', '71024 è il codice IMEI del mio telefono',
     '71025 is the serial code of my phone', '71023 è il numero del mio telefono', 'il codice del mio telefono, modello 71032',
     'Il codice del mio telefono cliente è 71027', 'Per sbloccare il mio telefono uso l\'impronta, il modello è 71020',
-  ]) assert.ok(/\d{4}$|\d{4} euro$|\d{4}\b/.test(alModello(t)) && alModello(t) === t.replace('1111', P.SEGNAPOSTO), t);
+  ]) assert.equal(alModello(t), t.replace('1111', P.SEGNAPOSTO), t);
 });
 
 test('in tedesco il codice annunciato al futuro, dopo una relativa o con lo scopo non esce', () => {
