@@ -84,7 +84,7 @@ test('la mappa passa dal registro e torna uguale, anche coi tempi di GitHub dava
   const righe = righeDellaMappa(m).map((r) => `2026-11-26T00:00:00.1234567Z ${r}`);
   const letta = mappaDaRegistro(['altro', ...righe, 'altro ancora'].join('\n'));
   assert.deepEqual(letta.mappa, m);
-  assert.match(mappaDaRegistro(righe.slice(1).join('\n')).errore || '', /manca il pezzo 1/);
+  assert.match(mappaDaRegistro('[mappa-prove] 2/2 abc').errore || '', /manca il pezzo 1 di 2/);
   assert.match(mappaDaRegistro('niente').errore, /nessuna riga/);
 });
 
