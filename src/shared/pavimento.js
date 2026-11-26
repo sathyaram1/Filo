@@ -175,16 +175,13 @@
   const RELATIVA = /^\s*,\s*(?:den|die|das|der|dem|welche[nmrs]?|che|which|that|que|qui|kt[óo]r\p{L}*)\s[^,;!?\n\d]{1,40},/iu;
   const SENZA_VIRGOLETTA = new RegExp(`(?:${INTORNO_APERTE}[ \\t]*)+$`);
   const DOPO_VIRGOLETTA = new RegExp(`^(?:[ \\t]*${INTORNO_CHIUSE})+`);
-  // `risposta`: la riga sotto la domanda, dove il codice può venire dopo «certo,» e, in una conversazione copiata, dopo
-  // chi scrive («Marco: qual è il pin?» / «Luc: 4821», #2692).
+  // `risposta`: la riga sotto, dopo chi scrive (`testa`). Sotto chi chiede il codice vale ogni punto del messaggio,
+  // come per la password («Luc: è sempre 4821», #2692); sotto una riga che lo nomina e basta, solo la testa.
   function alPostoDelCodice(z, m, inTesta, forte, risposta) {
     const prima = z.slice(0, m.index).replace(SENZA_VIRGOLETTA, '');
     if (inTesta) {
-      const R = riservati();
-      if (!prima.trim()) return true;
-      if (!risposta || !R) return false;
-      const parla = risposta.chat ? R.parlaInChat(prima) : null;
-      return R.apreLaRisposta(parla ? parla.resto : prima);
+      if (!risposta) return !prima.trim();
+      return m.index >= risposta.testa && (risposta.chiesto || !prima.slice(risposta.testa).trim());
     }
     if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length).replace(DOPO_VIRGOLETTA, ''))) return true;
     const da = Math.max(0, prima.length - CODA);
