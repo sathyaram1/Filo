@@ -672,6 +672,22 @@ test('#2678: la frase-password fra virgolette esce intera qualunque parola la ap
     'la password "Recupera accesso" non va']) assert.equal(P.oscura(riga), riga);
 });
 
+test('#2689: fra parentesi PIN, CVV e codici escono come senza, con le parentesi intorno al segnaposto', () => {
+  for (const [riga, atteso] of [
+    ['il PIN è (4821)', `il PIN è (${S})`], ['il PIN è («4821»)', `il PIN è («${S}»)`], ['il CVV è (123)', `il CVV è (${S})`],
+    ['il codice è (482913)', `il codice è (${S})`], ['il PIN: (4821)', `il PIN: (${S})`], ['CVV (123)', `CVV (${S})`],
+    ['il PIN è [4821]', `il PIN è [${S}]`], ['il CVV è [123]', `il CVV è [${S}]`], ['il codice è [482913]', `il codice è [${S}]`],
+    ['il codice è ( 482913 )', `il codice è ( ${S} )`], ['il pin è ( « 4821 » )', `il pin è ( « ${S} » )`],
+    ['Il PIN è "(4821)"', `Il PIN è "(${S})"`], ['il codice è («482913»).', `il codice è («${S}»).`],
+    ['Il codice del cancello è (4829)', `Il codice del cancello è (${S})`], ['Inserisci il codice (615204)', `Inserisci il codice (${S})`],
+    ['Telegram code: (48291)', `Telegram code: (${S})`], ['(482913) è il tuo codice', `(${S}) è il tuo codice`],
+    ['Use (337164) to verify', `Use (${S}) to verify`], ['il PIN è (4821) e il CVV è (123)', `il PIN è (${S}) e il CVV è (${S})`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const riga of ['Il codice cliente è (482913)', 'Codice prodotto (482913)', 'Il codice è (2024)', 'il PIN è (12)',
+    'Il PIN (4 cifre) va scelto', 'if (pin < 1000) return', 'il CVV è (123/2)', 'Chiama (02) 4829 1736 per il codice',
+    'nel 2024 (482913 utenti)']) assert.equal(P.oscura(riga), riga);
+});
+
 // #1403.5 — un'etichetta fuori dall'alfabeto latino annuncia la password come «Password:». Una per ogni alternativa
 // della lista di urlExfil.js, che vale per il testo e per i campi dei moduli.
 const ETICHETTE_NON_LATINE = ['пароль', 'Пароль', 'ПАРОЛЬ', 'пароля', 'лозинка', 'κωδικός', 'ΚΩΔΙΚΟΣ',
