@@ -1026,7 +1026,10 @@ async function main() {
     const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT), root: albero.dir }) : { changed: [], nota: '' };
     if (scelta.nota) console.log(`\n${scelta.nota}`);
     const changed = scelta.changed;
-    const { specs, soloCommenti, troppoLarghi } = specDellaScelta({ changed, base, root: albero.dir });
+    const letta = changed.length ? leggiMappa({ file: process.env.FILO_MAPPA_PROVE || '', root: albero.dir }) : null;
+    const { specs, soloCommenti, troppoLarghi, mappa: daMappa } = specDellaScelta({ changed, base, root: albero.dir, mappa: letta?.mappa || null });
+    const rigaMappa = testoDellaMappa({ letta, daMappa });
+    if (rigaMappa) console.log(`\n${rigaMappa}`);
     // Il riallineamento senza file risolti l'ha già detto nella sua nota.
     const motivo = spec.rilancia && (changed.length || !scelta.nota) ? motivoDellaScelta({ changed, soloCommenti, troppoLarghi, specs: specs.length }) : '';
     if (motivo) console.log(`\n${motivo}`);
