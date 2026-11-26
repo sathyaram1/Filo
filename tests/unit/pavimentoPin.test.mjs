@@ -38,7 +38,9 @@ test('una frase sul PIN senza il suo valore resta com\'è', () => {
     'Ho messo un pin sulla mappa al civico 1234',
     'Il PIN del telefono è sbagliato, chiama il 3331234567',
     'Codice cliente: 48213, il pin del telefono non lo so',
-  ]) assert.equal(P.oscura(frase), frase, frase);
+    'Il PIN predefinito del telefono è 0000',
+    'PIN di fabbrica del telefono: 1234',
+  ])assert.equal(P.oscura(frase), frase, frase);
 });
 
 test('in uscita il PIN col complemento si riconosce, e il primo verbo chiude il complemento', () => {
