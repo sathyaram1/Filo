@@ -550,7 +550,7 @@
   // Un segreto che non porta il prefisso di un servizio: almeno dodici caratteri senza spazi, con lettere e cifre.
   function formaDiSegreto(grezzo) {
     const v = valoreDiChiave(grezzo);
-    if (!v || v.length < 12 || /\s/.test(v) || /:\/\/|^www\./i.test(v) || EMAIL.test(v)) return '';
+    if (!v || v.length < 12 || /\s/.test(v) || INDIRIZZO_O_EMAIL(v)) return '';
     return /[A-Za-z]/.test(v) && /[0-9]/.test(v) ? v : '';
   }
   function valorePerNome(nome, grezzo) {
