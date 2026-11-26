@@ -184,13 +184,18 @@ function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
   let soloForma = data;
   let dopoPresenta = false;
   let n = 0;
-  for (const [, w, spazio] of risposta.matchAll(/(\S+)(\s*)/g)) {
+  // Le parole di un nome in più parole («le mot de passe est …») sono il nome, non il dato.
+  const nomi = menzioni(risposta);
+  for (const m of risposta.matchAll(/(\S+)(\s*)/g)) {
+    const [, w, spazio] = m;
     n += 1;
     const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    const da = m.index + w.length - w.replace(/^[^\p{L}\p{N}]+/u, '').length;
+    const nelNome = nomi.some((x) => da >= x.i && da + t.length <= x.j);
     // «Ciao Marco!» non è la password: la frase del saluto non conta per le parole di sole lettere.
     if (!trovato && SALUTO.test(t)) saluto = true;
     // «Marco:», «eccola:» presentano, non sono il dato.
-    const candidata = t && !w.endsWith(':') && !AVVII.has(t) && !PRESENTA_DATO.has(t) && !presentata.some((re) => re.test(t));
+    const candidata = t && !nelNome && !w.endsWith(':') && !AVVII.has(t) && !PRESENTA_DATO.has(t) && !presentata.some((re) => re.test(t));
     const segni = /[^\p{L}'’]/u.test(t);
     const qualunque = tipo === 'password' && !saluto && !forte && ((lettere && n <= PAROLE_RISPOSTA) || dopoPresenta);
     if (soloForma) {
