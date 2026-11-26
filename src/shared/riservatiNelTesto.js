@@ -213,7 +213,7 @@ function portaIlDato(riga, tipo, inTesta, dopoIlNome = false) {
   let q = false;
   for (let k = parole.length - 1; k >= 0; k--) {
     const p = parole[k].replace(/[)\]»”"'’]+$/u, '');
-    if (/[.!?,;。！？，；؟;]$/.test(p)) q = DOMANDA.test(p.slice(-1));
+    if (CHIUDE_PAROLA.test(p) || /[,;，；]$/u.test(p)) q = DOMANDA.test(p.slice(-1));
     inDomanda[k] = q;
   }
   let testa = inTesta;
