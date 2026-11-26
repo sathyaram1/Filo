@@ -14,7 +14,7 @@ const RT = () => globalThis.SN_RISERVATI_TESTO || require('../../shared/riservat
 const PAV = () => globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
 
 // Com'è la password, non qual è: «scade», «è sbagliata», «non funziona», «la stessa di prima».
-const STATO = /^(?:scad(?:e|ono|rà|ut[aoie])|sbagliat[aoie]|errat[aoie]|corrett[aoie]|debol[ei]|fort[ei]|sicur[aoie]|valid[aoie]|bloccat[aoie]|dimenticat[aoie]|smarrit[aoie]|pers[aoie]|rinnovat[aoie]|resettat[aoie]|reimpostat[aoie]|modificat[aoie]|cambi(?:a|ano|erà|at[aoie])|stat[aoie]|funzion(?:a|ano|erà)|dett[aoie]|prima|dopo|precedente|non|mai|va|vanno|expire[sd]?|wrong|incorrect|invalid|weak|strong|changed|forgotten|lost|works?|not|never|before|previous)$/;
+const STATO = /^(?:scad(?:e|ono|rà|ut[aoie])|sbagliat[aoie]|errat[aoie]|corrett[aoie]|debol[ei]|fort[ei]|sicur[aoie]|valid[aoie]|bloccat[aoie]|dimenticat[aoie]|smarrit[aoie]|pers[aoie]|rinnovat[aoie]|resettat[aoie]|reimpostat[aoie]|modificat[aoie]|cambi(?:a|ano|erà|at[aoie])|stat[aoie]|funzion(?:a|ano|erà)|dett[aoie]|lung[aoh]e?|cort[aoie]|troppo|spesso|essere|ricord(?:o|a|i|iamo)|trov(?:i|a|ate|ano)|recuper(?:a|ano|i)|prima|dopo|precedente|non|mai|va|vanno|expire[sd]?|wrong|incorrect|invalid|weak|strong|changed|forgotten|lost|works?|too|short|long|often|not|never|before|previous)$/;
 const pulita = (w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
 
 // La frase dopo il nome della password si divide dove una parola presenta il valore («è», «eccola», i due punti): in
