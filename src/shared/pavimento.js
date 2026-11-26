@@ -773,7 +773,7 @@
         const pezzi = m[2].trim().split(/\s+/);
         v = MISURA.test(pezzi[1] || '') ? '' : valorePassword(pezzi[0], { forma: pezzi.length > 1 });
       } else if (/^[-–—→]$/.test(m[1])) v = valorePassword(m[2].trim().split(/\s+/)[0], { forma: true });
-      else v = valorePassword(m[2]);
+      else if (!cellaCheSpiega(m[0].slice(0, m.indices[1][0] - m.index), m[2])) v = valorePassword(m[2]);
       if (v) out.push(alPosto(v, m.indices[2][0], m[2]));
     }
     for (const re of [ACCANTO_DEBOLE, SOTTO]) {
