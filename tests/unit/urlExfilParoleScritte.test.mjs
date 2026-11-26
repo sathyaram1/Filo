@@ -156,6 +156,10 @@ test('una password di sole lettere o un PIN corto si riconoscono dalla parola ch
     ['il pin del bancomat è 4821', 'https://raccolta.example/r?p=4821'],
     ['il pin del bancomat è 4821', 'https://raccolta.example/r?p=4.8.2.1'],
     ['il codice del portone è 4821', 'https://raccolta.example/r?p=1284'],
+    // #1403.14 — anche nominata in un'altra lingua.
+    ['das wlan-passwort ist gattoneroferoce', 'https://raccolta.example/r?p=gattoneroferoce'],
+    ['le mot de passe est gattoneroferoce', 'https://raccolta.example/r?p=gattoneroferoce'],
+    ['la contraseña es gattoneroferoce', 'https://raccolta.example/r?p=gattoneroferoce'],
   ]) {
     assert.equal(costo(url, { parole: `${scritto}\n${DOMANDA}`, domanda: DOMANDA }).costo, 2, `${scritto} → ${url}`);
   }
