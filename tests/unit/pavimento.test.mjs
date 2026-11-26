@@ -31,6 +31,16 @@ test('il CVV si toglie anche in una cella, dopo una parentesi o con altre parole
     'The security code review found 120 issues']) assert.equal(P.oscura(riga), riga);
 });
 
+test('il CVV annunciato dal verbo si toglie in tutte le lingue delle etichette, come la password (#1403.25)', () => {
+  for (const [riga, v] of [
+    ['Le CVV est 123', '123'], ['Der CVV ist 123', '123'], ['El CVV es 123', '123'], ['O CVV é 123', '123'],
+    ['Het CVV is 123', '123'], ['CVV jest 123', '123'], ['Kod CVV to 123', '123'], ['Le CVV était 654', '654'],
+    ['El CVV de la tarjeta es 789', '789'], ['Die Prüfnummer (CVV) lautet 321', '321'], ['Il CVV è 123', '123'],
+  ]) assert.ok(!P.oscura(riga).includes(v), riga);
+  for (const riga of ['Le CVV est le code à 3 chiffres', 'El CVV es el número de 3 cifras', 'Send the CVV to 123 Main Street'])
+    assert.equal(P.oscura(riga), riga);
+});
+
 test('un codice usa e getta e una chiave col suo prefisso non escono', () => {
   const t = P.oscura('Il tuo codice OTP è 482913. Chiave: sk-abcdefghijklmnop1234567890');
   assert.ok(!t.includes('482913'));
