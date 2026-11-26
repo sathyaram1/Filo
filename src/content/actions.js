@@ -2469,6 +2469,7 @@
     copyUrlToClipboard,
     isAddress,
     cutSelection,
+    prendiLaSelezioneDiAdesso,
     blobToDataUrl,
     blobDaDataUrl,
     pasteFromClipboard,
