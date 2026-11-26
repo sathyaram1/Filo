@@ -387,8 +387,8 @@
     const k = fuori.search(/\n|[.,;!?](?=\s|$)/);
     return k < 0 ? coda : coda.slice(0, k);
   };
-  // `spiega(parole)`: la frase fin qui, fino alla parola, spiega la password («va cambiata ogni 90 giorni») e la parola
-  // di sole lettere non è il valore. Chi toglie il testo (correttoreRiservati.js) la passa; chi lo confronta con un URL no.
+  // `spiega(parole, k)`: la parola k della frase spiega la password («va cambiata ogni 90 giorni») e, di sole lettere, non
+  // è il valore. Chi toglie il testo (correttoreRiservati.js) la passa; chi lo confronta con un URL no.
   function segretiDetti(testo, { spiega = null } = {}) {
     const out = [];
     const prendi = (re, soloCifre) => {
