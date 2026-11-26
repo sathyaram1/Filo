@@ -69,7 +69,7 @@ const FINE_FRASE = new RegExp(`[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'gu');
 // Il testo come lo leggono le regole: minuscolo, i due punti a tutta larghezza come i nostri, e il punto e virgola di
 // una riga in greco come punto di domanda (in greco è quello). Stessa lunghezza: le posizioni restano.
 const minuscolo = (t) => String(t == null ? '' : t).toLowerCase().replace(/：/g, ':')
-  .replace(/^.*\p{Script=Greek}.*$/gmu, (riga) => riga.replace(/[;\\u037E]/gu, '?'));
+  .replace(/^.*\p{Script=Greek}.*$/gmu, (riga) => riga.replace(new RegExp('[;\\u037E]', 'gu'), '?'));
 const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
