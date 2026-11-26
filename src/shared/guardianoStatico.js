@@ -332,7 +332,7 @@
   const ANNUNCI = Object.freeze(['è', "e'", 'e’', 'é', 'era', 'sarebbe', 'sarà', 'is', 'are', 'was', 'sono', 'ecco', 'here',
     'vale', 'risulta', "c'est", 'c’est', 'est', 'était', 'etait', 'sera', 'ist', 'lautet', 'war', 'wird', 'es', 'será',
     'serà', 'serão', 'luidt', 'jest', 'brzmi', 'będzie', 'это', 'был', 'была', 'было', 'были', 'будет', 'является',
-    'είναι', 'ήταν']);
+    'είναι', 'ήταν', 'هي', 'هو', 'היא', 'הוא']);
   // Un annuncio come parola intera, per le regex col flag `u`.
   const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
   // Le etichette e i verbi fuori dall'alfabeto latino sono quelli dei campi segreti (#1403.8): una lingua nuova va solo lì.
