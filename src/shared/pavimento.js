@@ -202,7 +202,10 @@
   const ACCANTO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:|=\\t?!.,;\\[\\]«»"<>{}$]){0,40}?';
   const ACCANTO_LUNGO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:|=\\t?!.,;\\[\\]«»"<>{}$]){0,90}?';
   const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
-  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+(?:è|e'|is|was|era)[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
+  // Il verbo che chiude l'etichetta, nelle lingue delle etichette («le mot de passe est …», «Das Passwort lautet …»). Il
+  // «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
+  const VERBO = '(?:è|é|e\'|is|was|era|est|[ée]tait|sera|ist|lautet|war|es|será|luidt|jest|brzmi|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)';
+  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+${VERBO}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
@@ -291,7 +294,7 @@
   // qualunque solo da sola: dopo di lei la riga finisce o comincia un altro campo o una parentesi. Seguita da altre
   // parole è una frase («Password: deve avere almeno otto caratteri») e resta.
   const AL_POSTO = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t\\[(]{3,64})([^\\n|\\t]*)`, 'gid');
-  const DOPO = '[ \\t]*(?:[:=|\\t]|[-–—→](?=[ \\t])|[ \\t](?:è|e\'|is|was|era)(?=[ \\t]))[ \\t]*([^\\s|\\t]{6,70})';
+  const DOPO = `[ \\t]*(?:[:=|\\t]|[-–—→](?=[ \\t])|[ \\t]${VERBO}(?=[ \\t]))[ \\t]*([^\\s|\\t]{6,70})`;
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
@@ -586,10 +589,33 @@
     }
   }
 
+  // Fra virgolette con lo spazio dentro («la password è « Mela!Verde77 »», la grafia francese) il valore si legge come
+  // senza spazi: gli spazi passano fuori, e la lunghezza resta, così ogni posto trovato vale anche nel testo vero (#1403.11).
+  // L'apostrofo attaccato a una parola («dell'altra») non apre né chiude; le altre virgolette sì, anche dopo «は». Dentro
+  // il valore un apostrofo fra due lettere o cifre («« l'Albero77 »») è della password, non la chiude.
+  const Q = '«»“”„‚‘’‹›"\'「」『』';
+  const FRA_VIRGOLETTE = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${Q}](?:(?:[^\\n${Q}]|(?<=[\\p{L}\\p{N}])['’‘](?=[\\p{L}\\p{N}])){0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
+  const HA_VIRGOLETTE = new RegExp(`[${Q}]`, 'u');
+  const TESTA_VIRGOLETTE = new RegExp(`^[${Q}]+`, 'u');
+  const CODA_VIRGOLETTE = new RegExp(`[${Q}]+$`, 'u');
+  const spazi = (w) => ' '.repeat(w.length);
+  const virgoletteStrette = (s) => (HA_VIRGOLETTE.test(s)
+    ? s.replace(FRA_VIRGOLETTE, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
+  // Un valore preso con le virgolette attaccate («»Mela!Verde77«») nel testo vero le ha staccate: si cerca senza.
+  function nelTestoVero(x, vero) {
+    const v = String(x.valore);
+    if (vero.includes(v)) return x;
+    const testa = (v.match(TESTA_VIRGOLETTE) || [''])[0].length;
+    const y = { ...x, valore: v.slice(testa).replace(CODA_VIRGOLETTE, '') };
+    if (Number.isInteger(x.inizio)) y.inizio = x.inizio + testa;
+    return y;
+  }
+
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   function trova(valore) {
-    const s = testo(valore);
+    const vero = testo(valore);
+    const s = virgoletteStrette(vero);
     const out = [];
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
@@ -608,7 +634,8 @@
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
-    return out.filter((x) => x.valore && String(x.valore).length >= 3);
+    return out.filter((x) => x.valore).map((x) => (s === vero ? x : nelTestoVero(x, vero)))
+      .filter((x) => String(x.valore).length >= 3);
   }
 
   // Le password scritte a mano (la risposta sotto chi la chiede, «Utente / Password: mario / …», dopo il nome della rete):

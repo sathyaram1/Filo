@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.306', date: '2026-11-26',
+      fixes: [
+        { testo: 'Una password scritta fra virgolette con lo spazio dentro, come « Mela!Verde77 » alla francese, non arriva più ai modelli: Filo la toglie come quando le virgolette sono attaccate. Lo stesso in francese, tedesco, spagnolo, portoghese, olandese e polacco quando scrivi «le mot de passe est …» invece dei due punti.', segnalazione: 1403 },
+      ],
+    },
+    {
       version: '0.2.305', date: '2026-11-25',
       fixes: [
         { testo: 'Se alleghi a un feedback un file .csv con una colonna di password, come l\'esportazione delle password del browser, prima che parta Filo ti avvisa, e quelle password non arrivano a nessun modello, come già quelle di una tabella. E mentre ricontrolla un file di log grosso, finestre e schede rispondono.', segnalazione: 1403 },
