@@ -4,8 +4,8 @@
 
 import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
 import { _electron as electron, test as testSenzaFixture } from '@playwright/test';
-import { rmSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { rmSync, writeFileSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
