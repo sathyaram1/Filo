@@ -71,8 +71,12 @@ const ellittica = (testa, dopo) => {
     && ELLITTICA_PRIMA.test(pezzi[pezzi.length - 1]) && ELLITTICA_DOPO.test(dopo);
 };
 // In chat la password si chiama anche così: «pass» solo con l'articolo o col wifi, da solo è anche l'inglese «to pass».
+// Nelle altre lingue (#1403.14): «mdp», «la clave del wifi», «WLAN-Schlüssel», e i composti attaccati del tedesco
+// («Wlanpasswort», «Routerpasswort»).
 const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|pass\\s+(?:del(?:la)?\\s+)?wi-?fi'
-  + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
+  + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router)|mdp'
+  + '|clave\\s+(?:(?:del|de\\s+la|de)\\s+)?(?:wi-?fi|red|router)|(?:wlan|wi-?fi|router|netzwerk)-?schlüssel'
+  + '|\\p{L}{2,20}(?:passwort|kennwort))(?![\\p{L}\\p{N}])';
 const CHIESTA_IN_CHAT = `${ETICHETTE_CORTE}|(?<![\\p{L}\\p{N}])credenziali(?![\\p{L}\\p{N}])`;
 // Il punto di domanda anche delle altre scritture: quello a tutta larghezza, l'arabo, il greco.
 const DOMANDA = new RegExp('[?？؟\\u037E]', 'u');
