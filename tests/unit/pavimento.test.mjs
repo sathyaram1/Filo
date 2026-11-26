@@ -1168,3 +1168,58 @@ test('l\'etichetta araba con «e», «con» o «per» attaccati non lascia la pa
     assert.ok(!P.oscura(t).includes('Gatto2024'), t);
   }
 });
+
+// #1403.6: il verbo e il nome della password nelle altre lingue, anche senza spazi (cinese, giapponese, coreano).
+test('la password annunciata da un verbo non esce in nessuna lingua, e il resto della frase resta', () => {
+  for (const [riga, v, resto] of [
+    ['Le mot de passe est Mela!Verde77', 'Mela!Verde77', 'Le mot de passe est '],
+    ['Das Passwort ist Mela!Verde77', 'Mela!Verde77', 'Das Passwort ist '],
+    ['Das WLAN-Passwort lautet Mela!Verde77', 'Mela!Verde77', 'lautet '],
+    ['la contraseña es Mela!Verde77', 'Mela!Verde77', 'la contraseña es '],
+    ['A senha do wifi é Mela!Verde77', 'Mela!Verde77', 'A senha do wifi é '],
+    ['Hasło do wifi to Mela!Verde77', 'Mela!Verde77', 'Hasło do wifi to '],
+    ['Le mot de passe du wifi est 12345678', '12345678', 'du wifi est '],
+    ['пароль это Ключ!Зима2024', 'Ключ!Зима2024', 'пароль это '],
+    ['вход с паролем Ключ!Зима2024', 'Ключ!Зима2024', 'вход с паролем '],
+    ['Пароли:\nКлюч!Зима2024', 'Ключ!Зима2024', 'Пароли:'],
+    ['Пароль: зима', 'зима', 'Пароль: '],
+    ['ο κωδικός είναι Κλειδί!2024', 'Κλειδί!2024', 'ο κωδικός είναι '],
+    ['WiFi密码是12345678', '12345678', 'WiFi密码是'],
+    ['密码为Mima2024!', 'Mima2024!', '密码为'],
+    ['密码：Mima2024!', 'Mima2024!', '密码：'],
+    ['パスワードはPass2024!です', 'Pass2024!', 'です'],
+    ['비밀번호는 Pass2024!', 'Pass2024!', '비밀번호는 '],
+    ['Der PIN ist 4821', '4821', 'Der PIN ist '],
+    ['Le CVV est 123', '123', 'Le CVV est '],
+    ['El CVV es 123', '123', 'El CVV es '],
+    ["le mot de passe c'est Mela!Verde77", 'Mela!Verde77', "c'est "],
+    ["le mot de passe du wifi, c'est Mela!Verde77", 'Mela!Verde77', "wifi, c'est "],
+    ['пароль был Ключ!Зима2024', 'Ключ!Зима2024', 'пароль был '],
+    ['паролем является Ключ!Зима2024', 'Ключ!Зима2024', 'паролем является '],
+    ['密码是：Mima2024!', 'Mima2024!', '密码是：'],
+    ['パスワードは、Pass2024!です', 'Pass2024!', 'です'],
+  ]) {
+    const t = P.oscura(riga);
+    assert.ok(!t.includes(v), riga);
+    assert.ok(t.includes(S) && t.includes(resto), `${riga} → ${t}`);
+  }
+});
+
+test('nelle altre lingue la frase che nomina la password senza darla resta com\'è', () => {
+  for (const t of [
+    'Le mot de passe est trop court', 'Das Passwort ist falsch', 'la contraseña es incorrecta', 'Hasło jest łatwe',
+    'пароль это важно', 'ο κωδικός είναι λάθος', '密码是什么？', 'パスワードは忘れました', '비밀번호는 무엇입니까?',
+    'パスワードマネージャー: 1Password', 'Send the password to bob@mail.com',
+    "le mot de passe c'est important", 'пароль был неверный', '密码是：必填项', 'Le CVV est obligatoire',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
+// Il pavimento gira a ogni chiamata a un modello nel processo principale: un testo lungo che ripete l'etichetta non lo
+// deve fermare. Oggi costa 2-5 unità, col flag u sulle regex delle etichette ne costava 90-250.
+test('un testo di 120.000 caratteri che ripete l\'etichetta si controlla in fretta', () => {
+  for (const pezzo of ['비밀번호는 뭐예요 비밀번호는 ', 'пароль это важно и пароль от ', 'mot de passe est' + ' '.repeat(200)]) {
+    const s = pezzo.repeat(Math.ceil(120000 / pezzo.length));
+    const c = costoInUnita(() => P.oscura(s), { tetto: 30 });
+    assert.ok(c.entro, `${pezzo.slice(0, 12)}: ${c.come}`);
+  }
+});

@@ -537,7 +537,7 @@
     + `)${FUORI}|密[钥鑰]|暗号化キー|セキュリティ\\s*キー|ネットワーク\\s*キー|事前共有キー|(?:네트워크\\s*)?보안\\s*키|(?:네트워크|무선|wpa[23]?(?:-psk)?|wi-?fi)\\s*키`;
   // Le parole che dopo «password» ne dicono una proprietà, non il valore: nel testo e nei nomi delle chiavi (tipoDiNome).
   const PROPRIETA_PASSWORD = 'managers?|policy|reset|recovery|generator|hint|strength';
-  const NON_ETICHETTA = `(?!\\s*(?:${PROPRIETA_PASSWORD})\\b)`;
+  const NON_ETICHETTA = `(?!\\s*(?:(?:${PROPRIETA_PASSWORD})\\b|マネージャ|管理|관리))`;
   const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   // Cinese, giapponese e thai non staccano le parole: dove finisce il valore e le parole che lo annunciano senza i due
@@ -548,6 +548,17 @@
   const ANNUNCI_NON_LATINI = `(?:${NON_LATINI.ANNUNCI_ATTACCATI})[ \\t]*`;
   const APRE_VALORE = new RegExp(`^[${NON_LATINI.APRE_VALORE}]+`);
   const finoAllaFrase = (v) => v.replace(APRE_VALORE, '').split(FINE_VALORE)[0];
+  // Cinese, giapponese e coreano non separano le parole: lì il verbo sta attaccato al nome (ATTACCATO, #1403.6).
+  // Le scritture per intervalli, senza \p: col flag u insieme a i ogni passo delle regex delle etichette costa decine di
+  // volte di più, e un testo lungo che ripete «비밀번호는» fermava il processo per secondi (#1403.6).
+  const CJK = '\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uF900-\\uFAFF\\u1100-\\u11FF\\u3130-\\u318F\\uAC00-\\uD7AF';
+  // I nomi sono le etichette non latine di campiSegreti.js che cominciano con una lettera di queste scritture.
+  const NOMI_CJK = `(?=[${CJK}])(?:${NON_LATINI.ETICHETTE_NON_LATINE})`;
+  // Il polacco «to» solo dopo «hasło»: in inglese «password to …» è una destinazione. Il controllo all'indietro parte
+  // solo dopo «to», altrimenti si rifà a ogni passo fra etichetta e valore.
+  const VERBO_PASSWORD = `(?:${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO}|to(?<=has[łl][a-ząęó]{0,3}[^\\n]{0,40}to))`;
+  // La virgola prima del verbo solo per il «c'est» francese: «le mot de passe du wifi, c'est …».
+  const VIRGOLA_CEST = ',[ \\t]*(?=c[\'’]est)';
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
@@ -564,9 +575,7 @@
   const UNA_FRECCIA = new RegExp(`^(?:${FRECCIA}|[-–—→])$`);
   // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra.
   const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*(${FRECCIA}|[:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
-  // Il «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
-  const VERBO_PASSWORD = `(?:${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO}|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)`;
-  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:[ \\t]+${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
+  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:(?:[ \\t]+|${VIRGOLA_CEST})${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
@@ -574,6 +583,9 @@
   // Anche dopo di cosa è («la password del wifi Mela!Verde77», #2678.7): il complemento non è il valore, quello dopo sì.
   const COMPLEMENTO = `(?:[ \\t]+${global.SN_GUARDIANO_STATICO.COMPLEMENTO})?`;
   const IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]+${VIRGOLETTA}([^\\s|\\[${VIRGOLETTE}(),;]{6,64})`, 'gi');
+  // Senza spazi il verbo o la particella stanno attaccati al nome («WiFi密码是12345678», «パスワードはPass2024!です»,
+  // «비밀번호는 Pass2024!»), e il valore finisce dove ricomincia la scrittura della frase.
+  const ATTACCATO = new RegExp(`(?:${NOMI_CJK})(?:(?:(?:就|也|还|還|都|一直)?(?:是|为|為)|は|が|も|는|은|이|가)[:：、，,]?|[:：=])[ \\t]*[「『“"']?([^\\s${CJK}「」『』“”"'。、，：；！？（）]{4,64})`, 'gu');
   const FORMA_FORTE = (v) => /\p{L}/u.test(v) && (/[0-9]/.test(v) || /[!@#$%^&*+=?~_]/.test(v));
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
   // In un CSV l'intestazione è un nome di campo, anche col prefisso delle esportazioni («login_password»): al più una
@@ -721,7 +733,7 @@
   // qualunque solo da sola: dopo di lei la riga finisce o comincia un altro campo o una parentesi. Seguita da altre
   // parole è una frase («Password: deve avere almeno otto caratteri») e resta.
   const AL_POSTO = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*([^\\s|\\t\\[(]{3,64})([^\\n|\\t]*)`, 'gid');
-  const DOPO = `[ \\t]*(?:${FRECCIA}|[:：=|\\t]|[-–—→](?=[ \\t])|[ \\t]${VERBO_PASSWORD}(?=[ \\t])|${ANNUNCI_NON_LATINI})[ \\t]*([^\\s|\\t]{6,70})`;
+  const DOPO = `[ \\t]*(?:${FRECCIA}|[:：=|\\t]|[-–—→](?=[ \\t])|(?:[ \\t]|${VIRGOLA_CEST})${VERBO_PASSWORD}(?=[ \\t])|${ANNUNCI_NON_LATINI})[ \\t]*([^\\s|\\t]{6,70})`;
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
@@ -1071,6 +1083,10 @@
     for (const m of s.matchAll(IN_FRASE)) {
       const v = valorePassword(m[1].replace(/[?!.,;:]+$/, ''));
       if (v && FORMA_FORTE(v)) out.push({ valore: v, regola: 'password' });
+    }
+    for (const m of s.matchAll(ATTACCATO)) {
+      const v = valorePassword(m[1], { forma: true });
+      if (v) out.push({ valore: v, regola: 'password' });
     }
     // La colonna «Password» di una tabella, a barre o a tabulazioni: le celle sotto l'intestazione. Una riga di due celle
     // con «Password» in testa è una coppia nome-valore («Password | x», poi «Server | imap…»): il valore lo toglie la regola
