@@ -30,6 +30,27 @@ test('una parola qualunque al posto della password si toglie solo lì, anche fra
   assert.equal(P.oscura('Password: « hunter »\nil film hunter mi è piaciuto'), `Password: « ${S} »\nil film hunter mi è piaciuto`);
 });
 
+test('nelle lingue delle etichette anche il verbo chiude l\'etichetta, con o senza virgolette', () => {
+  for (const [prima, dopo] of [
+    ['le mot de passe est « ', ' »'], ['Votre mot de passe est « ', ' ».'], ['le mot de passe était ', ''],
+    ['Das Passwort ist « ', ' »'], ['Das Kennwort lautet ', ''], ['la contraseña es « ', ' »'],
+    ['a senha é « ', ' »'], ['het wachtwoord luidt ', ''], ['Hasło to ', ''], ['hasło jest « ', ' »'],
+  ]) assert.equal(P.oscura(`${prima}Mela!Verde77${dopo}`), `${prima}${S}${dopo}`, prima);
+  for (const frase of [
+    'send the password to mario@example.com',
+    'Le mot de passe est obligatoire',
+    'Das Passwort ist falsch',
+    'la contraseña es incorrecta',
+  ]) assert.equal(P.oscura(frase), frase);
+});
+
+test('un apostrofo o una virgoletta dentro la password non chiude le virgolette con lo spazio', () => {
+  for (const frase of ["la password è « l'Albero77 »", 'Password: « l’Albero77 »', "mot de passe : « l'Albero77 »"]) {
+    assert.equal(P.oscura(frase).includes('Albero77'), false, frase);
+  }
+  assert.equal(P.oscura("l'amico « Mario » dice « l'altra volta »"), "l'amico « Mario » dice « l'altra volta »");
+});
+
 test('le virgolette con lo spazio che non portano una password restano come sono', () => {
   for (const frase of [
     'Ho detto « ciao » a Marco',
