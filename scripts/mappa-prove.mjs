@@ -90,7 +90,8 @@ export function leggiMappa({ file = '', corsa = '', root = ROOT } = {}) {
     const m = mappaDaRegistro(testo);
     return m.errore ? m : { mappa: m.mappa, fonte: file };
   }
-  const repo = process.env.GITHUB_REPOSITORY || repoDaRemoto(git(['remote', 'get-url', 'origin'], root).out);
+  // Dal remoto del clone e non da GITHUB_REPOSITORY: le prove di finish:check girano in cloni finti anche dentro GitHub.
+  const repo = repoDaRemoto(git(['remote', 'get-url', 'origin'], root).out);
   if (!repo) return { errore: 'non so quale repo leggere: il remoto origin non è su GitHub' };
   let corse;
   try {
