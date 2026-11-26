@@ -199,6 +199,11 @@
   // Un codice usa e getta di lettere e cifre («Steam Guard code: 7K2F9», quello da scrivere sulla TV, «WDJB-MJHT»):
   // conta solo al posto del codice, come i numeri, e col nome del codice nella frase.
   const CODICE_ALFANUMERICO = /(?<![\w./:-])(?:(?=[A-Z]*\d)(?=\d*[A-Z])[A-Z0-9]{5,10}|[A-Z]{4}-[A-Z]{4})(?![\w/-])/g;
+  const UN_CODICE = new RegExp(FORMA_CODICE.source);
+  const UN_ALFANUMERICO = new RegExp(CODICE_ALFANUMERICO.source);
+  const haUnCodice = (z, nome) => UN_CODICE.test(z) || (nome && UN_ALFANUMERICO.test(z));
+  // I messaggi sotto la domanda che si saltano cercando la risposta: in chat ne passano parecchi senza numero.
+  const RIGHE_SALTATE = 8;
   function codiciVicini(s, out) {
     const righe = s.split('\n');
     for (let i = 0; i < righe.length; i++) {
