@@ -18,7 +18,6 @@ const nessunaMorta = async (app, prima) => {
   expect(s.filter((x) => x.morta), 'nessuna scheda col contenuto distrutto').toEqual([]);
   expect(s.some((x) => x.attiva), 'resta una scheda davanti').toBe(true);
 };
-void tm;
 
 test('la finestra di pagamento di un altro sito si chiude da sola e la sua scheda se ne va', async ({ app, openTab, testServer }) => {
   const dest = testServer.html(`<title>PAGA</title>${pulsante('p', 'Paga', 'setTimeout(function(){window.close()},100)')}`, { pubblico: true });
