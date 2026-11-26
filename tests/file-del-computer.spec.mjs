@@ -552,9 +552,12 @@ test('un sito costruito e aperto dal disco: script e stili normali girano, lo sc
   await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
   const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
   await expect.poll(() => pagina.locator('body').getAttribute('data-fine'), { timeout: 15_000 }).toBe('1');
+  const esito = () => pagina.evaluate(() => ({ ...document.body.dataset }));
+  expect(await esito(), 'lo script e lo stile senza marca girano').toMatchObject({ classico: 'girato', normale: 'rgb(7, 8, 9)' });
+  // Un modulo che girasse arriverebbe entro il caricamento: si guarda ancora un poco perché non arrivi tardi.
   await pagina.waitForTimeout(1000);
-  const esito = await pagina.evaluate(() => ({ modulo: document.body.dataset.modulo || 'NO', colore: document.body.dataset.colore }));
-  console.log('ESPLORA', JSON.stringify(esito));
+  const e = await esito();
+  expect({ modulo: e.modulo || 'NO', colore: e.colore }, 'modulo e stile crossorigin restano fuori, come in un browser').toEqual({ modulo: 'NO', colore: 'rgb(0, 0, 0)' });
 });
 
 // Il server di chi ruberebbe: conta ogni connessione e ogni pacchetto che gli arriva, da qualunque strada.
