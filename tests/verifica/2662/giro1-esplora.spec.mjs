@@ -4,6 +4,7 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from '../../helpers/chatFinta.mjs';
 import { livelloAutonomia } from '../../helpers/autonomia.mjs';
+import { clickConfirm } from '../../helpers/confirm.mjs';
 
 const STRANO = 'Tono » secco «x» <img src=x onerror="window.__rotto=1"> 😀';
 
