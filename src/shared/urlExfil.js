@@ -331,13 +331,14 @@
 
   // I nomi della password nelle altre lingue, con le loro desinenze: un posto solo per la chat (qui e
   // riservatiNelTesto.js) e per le etichette del pavimento (pavimento.js). Il confine lo porta la lista, perché \b non
-  // vede le lettere fuori dall'ASCII («şifre», «пароль»); le scritture senza spazi non ne hanno. Le desinenze sono
-  // scritte, non una coda di lettere: «Lösenordshanterare» è il gestore, non l'etichetta. Prove:
-  // tests/unit/passwordAltreLingue.test.mjs.
-  // Il punto di domanda greco (U+037E) e la ano teleia (U+0387) stanno fra le lettere greche ma chiudono la parola.
+  // vede le lettere fuori dall'ASCII («şifre»); le scritture senza spazi non ne hanno. Le desinenze sono
+  // scritte, non una coda di lettere: «Lösenordshanterare» è il gestore, non l'etichetta. Quelle fuori dall'alfabeto
+  // latino le tiene campiSegreti.js (ETICHETTE_NON_LATINE). Prove: tests/unit/passwordAltreLingue.test.mjs.
+  if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
+  const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
   const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u037D\\u037F-\\u0386\\u0388-\\u03FF\\u0400-\\u052F\\u1E00-\\u1EFF]';
   // «parola» è anche l'italiano: il rumeno conta con chi la possiede, col wifi o dopo chi la chiede («care e parola»).
-  // «palabra clave» è la parola chiave; «κωδικός» è ogni codice: il postale e quelli di prodotto o d'ordine restano.
+  // «palabra clave» è la parola chiave.
   const PAROLE_PASSWORD = [
     'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', '(?<!palabras?\\s+)claves?',
     'senhas?', 'palavras?-passe', 'wachtwoord(?:en)?', 'has[łl](?:o|a|em|u)', 'parol(?:ă|a\\s+de|ei)',
