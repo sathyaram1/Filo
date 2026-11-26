@@ -127,7 +127,10 @@
       if (AUTOCOMPLETE_SEGRETO.test(String(el.getAttribute('autocomplete') || ''))) return true;
       const nomi = ['aria-label', 'placeholder', 'name', 'id', 'title'].map((a) => el.getAttribute(a) || '');
       nomi.push(etichettaCollegata(el), etichettaVicina(el));
-      if (PAROLE_SEGRETE.test(nomi.join(' ').replace(/([a-z])([A-Z])/g, '$1 $2'))) return true;
+      const testo = nomi.join(' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+      if (PAROLE_SEGRETE.test(testo)) return true;
+      // Un nome di campo come «codigo_de_seguridad» si legge come l'etichetta che il pavimento conosce.
+      if (NOME_CVV && NOME_CVV.test(testo.normalize('NFC').replace(/[_-]+/g, ' '))) return true;
       return formaDiCarta(el.value);
     }
 
