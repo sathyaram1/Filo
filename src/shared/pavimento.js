@@ -570,7 +570,7 @@
     for (const re of [ACCANTO_DEBOLE, SOTTO]) {
       for (const m of s.matchAll(re)) {
         const v = valorePassword(m[1], { forma: true });
-        if (v) out.push({ valore: v, regola: 'password' });
+        if (v && !INDIRIZZO_O_EMAIL(v)) out.push({ valore: v, regola: 'password' });
       }
     }
     for (const m of s.matchAll(IN_FRASE)) {
