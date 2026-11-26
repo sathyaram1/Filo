@@ -1037,7 +1037,9 @@
       t = t.slice(0, x.inizio) + SEGNAPOSTO + t.slice(x.inizio + v.length);
       fine = x.inizio;
     }
-    const valori = [...ovunque].sort((a, b) => b.length - a.length);
+    // L'ordine è quello della copia col solo \n (trova): un \r in più non fa passare un valore davanti a un altro.
+    const lungo = (v) => v.length - (v.match(/\r/g) || []).length;
+    const valori = [...ovunque].sort((a, b) => lungo(b) - lungo(a));
     for (const v of valori) {
       const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
       // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga».
