@@ -400,8 +400,9 @@
   // Le parole senza la forma di una password («Password: hunter», la cella, la colonna) contano solo da sole al posto del
   // valore, con l'etichetta in testa alla riga o alla cella: «un campo password o carta: …» resta.
   // Le etichette: anche la password del wifi del router, il codice di accesso e le altre lingue, che porta urlExfil.js
-  // (PRESENTA) col loro confine. ETICHETTA_NUDA vale anche attaccata a un prefisso («login_password»). Le stesse
-  // riconoscono i campi dei moduli (campiSegreti.js le prende da ETICHETTE, #1403.19).
+  // (PRESENTA) col loro confine; quelle non latine vengono da campiSegreti.js (ETICHETTE_NON_LATINE). ETICHETTA_NUDA
+  // vale anche attaccata a un prefisso («login_password»). Le stesse riconoscono i campi dei moduli (campiSegreti.js le
+  // prende da ETICHETTE, #1403.19).
   if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
   const ALTRE_LINGUE = global.SN_URL_EXFIL && global.SN_URL_EXFIL.PRESENTA ? `|${global.SN_URL_EXFIL.PRESENTA.altreLingue}` : '';
   const NOMI = '(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
