@@ -525,6 +525,29 @@ window.addEventListener('load', () => {
   expect(e.errori.join(' | '), 'l\'errore dello script arriva senza testo').not.toMatch(/chiave-/);
 });
 
+test('ESPLORA un sito costruito e aperto dal disco: script modulo e stile marcato crossorigin', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = join(cartellaTemporanea('costruito-'), 'dist');
+  mkdirSync(join(dir, 'assets'), { recursive: true });
+  writeFileSync(join(dir, 'assets', 'index.js'), "import { saluto } from './parte.js'; document.body.dataset.modulo = saluto;");
+  writeFileSync(join(dir, 'assets', 'parte.js'), "export const saluto = 'girato';");
+  writeFileSync(join(dir, 'assets', 'index.css'), '#t{color:rgb(4, 5, 6)}');
+  writeFileSync(join(dir, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Costruito</title>
+<script type="module" crossorigin src="./assets/index.js"></script><link rel="stylesheet" crossorigin href="./assets/index.css">
+<body><h1 id="t">Sito</h1><script>window.addEventListener('load', () => { document.body.dataset.colore = getComputedStyle(document.getElementById('t')).color; document.body.dataset.fine = '1'; });</script></body>`);
+  await home(app);
+  const file = join(dir, 'index.html');
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'index.html')), { timeout: 10_000 }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+  const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+  await expect.poll(() => pagina.locator('body').getAttribute('data-fine'), { timeout: 15_000 }).toBe('1');
+  await pagina.waitForTimeout(1000);
+  const esito = await pagina.evaluate(() => ({ modulo: document.body.dataset.modulo || 'NO', colore: document.body.dataset.colore }));
+  console.log('ESPLORA', JSON.stringify(esito));
+});
+
 // Il server di chi ruberebbe: conta ogni connessione e ogni pacchetto che gli arriva, da qualunque strada.
 async function raccoglitore() {
   const arrivi = [];
