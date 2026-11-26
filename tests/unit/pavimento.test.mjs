@@ -638,7 +638,9 @@ test('il codice dato in risposta a chi lo chiede in chat esce come segnaposto, c
   ];
   for (const [t, atteso] of casi) assert.equal(P.oscura(t), atteso, t);
   // Un numero che non è la risposta, o la risposta che dà un identificativo, resta.
-  for (const t of ['Qual è il codice del cancello?\nTotale: 4821', 'Marco: qual è il codice cliente?\nLuc: 48213',
+  for (const t of ['Marco: ho cambiato il pin della carta\nLuc: ok\nAnna: ci vediamo alle 1830',
+    'Marco: qual è il pin?\nLuc: non lo so\nLuc: chiedi ad Anna, il suo numero finisce con 4821',
+    'Marco: qual è il pin?\nLuc: chiamami al 333 1234567', 'Marco: qual è il codice cliente?\nLuc: 48213',
     'Marco: qual è il pin?\nLuc: ho 1500 euro sul conto', 'Marco: come cambio il codice di Gmail?\nLuc: vai in impostazioni, ordine 1234',
     'Qual è il codice di avviamento postale di Roma?\nÈ 00118']) {
     assert.equal(P.oscura(t), t, t);
