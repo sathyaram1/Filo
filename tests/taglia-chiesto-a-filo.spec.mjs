@@ -7,6 +7,17 @@ import { paginaDellAiuto, statoDi, scrivi, clicca } from './helpers/riquadri.mjs
 
 const appunti = (app) => app.evaluate(({ clipboard }) => clipboard.readText());
 
+// Su http una password fa comparire l'avviso del sito sospetto, che rende la scheda inerte finché non si sceglie
+// «Continua»: è quello che farebbe l'utente prima di scrivere.
+async function apriCampi(app, openTab, testServer) {
+  const page = await testServer.openReady(openTab, CAMPI);
+  const coperta = async () => (await copertura(app).catch(() => null))?.coperta === true;
+  await expect.poll(coperta, { timeout: 10_000 }).toBe(true);
+  await (await vistaAvviso(app)).getByRole('button', { name: 'Continua' }).click();
+  await expect.poll(coperta, { timeout: 6_000 }).toBe(false);
+  return page;
+}
+
 const CAMPO = 'display:block;width:300px;margin-top:16px;font:16px sans-serif';
 const CAMPI = `<!doctype html><html><head><title>Campi</title></head><body style="margin:0;padding:40px">
   <input id="prima" type="text" value="testo di prima" style="${CAMPO}">
