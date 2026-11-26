@@ -11,20 +11,22 @@ function entro(promessa, ms) {
   return Promise.race([Promise.resolve(promessa).catch(() => null), new Promise((ok) => setTimeout(() => ok(null), ms))]);
 }
 
+// Quello che `crea` riceve dal guardiano, scritto nel codice che parte: nel riquadro di un altro sito non c'è altro.
 function preambolo() {
   const G = globalThis.SN_GUARDIANO_STATICO;
-  return `const luhn = ${G.luhn}; const cartaValida = ${G.cartaValida};`;
+  return `const luhn = ${G.luhn}; const cartaValida = ${G.cartaValida};
+    const opzioniSegreti = { nomeCvv: ${JSON.stringify(G.NOME_CVV)} };`;
 }
 
 function codiceMisura() {
   return `(function () { ${preambolo()}
-    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida).campiInVista(); } catch (_) { return []; } })()`;
+    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida, opzioniSegreti).campiInVista(); } catch (_) { return []; } })()`;
 }
 
 // Per il protocollo d'ispezione: `this` è la radice di un componente chiuso.
 function codiceMisuraRadice() {
   return `function () { ${preambolo()}
-    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida).campiInVista(this); } catch (_) { return []; } }`;
+    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida, opzioniSegreti).campiInVista(this); } catch (_) { return []; } }`;
 }
 
 // Dove un riquadro mostra il suo documento, nel documento che lo ospita: dentro bordo e margine interno. `sx`/`sy`:
