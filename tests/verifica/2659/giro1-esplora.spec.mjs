@@ -107,3 +107,30 @@ test('due finestre di altri siti chiuse insieme se ne vanno tutte e due', async 
   await page.click('#c');
   await nessunaMorta(app, prima);
 });
+
+test('aperta e chiusa subito, mentre carica, la finestra di un altro sito non lascia schede', async ({ app, openTab, testServer }) => {
+  const dest = testServer.html('<title>CHAT</title>', { pubblico: true });
+  const page = await openTab(testServer.html(`<title>NEGOZIO</title>${pulsante('a', 'Apri e chiudi', `var w=window.open(${JSON.stringify(dest)},'chat');setTimeout(function(){w.close()},30)`)}`));
+  const prima = (await schede(app)).length;
+  for (let i = 0; i < 3; i++) {
+    await davanti(app, page.url());
+    await page.click('#a');
+    await page.waitForTimeout(1500);
+  }
+  await nessunaMorta(app, prima);
+});
+
+test('la finestra di un altro sito chiusa dal pulsante della scheda di Filo non lascia schede morte', async ({ app, openTab, testServer }) => {
+  const dest = testServer.html('<title>CHAT</title>', { pubblico: true });
+  const page = await openTab(testServer.html(`<title>NEGOZIO</title>${pulsante('a', 'Apri', `window.__w=window.open(${JSON.stringify(dest)},'chat')`)}`));
+  const prima = (await schede(app)).length;
+  await page.click('#a');
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'CHAT'), { timeout: 8000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => {
+    const m = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const t = m.tabs.find((x) => x.view.webContents.getTitle() === 'CHAT');
+    m.close(t.id);
+  });
+  await nessunaMorta(app, prima);
+  await expect.poll(() => page.evaluate(() => window.__w.closed), { timeout: 8000 }).toBe(true);
+});
