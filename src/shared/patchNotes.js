@@ -11,6 +11,7 @@
     {
       version: '0.2.306', date: '2026-11-26',
       fixes: [
+        { testo: 'Un PIN scritto con la cosa che sblocca, come «il pin del telefono è 4821», non arriva più a nessun modello, e se un\'azione di Filo sta per scriverlo in una pagina ti chiede prima conferma.', segnalazione: 2678 },
         { testo: 'Una password scritta fra virgolette con lo spazio dentro, come « Mela!Verde77 » alla francese, non arriva più ai modelli: Filo la toglie come quando le virgolette sono attaccate. Lo stesso in francese, tedesco, spagnolo, portoghese, olandese e polacco quando scrivi «le mot de passe est …» invece dei due punti.', segnalazione: 1403 },
         { testo: 'Una password scritta in svedese, turco, russo, cinese o in un\'altra lingua, come «Lösenord: …» o la risposta a chi la chiede in chat, non arriva ai modelli, come succede già con «Password: …».', segnalazione: 2673 },
         { testo: 'Un codice di accesso scritto in francese, tedesco, spagnolo, portoghese, olandese o polacco, come «Le code est 482913» o «der Zugangscode ist 482913», non arriva a nessun modello, come già succedeva in italiano e in inglese.', segnalazione: 1403 },
