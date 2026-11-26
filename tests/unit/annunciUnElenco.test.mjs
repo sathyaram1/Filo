@@ -47,6 +47,6 @@ test('una parola dell\'elenco attaccata a cifre non annuncia niente', () => {
 test('il pavimento e il correttore non tengono un elenco loro', () => {
   for (const f of ['pavimento.js', 'riservatiNelTesto.js']) {
     const src = readFileSync(join(ROOT, 'src', 'shared', f), 'utf8');
-    assert.ok(!/lautet|będzie|является/.test(src), `${f}: le parole stanno in guardianoStatico.js (ANNUNCI)`);
+    assert.ok(!/luidt|brzmi|είναι/.test(src), `${f}: le parole stanno in guardianoStatico.js (ANNUNCI)`);
   }
 });
