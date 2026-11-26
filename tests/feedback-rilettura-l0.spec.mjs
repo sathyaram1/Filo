@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { nelMondoDiFilo, statoDi, clicca, paginaDelloStrato } from './helpers/riquadri.mjs';
-import { CONFIRM_HOST, confirmText, clickConfirm, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm, fillConfirmInput, scrollConfirmToEnd, aspettaConfermaPronta } from './helpers/confirm.mjs';
+import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = 'tests/.shots';
