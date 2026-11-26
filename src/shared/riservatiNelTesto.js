@@ -51,10 +51,13 @@ const SALUTO = new RegExp(`^(?:${SALUTI})$`, 'u');
 // La richiesta più corta è il solo nome in fondo al messaggio («sono arrivato, password del wifi», «Marco: pw di casa»):
 // sulla riga, prima, chi parla o un'altra frase, poi al più un articolo o un saluto; dopo il nome solo di cosa è e la
 // fine della riga. «Password del wifi» da sola è l'etichetta di una pagina, «password dimenticata» non chiede (#2638.1).
-// Le altre lingue come l'italiano: «Marco: пароль от wifi», «τον κωδικό του wifi», «wifi密码» (attaccato, senza spazio).
-const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|i|the|your|tua|vostra|${SALUTI}|wi-?fi|router|home|а|и|τον|το|την|τη|ο|η)(?:\\s+|(?=的?$))))*的?$`, 'u');
-const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|per|for|of|от|для|к|від|του|της|των|til|till|för|af|na|za|pentru|untuk)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua|το)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
-const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:grazie|thanks|thx))?[^\\p{L}\\p{N}]*$`, 'u');
+// Le altre lingue come l'italiano: «Marco: пароль от wifi», «τον κωδικό του wifi», «wifi密码» (attaccato, senza spazio),
+// «le mot de passe du wifi stp», «das WLAN-Passwort bitte» (#1403.14).
+const ELLITTICA_PRIMA = new RegExp(`^\\s*(?:(?:l['’]|(?:la|il|lo|le|les|i|the|your|tua|vostra|el|tu|o|a|teu|das|der|die|dein|deine|ton|ta|votre|${SALUTI}|wi-?fi|wlan|router|home|а|и|τον|το|την|τη|ο|η)(?:\\s+|-|(?=的?$))))*的?$`, 'u');
+const DI_COSA = String.raw`(?:(?:(?:del(?:la|lo)?|di|de|du|des|do|da|per|for|of|vom|von|für|fürs|от|для|к|від|του|της|των|til|till|för|af|na|za|pentru|untuk)\s+|dell['’]\s*)(?:(?:la|il|lo|the|my|mio|mia|tuo|tua|le|el|o|a|das|dem|den|der|ton|ta|mon|ma|tu|teu|mi|το)\s+|l['’]\s*)?[\p{L}\p{N}][\p{L}\p{N}_-]*|wi-?fi|wlan|router|rete|modem|casa|home)`;
+const CORTESIA = "grazie|thanks|thx|please|pls|plz|per\\s+favore|stp|svp|s['’]il\\s+(?:te|vous)\\s+pla[iî]t|merci|bitte|danke"
+  + '|por\\s+favor|porfa|gracias|obrigad[oa]|пожалуйста|спасибо';
+const ELLITTICA_DOPO = new RegExp(`^(?:\\s+${DI_COSA}){0,3}(?:\\s+(?:${CORTESIA}))?[^\\p{L}\\p{N}]*$`, 'u');
 // La fine di una frase, un elenco solo per tutto il file: i punti che vogliono lo spazio dopo e quelli delle scritture
 // senza spazi. Il punto di domanda greco qui è già «?» (minuscolo()).
 const PUNTI = '.!?؟;';
