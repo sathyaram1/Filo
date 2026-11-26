@@ -3,7 +3,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { paginaDellAiuto, statoDi, scrivi, clicca } from './helpers/riquadri.mjs';
 
 const appunti = (app) => app.evaluate(({ clipboard }) => clipboard.readText());
 
