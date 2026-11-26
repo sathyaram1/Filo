@@ -86,7 +86,8 @@ test('il campo del CVV si riconosce dall’etichetta in ogni lingua del paviment
 test('ogni chiamata di crea nell’app passa i nomi del CVV del guardiano', async () => {
   const fs = await import('node:fs');
   const path = await import('node:path');
-  const radice = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../src');
+  const { fileURLToPath } = await import('node:url');
+  const radice = fileURLToPath(new URL('../../src', import.meta.url));
   const chiamate = [];
   const giu = (dir) => {
     for (const voce of fs.readdirSync(dir, { withFileTypes: true })) {
