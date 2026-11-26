@@ -502,7 +502,10 @@ test('una segnalazione proposta da Filo e fermata dalla rilettura: confermata e 
   const a = { type: 'INVIA_FEEDBACK', testo, titolo: 'Zoom', _proposta: true };
   const r = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { richiesta: a.testo }), a);
   expect(r.needsConfirm).toBeGreaterThan(0);
-  await proponiInChat(page, { ...a, _confirm: { level: r.needsConfirm, text: r.describe, parti: r.parti } }, 'prova-proposta');
+  const proposta = { ...a, _confirm: { level: r.needsConfirm, text: r.describe, parti: r.parti } };
+  // Sotto la parola il riquadro si apre da solo; con la parola, dal clic sul bottone.
+  if (r.needsConfirm >= 3) await proponiInChat(page, proposta, 'prova-proposta');
+  else await page.evaluate((a) => window.__filoDashActions.renderActions(document.body.appendChild(document.createElement('div')), [a], { autoConfirm: true }), proposta);
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
   if (r.needsConfirm >= 3) await fillConfirmInput(page, 'conferma');
   await scrollConfirmToEnd(page);
