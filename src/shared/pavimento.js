@@ -71,7 +71,7 @@
   const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
   // Le stesse due regole nelle lingue dei nomi del codice (#1403.13): «Le code de suivi est …», «El código del pedido es …»,
   // «Kod rabatowy to …», «Der Code der Bestellung ist …». «Code» solo col complemento, perché da solo è anche inglese.
-  const SEPARA_ALTRE = `(?:\\s*[:=#]|\\s+(?:${VERBO}|${FUTURO}|to)(?![\\p{L}]))?\\s*$`;
+  const SEPARA_ALTRE = `(?:\\s*[:=#]|\\s+(?:${VERBO}|to)(?![\\p{L}]))?\\s*$`;
   // Il possessivo vale l'articolo («Le code de mon colis», «Kod mojej paczki»). «Le code banque», senza complemento,
   // passa dall'elenco degli identificativi: lì la parola dopo «code» può essere un aggettivo («Le code généré est …»).
   const POSSESSIVO_ALTRE = '(?:mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leurs?|mis|mi|tus?|sus?|nuestr[oa]s?|vuestr[oa]s?'
