@@ -72,6 +72,8 @@ function segui(app, prova, dir) {
 export function accendiCopertura() {
   const dir = process.env.FILO_COPERTURA;
   if (!dir) return;
+  // Dalla config un import di @playwright/test in cima si rompe nella trasformazione dei moduli: si chiede qui.
+  const { _electron, test } = createRequire(import.meta.url)('@playwright/test');
   const proto = Object.getPrototypeOf(_electron);
   if (proto.__filoCopertura) return;
   proto.__filoCopertura = true;
