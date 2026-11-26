@@ -856,9 +856,13 @@
   // Le password scritte a mano (la risposta sotto chi la chiede, «Utente / Password: mario / …», dopo il nome della rete):
   // le forme del correttore, da un posto solo (riservatiNelTesto.js). Qui la risposta conta solo sulle righe sotto la
   // domanda, e solo un valore con una cifra o un simbolo: una parola qualunque resta (tests/unit/pavimento.test.mjs).
-  function scritteAMano(s, out) {
+  // Il codice dato in risposta lo legge codiciVicini, che sa quali numeri non aprono niente (#2692).
+  function riservati() {
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
-    const R = global.SN_RISERVATI_TESTO;
+    return global.SN_RISERVATI_TESTO || null;
+  }
+  function scritteAMano(s, out) {
+    const R = riservati();
     if (!R) return;
     const basso = s.toLowerCase();
     const stesso = basso.length === s.length;
