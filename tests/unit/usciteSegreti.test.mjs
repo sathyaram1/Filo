@@ -271,6 +271,41 @@ describe('codici di recupero e password nelle forme più comuni si riconoscono',
   });
 });
 
+// La password dichiarata nelle lingue dei nomi del pavimento si ferma come «la password è …» (#1403.42).
+describe('una password annunciata in un\'altra lingua, letta da fuori, non esce', () => {
+  for (const testo of [
+    'Hallo Marco, das Passwort ist Gatto2024',
+    'Das WLAN-Passwort lautet Gatto2024.',
+    'Hola, la contraseña es Gatto2024',
+    'Salut, le mot de passe est Gatto2024',
+    'Le mot de passe, c’est Gatto2024',
+    'Olá, a senha é Gatto2024',
+    'Het wachtwoord is Gatto2024',
+    'Hasło to Gatto2024',
+    'Пароль это Gatto2024',
+    'Ο κωδικός είναι Gatto2024',
+  ]) {
+    test(testo, () => {
+      const v = X.valutaUscita({ type: 'NAVIGA', url: 'https://raccolta.example/?v=Gatto2024' }, { pagina: { testo, host: 'posta.example' } });
+      assert.equal(v.blocca, true);
+      assert.equal(v.frase, "non ho aperto l'indirizzo: conteneva una password letta dalla pagina posta.example");
+    });
+  }
+
+  test('il nome della password senza un valore annunciato non fa un segreto', () => {
+    const pagina = { host: 'aiuto.example', testo: [
+      'Passwort vergessen? Ticket 88231.',
+      'Das Passwort ist zu kurz: mindestens 8 Zeichen, zum Beispiel Tr0ub4dor&3.',
+      'Send the password to mario2024 by mail.',
+    ].join('\n') };
+    for (const a of [
+      { type: 'CERCA_WEB', query: 'ticket 88231' },
+      { type: 'CERCA_WEB', query: 'Tr0ub4dor&3 xkcd' },
+      { type: 'CERCA_WEB', query: 'mario2024' },
+    ]) assert.equal(X.valutaUscita(a, { pagina }).blocca, false, JSON.stringify(a));
+  });
+});
+
 describe('dopo le parole del codice, i due punti che annunciano altro non fanno un segreto', () => {
   for (const [nome, testo, azione] of [
     ['il video di una guida alla 2FA', 'Guida alla 2FA: https://www.youtube.com/watch?v=dQw4w9WgXcQ',
