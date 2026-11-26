@@ -398,7 +398,7 @@
         for (const [k, w] of parole.entries()) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
           const cifre = /\d/.test(t);
-          const spiegata = !cifre && !!spiega && !!spiega(parole.slice(0, k + 1));
+          const spiegata = !cifre && !!spiega && !!spiega(parole, k);
           if (cifre ? soloAlnum(t).length < 4 : (soloCifre || spiegata || t.length < MIN_TOKEN || RIEMPITIVI.has(t))) continue;
           out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
         }
