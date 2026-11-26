@@ -76,6 +76,7 @@ for (const nome of NOMI) {
     test.setTimeout(60_000);
     const page = await testServer.openReady(openTab, modulo(nome));
     await superaAvvisoSeC(app);
+    await page.fill('#t', 'Mario Bianchi');
     await page.fill('#c', '8264');
     await expect(page.locator('#c')).toHaveValue('8264');
     await preparaModelli(app);
