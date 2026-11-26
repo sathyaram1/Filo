@@ -6,8 +6,6 @@ import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 import { home } from '../../helpers/chatFinta.mjs';
 
-const tm = (BrowserWindow) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-
 test('r1 il titolo di un file del computer chiuso non parte verso il modello che indicizza l\'archivio', async ({ app }) => {
   test.setTimeout(60_000);
   const dir = join(cartellaTemporanea('referti-'), 'Documenti');
