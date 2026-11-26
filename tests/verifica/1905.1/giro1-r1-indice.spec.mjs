@@ -47,7 +47,7 @@ test('r1 il titolo di un file del computer chiuso non parte verso il modello che
     const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => /^file:/.test(x.url || '') && /referto\.html$/.test(x.url));
     return t && t.title && /Referto/.test(t.title) ? t.id : null;
   })), { timeout: 15_000 }).toBeTruthy();
-  await app.evaluate(({ BrowserWindow }, i) => tm(BrowserWindow).closeTab(i), id);
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.closeTab(i), id);
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.listMeta()).some((x) => /referto\.html$/.test(x.url || ''))),
     { message: 'la scheda chiusa è nell\'archivio' }).toBe(true);
   // Una pagina web chiusa nello stesso momento: lei sì va all'indice, e dice che l'indice gira.
