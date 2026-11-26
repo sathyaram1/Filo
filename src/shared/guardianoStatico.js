@@ -340,7 +340,7 @@
   const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
   // Cinese, giapponese e coreano scrivono anche i due punti larghi (：).
   const ATTACCO = new RegExp(`(?:^|[:：=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following)`
-    + `|(?:${NON_LATINI.ANNUNCI_ATTACCATI})|(?:^|\\s)(?:${NON_LATINI.ANNUNCI_PAROLA}))$`, 'i');
+    + `|(?:${NON_LATINI.ANNUNCI_ATTACCATI}))$`, 'i');
   const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:：=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
   function annunciato(fra, valore = '', { stretto = false } = {}) {
