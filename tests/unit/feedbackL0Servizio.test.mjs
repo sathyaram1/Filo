@@ -240,7 +240,7 @@ test('un CSV allegato con la colonna password dà l\'avviso: punti e virgola, vi
 test('il controllo senza modello che non risponde: niente avviso inventato, e la rilettura vale come saltata', async () => {
   const L0 = crea({
     gate: { async complete() { return { text: '{"trovati":[]}' }; } }, azioni: AZ, log: muto,
-    impostazioni: async () => ({}), statico: { prepara() {}, leggi: async () => null },
+    impostazioni: async () => ({}), statico: { leggi: async () => null },
   });
   const r = await L0.controlla({ testo: 'vedi log', allegati: [{ name: 'a.log', type: 'text/plain', dataUrl: dataUrl('password = hunter22') }] });
   assert.deepEqual(r, { stato: 'saltato' });
