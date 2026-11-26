@@ -44,6 +44,7 @@ function cartella() {
   writeFileSync(join(dir, 'progetto', 'config.toml'), 'api_key = "chiave-toml"\n');
   writeFileSync(join(dir, 'progetto', 'credenziali'), 'PASSWORD="chiave-senza-estensione"\n');
   writeFileSync(join(dir, 'progetto', 'chiavi.ini'), 'CHIAVE_INI="chiave-ini"\n');
+  writeFileSync(join(dir, 'progetto', 'mio.js'), 'var MIO = "gira";\n');
   return dir;
 }
 
