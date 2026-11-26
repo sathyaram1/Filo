@@ -342,7 +342,7 @@
     'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', '(?<!palabras?\\s+)claves?',
     'senhas?', 'palavras?-passe', 'wachtwoord(?:en)?', 'has[łl](?:o|a|em|u)', 'parol(?:ă|a\\s+de|ei)',
     'parola\\s+(?:mea|ta|noastr[ăa]|voastr[ăa]|wi-?fi|wlan|router|re[țţt]elei|contului)',
-    `(?<=(?<!${'[A-Za-z\\u00C0-\\u024F]'})(?:care\\s+(?:e|este|era)|d[ăa]-mi|trimite-mi|spune-mi|zi-mi|[șşs]tii|ai)\\s+)parola`,
+    '(?<=(?<![A-Za-z\\u00C0-\\u024F])(?:care\\s+(?:e|este|era)|d[ăa]-mi|trimite-mi|spune-mi|zi-mi|[șşs]tii|ai)\\s+)parola`,
     'parool(?:i|e)?', 'l[öo]senord(?:et|en)?', 'passord(?:et|ene)?', 'adgangskode(?:n|r|rne)?', 'kodeord(?:et)?',
     'salasan(?:a|an|aa|asi|ani)', 'jelsz(?:[óo]t?|av(?:a|ad|am|ak|at)?)', 'hesl(?:o|a|em|u|e)', 'gesl(?:o|a|om|u)',
     '[şs][iİı]\\u0307?fre(?:si|yi|n|niz|nizi|ler|m|mi|min|miz|ni|nin)?', 'lozink(?:a|e|u|om|i)', 'slapta[žz]od(?:is|į|žio|i)',
