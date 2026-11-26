@@ -289,7 +289,7 @@ test('il codice per sbloccare il proprio telefono o computer, detto col possessi
   ]) assert.equal(P.oscura(t), t, t);
 });
 
-test('il codice del proprio telefono esce nemmeno con un\'altra preposizione, la parola che dice a cosa serve, un avverbio o un refuso', () => {
+test('il codice del proprio telefono non esce nemmeno con un\'altra preposizione, la parola che dice a cosa serve, un avverbio o un refuso', () => {
   for (const t of [
     'The code to my phone is 5101', 'Il codice per il mio telefono è 5102', 'Il mio telefono ha il codice 4829',
     'Le code secret de mon téléphone est 4829', 'Le code de déverrouillage de mon téléphone est 4829',
