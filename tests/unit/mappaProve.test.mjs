@@ -177,7 +177,8 @@ test('finish:check: coi file che la mappa conosce sceglie lei dalle righe cambia
     scrivi('src/main/x.js', `// uno\n// due\n${SORGENTE['src/main/x.js']}`);
     g('commit', '-qam', 'main va avanti');
     g('checkout', '-q', '-b', 'lavoro');
-    scrivi('src/main/x.js', `// uno\n// due\n${SORGENTE['src/main/x.js'].replace('return 1;', 'return 9;')}`);
+    // Una riga dentro a() e una del modulo, che gira a ogni caricamento.
+    scrivi('src/main/x.js', `// uno\n// due\n${SORGENTE['src/main/x.js'].replace('return 1;', 'return 9;').replace('a();\n', 'a(); a();\n')}`);
     scrivi('src/main/y.js', 'module.exports = 1;\n');
     g('add', '-A'); g('commit', '-qm', 'lavoro');
     const m = { ...mappa(), commit: commitMappa };
