@@ -41,7 +41,6 @@ async function aiutoCheTaglia(app, pagina) {
 
 async function chiediAFilo(app, shell, page, testo) {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
-  console.log('SNAP', JSON.stringify(await shell.evaluate(async () => window.filoShell.tabs.snapshot())).slice(0, 1500), page.url());
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
   const aiuto = await paginaDellAiuto(app, page);
   await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
