@@ -78,6 +78,20 @@ test('il CVV chiamato col suo nome nelle lingue delle etichette si toglie come �
     assert.equal(P.oscura(riga), riga);
 });
 
+test('il CVV col suo nome nelle lingue delle etichette si toglie; la frase che lo descrive resta (#2681)', () => {
+  for (const [riga, v] of [
+    ['Le cryptogramme est 123', '123'], ['El código de seguridad es 123', '123'], ['Die Kartenprüfnummer ist 123', '123'],
+    ['Le CVV est 123', '123'], ['Le cryptogramme visuel : 592', '592'], ['Le code de sécurité de la carte est 789', '789'],
+    ['O código de segurança é 321', '321'], ['Codi de seguretat: 888', '888'], ['KARTENPRÜFNUMMER: 4321', '4321'],
+    ['Ihr Sicherheitscode lautet 555', '555'], ['De beveiligingscode is 222', '222'], ['Kod bezpieczeństwa karty to 333', '333'],
+    ['Код безопасности: 444', '444'], ['Κωδικός ασφαλείας: 666', '666'], ['Card verification value: 777', '777'],
+    ['Il CVV era 615', '615'],
+  ]) assert.ok(!P.oscura(riga).includes(v), riga);
+  for (const riga of ['Le cryptogramme est un code à 3 chiffres', 'El código de seguridad tiene 3 dígitos',
+    'Die Prüfziffer der IBAN ist 89', 'Kod bezpieczeństwa to trzy cyfry', 'Send the CVV to 123 Main St',
+    'Cryptogrammeur 123']) assert.equal(P.oscura(riga), riga);
+});
+
 test('un codice usa e getta e una chiave col suo prefisso non escono', () => {
   const t = P.oscura('Il tuo codice OTP è 482913. Chiave: sk-abcdefghijklmnop1234567890');
   assert.ok(!t.includes('482913'));
