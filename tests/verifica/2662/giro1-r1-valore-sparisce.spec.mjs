@@ -18,8 +18,9 @@ test('r1 il valore scritto in una frase resta leggibile nella riga della cronolo
   test.setTimeout(60_000);
   const page = await home(app);
   await app.evaluate((_e, v) => globalThis.SN_STORAGE.updateSettings({ agentStyle: v }), STILE);
-  const riga = page.locator('.dash-cambio', { hasText: 'stile dell' }).last();
-  await expect(riga).toBeVisible({ timeout: 10_000 });
+  const prima = page.locator('.dash-cambio', { hasText: 'stile dell' }).last();
+  await expect(prima).toBeVisible({ timeout: 10_000 });
+  const riga = page.locator(`.dash-cambio[data-id="${await prima.getAttribute('data-id')}"]`);
 
   const ferma = await misura(riga);
   await riga.hover();
