@@ -180,6 +180,29 @@ test('un\'etichetta in grassetto o corsivo Markdown coi due punti dentro copre i
   }
 });
 
+// #2673.6 — in un file di testo di Windows «Password:» a capo e il valore arrivavano ai modelli.
+test('con gli a capo di Windows o col solo \\r il testo si copre come con l\'a capo semplice, e gli a capo restano', () => {
+  assert.equal(P.oscura('Password:\r\nNyckel!2024'), `Password:\r\n${S}`);
+  assert.equal(P.oscura('Wi-Fi password:\r\nNyckel!2024\r\nSSID: Casa'), `Wi-Fi password:\r\n${S}\r\nSSID: Casa`);
+  assert.equal(P.oscura('Password:\rNyckel!2024\rSSID: Casa'), `Password:\r${S}\rSSID: Casa`);
+  assert.equal(P.oscura('Note\nPassword:\r\nGirasole2024\nfine'), `Note\nPassword:\r\n${S}\nfine`);
+  const casi = [
+    'Password:\nNyckel!2024', 'Password:\n\nGirasole2024', 'Password:\nhunter\n', 'Password del wifi\n\n\nGirasole2024',
+    'Router Wi-Fi password:\n\nFaro#Blu55', 'La mia password:\n  Girasole2024  ', 'Utente: mario\nPassword: tramonto\n',
+    'Password: casa mia al mare 2019\nSSID: Casa', 'Il tuo codice di verifica\n\n904127\n\nScade tra 10 minuti.',
+    'Your one-time codes:\n4417 2290\n8810 3321', 'nome,password\nmario,Girasole2024\nluca,Faro#Blu55\n',
+    '| Servizio | Password |\n|---|---|\n| posta | Girasole2024 |',
+    '-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: GnuPG v2\n\nlQOYBF3jN2kBCAC5q8xR2vT7mN4pK9wL3sA1dF6gH8jZ0cX2vB5nM7qW4eR9tY1u\n=Ab3x\n-----END PGP PRIVATE KEY BLOCK-----',
+    'Wi-Fi password:\nchiedi al bancone', 'Reset your password:\nhttps://example.com/reset', 'Lista della spesa\nlatte\npane',
+  ];
+  for (const lf of casi) {
+    for (const a of ['\r\n', '\r']) assert.equal(P.oscura(lf.replaceAll('\n', a)), P.oscura(lf).replaceAll('\n', a), JSON.stringify(lf));
+  }
+  const crlf = 'Utente: mario\r\nPassword: tramonto\r\n';
+  assert.deepEqual(P.trova(crlf).filter((x) => Number.isInteger(x.inizio)).map((x) => crlf.slice(x.inizio, x.inizio + x.valore.length)),
+    P.trova(crlf).filter((x) => Number.isInteger(x.inizio)).map((x) => x.valore), 'i posti sono quelli del testo vero');
+});
+
 test('un codice di accesso con le lettere esce intero, non solo le sue cifre; l\'anno altrove resta', () => {
   const t = P.oscura('Codice di accesso: Girasole2024. Contratto firmato nel 2024.');
   assert.ok(!t.includes('Girasole'));
