@@ -175,9 +175,17 @@
   const RELATIVA = /^\s*,\s*(?:den|die|das|der|dem|welche[nmrs]?|che|which|that|que|qui|kt[óo]r\p{L}*)\s[^,;!?\n\d]{1,40},/iu;
   const SENZA_VIRGOLETTA = new RegExp(`(?:${INTORNO_APERTE}[ \\t]*)+$`);
   const DOPO_VIRGOLETTA = new RegExp(`^(?:[ \\t]*${INTORNO_CHIUSE})+`);
-  function alPostoDelCodice(z, m, inTesta, forte) {
+  // `risposta`: la riga sotto la domanda, dove il codice può venire dopo «certo,» e, in una conversazione copiata, dopo
+  // chi scrive («Marco: qual è il pin?» / «Luc: 4821», #2692).
+  function alPostoDelCodice(z, m, inTesta, forte, risposta) {
     const prima = z.slice(0, m.index).replace(SENZA_VIRGOLETTA, '');
-    if (inTesta) return !prima.trim();
+    if (inTesta) {
+      const R = riservati();
+      if (!prima.trim()) return true;
+      if (!risposta || !R) return false;
+      const parla = risposta.chat ? R.parlaInChat(prima) : null;
+      return R.apreLaRisposta(parla ? parla.resto : prima);
+    }
     if (PRIMA_DEL_NOME.test(z.slice(m.index + m[0].length).replace(DOPO_VIRGOLETTA, ''))) return true;
     const da = Math.max(0, prima.length - CODA);
     const n = [...prima.slice(da).matchAll(NOMI_CODICE)].pop();
