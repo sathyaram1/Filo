@@ -121,7 +121,9 @@
   // chiudere l'etichetta, così «il codice del telefono del cliente» e «my phone number» restano identificativi.
   const POSSESSIVO = `(?:mi[oaei]|tu[oaei]|su[oaei]|nostr[oaei]|vostr[oaei]|loro|my|your|his|her|our|their|${POSSESSIVO_ALTRE}`
     + '|(?:mein|dein|sein|ihr|unser|eur)\\p{L}*|mijn|jouw|je|uw|zijn|haar|onze?)';
+  // L'elenco degli apparecchi è uno solo: vale per la frase col possessivo e per l'etichetta senza (#1403.44).
   const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
+    + '|t[ée]l|celus?|compus?|gsms?|smartphones?'
     + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
     + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
     + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
