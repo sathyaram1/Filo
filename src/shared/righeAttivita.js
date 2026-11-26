@@ -433,7 +433,7 @@
     ACCOUNT: (a) => {
       const o = a._output || {};
       // Chi era già dove chiedeva non ha avuto niente di nuovo: la riga lo dice e resta fuori dal riassunto.
-      const gia = { dentro: 'Eri già dentro Filo', collegato: 'YouTube, Gmail e Drive erano già collegati', fuori: 'Non eri dentro nessun account' }[o.gia];
+      const gia = Object.hasOwn(GIA_ACCOUNT, o.gia) ? GIA_ACCOUNT[o.gia] : '';
       if (gia) return { icon: '👤', text: gia, failed: true };
       const fatto = { accedi: 'Accesso con Google aperto', collega_google: 'Collegamento di YouTube, Gmail e Drive aperto', esci: 'Uscito dall\'account di Filo' }[o.voce];
       return { icon: '👤', text: fatto || 'Account' };
@@ -460,6 +460,21 @@
       return { icon: '🧰', text: testo };
     },
   };
+  const GIA_ACCOUNT = { dentro: 'Eri già dentro Filo', collegato: 'YouTube, Gmail e Drive erano già collegati', fuori: 'Non eri dentro nessun account' };
+  // Un esito per ogni riga di una mossa senza effetto: le chat salvate prima che la voce la marcasse ne tengono la
+  // frase solo come perché, e riaperte la riconoscono da lì (#553.16). Sentinella: tests/unit/esitiInArchivio.test.mjs.
+  const PROVE_SENZA_EFFETTO = {
+    COMANDO_FINESTRA: [{ comando: 'home', _output: { window: 'home', already: true } }],
+    ACCOUNT: Object.keys(GIA_ACCOUNT).map((gia) => ({ _output: { gia } })),
+    BARRA_SITI: [
+      { operazione: 'aggiungi', _output: { gia: true, invariata: true } },
+      ...['rinomina', 'sposta', 'togli'].map((operazione) => ({ operazione, _output: { invariata: true } })),
+    ],
+    CHIUDI_SCHEDE: ['niente', 'sito'].map((nessuna) => ({ _output: { chiuse: 0, nessuna } })),
+  };
+  function proveSenzaEffetto(type) {
+    return (Object.hasOwn(PROVE_SENZA_EFFETTO, type) ? PROVE_SENZA_EFFETTO[type] : []).map((p) => ({ type, _executed: true, ...p }));
+  }
   // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
   // del diario resta (è successo qualcosa), ma non promette il contrario.
   const FAILED_LABELS = {
@@ -705,7 +720,7 @@
   }
 
   global.SN_RIGHE_ATTIVITA = {
-    riga: rigaAttivita, rigaArchivio, testoSegnalazione, pulito, FAILED_LABELS, etichettaFallita, etichettaNonFatta, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
+    riga: rigaAttivita, rigaArchivio, proveSenzaEffetto, testoSegnalazione, pulito, FAILED_LABELS, etichettaFallita, etichettaNonFatta, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
     rifiutataDallaRegola, sceltaContatori, sceltaAutonomia, testoRicercaDocumenti, testoRicercaSalvate, testoRinominati, testoEliminati,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

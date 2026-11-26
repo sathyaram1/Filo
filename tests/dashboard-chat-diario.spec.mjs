@@ -569,6 +569,40 @@ test('F6 — la home chiesta dalla home, riletta da una scheda nuova o dalla hom
   await restore(app, '__fakeF6');
 });
 
+// #553.16 — una chat salvata dalla 0.2.302 tiene la mossa senza effetto come non riuscita, col perché che ripete la
+// frase della diretta: riaperta, mostra quella frase con la sua icona, non il triangolo di un comando non eseguito.
+test('F7 — una mossa senza effetto salvata dalla versione di prima, riaperta, si legge come in diretta', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await newtabPage(app);
+  const id = 'chat-salvata-dalla-302';
+  const esiti = [
+    { type: 'COMANDO_FINESTRA', esito: 'fallito', riga: 'Aprire la home di Filo', motivo: 'Sei già nella home' },
+    { type: 'BARRA_SITI', esito: 'fallito', riga: 'Mettere nella barra dei siti «youtube.com»', parti: ['Mettere nella barra dei siti ', { citazione: 'youtube.com' }], motivo: 'È già nella barra dei siti · YouTube' },
+    { type: 'ACCOUNT', esito: 'fallito', riga: 'Usare il menu dell\'account di Filo', motivo: 'Eri già dentro Filo' },
+    { type: 'TIMER', esito: 'fallito', riga: 'Avviare un timer', motivo: 'troppi timer' },
+  ];
+  await app.evaluate(async (_e, { chatId, voci }) => {
+    await globalThis.SN_FILO_CHATS.append(chatId, { role: 'user', text: 'portami alla home e metti youtube nella barra' });
+    await globalThis.SN_FILO_CHATS.append(chatId, { role: 'filo', text: 'Era già tutto a posto.', esiti: voci });
+  }, { chatId: id, voci: esiti });
+  const riaperta = await openTab(`filo://dashboard/dashboard.html?chat=${id}`);
+  const bolla = riaperta.locator('.dash-bubble-filo', { hasText: 'Era già tutto a posto' });
+  await expect(bolla).toBeVisible({ timeout: 10_000 });
+  const righe = bolla.locator('.dash-activity-row');
+  await expect(righe).toHaveCount(4);
+  const viste = await righe.evaluateAll((rs) => rs.map((r) => [r.querySelector('.dash-activity-row-icon')?.textContent || '', r.textContent.replace(/\s+/g, ' ').trim()]));
+  await riaperta.screenshot({ path: 'tests/.shots/diario-senza-effetto-salvate-prima.png' });
+  expect(viste[0]).toEqual(['🏠', expect.stringMatching(/Sei già nella home$/)]);
+  expect(viste[1]).toEqual(['📌', expect.stringMatching(/È già nella barra dei siti · YouTube$/)]);
+  expect(viste[2]).toEqual(['👤', expect.stringMatching(/Eri già dentro Filo$/)]);
+  for (const [, testo] of viste.slice(0, 3)) expect(testo).not.toMatch(/non eseguito|non cambiat|non riuscit|⚠/i);
+  // Un guasto vero resta l'avviso.
+  expect(viste[3][0]).toBe('⚠');
+  // Il nome della voce sta nel suo riquadro, come in diretta.
+  await expect(righe.nth(1).locator('.dash-altrui')).toHaveText('YouTube');
+});
+
 // La spunta sotto un appunto salvato chiude la conversazione come il bottone della home, e lo dice.
 test('F3 — la spunta dopo un appunto salvato chiude la conversazione', async ({ app, shell }) => {
   test.setTimeout(60_000);

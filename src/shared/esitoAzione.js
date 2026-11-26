@@ -460,6 +460,8 @@
     if (!TIPO.test(type)) return null;
     const giaFatta = valido(x.esito) && !Object.keys(x).some((k) => k.startsWith('_'));
     if (giaFatta) {
+      const salvata = comeInDiretta({ ...x, type });
+      if (salvata.senzaEffetto === true && x.senzaEffetto !== true) return salvata;
       const f = type === 'APRI_FILE' && x.file ? fileDi(x.file) : null;
       const generica = SENZA_TITOLO[type] ? SENZA_TITOLO[type][x.esito === CHIESTO ? 0 : 1] : '';
       return senzaVuoti({
@@ -551,6 +553,28 @@
     const R = global.SN_RIGHE_ATTIVITA;
     try { return R ? R.rigaArchivio(x) : null; } catch (_) { return null; }
   }
+  // Una mossa senza effetto salvata prima che la voce la marcasse (0.2.302 e 0.2.303): non riuscita, col perché che
+  // ripete la frase della diretta. Riletta si dice come quella, con la sua icona; le altre voci tornano come sono (#553.16).
+  function comeInDiretta(v) {
+    if (!v || v.esito !== FALLITO || v.senzaEffetto === true || v.no === true || v.partita === true || v.riprova === true) return v;
+    const R = global.SN_RIGHE_ATTIVITA;
+    const m = pulito(v.motivo);
+    if (!m || !R || typeof R.proveSenzaEffetto !== 'function') return v;
+    for (const p of R.proveSenzaEffetto(String(v.type || ''))) {
+      const d = rigaDelDiario(p);
+      const testo = d && d.failed ? pulito(d.text) : '';
+      const perche = testo ? pulito(motivo(p)) || testo : '';
+      if (!perche || (m !== perche && !m.startsWith(`${perche} · `))) continue;
+      // Il nome dopo la frase (la voce della barra) l'ha scelto chi l'ha messa: in diretta sta nel suo riquadro.
+      const nome = perche === testo && m !== perche ? m.slice(perche.length + 3) : '';
+      return senzaVuoti({
+        type: v.type, esito: FALLITO, riga: breve(perche === testo ? m : testo, MAX_RIGA),
+        parti: nome ? [`${testo} · `, { citazione: nome, nuda: true }] : null,
+        motivo: perche === testo ? '' : breve(m, MAX_MOTIVO), senzaEffetto: true, icona: d.icon,
+      });
+    }
+    return v;
+  }
   // Tutte, senza tetto: un turno con cento letture le racconta tutte.
   function vociArchivio(lista) {
     return (Array.isArray(lista) ? lista : []).map(voceArchivio).filter(Boolean);
@@ -593,8 +617,9 @@
     const fumetto = S ? S.fumetto({ titolo: v.titoloSegnalazione, testo: v.segnalazione }, { ripiego: false }) : '';
     return fumetto ? { ...r, fumetto } : r;
   }
-  function rigaSenzaFumetto(v) {
-    if (!v || !v.type) return null;
+  function rigaSenzaFumetto(voce) {
+    if (!voce || !voce.type) return null;
+    const v = comeInDiretta(voce);
     const riga = pulito(v.riga);
     if (v.type === 'FERMATA') return { icona: '🔒', testo: riga || 'Fermata: avrebbe portato fuori un segreto', fallita: true };
     // La riga a pezzi, se il testo altrui c'è: chi disegna lo mette nel suo riquadro (#592.25).
@@ -647,8 +672,9 @@
         ? 'proposta dalla segnalazione automatica di Filo, non da te' : 'proposta da te';
       return ` (${chi}; testo intero: «${corpo}»)`;
     };
-    return (Array.isArray(voci) ? voci : []).map((v) => {
-      if (!v || !v.type) return '';
+    return (Array.isArray(voci) ? voci : []).map((voce) => {
+      if (!voce || !voce.type) return '';
+      const v = comeInDiretta(voce);
       const cosa = campo(v.riga) || v.type;
       if (v.type === 'FERMATA') return `- NON fatta, fermata da Filo (un segreto non esce): ${cosa}`;
       if (v.esito === CHIESTO) return `- NON fatta: chiesta la conferma all'utente, che allora non l'aveva ancora data: ${cosa}${segnalazione(v)}`;

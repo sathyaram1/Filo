@@ -18,6 +18,7 @@
         { testo: 'Nelle righe dei cambi della home e nel segno di spunta sul tuo messaggio, il valore di un\'impostazione scritto da te o scelto da Filo per te sta nel suo riquadro, così non si confonde con le parole di Filo.', segnalazione: [2655, 2657] },
         { testo: 'Quando traduci la pagina, i riquadri incorporati da un sito dove hai spento Filo, come un blocco di commenti, restano com\'erano, e l\'avviso finale dice quale sito è rimasto fuori.', segnalazione: 2656 },
         { testo: 'Il numero di carta o il codice che hai scritto in una bozza resta tuo anche dopo aver chiuso e riaperto Filo: se il sito te la rimette davanti e chiedi aiuto all\'assistente, Filo non lo tratta più come un segreto letto dalla pagina e non lo tiene per un mese fra quelli da non far uscire.', segnalazione: 810 },
+        { testo: 'In una conversazione riaperta, una richiesta che non ha cambiato niente, come la home chiesta mentre eri già lì, un sito già nella barra o l\'accesso quando eri già dentro, si legge come quando Filo ti aveva risposto, con la sua icona e senza l\'avviso di errore, anche nelle conversazioni salvate prima. Filo non la conta più fra le cose fatte.', segnalazione: 553 },
       ],
     },
     {
@@ -43,7 +44,7 @@
     {
       version: '0.2.302', date: '2026-11-24',
       fixes: [
-        { testo: 'Se chiedi a Filo di portarti alla home mentre ci sei già, in una scheda nuova o nella home ricaricata sotto la sua risposta resta scritto «Sei già nella home», come quando ti aveva risposto e senza avvisi di errore, e Filo nei messaggi dopo non lo conta fra le cose fatte, nemmeno nelle conversazioni salvate prima. Lo stesso per le altre richieste che non cambiano niente, come un sito già nella barra.', segnalazione: 553 },
+        { testo: 'Se chiedi a Filo di portarti alla home mentre ci sei già, in una scheda nuova o nella home ricaricata sotto la sua risposta resta scritto «Sei già nella home», come quando ti aveva risposto, e Filo nei messaggi dopo non lo conta fra le cose fatte.', segnalazione: 553 },
         { testo: 'Nel racconto di quello che Filo ha fatto, anche in una chat riaperta, il nome di un timer o di una sveglia, una pagina aperta, un comando, il valore di un\'impostazione cambiata, l\'errore di un programma e gli altri testi scelti da un modello o da un sito stanno nel loro riquadro, anche sul pulsante dopo l\'OK: non si leggono più come parole di Filo.', segnalazione: 2648 },
       ],
     },
