@@ -284,7 +284,7 @@ function chiusaDavvero(l, r) {
 // Il messaggio sopra il campo a cui il campo risponde: { tipo, chiesta, data } o null. Con la risposta già sopra
 // (`data`) il campo perde solo le parole con la forma di una password: una seconda password sì, le parole normali no.
 function richiestaAperta(sopra) {
-  const l = sopra.toLowerCase();
+  const l = minuscolo(sopra);
   const tutte = richieste(l, true);
   let ultima = null;
   for (const r of tutte) {
