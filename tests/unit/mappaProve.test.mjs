@@ -7,7 +7,12 @@ import {
   percorsoDaIndirizzo, iniziDiRiga, rigaDi, durateDaRapporto, unisciRegistrazioni, costruisciMappa, righeDellaMappa,
   mappaDaRegistro, blocchiDelDiff, righeDelBlocco, rigaSullaMappa, proveDelCambio,
 } from '../../scripts/lib/mappaProve.mjs';
-import { leggiArgomenti, testoScelta } from '../../scripts/mappa-prove.mjs';
+import { leggiArgomenti, testoScelta, leggiMappa } from '../../scripts/mappa-prove.mjs';
+import { specDellaScelta, testoDellaMappa } from '../../scripts/finish-local.mjs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = '/repo/Filo';
 
