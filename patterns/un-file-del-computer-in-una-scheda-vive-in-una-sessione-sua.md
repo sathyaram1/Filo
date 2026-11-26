@@ -34,6 +34,11 @@ stessa origine dei suoi file e legge tutto. Una CSP `sandbox` non basta: in un'o
 più le immagini `file:` (provato in #1905). In più `nosniff` su ogni risposta: un `.txt` o un `.json` non gira come
 script, così le sue righe non diventano variabili della pagina.
 
+Il prezzo è quello di un browser: uno script `type="module"` e ogni risorsa marcata `crossorigin` chiedono un permesso
+fra origini che un file non dà, e non si caricano. Un sito costruito (Vite e simili) aperto dal disco resta vuoto; la
+novità lo dice, e la prova «un sito costruito e aperto dal disco» lo tiene. Riaprire quel permesso riaprirebbe anche
+la tela (`<img crossorigin>`).
+
 Il fusibile è del binario, non della sessione, e va spento dappertutto:
 
 - nel pacchetto, in `scripts/after-pack.js`, su ogni sistema, prima della firma del Mac e del lanciatore di Linux;
