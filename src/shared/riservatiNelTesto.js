@@ -39,7 +39,8 @@ const RICHIESTA = new RegExp([
     + '|t[\'’]as|c[\'’]est\\s+quoi|quel\\s+est|j[\'’]ai\\s+besoin|(?:schick|gib|sag|nenn)(?:e|st)?\\s+mir'
     + '|(?:kannst|könntest|hast|weißt|weisst)\\s+du|wie\\s+(?:ist|lautet|war)|was\\s+ist|ich\\s+brauche'
     + '|(?:m[aá]nda|p[aá]sa|env[ií]a|d[aá]|di)me(?:l[ao])?|me\\s+(?:pasas|mandas|das|dices|env[ií]as|passa|manda|diz|envia)'
-    + '|puedes|podr[ií]as|tienes|sabes|necesito|pode|podes|poderia|tem|preciso|cu[aá]l\\s+es)',
+    // «preciso» da solo è anche italiano («preciso che la password scade…»): conta col «da/do/de» del portoghese.
+    + '|puedes|podr[ií]as|tienes|sabes|necesito|pode|podes|poderia|tem|preciso\\s+d[aoe]s?|cu[aá]l\\s+es)',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|')
   // Le scritture senza spazi non hanno confine fra le parole: «密码是多少».
   // 吗 e 呢 chiudono la domanda al posto del punto di domanda: «你知道wifi密码吗», «密码呢».
