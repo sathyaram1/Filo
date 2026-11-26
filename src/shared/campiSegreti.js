@@ -228,7 +228,7 @@
     }
 
     return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti, NOMI_DEI_CAMPI, ETICHETTE_NON_LATINE,
-      ANNUNCI_ATTACCATI, ANNUNCI_PAROLA, FINE_VALORE };
+      LETTERA, ANNUNCI_ATTACCATI, FINE_VALORE, APRE_VALORE };
   }
 
   // Il testo della regola delle etichette del pavimento, da passare a `crea`: una lista sola per campi e testo.
