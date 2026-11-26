@@ -90,6 +90,10 @@ test('dopo la frase che porta la password il resto della risposta parte intero, 
 test('un pin chiesto parte senza le sue cifre; per un codice le parole senza cifre restano', () => {
   assert.equal(risposta('è 4821, non dirlo a nessuno', 'Luca: qual è il pin del bancomat?').nuovo, 'è [dato riservato], non dirlo a nessuno');
   assert.equal(risposta('certo, domani mattina', 'Luca: mi mandi il codice?').nuovo, 'certo, domani mattina');
+  // #1403.35 — anche chiesto col nome che gli danno le banche.
+  for (const sopra of ['Luca: qual è il numero segreto della carta?', 'Luca: wie ist deine Geheimzahl?', 'Luca: ¿cuál es el número secreto?']) {
+    assert.equal(risposta('è 4821, non dirlo a nessuno', sopra).nuovo, 'è [dato riservato], non dirlo a nessuno', sopra);
+  }
 });
 
 // #1403.14 — la domanda che nomina la password in un'altra lingua la chiede come quella in italiano.

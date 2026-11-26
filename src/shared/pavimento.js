@@ -52,7 +52,13 @@
   // prefisso («Use 337164 to verify», «G-482913»), perché «Verificato da 1532 utenti» non è un codice. Un anno resta.
   // Il nome del codice anche nelle lingue delle etichette (#1403.13): «código», «kod», i composti tedeschi e olandesi
   // («Zugangscode», «verificatiecode») elencati, perché «barcode» o «unicode» non annunciano un segreto.
-  const NOMI_DEL_CODICE = '\\b(?:codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa|c[óo]digos?|kod(?:u|em|y)?'
+  // I nomi del PIN senza «codice» (#1403.35): «numero segreto», «Geheimzahl» (il PIN della carta per le banche tedesche),
+  // «Pincode». Dicono da soli che il numero apre qualcosa, anche accanto a un cliente o a un ordine.
+  const NOMI_DEL_PIN = '(?:pin-?(?:codes?|nummern?)|geheim(?:zahl(?:en)?|nummern?|codes?)|geheime?\\s+(?:nummer|code)'
+    + '|n[uú]m[eé]r[oi]s?\\s+(?:segret[oi]|secret[oa]?s?|confidenzial[ei]|confidentiels?|confidencial(?:es)?|riservat[oi])'
+    + '|secret\\s+(?:numbers?|pins?)|confidential\\s+(?:numbers?|pins?)|tajn(?:y|ego|ym)\\s+numer(?:u|em)?)';
+  const NOME_PIN = new RegExp(`\\b${NOMI_DEL_PIN}\\b`, 'i');
+  const NOMI_DEL_CODICE = `\\b(?:${NOMI_DEL_PIN}|codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa|c[óo]digos?|kod(?:u|em|y)?`
     + '|(?:zugangs|sicherheits|best[äa]tigungs|verifizierungs|verifikations|anmelde|einmal|aktivierungs|freischalt(?:ungs)?'
     + '|entsperr|autorisierungs|authentifizierungs|tür|toegangs|verificatie|beveiligings|bevestigings|inlog|login|activatie)codes?)\\b';
   const NOME_CODICE = new RegExp(NOMI_DEL_CODICE, 'i');
@@ -107,7 +113,7 @@
   const NOME_ALTRE = /(?<![\p{L}])(?:code|c[óo]digo|kod)(?![\p{L}])/giu;
   const LEGAMI_ALTRE = /^(?:\s+|[dl]['’]|(?:de|du|des|del|do|da|dos|das|la|las|los|le|les|el|o|a|os|as|à|al|au|aux|pour|para|f[üu]r|vom|von|der|die|das|dem|den|zur|zum|van|het|od|ton|ta|votre|tu|su|seu|sua)(?![\p{L}]))+/iu;
   const DOPO_IL_NOME = new RegExp(`^${SEPARA_ALTRE}`, 'u');
-  const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
+  const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|confidenzial\w*|riservat\w*|privat\w*|confidential|private|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
   // Le cose che un codice apre: il loro codice è un segreto anche col nome comune davanti («Il codice del cancello è
   // 4829», «Codice di ritiro: 640385»). Contano solo come nome del codice, cioè subito dopo «codice» o subito prima di
   // «code»: «Videocitofono Wi-Fi, codice prodotto 4829» è un identificativo. «Porta» è anche un verbo: solo lì.
@@ -198,6 +204,7 @@
           const frase = pezzi[f];
           const nome = NOME_CODICE.test(frase);
           const forte = SEGNO_FORTE.test(frase);
+          const pinNellaFrase = nome && NOME_PIN.test(frase);
           // Senza il nome del codice: «Per aprire il cancello digita 3958», non «Apri il file e inserisci 48291».
           const perAprire = PER_APRIRE.test(frase) && (APRE.test(frase) || /\b(?:port[ae]|entra(?:re)?)\b/i.test(frase));
           if (!nome && !forte && !perAprire) continue;
@@ -221,10 +228,13 @@
               const prima = z.slice(Math.max(0, m.index - CODA), m.index).replace(SENZA_VIRGOLETTA, '');
               const etichetta = inTesta ? frase.slice(-CODA) : prima;
               const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
-              const entra = forte || chiave.apre;
+              // Il PIN conta se è lui il nome più vicino al numero: in «Codice cliente 4829, numero segreto…» il numero è del cliente.
+              const ultimo = pinNellaFrase ? [...etichetta.matchAll(NOMI_CODICE)].pop() : null;
+              const pin = !!ultimo && NOME_PIN.test(ultimo[0]);
+              const entra = forte || pin || chiave.apre;
               if (nonApre && !(nome && entra)) continue;
               if (predefinito && chiave.pin && !forte) continue;
-              if (nome ?!(alPostoDelCodice(z, m, inTesta, forte) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
+              if (nome ? !(alPostoDelCodice(z, m, inTesta, forte || pin) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
                 : !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
               // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
               if (!lettere && !m[2] && ANNO.test(v) && !chiave.solo) continue;
@@ -896,7 +906,8 @@
     return giro(valore, 0);
   }
 
-  // ETICHETTE: il testo della regola dei nomi della password, per i campi dei moduli (campiSegreti.js).
-  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, ETICHETTE: ETICHETTA_NUDA };
+  // ETICHETTE: il testo della regola dei nomi della password, per i campi dei moduli (campiSegreti.js); NOMI_DEL_PIN per
+  // i segreti detti dall'utente che non devono uscire in un indirizzo (urlExfil.js).
+  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, ETICHETTE: ETICHETTA_NUDA, NOMI_DEL_PIN };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAVIMENTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
