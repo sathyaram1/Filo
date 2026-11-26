@@ -22,6 +22,12 @@ const casi = [
   ['conversazione copiata da Telegram',
     'Marco, [26.11.26 15:42]\nmi mandi la password?\n\nLuc, [26.11.26 15:43]\nGatto2024',
     'Marco, [26.11.26 15:42]\nqual è il pin della carta?\n\nLuc, [26.11.26 15:43]\n4821', '4821'],
+  ['saluto col nome prima del numero',
+    'Marco: mi mandi la password?\nLuc: ciao Marco! Gatto2024',
+    'Marco: qual è il pin della carta?\nLuc: ciao Marco! 4821', '4821'],
+  ['la domanda copiata senza il nome di chi la fa',
+    'mi mandi la password?\nLuc: Gatto2024',
+    'qual è il pin?\nLuc: 4821', '4821'],
 ];
 
 for (const [nome, password, pin, valore] of casi) {
