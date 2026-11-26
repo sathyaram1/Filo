@@ -28,7 +28,7 @@ test('r1 il valore di una frase si legge nella riga del cambio almeno quanto pri
   expect(await visto(riga), 'riga ferma: del valore si leggono le prime parole').toBeGreaterThanOrEqual(55);
 });
 
-test('r1 con tre valori cambiati insieme il primo si legge, e la riga non si tronca a metà parola senza puntini', async ({ app }) => {
+test('r1 con tre valori cambiati insieme il primo si legge', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
   const tts = await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.tts || {}));
