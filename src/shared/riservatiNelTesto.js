@@ -223,7 +223,7 @@ function parlaInChat(riga) {
   return m ? { chi: m[1].trim().toLowerCase(), resto: s.slice(m[0].length) } : null;
 }
 // Come apre una risposta prima del dato, sulla sua riga: «certo, 4821», «eccolo: 4821», «sì è 4821», «ciao! 4821».
-const ASSENSI = new Set(['sì', 'si', 'yes', 'yep', 'ok', 'oui', 'ja', 'sí', 'sim', 'da', 'tak']);
+const ASSENSI = new Set(['sì', 'si', 'yes', 'yep', 'ok', 'oui', 'ja', 'sí', 'sim', 'да', 'tak']);
 function apreLaRisposta(testa) {
   const parole = minuscolo(testa).split(/\s+/u).map((w) => w.replace(/^[^\p{L}\p{N}=]+|[^\p{L}\p{N}=’']+$/gu, '')).filter(Boolean);
   return parole.length <= 4
