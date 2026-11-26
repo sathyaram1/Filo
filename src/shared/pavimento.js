@@ -266,7 +266,8 @@
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
-  // circondati da spazi; il valore sotto l'etichetta anche dopo una riga vuota (due paragrafi), ma da solo sulla riga.
+  // circondati da spazi; il valore sotto l'etichetta anche dopo una riga vuota (due paragrafi), ma da solo sulla riga,
+  // coi due punti o senza: «Wi-Fi password:» a capo vale quanto «Password:» a capo (#2673.3).
   const PRIMA = '(?:^|[\\n|\\t])[^\\n|\\t:=.!?;,]{0,30}?';
   // Fra etichetta e separatore niente virgolette, uguali o parentesi di codice: in `"Password" :: #c` o in
   // `password" id="pwd1"` quello che segue è di un altro campo.
@@ -276,7 +277,7 @@
   // Il «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
   const VERBO_PASSWORD = `(?:${VERBO}|${FUTURO}|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)`;
   const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+${VERBO_PASSWORD}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
-  const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
+  const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*:?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
   const IN_FRASE = new RegExp(`${ETICHETTA}(?:[ \\t]+(?:provvisori[ao]|temporane[ao]|iniziale|nuova|attuale|new|temporary|initial|current))?[ \\t]+([^\\s|\\[«»"'(),;]{6,64})`, 'gi');
@@ -341,9 +342,11 @@
   // posto di un valore ma non lo è; così il nome di un tipo («password: str», «password: string»).
   const CODICE_SORGENTE = /^(?:[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?|[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\(.*)$/;
   const NOME_DI_TIPO = /^(?:str|string|int|integer|bool|boolean|number|bytes|any|object|char|varchar|text|unknown|void)(?:\[\])?$/i;
+  // Un indirizzo o un'email sotto «Reset your password:» ha la forma di una password ma è il link per cambiarla.
+  const INDIRIZZO_O_EMAIL = (v) => /:\/\/|^www\./i.test(v) || EMAIL.test(v);
   function formaVicina(pezzo) {
     const v = pezzo.replace(/^[:=\-–—→«"'“‘(\[]+/, '').replace(/[.,;:!?)»"'”’\]]+$/, '');
-    if (v.length < 6 || v.length > 64 || v.includes(SEGNAPOSTO) || /:\/\/|^www\./i.test(v) || EMAIL.test(v) || CODICE_SORGENTE.test(v)) return '';
+    if (v.length < 6 || v.length > 64 || v.includes(SEGNAPOSTO) || INDIRIZZO_O_EMAIL(v) || CODICE_SORGENTE.test(v)) return '';
     return FORMA_FORTE(v) ? v : '';
   }
   // La prima riga piena sotto un'etichetta, saltando le righe vuote e quelle dei soli bottoni o puntini («Mostra»,
@@ -567,7 +570,7 @@
     for (const re of [ACCANTO_DEBOLE, SOTTO]) {
       for (const m of s.matchAll(re)) {
         const v = valorePassword(m[1], { forma: true });
-        if (v) out.push({ valore: v, regola: 'password' });
+        if (v && !INDIRIZZO_O_EMAIL(v)) out.push({ valore: v, regola: 'password' });
       }
     }
     for (const m of s.matchAll(IN_FRASE)) {
