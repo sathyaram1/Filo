@@ -273,7 +273,8 @@ npm run test:unit          # logica pura, ms, senza Electron (sul PC dell'owner 
 npm run test:smoke         # smoke headless con screenshot
 npm test                   # SUITE COMPLETA (~770 spec, ~4.650 casi): NON si lancia a mano (vedi § Verifica)
 npm run test:importanti    # i cammini principali, un avvio solo, tetto 4 minuti
-npm run finish:check       # in locale: unit + prove importanti + spec delle aree toccate dal ramo (sul PC dell'owner quelli arrivati da main li prova GitHub)
+npm run finish:check       # in locale: unit + prove importanti + spec che passano dalle funzioni cambiate (mappa della suite; senza, per aree) (sul PC dell'owner quelli arrivati da main li prova GitHub)
+node scripts/mappa-prove.mjs  # gli spec che passano dalle righe cambiate dal ramo, col tempo previsto, senza aprire Filo
 npm run test:shoot         # cattura visiva della finestra reale
 ```
 
