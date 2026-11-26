@@ -5,6 +5,7 @@
 const { protocol, net } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { percorsoFilo } = require('./percorsoFilo');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'src');
