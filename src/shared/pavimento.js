@@ -216,7 +216,8 @@
               const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
               const entra = forte || chiave.apre;
               if (nonApre && !(nome && entra)) continue;
-              if (nome ? !(alPostoDelCodice(z, m, inTesta, forte) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
+              if (predefinito && chiave.pin && !forte) continue;
+              if (nome ?!(alPostoDelCodice(z, m, inTesta, forte) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
                 : !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
               // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
               if (!lettere && !m[2] && ANNO.test(v) && !chiave.solo) continue;
