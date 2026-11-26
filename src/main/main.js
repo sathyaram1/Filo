@@ -22,6 +22,9 @@ if (!app.requestSingleInstanceLock()) {
   return;
 }
 
+// Prima di ogni altro modulo dell'app: la mappa prova → file della suite deve vedere anche l'avvio (#2502).
+if (process.env.FILO_COPERTURA) require('./copertura').accendi(app);
+
 // Dopo userData, prima di ogni altro require: un modulo caricato prima non passa dalla cache (#2118).
 const cacheCodice = require('./cacheCodice');
 cacheCodice.accendi(app);
