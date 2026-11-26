@@ -21,7 +21,8 @@ function riservati(grezzo) {
   const out = [];
   const l = testo.toLowerCase();
   try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
-  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l)); } catch (_) {}
+  // Le parole di una frase che spiega la password («va cambiata ogni 90 giorni») restano, con la regola del pavimento.
+  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l, { spiega: PAV().spiegazione })); } catch (_) {}
   // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   const valori = [...RT().lunghi(out), ...RT().trova(testo)];
