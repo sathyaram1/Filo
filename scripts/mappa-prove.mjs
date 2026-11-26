@@ -144,7 +144,7 @@ export function cambiDelDiff({ diff, primaDi = '', file = [], commitMappa = '', 
   return { cambi, nuovi: nuovi.filter((f) => f.startsWith('src/')), nota };
 }
 
-const secondi = (ms) => (ms >= 90_000 ? `${Math.round(ms / 60_000)} min` : `${Math.max(1, Math.round(ms / 1000))} s`);
+const secondi = (ms) => (ms >= 90_000 ? `${Math.round(ms / 60_000)} min` : `${ms > 0 ? Math.max(1, Math.round(ms / 1000)) : 0} s`);
 
 /** Il testo per chi lavora. PURA. */
 export function testoScelta({ prove, senzaProve, nuovi, mappa, fonte, nota = '', specDelRamo = [] }) {
