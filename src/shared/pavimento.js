@@ -348,7 +348,7 @@
   // qualunque solo da sola: dopo di lei la riga finisce o comincia un altro campo o una parentesi. Seguita da altre
   // parole è una frase («Password: deve avere almeno otto caratteri») e resta.
   const AL_POSTO = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t\\[(]{3,64})([^\\n|\\t]*)`, 'gid');
-  const DOPO = `[ \\t]*(?:[:=|\\t]|[-–—→](?=[ \\t])|[ \\t]${VERBO}(?=[ \\t]))[ \\t]*([^\\s|\\t]{6,70})`;
+  const DOPO = `[ \\t]*(?:[:=|\\t]|[-–—→](?=[ \\t])|[ \\t]${VERBO_PASSWORD}(?=[ \\t]))[ \\t]*([^\\s|\\t]{6,70})`;
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
