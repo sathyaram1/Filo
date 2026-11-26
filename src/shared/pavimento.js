@@ -16,7 +16,9 @@
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
-  const NOME_CVV = '\\b(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?)\\b';
+  // I nomi stanno nel guardiano, che li porta anche ai campi segreti delle pagine (#2686).
+  if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
+  const NOME_CVV = global.SN_GUARDIANO_STATICO.NOME_CVV;
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
   const APERTE = '«"\'“‘„';
