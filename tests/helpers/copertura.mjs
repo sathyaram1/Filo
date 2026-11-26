@@ -11,7 +11,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OGNI_MS = 1000;
 
 /** Il nome della prova in corsa, relativo al repo e a barre normali; vuoto fuori da una prova. */
-function provaInCorsa() {
+function provaInCorsa(test) {
   try { return relative(ROOT, test.info().file).split('\\').join('/'); } catch (_) { return ''; }
 }
 
