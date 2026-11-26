@@ -63,9 +63,10 @@
     + '|uwierzyteln\\p{L}*|d[ée]verrouillage|desbloque\\p{L}*|odblokow\\p{L}*|r[ée]cup[ée]ration|recupera\\p{L}*|odzyskiw\\p{L}*|secours'
     + '|emerg[êe]ncia|emergencia|respaldo|backup|secret\\p{L}*|tajn\\p{L}*|temporaire|tempor[áa]l|tempor[áa]rio|tymczasow\\p{L}*'
     + '|nuevo|novo|nowy|[úu]nico|jednorazow\\p{L}*|sms|e-?mail|correo|envoy[ée]|enviado|recibido|re[çc]u|recebido|siguiente|seguinte'
-    + '|num[ée]ric[oa]|personnel|personal|pin|otp|blik|tan|validation|validaci[óo]n|valida[çc][ãa]o|retrait|retiro|levantamento|odbioru'
-    + '|ouverture|apertura|abertura|otwarcia|din[áa]mico|dynamique|transac\\p{L}*|transa[çc][ãa]o|identifica\\p{L}*|identyfikac\\p{L}*)$', 'iu');
-  const APRE_ALTRE = '(?:portes?|portail|portillon|entr[ée]e|immeuble|interphone|digicode|coffre(?:-fort)?|alarme|garage|cadenas|casier|consigne'
+    + '|num[ée]ric[oa]|personnel|personal|pin|otp|blik|tan|validation|validaci[óo]n|valida[çc][ãa]o'
+    + '|din[áa]mico|dynamique|transac\\p{L}*|transa[çc][ãa]o|identifica\\p{L}*|identyfikac\\p{L}*)$', 'iu');
+  const APRE_ALTRE = '(?:retrait|retiro|levantamento|odbioru|abholung|ouverture|apertura|abertura|otwarcia|öffnung|recoger|retirar|abrir|ouvrir'
+    + '|entrer|entrar|öffnen|otworzy\\p{L}*|odebra\\p{L}*|r[ée]cup[ée]rer|levantar|portes?|portail|portillon|entr[ée]e|immeuble|interphone|digicode|coffre(?:-fort)?|alarme|garage|cadenas|casier|consigne'
     + '|puertas?|portal|port[óo]n|entrada|edificio|portero|alarma|garaje|candado|cerradura|taquilla|casillero|porta|port[ãa]o|pr[ée]dio|cofre'
     + '|fechadura|cadeado|t[üu]r|tor|haust[üu]r|eingang\\p{L}*|geb[äa]ude\\p{L}*|tresors?|safe|alarm\\p{L}*|schloss\\p{L}*|schlie(?:ß|ss)fach\\p{L}*'
     + '|drzwi|bram[ay]?|furtk[ai]|wej[śs]ci\\p{L}*|sejfu?|domofonu?|gara[żz]u|deur|poort|ingang|kluis|wi-?fi|wlan)';
