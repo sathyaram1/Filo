@@ -40,7 +40,7 @@ function accendi(app) {
       });
     } catch (_) {}
   };
-  const nome = path.join(dir, `main-${process.pid}-${Date.now()}.json`);
+  const nome = path.join(dir, `main-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`);
   const scrivi = () => {
     prendi();
     const file = {};
