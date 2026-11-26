@@ -102,28 +102,7 @@ async function filoHandler(request) {
     // Le icone che Filo tiene per pagine salvate e schede archiviate (#1273) stanno nella cartella dati, non nel pacchetto.
     if (host === 'icone') return require('./services/copieIcone').risposta(rel);
 
-    let fsPath;
-    if (host === 'shell') {
-      fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
-    } else if (host === 'newtab') {
-      // La home sta nella cartella dashboard: «newtab.html» è il nome che la regola <host>/<host>.html delle altre
-      // pagine fa scrivere, e deve aprire la home invece di un file che non c'è (#830.4).
-      const home = !rel || rel.toLowerCase() === 'newtab.html';
-      fsPath = path.join(SRC, 'pages', 'dashboard', home ? 'dashboard.html' : rel);
-    } else if (host === 'asset') {
-      fsPath = path.join(ASSETS, rel);
-    } else if (host === 'style') {
-      fsPath = path.join(SRC, 'styles', rel);
-    } else if (host === 'shared') {
-      fsPath = path.join(SRC, 'shared', rel);
-    } else if (host === 'src') {
-      // Il codice portato chiama chrome.runtime.getURL('src/...') e lo shim
-      // costruisce filo://src/..., che atterra qui.
-      fsPath = path.join(SRC, rel);
-    } else {
-      // filo://<page>/<file?> → src/pages/<page>/<file or page.html>
-      fsPath = path.join(SRC, 'pages', host, rel || `${host}.html`);
-    }
+    const fsPath = path.join(ROOT, percorsoFilo(host, rel));
 
     // Il confine include il separatore: senza, una cartella sorella che inizia
     // con la stessa stringa ("Filo-altro" accanto a "Filo") passerebbe.
