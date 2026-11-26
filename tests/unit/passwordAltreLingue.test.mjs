@@ -63,3 +63,53 @@ test('la password detta in chat in un\'altra lingua non esce in un indirizzo', (
   }
   assert.equal(X.taintScritto('https://raccolta.example/?q=gattonero', 'ho visto gattonero ieri', 'apri il sito'), null);
 });
+
+test('come in italiano: chi ricorda, chi può, chi ce l\'ha, la particella finale e il solo nome chiedono', () => {
+  for (const d of ['напомни пароль от wifi', 'можешь скинуть пароль от wifi', 'у тебя есть пароль от wifi', 'пароль от wifi',
+    'θυμάσαι τον κωδικό του wifi', 'μου λες τον κωδικό του wifi', 'τι κωδικό έχει το wifi', 'τον κωδικό του wifi',
+    '你知道wifi密码吗', '密码呢', '请问wifi密码', 'wifi密码', 'wifi的密码', 'wifi密码发一下',
+    'kan du sende passordet', 'şifreyi atar mısın', 'wifi şifresi ne', 'care e parola?', 'dă-mi parola', 'trimite-mi parola']) {
+    assert.equal(risposta('gattonero', `Marco: ${d}`), S, d);
+  }
+  for (const [d, r] of [['у меня есть новый пароль', 'отлично'], ['Τι ωραία μέρα', 'υπέροχη'], ['ne parliamo domani della password', 'ok vediamo']]) {
+    assert.equal(risposta(r, `Marco: ${d}`), r, d);
+  }
+});
+
+test('il punto di domanda greco, scritto col punto e virgola o col suo segno, chiude la domanda', () => {
+  for (const d of ['τον κωδικό;', 'τον κωδικό;', 'Ποιος είναι ο κωδικός;', 'έχεις τον κωδικό του wifi;']) {
+    assert.equal(risposta('gattonero', `Marco: ${d}`), S, d);
+    assert.equal(risposta('ok Nyckel2024', `Marco: ${d}`), `ok ${S}`, d);
+  }
+  // Fuori dal greco il punto e virgola resta quello che è.
+  assert.equal(risposta('ok a domani', 'Marco: ho cambiato la password; ci vediamo'), 'ok a domani');
+});
+
+test('le forme declinate: il rumeno «parola» col possessivo o il wifi, il turco «şifrem»', () => {
+  for (const t of ['Şifrem: Nyckel!2024', 'Wi-Fi şifrem: Nyckel!2024', 'Parola mea: Nyckel!2024', 'Parola wifi: Nyckel!2024']) {
+    assert.ok(!P.oscura(t).includes('Nyckel'), t);
+  }
+  for (const t of ['Parola: Ciao2024', 'Parola mia, Ciao2024 è il saluto']) assert.equal(P.oscura(t), t, t);
+});
+
+test('i due punti e l\'uguale a tutta larghezza valgono i nostri', () => {
+  for (const e of ['密码', 'パスワード', 'WiFi密码', 'Lösenord', 'Passwort']) {
+    assert.equal(P.oscura(`${e}：Nyckel!2024`), `${e}：${S}`, e);
+    assert.equal(P.oscura(`${e}＝Nyckel!2024`), `${e}＝${S}`, e);
+  }
+  assert.equal(risposta('密码：gattonero', 'Marco: 密码是多少'), `密码：${S}`);
+});
+
+test('il codice postale, quelli di prodotto e la parola chiave spagnola non sono password', () => {
+  for (const t of ['Ταχυδρομικός κωδικός: 10558', 'Κωδικός προϊόντος: AB-1234', 'ΚΩΔΙΚΟΣ ΠΡΟΪΟΝΤΟΣ: AB-1234',
+    'Κωδικός πελάτη: C-99812', 'Palabras clave: seo2024', 'Palabra clave: seo2024']) assert.equal(P.oscura(t), t, t);
+  for (const t of ['Κωδικός: Nyckel!2024', 'Κωδικός πρόσβασης: Nyckel!2024', 'Clave: Nyckel!2024']) {
+    assert.ok(!P.oscura(t).includes('Nyckel'), t);
+  }
+});
+
+test('dopo il punto cinese o il punto di domanda greco la frase della risposta è finita', () => {
+  // Una parola di sole lettere conta solo nella frase del dato: dopo il punto è il resto del messaggio.
+  assert.equal(risposta('Nyckel2024。明天见', 'Marco: 密码是多少'), `${S}。明天见`);
+  assert.equal(risposta('Nyckel2024. αύριο', 'Marco: πες μου τον κωδικό'), `${S}. αύριο`);
+});
