@@ -419,8 +419,8 @@
     + '|codice\\s+(?:di\\s+)?(?:accesso|segreto))\\b';
   // La chiave del wifi come la chiamano i router nelle altre lingue (#1403.19): «Ключ сети», «暗号化キー». Il confine
   // come in urlExfil.js: \b non vede le lettere fuori dall'ASCII.
-  const FUORI = '(?![A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F])';
-  const CHIAVI_DI_RETE = '|(?<![A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F])(?:'
+  const FUORI = `(?![${LETTERE}])`;
+  const CHIAVI_DI_RETE = `|(?<![${LETTERE}])(?:`
     + '(?:ключ(?:а|ом|у)?|klucz(?:a|em|u)?)\\s+(?:сети|безопасности(?:\\s+сети)?|шифрования|sieci(?:\\s+bezprzewodowej)?|zabezpiecze[ńn]|wi-?fi|wlan|wpa[23]?(?:-psk)?)'
     + '|сетевой\\s+ключ|(?:netwerk|beveiligings|wpa[23]?(?:-psk)?-?|wi-?fi-?|wlan-?)sleutel'
     + `)${FUORI}|密[钥鑰]|暗号化キー|セキュリティ\\s*キー|ネットワーク\\s*キー|事前共有キー|(?:네트워크\\s*)?보안\\s*키|(?:네트워크|무선|wpa[23]?(?:-psk)?|wi-?fi)\\s*키`;
