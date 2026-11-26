@@ -390,7 +390,7 @@ const lunghi = (vs) => vs.map(valoreDi).filter((v) => v.length >= 4);
 // risposta a chi chiede una password, sulle righe dopo la domanda: «Come cambio la password di Gmail? Ordine 1234…» resta.
 function trova(testo, { sotto = false } = {}) {
   const out = [];
-  const l = String(testo == null ? '' : testo).toLowerCase();
+  const l = minuscolo(testo);
   if (!l.trim()) return [];
   try { out.push(...formeLibere(l)); } catch (_) {}
   try {
