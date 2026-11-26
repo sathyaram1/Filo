@@ -8,8 +8,6 @@
 // Il passo «moduli_caricati» dei contatori d'avvio: da qui alla fine del codice in cima al file, prima di whenReady.
 const inizioModuli = Date.now();
 const { app, BrowserWindow, nativeTheme, session } = require('electron');
-// Prima di ogni altro require: la mappa prova → file della suite deve vedere anche il codice che gira all'avvio (#2502).
-if (process.env.FILO_COPERTURA) require('./copertura').accendi(app);
 const path = require('node:path');
 
 // Anche userData (cookie, cache) va nella temp, o l'isolamento non è completo.
