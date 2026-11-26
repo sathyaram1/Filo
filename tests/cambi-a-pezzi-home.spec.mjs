@@ -111,3 +111,29 @@ test('il segno «Cambi fatti» sulla bolla dell\'utente tiene il valore del mode
     await ripristina(app);
   }
 });
+
+// #2662 — il riquadro è un pezzo unico: in una riga tagliata coi puntini, se non ci stava, spariva intero.
+test('un valore lungo resta leggibile nella riga del cambio: annullata e a finestra stretta il riquadro si accorcia, non sparisce', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  const misura = (riga) => riga.evaluate((r) => {
+    const t = r.querySelector('.dash-cambio-testo').getBoundingClientRect();
+    const q = r.querySelector('.dash-cambio-testo .dash-altrui').getBoundingClientRect();
+    return { fine: Math.round(t.right), riquadro: Math.round(q.right), visto: Math.round(Math.min(t.right, q.right) - q.left) };
+  });
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ agentStyle: 'Rispondi in modo breve, diretto e senza giri di parole, dammi del tu' }));
+  const nata = page.locator('.dash-cambio', { hasText: 'stile dell' }).last();
+  await expect(nata).toBeVisible({ timeout: 10_000 });
+  const riga = page.locator(`.dash-cambio[data-id="${await nata.getAttribute('data-id')}"]`);
+  await riga.hover();
+  await riga.locator('.dash-cambio-annulla').click();
+  await expect(riga.locator('.dash-cambio-stato')).toHaveText('annullato', { timeout: 10_000 });
+  await app.evaluate(({ BrowserWindow }) => { for (const w of BrowserWindow.getAllWindows()) if (w._filoTabs) w.setSize(1000, 760); });
+  await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeLessThan(1100);
+  await expect.poll(async () => { const m = await misura(riga); return m.riquadro <= m.fine + 1; }, { timeout: 5_000 }).toBe(true);
+  const m = await misura(riga);
+  expect(m.visto, 'del valore si legge un pezzo').toBeGreaterThan(40);
+  expect(await riga.locator('.dash-cambio-testo .dash-altrui').textContent()).toContain('Rispondi in modo breve');
+  await riga.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/cambi-a-pezzi-home-stretta.png' });
+});
