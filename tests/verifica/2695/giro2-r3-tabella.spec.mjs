@@ -11,7 +11,7 @@ const P = require('../../../src/shared/pavimento.js');
 const R = require('../../../src/main/services/correttoreRiservati.js');
 const alCorrettore = (campo) => R.richiestaSenzaRiservati({ prima: '', nuovo: campo, dopo: '', campo, campoDa: 0 }).nuovo;
 
-test('r2 una riga di tabella che descrive la password arriva intera ai due cancelli', () => {
+test('r3 una riga di tabella che descrive la password arriva intera ai due cancelli', () => {
   const rotte = [];
   for (const riga of [
     '| Scadenza password: | 90 giorni |',
