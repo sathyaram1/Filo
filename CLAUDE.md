@@ -192,8 +192,10 @@ osservato. Minimi per tipo di modifica:
   riporta verde (`node scripts/rossi-della-suite.mjs` dà l'elenco) e la
   versione di un commit con la suite verde si segna «stabile». Al suo posto chi
   verifica lancia `npm run finish:check` (unit, prove importanti e gli spec
-  delle aree toccate). Le regressioni restano di chi le introduce: se ne temi
-  una precisa, lancia quello spec.
+  che passano dalle funzioni cambiate, letti dalla mappa prova → file che la
+  suite rifà a ogni corsa). `node scripts/mappa-prove.mjs` stampa l'elenco
+  intero, dal più specifico al più largo, col tempo previsto: chi lavora lancia
+  quelli del comportamento che ha cambiato e aggiorna quelli rimasti indietro.
 
 **Prima di consegnare, la verifica te la fai tu**, con gli stessi criteri che
 userà chi ti verifica: **`routines/roles/_criteri-verifica.md`** (nelle routine
