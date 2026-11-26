@@ -184,7 +184,7 @@ function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
       out.push(...v);
     }
     dopoPresenta = w.endsWith(':') || PRESENTA_RISPOSTA.has(t);
-    if (/[.!?]$/.test(w) || spazio.includes('\n')) {
+    if (CHIUDE_PAROLA.test(w) || spazio.includes('\n')) {
       if (saluto) saluto = false;
       else if (forte) soloForma = true;
       else if (trovato) lettere = false;
