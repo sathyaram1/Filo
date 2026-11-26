@@ -9,7 +9,6 @@ const { percorsoFilo } = require('./percorsoFilo');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'src');
-const ASSETS = path.join(ROOT, 'assets');
 
 // CSP applicata ai soli documenti HTML serviti via filo:// (vedi filoHandler).
 const FILO_PAGE_CSP = [
