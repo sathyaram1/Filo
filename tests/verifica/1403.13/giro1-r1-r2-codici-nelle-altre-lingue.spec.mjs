@@ -17,6 +17,8 @@ test('r1 il codice di una spedizione, di un ordine o di un errore resta, come in
     'El código del pedido es 482913',
     'Código de seguimiento: 482913',
     'Der Code der Bestellung ist 482913',
+    'Su código de reserva es 482913',
+    'Kod rabatowy to 4829',
   ]) {
     expect(P.oscura(t), t).toBe(t);
   }
