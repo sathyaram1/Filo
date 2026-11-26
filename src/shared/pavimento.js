@@ -466,7 +466,20 @@
     }
   }
 
+  // I due punti e l'uguale a tutta larghezza («密码：…», «パスワード＝…») valgono i nostri: le regole leggono una copia
+  // della stessa lunghezza, e il valore torna com'è scritto nel testo.
   function passwordAccanto(s, out) {
+    const n = s.replace(/：/g, ':').replace(/＝/g, '=');
+    if (n === s) return etichette(s, out);
+    const qui = [];
+    etichette(n, qui);
+    for (const x of qui) {
+      const v = String(x.valore);
+      const k = Number.isInteger(x.inizio) ? x.inizio : n.indexOf(v);
+      out.push(k >= 0 ? { ...x, valore: s.slice(k, k + v.length) } : x);
+    }
+  }
+  function etichette(s, out) {
     alPostoDelValore(s, out);
     fraseDopo(s, out);
     chiaviDiConfigurazione(s, out);
