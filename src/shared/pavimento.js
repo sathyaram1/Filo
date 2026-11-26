@@ -935,14 +935,40 @@
     return out;
   }
 
+  // Gli a capo di Windows e quelli col solo \r (un file di testo allegato) valgono il nostro (#2673.6): le regole leggono
+  // una copia col solo \n, e `posto` riporta ogni suo carattere nel testo vero, dove torna il valore di più righe.
+  function aCapo(vero) {
+    if (!vero.includes('\r')) return null;
+    const piano = vero.replace(/\r\n?/g, '\n');
+    const posto = new Int32Array(piano.length + 1);
+    for (let i = 0, k = 0; i < vero.length; i++) {
+      if (vero[i] === '\r' && vero[i + 1] === '\n') continue;
+      posto[k++] = i;
+    }
+    posto[piano.length] = vero.length;
+    return { piano, posto };
+  }
+  function conGliACapoVeri(x, { piano, posto }, vero) {
+    const v = String(x.valore);
+    const y = { ...x };
+    if (Number.isInteger(x.inizio) && x.inizio >= 0 && x.inizio <= piano.length) y.inizio = posto[x.inizio];
+    const k = Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio) ? x.inizio : piano.indexOf(v);
+    if (k < 0 || vero.includes(v)) return y;
+    const da = posto[k] - (v[0] === '\n' && vero[posto[k] - 1] === '\r' ? 1 : 0);
+    y.valore = vero.slice(da, posto[k + v.length - 1] + 1);
+    return y;
+  }
+
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   function trova(valore) {
     const vero = testo(valore);
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
     const R = global.SN_RISERVATI_TESTO;
+    const copia = aCapo(vero);
+    const piano = copia ? copia.piano : vero;
     // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
-    const s = virgoletteStrette(R ? R.senzaEnfasi(vero) : vero);
+    const s = virgoletteStrette(R ? R.senzaEnfasi(piano) : piano);
     const out = [];
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
@@ -963,7 +989,8 @@
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
     out.push(...interiFraVirgolette(s, out));
-    return out.filter((x) => x.valore).map((x) => (s === vero ? x : nelTestoVero(x, vero)))
+    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano)))
+      .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
       .filter((x) => String(x.valore).length >= 3);
   }
 
@@ -1009,7 +1036,9 @@
       t = t.slice(0, x.inizio) + SEGNAPOSTO + t.slice(x.inizio + v.length);
       fine = x.inizio;
     }
-    const valori = [...ovunque].sort((a, b) => b.length - a.length);
+    // L'ordine è quello della copia col solo \n (trova): un \r in più non fa passare un valore davanti a un altro.
+    const lungo = (v) => v.length - (v.match(/\r\n/g) || []).length;
+    const valori = [...ovunque].sort((a, b) => lungo(b) - lungo(a));
     for (const v of valori) {
       const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
       // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga».
