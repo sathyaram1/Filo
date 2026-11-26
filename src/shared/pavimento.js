@@ -449,7 +449,9 @@
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
   const QUALIFICA = '(?:[ \\t]+(?:provvisori[ao]|temporane[ao]|iniziale|nuova|attuale|new|temporary|initial|current))?';
-  const IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}[ \\t]+${VIRGOLETTA}([^\\s|\\[${VIRGOLETTE}(),;]{6,64})`, 'gi');
+  // Anche dopo di cosa è («la password del wifi Mela!Verde77», #2678.7): il complemento non è il valore, quello dopo sì.
+  const COMPLEMENTO = "(?:[ \\t]+(?:(?:del(?:la|lo)?|di|per|for|of)[ \\t]+|dell['’][ \\t]*)(?:(?:il|la|lo|the|my|your|our|mio|mia|tuo|tua)[ \\t]+)?[A-Za-z0-9À-ÿ][A-Za-z0-9À-ÿ_-]{0,30})?";
+  const IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]+${VIRGOLETTA}([^\\s|\\[${VIRGOLETTE}(),;]{6,64})`, 'gi');
   const FORMA_FORTE = (v) => /\p{L}/u.test(v) && (/[0-9]/.test(v) || /[!@#$%^&*+=?~_]/.test(v));
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
   // In un CSV l'intestazione è un nome di campo, anche col prefisso delle esportazioni («login_password»): al più una
