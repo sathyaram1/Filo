@@ -244,7 +244,7 @@ export function proveDelCambio(mappa, cambi) {
   for (const [rel, righe] of cambi) {
     const f = mappa.file[rel];
     if (!f) { senzaProve.push(rel); continue; }
-    const intero = f.funzioni.reduce((m, x) => (x[1] - x[0] > m[1] - m[0] ? x : m), f.funzioni[0] || [1, 1]);
+    const intero = f.funzioni.reduce((m, x) => Math.max(m, x[1]), 1);
     const prese = new Set();
     if (!righe) {
       dai(f.carico, 'file', 1 / Math.max(1, mappa.insiemi[f.carico].length));
