@@ -123,6 +123,8 @@
       if (p && APRE_ALTRE_SOLO.test(p[0])) return { apre: true, solo: DOPO_IL_NOME.test(coda.slice(p[0].length)) };
     }
     if (!it) return { apre: false, solo: false };
+    // Un PIN non è mai un identificativo, di qualunque cosa sia: «il pin del telefono è 4821», anche se è un anno (#2678.3).
+    if (/^pin$/i.test(it[0])) return { apre: true, solo: true };
     const coda = prima.slice(it.index + it[0].length).replace(LEGAMI, '');
     return { apre: NOME_CHE_APRE.test(coda), solo: NOME_CHE_APRE_SOLO.test(coda) };
   };
