@@ -1070,7 +1070,7 @@
   // ETICHETTE: il testo della regola dei nomi della password, per i campi dei moduli (campiSegreti.js); NOMI_DEL_PIN per
   // i segreti detti dall'utente che non devono uscire in un indirizzo (urlExfil.js); SPIEGA, le parole che spiegano la
   // password, per il correttore.
-  const SPIEGA = { inizio: INIZIO_SPIEGAZIONE, misura: MISURA, tempo: TEMPO, descrive: DESCRIVE };
+  const SPIEGA = { inizio: INIZIO_SPIEGAZIONE, misura: MISURA, tempo: TEMPO, descrive: DESCRIVE, nonValore: NON_VALORE };
   global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, SPIEGA, ETICHETTE: ETICHETTA_NUDA, NOMI_DEL_PIN };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAVIMENTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
