@@ -395,11 +395,10 @@
       for (const m of testo.matchAll(re)) {
         const coda = fineFrase(testo.slice(m.index + m[0].length, m.index + m[0].length + 200));
         const parole = coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO);
-        let spiegata = false;
         for (const [k, w] of parole.entries()) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
           const cifre = /\d/.test(t);
-          if (spiega && !spiegata) spiegata = !!spiega(parole.slice(0, k + 1));
+          const spiegata = !cifre && !!spiega && !!spiega(parole.slice(0, k + 1));
           if (cifre ? soloAlnum(t).length < 4 : (soloCifre || spiegata || t.length < MIN_TOKEN || RIEMPITIVI.has(t))) continue;
           out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
         }
