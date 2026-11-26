@@ -44,7 +44,7 @@ test('nelle lingue delle etichette anche il verbo chiude l\'etichetta, con o sen
   ]) assert.equal(P.oscura(frase), frase);
 });
 
-test('un apostrofo o una virgoletta dentro la password non chiude le virgolette con lo spazio', () => {
+test('un apostrofo dentro la password non chiude le virgolette con lo spazio', () => {
   for (const frase of ["la password è « l'Albero77 »", 'Password: « l’Albero77 »', "mot de passe : « l'Albero77 »"]) {
     assert.equal(P.oscura(frase).includes('Albero77'), false, frase);
   }
