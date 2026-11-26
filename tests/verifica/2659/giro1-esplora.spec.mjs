@@ -129,7 +129,7 @@ test('la finestra di un altro sito chiusa dal pulsante della scheda di Filo non 
   await app.evaluate(({ BrowserWindow }) => {
     const m = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     const t = m.tabs.find((x) => x.view.webContents.getTitle() === 'CHAT');
-    m.close(t.id);
+    m.closeTab(t.id);
   });
   await nessunaMorta(app, prima);
   await expect.poll(() => page.evaluate(() => window.__w.closed), { timeout: 8000 }).toBe(true);
