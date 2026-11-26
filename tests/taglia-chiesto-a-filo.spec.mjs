@@ -85,6 +85,25 @@ for (const campo of ['#prima', '#segreta']) {
   });
 }
 
+test('dopo Incolla col tasto destro in un campo, «modifica» chiesto a Filo riscrive la selezione di adesso', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, CAMPI);
+  await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti'));
+  await incollaColTastoDestro(page, '#prima');
+
+  await selezionaNellArea(page);
+  await aiutoCheTaglia(app, { op: 'edit_text', text: 'taglia questo' });
+  await chiediAFilo(app, shell, page, 'modifica questo testo');
+
+  await expect.poll(() => statoDi(app, page, '.sn-editbox-instruction'), { timeout: 20_000 }).not.toBeNull();
+  const strato = await scrivi(app, page, '.sn-editbox-instruction', 'più formale');
+  await strato.keyboard.press('Enter');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-proposed'))?.testo || '').toContain('riscritto');
+  await clicca(app, page, '.sn-editbox-replace');
+  await expect(page.locator('#area')).toHaveValue('tieni Testo riscritto. resta');
+  await expect(page.locator('#prima')).toHaveValue('dagli appunti');
+});
+
 test('«taglia» chiesto a Filo con una password selezionata non la porta negli appunti, e Filo lo dice', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, CAMPI);
