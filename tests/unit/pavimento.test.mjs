@@ -207,13 +207,13 @@ test('un codice usa e getta non esce in francese, tedesco, spagnolo, portoghese,
 });
 
 // Il pavimento gira su ogni chiamata a un modello, nel processo principale: una riga lunga piena di codici annunciati
-// si controlla in fretta e li toglie tutti (prima ci voleva una decina di secondi).
+// si controlla in fretta e li toglie tutti (prima costava centinaia di unità di riferimento, ora meno di dieci).
 test('una riga di 120.000 caratteri che ripete un codice annunciato si controlla in fretta', () => {
   for (const pezzo of ['the code is 482913. ', 'el código es 482913. ', 'der Zugangscode ist 482913 ']) {
     const s = pezzo.repeat(Math.ceil(120000 / pezzo.length));
-    const t0 = Date.now();
-    const fuori = P.oscura(s);
-    assert.ok(Date.now() - t0 < 1500, `${pezzo}: ${Date.now() - t0} ms`);
+    let fuori = '';
+    const c = costoInUnita(() => { fuori = P.oscura(s); }, { tetto: 60 });
+    assert.ok(c.entro, `${pezzo}: ${c.come}`);
     assert.ok(!fuori.includes('482913'), pezzo);
   }
 });
