@@ -213,6 +213,23 @@ test('il pulsante che chiude la finestra di un altro sito la chiude, e la pagina
   expect((await schede(app)).find((s) => s.attiva)?.titolo).toBe('NEGOZIO');
 });
 
+// #2659 — la finestra di un altro sito vive in un altro processo: chiusa dalla pagina, la sua scheda se ne va lo stesso.
+test('la pagina chiude la finestra di un altro sito che ha aperto, e la sua scheda se ne va', async ({ app, openTab, testServer }) => {
+  const dest = testServer.html('<title>CHAT</title>', { pubblico: true });
+  const page = await openTab(testServer.html(`<title>NEGOZIO</title>${pulsante('a', 'Apri', `window.__w=window.open(${JSON.stringify(dest)},'chat')`)}${pulsante('c', 'Chiudi', 'window.__w.close()')}`));
+  const prima = (await schede(app)).length;
+  await page.click('#a');
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'CHAT'), { timeout: 8000 }).toBe(true);
+  expect((await schede(app)).length).toBe(prima + 1);
+  await davanti(app, page.url());
+  await page.click('#c');
+  await expect.poll(() => page.evaluate(() => window.__w.closed), { timeout: 8000 }).toBe(true);
+  await expect.poll(async () => (await schede(app)).length, { timeout: 8000 }).toBe(prima);
+  const vive = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.every((t) => !t.view.webContents.isDestroyed()));
+  expect(vive, 'nessuna scheda col contenuto distrutto').toBe(true);
+  expect((await schede(app)).find((s) => s.attiva)?.titolo).toBe('NEGOZIO');
+});
+
 test('la finestra della pagina che si porta davanti da sola resta dietro quando clicchi sulla pagina', async ({ app, openTab, testServer }) => {
   // Chiede il primo piano di continuo, e finge anche le richieste che Filo ascolta, verso sé e verso la pagina.
   const chat = testServer.html(`<title>CHAT</title><script>setInterval(function(){

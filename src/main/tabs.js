@@ -1202,11 +1202,12 @@ class TabManager {
         extraHeaders: `Content-Type: ${invio.contentType || 'application/x-www-form-urlencoded'}${invio.boundary ? `; boundary=${invio.boundary}` : ''}`,
       } : undefined);
     }
-    // La pagina che l'ha aperta può chiuderla (window.close): la scheda se ne va con lei.
+    // La pagina che l'ha aperta può chiuderla (window.close): la scheda se ne va con lei. Si confronta la vista, non il
+    // webContents, che a distruzione avvenuta la vista non dà più; una vista ricreata no (#2659).
     if (adotta) {
       const wc = view.webContents;
       AzioniContate.scheda(wc);
-      wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id, { daSola: true }); }));
+      wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view === view) this.closeTab(tab.id, { daSola: true }); }));
       wc.on('did-start-navigation', (e) => this._chiestaPerNome(tab, wc, e));
     }
     if (activate) {
