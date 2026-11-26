@@ -95,7 +95,9 @@ const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvi
 // pagine, che il correttore chiama nello stesso giro.
 const ANNUNCI = guardiano().ANNUNCI;
 const ANNUNCIO = `(?:${ANNUNCI.map(esc).join('|')})(?!\\p{L})`;
-const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo']);
+// «c'est», «ist», «es»: come «è» nelle altre lingue della richiesta (#1403.14).
+const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo',
+  "c'est", 'c’est', 'est', 'ist', 'lautet', 'es', 'é', 'это']);
 // Dentro una risposta queste aprono quasi sempre altro («sono stanco», «vale poco», «sono arrivato»): non presentano
 // la parola dopo, né fanno di una riga la risposta.
 const NON_IN_RISPOSTA = new Set(['sono', 'are', 'vale', 'risulta', 'here']);
