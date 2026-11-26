@@ -21,6 +21,9 @@ const FRASI = [
   ['pw «Mela! Verde77»', `pw «${S}»`],
   ['mi mandi la password?\n«Mela! Verde77»', `mi mandi la password?\n«${S}»`],
   ['la password è «Mela! Verde77. Gialla9»', `la password è «${S}»`],
+  ['ciao, la password è «Mela! Verde77»', `ciao, la password è «${S}»`],
+  ['Ciao Marco, la password del wifi è « Mela! Verde77 », a dopo', `Ciao Marco, la password del wifi è « ${S} », a dopo`],
+  ['ok, Password: "cavallo batteria graffetta"', `ok, Password: "${S}"`],
 ];
 
 test('verso il modello la password fra virgolette diventa un segnaposto solo, intera', () => {
