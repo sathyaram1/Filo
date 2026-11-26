@@ -44,7 +44,7 @@ test('r1 il titolo di un file del computer chiuso non parte verso il modello che
   expect(r.executed).toBe(true);
   let id = null;
   await expect.poll(async () => (id = await app.evaluate(({ BrowserWindow }) => {
-    const t = tm(BrowserWindow).tabs.find((x) => /^file:/.test(x.url || '') && /referto\.html$/.test(x.url));
+    const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => /^file:/.test(x.url || '') && /referto\.html$/.test(x.url));
     return t && t.title && /Referto/.test(t.title) ? t.id : null;
   })), { timeout: 15_000 }).toBeTruthy();
   await app.evaluate(({ BrowserWindow }, i) => tm(BrowserWindow).closeTab(i), id);
