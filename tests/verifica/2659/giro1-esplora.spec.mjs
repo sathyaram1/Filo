@@ -96,9 +96,12 @@ test('la stessa finestra per nome portata a un altro sito e poi chiusa se ne va,
 test('due finestre di altri siti chiuse insieme se ne vanno tutte e due', async ({ app, openTab, testServer }) => {
   const a = testServer.html('<title>A</title>', { pubblico: true });
   const b = testServer.html('<title>B</title>', { pubblico: true });
-  const page = await openTab(testServer.html(`<title>NEGOZIO</title>${pulsante('a', 'Apri', `window.__a=window.open(${JSON.stringify(a)},'a');window.__b=window.open(${JSON.stringify(b)},'b')`)}${pulsante('c', 'Chiudi', 'window.__a.close();window.__b.close()')}`));
+  const page = await openTab(testServer.html(`<title>NEGOZIO</title>${pulsante('a', 'Apri A', `window.__a=window.open(${JSON.stringify(a)},'a')`)}${pulsante('b', 'Apri B', `window.__b=window.open(${JSON.stringify(b)},'b')`)}${pulsante('c', 'Chiudi', 'window.__a.close();window.__b.close()')}`));
   const prima = (await schede(app)).length;
   await page.click('#a');
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'A'), { timeout: 8000 }).toBe(true);
+  await davanti(app, page.url());
+  await page.click('#b');
   await expect.poll(async () => (await schede(app)).filter((s) => s.titolo === 'A' || s.titolo === 'B').length, { timeout: 8000 }).toBe(2);
   await davanti(app, page.url());
   await page.click('#c');
