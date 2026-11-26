@@ -148,6 +148,24 @@ jobs:
         shell: bash
         run: PLAYWRIGHT_JSON_OUTPUT_NAME=suite-risultati.json npx playwright merge-reports --reporter=json blob-report
 
+      - name: Le registrazioni delle parti
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: suite-copertura-*
+          path: copertura
+          merge-multiple: true
+
+      # La mappa prova → file (#2502) va nel registro, righe [mappa-prove]: dalla cloud gli allegati non si scaricano,
+      # il registro sì (node scripts/mappa-prove.mjs la legge da lì). Una mappa che non nasce non tocca il verdetto.
+      - name: Mappa prova → file
+        continue-on-error: true
+        env:
+          SUITE_COMMIT: ${{ inputs.commit || github.sha }}
+          CORSA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: node scripts/mappa-prove.mjs costruisci --registrazioni copertura --rapporto suite-risultati.json --commit "$SUITE_COMMIT" --corsa "$CORSA" --out mappa-prove.json
+
       # Uscita 0 nessun rosso nuovo, 1 rossi nuovi, 2 suite (o una sua parte) non arrivata in fondo: NON è un verde.
       # Le righe [registro-suite] del suo registro sono quello che legge scripts/rossi-della-suite.mjs.
       - name: Verdetto (rossi nuovi fuori dai rossi noti del contenitore)
