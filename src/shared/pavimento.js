@@ -162,7 +162,7 @@
   const CHIUDE_ETICHETTA = new RegExp(`(?:[:=#]|(?:^|\\s)(?:${VERBO}|will\\s+be)(?:\\s+(?:il|el|le|o|the))?|\\bn\\.|\\bnr\\.?|\\bno\\.)\\s*$`, 'i');
   // Il polacco «to» solo dopo «kod»: in inglese «code to …» è una destinazione.
   const CHIUDE_KOD = /\sto\s*$/i;
-  const PRIMA_DEL_NOME = new RegExp(`^\\s*(?:[:=-]\\s*)?(?:${VERBO}|=|sarà)\\s+(?:[\\p{L}'’-]+\\s+){0,4}?${NOMI_DEL_CODICE}`, 'iu');
+  const PRIMA_DEL_NOME = new RegExp(`^\\s*(?:[:=-]\\s*)?(?:${VERBO}|=)\\s+(?:[\\p{L}'’-]+\\s+){0,4}?${NOMI_DEL_CODICE}`, 'iu');
   // Prima del numero si guarda solo la coda: il nome conta a 60 caratteri al più, e rileggere da capo la riga a ogni
   // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
   const CODA = 400;
