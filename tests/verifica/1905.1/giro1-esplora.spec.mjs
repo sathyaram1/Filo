@@ -91,7 +91,7 @@ const esito = { errori: [] };
 const segna = () => { document.body.dataset.esito = JSON.stringify(esito); };
 window.addEventListener('error', (ev) => { esito.errori.push(String(ev.message || '')); segna(); });
 </script><script src="progetto/.env"></script><script src="progetto/settings.py"></script><script src="progetto/config.toml"></script>
-<script src="progetto/credenziali"></script><script src="progetto/chiavi.ini"></script><script>
+<script src="progetto/credenziali"></script><script src="progetto/chiavi.ini"></script><script src="progetto/mio.js"></script><script>
 window.addEventListener('load', () => {
   const g = (n) => { try { return eval(n); } catch (_) { return 'NO'; } };
   esito.env = g('TOKEN'); esito.py = g('SECRET_KEY'); esito.toml = g('api_key'); esito.senza = g('PASSWORD'); esito.ini = g('CHIAVE_INI');
