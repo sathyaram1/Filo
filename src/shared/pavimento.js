@@ -585,11 +585,23 @@
 
   // Fra virgolette con lo spazio dentro («la password è « Mela!Verde77 »», la grafia francese) il valore si legge come
   // senza spazi: gli spazi passano fuori, e la lunghezza resta, così ogni posto trovato vale anche nel testo vero (#1403.11).
+  // L'apostrofo attaccato a una parola («dell'altra») non apre né chiude; le altre virgolette sì, anche dopo «は».
   const Q = '«»“”„‚‘’‹›"\'「」『』';
-  const FRA_VIRGOLETTE = new RegExp(`(?<![\\p{L}\\p{N}])([«»“„‚‘‹›"'「『])([^\\S\\n]*)([^\\s${Q}](?:[^\\n${Q}]{0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“‘’›‹"'」』])(?![\\p{L}\\p{N}])`, 'gu');
+  const FRA_VIRGOLETTE = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${Q}](?:[^\\n${Q}]{0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
+  const HA_VIRGOLETTE = new RegExp(`[${Q}]`, 'u');
+  const BORDI_VIRGOLETTE = new RegExp(`^[${Q}]+|[${Q}]+$`, 'gu');
   const spazi = (w) => ' '.repeat(w.length);
-  const virgoletteStrette = (s) => (/[«»“”„‚‘’‹›"'「」『』]/.test(s)
+  const virgoletteStrette = (s) => (HA_VIRGOLETTE.test(s)
     ? s.replace(FRA_VIRGOLETTE, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
+  // Un valore preso con le virgolette attaccate («»Mela!Verde77«») nel testo vero le ha staccate: si cerca senza.
+  function nelTestoVero(x, vero) {
+    const v = String(x.valore);
+    if (vero.includes(v)) return x;
+    const k = v.length - v.replace(/^[«»“”„‚‘’‹›"'「」『』]+/u, '').length;
+    const y = { ...x, valore: v.replace(BORDI_VIRGOLETTE, '') };
+    if (Number.isInteger(x.inizio)) y.inizio = x.inizio + k;
+    return y;
+  }
 
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
