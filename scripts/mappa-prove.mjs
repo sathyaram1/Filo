@@ -103,6 +103,9 @@ export function leggiMappa({ file = '', corsa = '', root = ROOT } = {}) {
     if (existsSync(copia)) {
       try { return { mappa: JSON.parse(readFileSync(copia, 'utf8')), fonte: `corsa ${id}` }; } catch (_) {}
     }
+    // Una corsa finita non cambia: quella senza mappa non si riscarica a ogni domanda.
+    const senza = join(cache, `${id}.senza`);
+    if (existsSync(senza)) continue;
     let lavori = [];
     try { lavori = JSON.parse(gh(['api', `repos/${repo}/actions/runs/${id}/jobs?per_page=100`, '--jq', '[.jobs[] | {id, name, status}]'])); } catch (_) { continue; }
     const verdetto = lavori.find((j) => j.name === 'verdetto' && j.status === 'completed');
