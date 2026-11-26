@@ -54,6 +54,7 @@ const PUNTI = '.!?؟;';
 const PUNTI_CJK = '。！？';
 const SPEZZA_FRASE = new RegExp(`[${PUNTI}]+\\s|[${PUNTI_CJK}]+|\\n`, 'u');
 const CHIUDE_PAROLA = new RegExp(`[${PUNTI}${PUNTI_CJK}]$`, 'u');
+const INCISO = new RegExp(`[,;]\\s|[，；、]|[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'u');
 const ellittica = (testa, dopo) => {
   const pezzi = testa.split(new RegExp(`[,;:，；：、]|[${PUNTI}]+\\s|[${PUNTI_CJK}]+|\\s[-–—]\\s`, 'u'));
   return pezzi.length > 1 && /[\p{L}\p{N}]/u.test(pezzi.slice(0, -1).join(''))
