@@ -154,22 +154,25 @@
   const PARTICIPIO = '(?:stat[oaie]|been|[ée]t[ée]|sido|gewesen|geweest)';
   const AUSILIARE = '(?:has|have|had|ha|hat|heeft|a|avait|hab[íi]a|tem|tinha)';
   const AVV = `(?:\\s+${AVVERBIO_SBLOCCO})?`;
-  const CHIUDE_CORPO = `(?:\\s*[:=#,]|\\s*,?${AVV}\\s+(?:${VERBO_SBLOCCO}(?![\\p{L}])(?:${AVV}\\s+${PARTICIPIO})?|${AUSILIARE}${AVV}\\s+${PARTICIPIO})`
-    + `(?![\\p{L}])(?:\\s*[:=])?${AVV}(?:\\s+(?:il|el|le|o|the))?)?`;
-  const CHIUDE_SBLOCCO = `${CHIUDE_CORPO}\\s*$`;
+  const CHIUDE_VERO = `(?:\\s*[:=#,]|\\s*,?${AVV}\\s+(?:${VERBO_SBLOCCO}(?![\\p{L}])(?:${AVV}\\s+${PARTICIPIO})?|${AUSILIARE}${AVV}\\s+${PARTICIPIO})`
+    + `(?![\\p{L}])(?:\\s*[:=])?${AVV}(?:\\s+(?:il|el|le|o|the))?)`;
+  const CHIUDE_CORPO = `${CHIUDE_VERO}?`;
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
-  // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung»), mai un identificativo né il verbo.
+  // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung»), mai un identificativo né il
+  // verbo; solo col verbo o i due punti dopo, perché «codice del mio telefono nuovo serie 71034» è un altro dato.
   const NON_DOPO = `(?:${VERBO_SBLOCCO}|${AUSILIARE}|${AVVERBIO_SBLOCCO}|and|et|y|und|en|i|o|or|ou|${NOME_SBLOCCO})(?![\\p{L}])`;
   const DOPO_APPARECCHIO = `(?:\\s+(?!${NON_DOPO})(?!${NON_APRE.source})(?:(?:di|de|da|du|of|for)\\s+)?(?:[\\p{L}][\\p{L}\\d-]*|\\d{1,3}))`
-    + '{0,2}';
+    + '{1,2}';
   const UN_APPARECCHIO = `${AGGETTIVO}${APPARECCHIO}(?:\\s*(?:,|e|and|et|y|und|en|i|o|or|ou)\\s+(?:${LEGAME_SBLOCCO}\\s+)*${POSSESSIVO}`
-    + `\\s+${AGGETTIVO}${APPARECCHIO})?${DOPO_APPARECCHIO}`;
+    + `\\s+${AGGETTIVO}${APPARECCHIO})?`;
   const TRA_NOME_E_APPARECCHIO = `(?:\\s+(?:${LEGAME_SBLOCCO}|${QUALIFICA_SBLOCCO}))*`;
-  const NUCLEO = `(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${POSSESSIVO}\\s+${UN_APPARECCHIO}`
-    + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${UN_APPARECCHIO}`
+  const NUCLEO_COL_NOME = `(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${POSSESSIVO}\\s+${UN_APPARECCHIO}`
+    + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${UN_APPARECCHIO})`;
+  const NUCLEO = `(?:${NUCLEO_COL_NOME}`
     + `|${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}(?:['’]s)?(?:\\s+(?:ha|has|hat|heeft|tiene|tem|ma)(?:\\s+(?:il|un|the|a|el|o|den|einen|de))?)?`
     + `(?:\\s+(?:(?:unlock|lock|screen|access)\\s+)?|-)?${NOME_SBLOCCO})`;
-  const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])${NUCLEO}${CHIUDE_SBLOCCO}`, 'iu');
+  const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])(?:${NUCLEO_COL_NOME}${DOPO_APPARECCHIO}${CHIUDE_VERO}|${NUCLEO}${CHIUDE_CORPO})\\s*$`, 'iu');
+  const NON_UN_PREZZO = '(?![\\d\\p{L}]|\\s?(?:€|%|euro\\b|eur\\b|usd\\b|\\$))';
   // Il numero prima del nome: «4829 è il codice del mio telefono», «4829 is my phone code».
   const DOPO_IL_NUMERO = new RegExp(`^\\s*(?:[:=-]\\s*)?${VERBO_SBLOCCO}\\s+(?:(?:il|lo|la|the|le|el|o|der|de|het)\\s+)?${NUCLEO}(?![\\p{L}])`, 'iu');
   // «Quello del pc è 5512» dopo il codice del telefono, nella frase o in quella dopo: il pronome sta per il codice.
