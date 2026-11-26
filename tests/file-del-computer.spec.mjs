@@ -525,16 +525,25 @@ window.addEventListener('load', () => {
   expect(e.errori.join(' | '), 'l\'errore dello script arriva senza testo').not.toMatch(/chiave-/);
 });
 
-test('ESPLORA un sito costruito e aperto dal disco: script modulo e stile marcato crossorigin', async ({ app }) => {
+// Come in un browser: script modulo e risorse marcate crossorigin chiedono un permesso che un file non dà. La novità
+// lo dice; quello che non è marcato gira (#1905.1).
+test('un sito costruito e aperto dal disco: script e stili normali girano, lo script modulo e lo stile crossorigin no, come in un browser', async ({ app }) => {
   test.setTimeout(60_000);
   const dir = join(cartellaTemporanea('costruito-'), 'dist');
   mkdirSync(join(dir, 'assets'), { recursive: true });
   writeFileSync(join(dir, 'assets', 'index.js'), "import { saluto } from './parte.js'; document.body.dataset.modulo = saluto;");
   writeFileSync(join(dir, 'assets', 'parte.js'), "export const saluto = 'girato';");
+  writeFileSync(join(dir, 'assets', 'classico.js'), "document.body.dataset.classico = 'girato';");
   writeFileSync(join(dir, 'assets', 'index.css'), '#t{color:rgb(4, 5, 6)}');
+  writeFileSync(join(dir, 'assets', 'normale.css'), '#n{color:rgb(7, 8, 9)}');
   writeFileSync(join(dir, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Costruito</title>
 <script type="module" crossorigin src="./assets/index.js"></script><link rel="stylesheet" crossorigin href="./assets/index.css">
-<body><h1 id="t">Sito</h1><script>window.addEventListener('load', () => { document.body.dataset.colore = getComputedStyle(document.getElementById('t')).color; document.body.dataset.fine = '1'; });</script></body>`);
+<link rel="stylesheet" href="./assets/normale.css">
+<body><h1 id="t">Sito</h1><p id="n">testo</p><script src="./assets/classico.js"></script><script>window.addEventListener('load', () => {
+  document.body.dataset.colore = getComputedStyle(document.getElementById('t')).color;
+  document.body.dataset.normale = getComputedStyle(document.getElementById('n')).color;
+  document.body.dataset.fine = '1';
+});</script></body>`);
   await home(app);
   const file = join(dir, 'index.html');
   expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
