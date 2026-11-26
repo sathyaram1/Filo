@@ -769,8 +769,8 @@
   // Per il pavimento e per il correttore (correttoreRiservati.js); `valori`: stringhe o `{ valore, regola }`.
   const PAROLE_FRA_VIRGOLETTE = 8;
   const NOMINA_CORTA = new RegExp(ETICHETTA_CORTA, 'i');
-  const DOPO_ETICHETTA = new RegExp(`${ETICHETTA}(?:${ACCANTO}(?:[ \\t]*[:=]|[ \\t]+${VERBO_PASSWORD}))?[ \\t]*$`, 'i');
-  const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}[ \\t]*[:=]?[ \\t]*$`, 'i');
+  const PRIMA_DELLE_VIRGOLETTE = new RegExp(`${ETICHETTA}(?:${ACCANTO}(?:[ \\t]*[:=]|[ \\t]+${VERBO_PASSWORD}))?[ \\t]*$`, 'i');
+  const PRIMA_DELLE_VIRGOLETTE_CORTA = new RegExp(`${ETICHETTA_CORTA}[ \\t]*[:=]?[ \\t]*$`, 'i');
   const spiega = (parole) => NON_VALORE.test(parole[0]) || INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, ''))
     || parole.some((p) => MISURA.test(p) || TEMPO.test(p));
   function interiFraVirgolette(vero, valori) {
