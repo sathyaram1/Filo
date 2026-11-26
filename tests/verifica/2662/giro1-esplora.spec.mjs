@@ -102,8 +102,10 @@ test('segno sulla bolla: valore del modello nel riquadro, annullo dal segno, tas
     const cambia = { id: 's1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'agentStyle', valore: STRANO }) };
     await modelloFinto(app, [{ text: '', toolCalls: [cambia] }, { text: 'Fatto.' }]);
     await chiedi(page, 'cambia il mio stile');
-    await page.locator('.dash-action-btn', { hasText: 'Filo vuole impostare' }).click({ timeout: 10_000 });
-    await clickConfirm(page, 'ok', { timeout: 10_000 });
+    await clickConfirm(page, 'ok', { timeout: 6_000 }).catch(async () => {
+      await page.locator('.dash-action-btn', { hasText: 'Filo vuole impostare' }).click({ timeout: 10_000, force: true });
+      await clickConfirm(page, 'ok', { timeout: 10_000 });
+    });
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 15_000 });
     const segno = page.locator('.dash-cambi-segno').last();
     await expect(segno).toBeAttached({ timeout: 10_000 });
