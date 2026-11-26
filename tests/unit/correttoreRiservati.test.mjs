@@ -31,6 +31,15 @@ test('ogni parte della richiesta che porta testo passa dal segnaposto, anche la 
   assert.deepEqual(p.date[0].anni[0], { anno: 2024, giorno: 'mercoledì', dove: 'titolo', riga: '2024 [dato riservato]' });
 });
 
+// #2673.5 — l'enfasi del Markdown coi due punti dentro («__Password:__ …») stava fra etichetta e valore.
+test('un\'etichetta in grassetto o corsivo Markdown coi due punti dentro non fa partire il valore, nemmeno a pezzi', () => {
+  for (const t of ['__Password:__ Nyckel!2024', '_Password:_ Nyckel!2024', '**Password:** Nyckel!2024',
+    '- **Wi-Fi password:**\nNyckel!2024']) assert.ok(!R.oscura(t).includes('Nyckel!2024'), t);
+  const p = R.richiestaSenzaRiservati({ prima: '__Password:__ ', nuovo: 'Nyckel!2024', dopo: '\n__Utente:__ mario' });
+  assert.ok(!JSON.stringify(p).includes('Nyckel!2024'), JSON.stringify(p));
+  assert.equal(p.dopo, '\n__Utente:__ mario');
+});
+
 // La parola che presenta il dato e il dato possono partire in pezzi diversi, o la parola restare fuori dai pezzi: si
 // cerca nel campo intero, e il campo non parte.
 test('una password scritta dopo una pausa e una carta a metà fra due pezzi non partono', () => {
