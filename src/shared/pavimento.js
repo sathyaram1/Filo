@@ -158,10 +158,14 @@
     + `(?![\\p{L}])(?:\\s*[:=])?${AVV}(?:\\s+(?:il|el|le|o|the))?)`;
   const CHIUDE_CORPO = `${CHIUDE_VERO}?`;
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
-  // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung»), mai un identificativo né il
-  // verbo; solo col verbo o i due punti dopo, perché «codice del mio telefono nuovo serie 71034» è un altro dato.
-  const NON_DOPO = `(?:${VERBO_SBLOCCO}|${AUSILIARE}|${AVVERBIO_SBLOCCO}|and|et|y|und|en|i|o|or|ou|${NOME_SBLOCCO})(?![\\p{L}])`;
-  const DOPO_APPARECCHIO = `(?:\\s+(?!${NON_DOPO})(?!${NON_APRE.source})(?:(?:di|de|da|du|of|for)\\s+)?(?:[\\p{L}][\\p{L}\\d-]*|\\d{1,3}))`
+  // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung», «13»): elencate, perché dopo
+  // «phone» può venire «number»; e solo col verbo dopo: «codice del mio telefono nuovo serie 71034» è un altro dato.
+  const DOPO_APPARECCHIO = '(?:\\s+(?:(?:di|de|da|du|del|of|for|para|pour|f[üu]r)\\s+)?(?:nuov\\p{L}*|vecchi\\p{L}*|aziendal\\p{L}*|personal\\p{L}*'
+    + '|privat\\p{L}*|fisso|portatile|principale|attuale|lavoro|ufficio|casa|nuev\\p{L}*|viej\\p{L}*|trabajo|nouve(?:au|l|lle)|vieux|ancien\\p{L}*'
+    + '|travail|bureau|perso|pro|professionnel\\p{L}*|new|old|work|office|home|current|main|neu\\p{L}*|alt\\p{L}*|arbeit|dienst\\p{L}*|nieuw\\p{L}*'
+    + '|oud\\p{L}*|werk|novo|nova|antigo|velho|móvil|movil|portable|cellulare|celular|samsung|galaxy|iphone|pixel|xiaomi|redmi|huawei|honor'
+    + '|oppo|oneplus|motorola|moto|nokia|sony|lg|realme|vivo|apple|macbook|dell|hp|lenovo|thinkpad|asus|acer|surface|pro|max|plus|mini'
+    + '|ultra|air|se|lite|\\d{1,3})(?![\\p{L}\\d]))'
     + '{1,2}';
   const UN_APPARECCHIO = `${AGGETTIVO}${APPARECCHIO}(?:\\s*(?:,|e|and|et|y|und|en|i|o|or|ou)\\s+(?:${LEGAME_SBLOCCO}\\s+)*${POSSESSIVO}`
     + `\\s+${AGGETTIVO}${APPARECCHIO})?`;
