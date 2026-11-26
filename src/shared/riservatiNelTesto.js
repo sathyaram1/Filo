@@ -91,7 +91,7 @@ function refusoDiPassword(w) {
 let soloNomePassword = null;
 function nomeDiPassword(w) {
   const P = exfil() && exfil().PRESENTA;
-  if (!soloNomePassword && P) soloNomePassword = new RegExp(`^(?:${P.password.replace(/^\\b|\\b$/g, '')}|pw|pass)$`, 'u');
+  if (!soloNomePassword && P) soloNomePassword = new RegExp(`^(?:${P.password}|pw|pass)$`, 'u');
   return (soloNomePassword ? soloNomePassword.test(w) : w === 'password') || refusoDiPassword(w);
 }
 
