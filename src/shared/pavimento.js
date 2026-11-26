@@ -200,6 +200,7 @@
   const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
   const DAVANTI_AL_NOME = /^(?:il|lo|la|le|el|un|the|and|gli|una|une|uno|los|las|der|die|das|den|dem|des|het|een|ein\w*|unlock|lock|screen|access|pin|puk|sim|what|what['’]?s|here|ecco|anche|also|plus)$/i;
   const delMioApparecchio = (coda) => {
+    if (!UN_APPARECCHIO_NEL_TESTO.test(coda)) return false;
     const m = DEL_MIO_APPARECCHIO.exec(coda);
     if (!m || !INIZIA_COL_NOME.test(m[0])) return !!m;
     const w = /([A-Za-z][A-Za-z'-]{2,}|[A-Z]{2,})\s+$/.exec(coda.slice(0, m.index));
