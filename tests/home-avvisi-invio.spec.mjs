@@ -45,7 +45,7 @@ for (const [W, H] of [[1280, 840], [900, 700], [720, 640]]) {
 // #1551.1 — col testo grande delle Preferenze la home si dispone come in una finestra più stretta: il campo resta
 // largo abbastanza da scriverci e la colonna di destra non esce dalla finestra.
 for (const [W, H, scala, minimo] of [[1000, 760, 1.25, 240], [1000, 760, 1.5, 200], [720, 640, 1.5, 160]]) {
-  test(`testo ${scala * 100}% in una finestra ${W}x${H}: il campo della home resta largo e tutto sta nella finestra`, async ({ app }) => {
+  test(`testo ${scala * 100}% in una finestra ${W}x${H}: il campo della home resta largo e tutto sta nella finestra`, async ({ app, shell }) => {
     await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setContentSize(w, h), [W, H]);
     let page = await home(app);
     // Quello che salva la pagina Preferenze scegliendo la dimensione del testo.
