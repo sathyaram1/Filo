@@ -444,7 +444,19 @@
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
   const TEMPO = /^(?:gen(?:naio)?|feb(?:braio)?|mar(?:zo)?|apr(?:ile)?|mag(?:gio)?|giu(?:gno)?|lug(?:lio)?|ago(?:sto)?|set(?:tembre)?|ott(?:obre)?|nov(?:embre)?|dic(?:embre)?|jan(?:uary)?|february|march|april|may|june?|july?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|dec(?:ember)?|fa|ago|giorn[oi]|settiman[ae]|mes[ei]|ann[oi]|or[ae]|minut[oi]|days?|weeks?|months?|years?|hours?|minutes?|ieri|oggi|yesterday|today)[.,;:]?$/i;
-  const spiegazione = (parole) => INIZIO_SPIEGAZIONE.test(parole[0].replace(/[.,;:]+$/, '')) || parole.some((p) => MISURA.test(p) || TEMPO.test(p));
+  const ARTICOLO = /^(?:la|il|lo|i|le|gli|una?|the|an?|el|der|die|das|de|het)$/i;
+  // Davanti a un verbo «la», «lo», «le» sono un pronome, e la frase dice dove trovarla: «Password: la trovi sul modem».
+  const DOPO_PRONOME = /^(?:trov[aio]|trovate|troverai|troverete|ricevi|riceve|ricevete|riceverai|riceverete|mando|mandiamo|manderò|manderemo|invio|inviamo|invierò|invieremo|chiedi|chiedete|sai|sa|sanno|conosci|conosce|ha|hai|hanno|abbiamo|avete|cambi|cambia|cambierai|scegli|sceglierai|imposti|imposterai|scrivo|scriverò|dico|dirò|diamo|daremo|do|darò|one|ones)$/i;
+  // La prima parola che conta: un articolo in testa non dice niente («Password: la casa al mare», #2678.5).
+  const spiegazione = (parole) => {
+    const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
+    const articolo = ARTICOLO.test(p[0]) && p.length > 1;
+    const prima = articolo ? p[1] : p[0];
+    return NON_VALORE.test(prima) || INIZIO_SPIEGAZIONE.test(prima) || (articolo && DOPO_PRONOME.test(prima))
+      || parole.some((x) => MISURA.test(x) || TEMPO.test(x));
+  };
+  // Nelle parole anche i simboli di una password («la casa al mare 77!»), non il punto di domanda di una frase.
+  const PAROLA_DI_FRASE = /^[\p{L}\p{N}'’!@#$%^&*+=~_-]+[.,;:]?$/u;
   function fraseDopo(s, out) {
     for (const m of s.matchAll(FRASE_DOPO)) {
       // Le virgolette intorno alla frase («Password: «casa mia al mare»») non sono della password (#1403.27).
@@ -452,7 +464,7 @@
       const q = tutta.match(SOLO_FRA_VIRGOLETTE);
       const v = q ? q[3] : tutta;
       const parole = v.split(/\s+/);
-      if (parole.length < 2 || parole.length > 6 || parole.some((p) => !/^[\p{L}\p{N}'’]+[.,;:]?$/u.test(p)) || v.startsWith('[') || NON_VALORE.test(parole[0]) || formaVicina(parole[0])) continue;
+      if (parole.length < 2 || parole.some((p) => !PAROLA_DI_FRASE.test(p)) || v.startsWith('[') || formaVicina(parole[0])) continue;
       if (spiegazione(parole)) continue;
       out.push({ valore: v.replace(/[.,;:]+$/, ''), regola: 'password' });
     }
