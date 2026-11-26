@@ -41,3 +41,72 @@ for (const [W, H] of [[1280, 840], [900, 700], [720, 640]]) {
     expect(await page.locator('#input').evaluate((t) => t.scrollHeight - t.clientHeight)).toBeLessThanOrEqual(1);
   });
 }
+
+// #1551.1 — col testo grande delle Preferenze la home si dispone come in una finestra più stretta: il campo resta
+// largo abbastanza da scriverci e la colonna di destra non esce dalla finestra.
+for (const [W, H, scala, minimo] of [[1000, 760, 1.25, 240], [1000, 760, 1.5, 200], [720, 640, 1.5, 160]]) {
+  test(`testo ${scala * 100}% in una finestra ${W}x${H}: il campo della home resta largo e tutto sta nella finestra`, async ({ app }) => {
+    await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setContentSize(w, h), [W, H]);
+    let page = await home(app);
+    // Quello che salva la pagina Preferenze scegliendo la dimensione del testo.
+    await page.evaluate(async (s) => {
+      const r = await chrome.storage.local.get('settings');
+      await chrome.storage.local.set({ settings: { ...((r && r.settings) || {}), textScale: s } });
+    }, scala);
+    await page.reload();
+    page = await home(app);
+    await expect.poll(() => page.evaluate(() => document.documentElement.style.zoom)).toBe(String(scala));
+    await page.locator('#input').fill('ciao Filo, che tempo fa domani?');
+    await page.waitForTimeout(300);
+    const m = await page.evaluate(() => {
+      const r = (id) => document.getElementById(id).getBoundingClientRect();
+      const dash = r('dash');
+      return { campo: document.getElementById('input').clientWidth, dash, destra: r('right'), invio: r('sendBtn') };
+    });
+    expect(m.campo).toBeGreaterThanOrEqual(minimo);
+    expect(m.destra.right).toBeLessThanOrEqual(m.dash.right + 1);
+    expect(m.invio.right).toBeLessThanOrEqual(m.destra.left);
+    expect(m.invio.width).toBeGreaterThan(30);
+    // La frase breve sta su una riga: il campo non è una fessura che la spezza parola per parola.
+    expect(await page.locator('#input').evaluate((t) => Math.round(t.scrollHeight / parseFloat(getComputedStyle(t).lineHeight)))).toBeLessThanOrEqual(2);
+  });
+}
+
+// #1551.1 — una home aperta, o ingrandita, mentre un avviso che resta finché lo chiudi è già nell'angolo: l'avviso
+// vola nella colonna e il tasto Invia resta scoperto.
+test('home nuova aperta con un avviso già nell\'angolo, poi ingrandita: l\'avviso lascia l\'angolo e Invia resta scoperto', async ({ app, shell, avvisi, openTab, testServer }) => {
+  const prima = await home(app);
+  await testServer.openReady(openTab, '<h1>Un sito</h1>');
+  await shell.evaluate(() => window.filoNotify('Il portachiavi di sistema non risponde: l’accesso vale fino alla chiusura di Filo', { durationSec: 0, actions: [{ label: 'Capito', onClick() {} }] }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
+
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+  let nuova = null;
+  await expect.poll(() => {
+    nuova = app.windows().find((w) => { try { return w !== prima && w.url().startsWith('filo://newtab'); } catch (_) { return false; } });
+    return !!nuova;
+  }, { timeout: 10_000 }).toBe(true);
+  await expect(nuova.locator('#sendBtn')).toBeVisible({ timeout: 8_000 });
+  const larga = await nuova.locator('#inputForm').evaluate((f) => f.getBoundingClientRect().width);
+  // Lo zoom della home cambiato mentre l'avviso è ancora nell'angolo.
+  await app.evaluate(({ webContents }) => {
+    const wc = webContents.getAllWebContents().find((w) => { try { return w.getURL().startsWith('filo://newtab') && w.isFocused?.() !== undefined && w.getZoomFactor; } catch (_) { return false; } });
+    return wc;
+  });
+  await nuova.evaluate(() => { document.body.dataset.provaZoom = '1'; });
+  await app.evaluate(({ webContents }) => {
+    const tutte = webContents.getAllWebContents().filter((w) => { try { return w.getURL().startsWith('filo://newtab'); } catch (_) { return false; } });
+    for (const w of tutte) w.executeJavaScript('document.body.dataset.provaZoom').then((v) => { if (v === '1') w.setZoomFactor(1.25); });
+  });
+  await expect.poll(() => nuova.evaluate(() => window.devicePixelRatio)).toBeGreaterThan(1.2);
+
+  await expect(nuova.locator('#accade > .dash-carta[data-tipo="cornice"]')).toContainText('Il portachiavi', { timeout: 9_000 });
+  await expect(vista.locator('.shell-notif.show')).toHaveCount(0);
+  // Il campo ha la larghezza di una home senza avvisi, allo zoom nuovo.
+  await nuova.waitForTimeout(300);
+  const dopo = await nuova.locator('#inputForm').evaluate((f) => f.getBoundingClientRect().width);
+  expect(Math.abs(dopo * 1.25 - larga)).toBeLessThanOrEqual(larga * 0.35);
+  await nuova.locator('#input').fill('scrivo e mando');
+  await nuova.locator('#sendBtn').click({ trial: true });
+});
