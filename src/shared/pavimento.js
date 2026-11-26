@@ -588,7 +588,8 @@
 
   // Fra virgolette con lo spazio dentro («la password è « Mela!Verde77 »», la grafia francese) il valore si legge come
   // senza spazi: gli spazi passano fuori, e la lunghezza resta, così ogni posto trovato vale anche nel testo vero (#1403.11).
-  // L'apostrofo attaccato a una parola («dell'altra») non apre né chiude; le altre virgolette sì, anche dopo «は».
+  // L'apostrofo attaccato a una parola («dell'altra») non apre né chiude; le altre virgolette sì, anche dopo «は». Dentro
+  // il valore una virgoletta stretta fra due caratteri («« l'Albero77 »») è della password, non la chiude.
   const Q = '«»“”„‚‘’‹›"\'「」『』';
   const FRA_VIRGOLETTE = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${Q}](?:(?:[^\\n${Q}]|(?<=[^\\s${Q}])[${Q}](?=[^\\s${Q}])){0,254}[^\\s${Q}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
   const HA_VIRGOLETTE = new RegExp(`[${Q}]`, 'u');
