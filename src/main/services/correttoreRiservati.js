@@ -13,6 +13,16 @@ const SOPRA_MAX = 1500;
 const RT = () => globalThis.SN_RISERVATI_TESTO || require('../../shared/riservatiNelTesto.js');
 const PAV = () => globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
 
+// Le parole di una frase che spiega la password («va cambiata ogni 90 giorni») restano, con la regola del pavimento;
+// quella che un annuncio presenta («la password ora è gattonero») è il valore anche se «ora» sembra un orario.
+function spiega(parole) {
+  const G = globalThis.SN_GUARDIANO_STATICO;
+  const prima = String(parole[parole.length - 2] || '');
+  const annunci = (G && G.ANNUNCI) || [];
+  if (prima.endsWith(':') || prima === '=' || annunci.includes(prima)) return false;
+  return PAV().spiegazione(parole);
+}
+
 function riservati(grezzo) {
   // L'enfasi del Markdown fra etichetta e valore («__Password:__ …») si legge come spazi, come nel pavimento.
   const testo = RT().senzaEnfasi(grezzo);
@@ -21,11 +31,11 @@ function riservati(grezzo) {
   const out = [];
   const l = testo.toLowerCase();
   try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
-  // Le parole di una frase che spiega la password («va cambiata ogni 90 giorni») restano, con la regola del pavimento.
-  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l, { spiega: PAV().spiegazione })); } catch (_) {}
+  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l, { spiega })); } catch (_) {}
   // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   const valori = [...RT().lunghi(out), ...RT().trova(testo)];
+  // Quello che il pavimento toglie al cancello dei modelli (un CVV di tre cifre, «login_password: …») qui non parte.
   try { valori.push(...PAV().trova(testo).map((x) => String(x.valore))); } catch (_) {}
   // Una password con gli spazi fra virgolette vale intera, come nel pavimento.
   try { valori.push(...RT().lunghi(PAV().interiFraVirgolette(testo, valori))); } catch (_) {}
