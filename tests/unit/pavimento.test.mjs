@@ -984,3 +984,9 @@ test('un testo lunghissimo senza spazi dopo l\'etichetta non ferma il pavimento'
   const valore = `x1${'ab'.repeat(40000)}`;
   assert.equal(P.oscura(`password: ${valore}`), `password: ${S}`);
 });
+
+test('l\'etichetta araba con «e», «con» o «per» attaccati non lascia la password al modello', () => {
+  for (const t of ['اسم المستخدم: ahmed وكلمة المرور: Gatto2024!', 'بكلمة المرور: Gatto2024!', 'ولكلمة المرور هي Gatto2024!']) {
+    assert.ok(!P.oscura(t).includes('Gatto2024'), t);
+  }
+});
