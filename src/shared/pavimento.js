@@ -49,6 +49,27 @@
   // il nome di un servizio («Telegram code», «codice Amazon») e le parole del monouso qui sotto.
   const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|è|\bn\.?|\bnr\.?)?\s*$/;
   const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
+  // Le stesse due regole nelle lingue dei nomi del codice (#1403.13): «Le code de suivi est …», «El código del pedido es …»,
+  // «Kod rabatowy to …», «Der Code der Bestellung ist …». «Code» solo col complemento, perché da solo è anche inglese.
+  const FUTURO = '(?:sarà|sera|será|serà|serão|będzie)';
+  const SEPARA_ALTRE = `(?:\\s*[:=#]|\\s+(?:${VERBO}|${FUTURO}|to)(?![\\p{L}]))?\\s*$`;
+  const ETICHETTA_ALTRE = new RegExp(`(?:\\b[Cc]ode\\s+(?:(?:de|du|des|van)\\s+(?:(?:la|les|le|de|het)\\s+|l['’]\\s*)?|d['’]\\s*)`
+    + `|\\b(?:[Cc][óo]digo|[Kk]od)\\s+(?:(?:de|del|do|da|dos|das)\\s+(?:(?:la|las|los|el|o|a|os|as)\\s+)?)?)([\\p{Ll}][\\p{Ll}-]{2,})${SEPARA_ALTRE}`, 'u');
+  const ETICHETTA_DE = new RegExp(`\\b[Cc]odes?\\s+(?:der|des|vom|zur|zum|für\\s+(?:die|den|das))\\s+(\\p{Lu}\\p{Ll}+)${SEPARA_ALTRE}`, 'u');
+  const UN_VERBO = new RegExp(`^(?:${VERBO}|${FUTURO}|sono|sont|son|são|sind|zijn|fue|foi|to)$`, 'iu');
+  const RESTA_ALTRE = new RegExp('^(?:acc[èe]s|acceso|acesso|dost[ęe]p\\p{L}*|v[ée]rifica\\p{L}*|weryfikac\\p{L}*|s[ée]curit[ée]|seguridad|seguran[çc]a'
+    + '|zabezpiecz\\p{L}*|bezpiecze\\p{L}*|beveiliging|confirma\\p{L}*|potwierdz\\p{L}*|bevestiging|activa\\p{L}*|ativa[çc][ãa]o|aktywac\\p{L}*'
+    + '|connexion|sesi[óo]n|sess[ãa]o|logowani\\p{L}*|inlog\\p{L}*|autori[sz]a\\p{L}*|autoryz\\p{L}*|authentifi\\p{L}*|autentica\\p{L}*'
+    + '|uwierzyteln\\p{L}*|d[ée]verrouillage|desbloque\\p{L}*|odblokow\\p{L}*|r[ée]cup[ée]ration|recupera\\p{L}*|odzyskiw\\p{L}*|secours'
+    + '|emerg[êe]ncia|emergencia|respaldo|backup|secret\\p{L}*|tajn\\p{L}*|temporaire|tempor[áa]l|tempor[áa]rio|tymczasow\\p{L}*'
+    + '|nuevo|novo|nowy|[úu]nico|jednorazow\\p{L}*|sms|e-?mail|correo|envoy[ée]|enviado|recibido|re[çc]u|recebido|siguiente|seguinte'
+    + '|num[ée]ric[oa]|personnel|personal|pin|otp|blik|tan|validation|validaci[óo]n|valida[çc][ãa]o|retrait|retiro|levantamento|odbioru'
+    + '|ouverture|apertura|abertura|otwarcia|din[áa]mico|dynamique|transac\\p{L}*|transa[çc][ãa]o|identifica\\p{L}*|identyfikac\\p{L}*)$', 'iu');
+  const APRE_ALTRE = '(?:portes?|portail|portillon|entr[ée]e|immeuble|interphone|digicode|coffre(?:-fort)?|alarme|garage|cadenas|casier|consigne'
+    + '|puertas?|portal|port[óo]n|entrada|edificio|portero|alarma|garaje|candado|cerradura|taquilla|casillero|porta|port[ãa]o|pr[ée]dio|cofre'
+    + '|fechadura|cadeado|t[üu]r|tor|haust[üu]r|eingang\\p{L}*|geb[äa]ude\\p{L}*|tresors?|safe|alarm\\p{L}*|schloss\\p{L}*|schlie(?:ß|ss)fach\\p{L}*'
+    + '|drzwi|bram[ay]?|furtk[ai]|wej[śs]ci\\p{L}*|sejfu?|domofonu?|gara[żz]u|deur|poort|ingang|kluis|wi-?fi|wlan)';
+  const APRE_ALTRE_SOLO = new RegExp(`^${APRE_ALTRE}$`, 'iu');
   const RESTA_UN_CODICE = /^(?:conferm\w*|sicurezza|temporane\w*|provvisori\w*|segret\w*|personal\w*|attivazion\w*|recupero|ripristino|emergenza|associazion\w*|abbinament\w*|ricevut\w*|inviat\w*|numeric\w*|nuovo|seguente|unico|sms|email|mail|your|the|my|this|that|our|its|new|same|following|above|below|one|confirmation|security|backup|recovery|reset|activation|temporary|secret|pairing|text|unique|special)$/;
   // Le cose che un codice apre: il loro codice è un segreto anche col nome comune davanti («Il codice del cancello è
   // 4829», «Codice di ritiro: 640385»). Contano solo come nome del codice, cioè subito dopo «codice» o subito prima di
