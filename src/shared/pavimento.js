@@ -456,8 +456,7 @@
     const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
     const articolo = ARTICOLO.test(p[0]) && p.length > 1;
     const prima = articolo ? p[1] : p[0];
-    return NON_VALORE.test(prima) || INIZIO_SPIEGAZIONE.test(prima) || (articolo && DOPO_PRONOME.test(prima))
-      || parole.some((x) => MISURA.test(x) || TEMPO.test(x));
+    return NON_VALORE.test(prima) || INIZIO_SPIEGAZIONE.test(prima) || (articolo && DOPO_PRONOME.test(prima)) || misuraODate(parole);
   };
   // Nelle parole anche i simboli di una password («la casa al mare 77!»), non il punto di domanda di una frase.
   const PAROLA_DI_FRASE = /^[\p{L}\p{N}'’!@#$%^&*+=~_-]+[.,;:]?$/u;
