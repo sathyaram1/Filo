@@ -519,6 +519,18 @@ export function sceltaDallaMappa({ mappa, file, base, root = ROOT }) {
   };
 }
 
+/** Cosa ha scelto la mappa prova → file, o perché non c'era. PURA. */
+export function testoDellaMappa({ letta, daMappa }) {
+  if (!letta) return '';
+  if (letta.errore) return `▸ Mappa prova → file non disponibile (${letta.errore}): scelgo gli spec per area e nome.`;
+  if (!daMappa) return '';
+  const m = letta.mappa;
+  const righe = [`▸ Mappa prova → file (${letta.fonte}, commit ${String(m.commit || '?').slice(0, 10)}): ${daMappa.specs.length} spec passano dalle funzioni cambiate e li lancio.`];
+  if (daMappa.soloCaricano.length) righe.push(`  Altri ${daMappa.soloCaricano.length} caricano soltanto i file cambiati: non li lancio, li corre la suite su main. L'elenco col tempo previsto: node scripts/mappa-prove.mjs`);
+  if (daMappa.nota) righe.push(`  ${daMappa.nota}`);
+  return righe.join('\n');
+}
+
 /**
  * Divide gli spec da lanciare fra quelli che DEVONO essere verdi e quelli
  * rossi anche su main su questa macchina (tests/rossi-noti.json, feedback
