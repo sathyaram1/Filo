@@ -1,6 +1,6 @@
 // Il controllo senza modello della rilettura (#1403): testo e allegati di testo letti con le regole del pavimento e del
-// guardiano. Gira nel processo a parte (feedbackL0StaticoFiglio.js) perché un log da 4 MB non fermi finestre e schede
-// (#1403.2); qui solo se il processo non c'è (unit test). Prove: tests/unit/feedbackL0Statico.test.mjs.
+// guardiano. Oltre SOGLIA_QUI gira nel processo a parte (feedbackL0StaticoFiglio.js), perché un log da 4 MB non fermi
+// finestre e schede (#1403.2). Prove: tests/unit/feedbackL0Statico.test.mjs.
 
 'use strict';
 
