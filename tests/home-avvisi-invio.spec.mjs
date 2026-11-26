@@ -58,6 +58,7 @@ for (const [W, H, scala, minimo] of [[1000, 760, 1.25, 240], [1000, 760, 1.5, 20
     await expect.poll(() => page.evaluate(() => document.documentElement.style.zoom)).toBe(String(scala));
     await page.locator('#input').fill('ciao Filo, che tempo fa domani?');
     await page.waitForTimeout(300);
+    await page.screenshot({ path: `tests/.shots/home-testo-${scala * 100}-${W}.png` });
     const m = await page.evaluate(() => {
       const r = (id) => document.getElementById(id).getBoundingClientRect();
       const dash = r('dash');
