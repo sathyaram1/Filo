@@ -117,6 +117,23 @@
   const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])\\s*(?:[:=#]|è|\\bis\\b)?\\s*$`, 'i');
   const LEGAMI = /^(?:\s+|(?:d|l|dell|all|dall|nell)['’]|(?:di|del|della|dello|dei|degli|delle|per|da|a|al|alla|allo|il|la|lo|i|gli|le|tuo|tua|of|for|to|the|your)\b)+/i;
   const PER_APRIRE = /\b(?:apri(?:re)?|apre|aprono|open(?:s|ing)?|entra(?:re)?|disattiva(?:re)?|disinseri(?:re|sci)|disarm(?:a|are)?)\b/i;
+  // Il codice del proprio telefono o computer lo sblocca, in ogni lingua (#1403.44): col possessivo e l'apparecchio a
+  // chiudere l'etichetta, così «il codice del telefono del cliente» e «my phone number» restano identificativi.
+  const POSSESSIVO = `(?:mi[oaei]|tu[oaei]|su[oaei]|nostr[oaei]|vostr[oaei]|loro|my|your|his|her|our|their|${POSSESSIVO_ALTRE}`
+    + '|(?:mein|dein|sein|ihr|unser|eur)\\p{L}*|mijn|jouw|je|uw|zijn|haar|onze?)';
+  const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
+    + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|smartphones?|i-?phones?'
+    + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
+    + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
+    + '|devices?|appareils?|ger[äa]te?s?|urz[ąa]dzeni[ea]|apparaats?)';
+  const NOME_SBLOCCO = '(?:codic[ei]|codes?|c[óo]digos?|kod(?:u|em|y)?|pin|passcode)';
+  const LEGAME_SBLOCCO = '(?:di|del|della|dello|dei|degli|delle|of|for|on|the|de|du|des|do|da|dos|das|para|pour|von|vom|f[üu]r|zu|zum'
+    + '|der|van|voor|het|od|dla|la|le|les|il|lo|el|los|las|o|a|os|as)';
+  const CHIUDE_SBLOCCO = `(?:\\s*[:=#]|\\s+(?:${VERBO}|${FUTURO}|to|will\\s+be|sono|are|sind|zijn)(?![\\p{L}])(?:\\s+(?:il|el|le|o|the))?)?\\s*$`;
+  const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
+  const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])(?:${NOME_SBLOCCO}(?:\\s+${LEGAME_SBLOCCO})*\\s+${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}`
+    + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}(?:\\s+${LEGAME_SBLOCCO})*\\s+${AGGETTIVO}${APPARECCHIO}`
+    + `|${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}(?:['’]s)?\\s+(?:(?:unlock|lock|screen|access)\\s+)?${NOME_SBLOCCO})${CHIUDE_SBLOCCO}`, 'iu');
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
