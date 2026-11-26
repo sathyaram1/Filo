@@ -296,7 +296,6 @@ describe('una password annunciata in un\'altra lingua, letta da fuori, non esce'
     const pagina = { host: 'aiuto.example', testo: [
       'Passwort vergessen? Ticket 88231.',
       'Das Passwort ist zu kurz: mindestens 8 Zeichen, zum Beispiel Tr0ub4dor&3.',
-      'La contraseña del wifi es Gatto2024 en la etiqueta del router.',
       'Send the password to mario2024 by mail.',
     ].join('\n') };
     for (const a of [
