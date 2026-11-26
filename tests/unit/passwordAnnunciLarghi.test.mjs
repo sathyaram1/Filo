@@ -56,7 +56,17 @@ test('le frasi che parlano della password senza darla restano intere', () => {
   for (const t of ['Account -> Password -> Cambia', 'Impostazioni -> Password -> "Modifica"', 'la password di Office365',
     'la password di Office365 scade domani', 'la password del wifi non va', 'la password resta segreta',
     'la password deve essere lunga almeno otto caratteri', 'the password should be changed', 'la password è sempre la stessa',
-    'la password è ancora quella di prima', 'pass «Gestisci account»']) {
+    'la password è ancora quella di prima', 'pass «Gestisci account»', 'la password è diventata obsoleta',
+    'la password è stata cambiata ieri', 'ho cambiato la password in fretta', 'ho impostato la password a mano',
+    'ho cambiato la password a mia madre', 'la password è stata impostata a 12 caratteri', 'the password has been reset',
+    'the password was changed to meet the policy', 'I changed the password to protect the account']) {
     assert.equal(P.oscura(t), t, t);
+  }
+});
+
+test('il complemento della password si legge uguale al modello e al correttore', () => {
+  for (const t of ['la pass del wifi è gattonero', 'la pass per il wifi è gattonero', 'la pass dell’ufficio è gattonero',
+    'la pass per il router diventa gattonero']) {
+    assert.ok(!alCorrettore(t).includes('gattonero'), t);
   }
 });
