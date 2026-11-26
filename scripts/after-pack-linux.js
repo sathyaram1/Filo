@@ -56,7 +56,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const SUFFISSO = '-bin';
-exports.SUFFISSO = SUFFISSO;
+
+// Il programma che si avvia e quello vero, col suffisso: il lanciatore qui e il fusibile (lib/fusibili-electron.js)
+// li cercano con questo conto solo.
+function programmiDelPacchetto(context) {
+  const nome = context.packager.executableName || 'filo';
+  return { nome, programma: path.join(context.appOutDir, nome), vero: path.join(context.appOutDir, nome + SUFFISSO) };
+}
+exports.programmiDelPacchetto = programmiDelPacchetto;
 
 // `exec -a` tiene il nome originale come nome del processo: senza, la finestra
 // si presenterebbe al sistema come «Filo-bin» e non si aggancerebbe più alla
