@@ -1038,7 +1038,7 @@
     DAI_SITI, testoDeiSitiComeAzione, indirizziDelComando, comandoInRete,
     taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
     // Le parole che presentano una password o un codice, come testo: una regex /g condivisa porterebbe con sé lastIndex.
-    PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, codice: PRESENTA_CODICE.source, altreLingue: NOMI_PASSWORD }),
+    PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, get codice() { return PRESENTA_CODICE().source; }, altreLingue: NOMI_PASSWORD }),
     VIRGOLETTE: Object.freeze({ caratteri: VIRGOLETTE, fra: FRA_VIRGOLETTE.source }),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
