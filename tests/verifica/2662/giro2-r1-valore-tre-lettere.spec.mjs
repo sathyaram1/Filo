@@ -33,10 +33,6 @@ test('r1 con tre valori cambiati insieme il primo si legge, e la riga non si tro
   const page = await home(app);
   const tts = await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.tts || {}));
   await app.evaluate((_e, t) => globalThis.SN_STORAGE.updateSettings({
-    agentStyle: STILE_DI_PROVA,
-    tts: { ...t, voice: 'Microsoft Elsa Online Natural Italian Italy', modelVoice: 'voce calda numero sette' },
-  }), tts).catch(() => null);
-  await app.evaluate((_e, t) => globalThis.SN_STORAGE.updateSettings({
     agentStyle: 'Rispondi in modo breve e diretto, dammi del tu sempre',
     tts: { ...t, voice: 'Microsoft Elsa Online Natural Italian Italy', modelVoice: 'voce calda numero sette' },
   }), tts);
