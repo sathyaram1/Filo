@@ -2,17 +2,18 @@
 // prova al suo processo main (src/main/copertura.js) e qui si registrano le funzioni di src/ eseguite dalle sue pagine.
 // Acceso solo da FILO_COPERTURA (playwright.config.js); il formato lo legge scripts/lib/mappaProve.mjs.
 
-import { createRequire } from 'node:module';
+import { _electron, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OGNI_MS = 1000;
 
-/** Il nome della prova in corsa, relativo al repo e a barre normali; vuoto fuori da una prova. */
-function provaInCorsa(test) {
-  try { return relative(ROOT, test.info().file).split('\\').join('/'); } catch (_) { return ''; }
+/** Il nome della prova in corsa, relativo al repo (la cartella della config) e a barre normali; vuoto fuori da una prova. */
+function provaInCorsa() {
+  try {
+    const info = test.info();
+    return relative(dirname(info.config.configFile), info.file).split('\\').join('/');
+  } catch (_) { return ''; }
 }
 
 function segui(app, prova, dir) {
