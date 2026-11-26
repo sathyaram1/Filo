@@ -58,9 +58,17 @@
     + '|n[uú]m[eé]r[oi]s?\\s+(?:segret[oi]|secret[oa]?s?|confidenzial[ei]|confidentiels?|confidencial(?:es)?|riservat[oi])'
     + '|secret\\s+(?:numbers?|pins?)|confidential\\s+(?:numbers?|pins?)|tajn(?:y|ego|ym)\\s+numer(?:u|em)?)';
   const NOME_PIN = new RegExp(`\\b${NOMI_DEL_PIN}\\b`, 'i');
+  // L'elenco degli apparecchi il cui codice li sblocca è uno solo (#1403.44): la frase col possessivo, l'etichetta senza
+  // e il nome attaccato a «code» («Handycode», «Gerätecode») lo leggono da qui.
+  const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
+    + '|t[ée]l|celus?|compus?|gsms?|smartphones?'
+    + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
+    + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
+    + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
+    + '|devices?|appareils?|ger[äa]te?s?|urz[ąa]dzeni[ea]|apparaats?)';
   const NOMI_DEL_CODICE = `\\b(?:${NOMI_DEL_PIN}|codic[ei]|codes?|keycodes?|pin|puk|passcode|otp|2fa|mfa|c[óo]digos?|kod(?:u|em|y)?`
     + '|(?:zugangs|sicherheits|best[äa]tigungs|verifizierungs|verifikations|anmelde|einmal|aktivierungs|freischalt(?:ungs)?'
-    + '|entsperr|autorisierungs|authentifizierungs|tür|toegangs|verificatie|beveiligings|bevestigings|inlog|login|activatie)codes?)\\b';
+    + `|entsperr|autorisierungs|authentifizierungs|tür|toegangs|verificatie|beveiligings|bevestigings|inlog|login|activatie|${APPARECCHIO})-?codes?)\\b`;
   const NOME_CODICE = new RegExp(NOMI_DEL_CODICE, 'i');
   const SEGNO_FORTE = /\b(?:verific\w*|verif(?:y|ied|ies|ication)\w*|autorizz\w*|authori[sz]\w*|autentic\w*|authentic\w*|sblocc\w*|unlock\w*|acced\w*|accesso|access|log-?in|log\s+in|sign-?in|sign\s+in|monouso|one-?time|usa\s+e\s+getta|otp|passcode|2fa|mfa|v[ée]rif\w*|verifizier\w*|acc[èe]s|acceso|acesso|connexion|zugang\w*|anmeld\w*|best[äa]tig\w*|toegang\w*|inlog\w*|dost[ęe]p\w*)\b/i;
   const NON_APRE = /\b(?:client[ei]|customer|client|ordin[ei]|orders?|prenotazion[ei]|booking|reservation|pratica|scont[oi]|discount|promo\w*|coupon|fiscale|postale|postal|zip|cap|prodott[oi]|products?|articol[oi]|items?|sku|tracking|spedizion[ei]|shipp?(?:ing|ment)|fattur[ae]|invoices?|riferimento|reference|tribut[oi]|civile|penale|strada|procedura|error[ei]?|errors?|status|http|abi|cab|ateco|ean|isbn|iban|swift|bic|ticket|bigliett[oi]|vol[oi]|flights?|ricetta|esenzione|destinatario|sdi|cig|cup|colore|colou?r|sorgente|source|paese|country|comune|catastale|matricola|tessera|socio|membro|member|telefono|phone|tel|numero\s+verde|chiam\w*|call|commandes?|pedidos?|encomendas?|bestellung\w*|zam[óo]wieni\w*|bestelling\w*|factures?|facturas?|faturas?|rechnung\w*|faktur\w*|produits?|articles?|productos?|produtos?|produkt\w*|erreurs?|erros?|fehler\w*|b[łl][ęe]d\w*|suivi|seguimiento|rastreo|rastreamento|sendungsverfolgung|r[ée]servations?|reservas?|reservierung\w*|buchung\w*|rezerwac\w*|boeking\w*|r[ée]duction|descuentos?|descontos?|rabatt\w*|rabat\w*|remise|gutschein\w*|cup[óo]n|cupom|pocztow\w*|postleitzahl|couleurs?|farbe|kolor\w*|barres|barras|barcode|kreskow\w*|kunde\w*|klient\w*|clientes?|banques?|guichets?|communes?|douan\w*|[ée]?tablissements?|pays|pa[íi]s|kraj\w*|naf|ape|insee|siret|siren|cpv|uai|cnae|nace|cip|iata|upc|gtin)\b/i;
@@ -96,9 +104,9 @@
     + '|nuevo|novo|nowy|[úu]nico|jednorazow\\p{L}*|sms|e-?mail|correo|envoy[ée]|enviado|recibido|re[çc]u|recebido|siguiente|seguinte'
     + '|num[ée]ric[oa]|personnel|personal|pin|otp|blik|tan|validation|validaci[óo]n|valida[çc][ãa]o'
     + '|din[áa]mico|dynamique|transac\\p{L}*|transa[çc][ãa]o|identifica\\p{L}*|identyfikac\\p{L}*'
-    // Le cose il cui codice è un segreto (carta, conto, telefono, app) e gli aggettivi di un codice d'accesso.
-    + '|cartes?|tarjetas?|cart[ãa]o|cart[õo]es|\\p{L}*kart\\p{L}*|comptes?|cuentas?|contas?|kont[aouy]s?|account|t[ée]l[ée]phone|portable'
-    + '|m[óo]vil|celular|tel[ée]fono|telem[óo]vel|telefon\\p{L}*|handys?|smartphone|appli\\p{L}*|app|aplicaci[óo]n|aplicativo'
+    // Le cose il cui codice è un segreto (carta, conto, app; gli apparecchi in APPARECCHIO) e gli aggettivi di un codice d'accesso.
+    + '|cartes?|tarjetas?|cart[ãa]o|cart[õo]es|\\p{L}*kart\\p{L}*|comptes?|cuentas?|contas?|kont[aouy]s?|account'
+    + '|appli\\p{L}*|app|aplicaci[óo]n|aplicativo'
     + '|confidenti\\p{L}*|confidencial|poufn\\p{L}*|priv[ée]e?|privad[oa]|prywatn\\p{L}*|pessoal|osobist\\p{L}*|provisoire|provisional'
     + '|provis[óo]rio|unique|num[ée]rique|suivant|ci-dessous|habituel|habitual|actuel|actual|atual|initial|inicial|parental'
     + '|ma[îi]tre|maestro|mestre|administra\\p{L}*|admin|utilisateur|usuario|usu[áa]rio|verrouillage|bloqueo|bloqueio|blokad\\p{L}*'
@@ -123,9 +131,87 @@
   const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])\\s*(?:[:=#]|è|\\bis\\b)?\\s*$`, 'i');
   const LEGAMI = /^(?:\s+|(?:d|l|dell|all|dall|nell)['’]|(?:di|del|della|dello|dei|degli|delle|per|da|a|al|alla|allo|il|la|lo|i|gli|le|tuo|tua|of|for|to|the|your)\b)+/i;
   const PER_APRIRE = /\b(?:apri(?:re)?|apre|aprono|open(?:s|ing)?|entra(?:re)?|disattiva(?:re)?|disinseri(?:re|sci)|disarm(?:a|are)?)\b/i;
+  // Il codice del proprio telefono o computer lo sblocca, in ogni lingua (#1403.44): col possessivo e l'apparecchio a
+  // chiudere l'etichetta, così «il codice del telefono del cliente» e «my phone number» restano identificativi.
+  const POSSESSIVO = `(?:mi[oaei]|tu[oaei]|su[oaei]|nostr[oaei]|vostr[oaei]|loro|my|your|his|her|our|their|${POSSESSIVO_ALTRE}`
+    + '|(?:mein|dein|sein|ihr|unser|eur)\\p{L}*|mijn|jouw|je|uw|zijn|haar|onze?)';
+  const APPARECCHIO_SOLO = new RegExp(`^${APPARECCHIO}$`, 'iu');
+  // Anche attaccato all'apparecchio, come si scrive in tedesco e olandese: «Handycode», «telefooncode», «Entsperrcode».
+  const NOME_SBLOCCO = '(?:(?:entsperr|sperr|zugangs|toegangs|ontgrendel)?(?:codic[ei]|codes?)|c[óo]digos?|kod(?:u|em|y)?|pin|passcode)';
+  const LEGAME_SBLOCCO = '(?:di|del|della|dello|dei|degli|delle|per|of|for|on|to|in|the|de|du|des|do|da|dos|das|para|pour|sur|en|von|vom|f[üu]r|zu|zum'
+    + '|auf|der|van|voor|op|het|od|dla|na|w|la|le|les|il|lo|el|los|las|o|a|os|as|al|alla|sul|sulla|nel|nella|au|à|om|te)';
+  // La parola che dice a cosa serve il codice, fra il nome e l'apparecchio: le parole che già tengono segreto un codice
+  // («personale», «nuovo», «secret»), i segni dell'entrare e quelle dello sblocco, coi loro verbi («pour déverrouiller»).
+  const SBLOCCA = '(?:sblocc\\p{L}*|unlock\\p{L}*|d[ée]verrouill\\p{L}*|verrouill\\p{L}*|d[ée]bloqu\\p{L}*|d[ée]bloc\\p{L}*|desbloqu\\p{L}*'
+    + '|bloqu\\p{L}*|entsperr\\p{L}*|sperr\\p{L}*|ontgrendel\\p{L}*|odblok\\p{L}*|blokad\\p{L}*)';
+  const QUALIFICA_SBLOCCO = `(?:d['’]\\s*)?(?:${SBLOCCA}|blocco|schermo|[ée]cran|pantalla|tela|lock|screen|segreto|secreto`
+    + `|${RESTA_UN_CODICE.source.slice(1, -1)}|${RESTA_ALTRE.source.slice(1, -1)}|${SEGNO_FORTE.source})(?![\\p{L}])`;
+  // Prima e dopo il verbo può stare un avverbio («ora è», «is now»), e il verbo può essere composto («è sempre stato»,
+  // «has been»); «e» senza accento è un refuso; la virgola o i due punti valgono il verbo («il codice del mio telefono, 4829»).
+  const AVVERBIO_SBLOCCO = '(?:now|always|still|currently|actually|just|sempre|ancora|ora|adesso|attualmente|toujours|maintenant|actuellement'
+    + '|siempre|ahora|todav[íi]a|actualmente|agora|ainda|jetzt|immer|noch|aktuell|nu|altijd|nog|teraz|zawsze|nadal|wci[ąa][żz])';
+  const VERBO_SBLOCCO = `(?:${VERBO}|e|cest|serait|ser[íi]a|wäre|would\\s+be|to|will\\s+be|sind|zijn)`;
+  const PARTICIPIO = '(?:stat[oaie]|been|[ée]t[ée]|sido|gewesen|geweest)';
+  const AUSILIARE = '(?:has|have|had|ha|hat|heeft|a|avait|hab[íi]a|tem|tinha)';
+  const AVV = `(?:\\s+${AVVERBIO_SBLOCCO})?`;
+  const CHIUDE_VERO = `(?:\\s*[:=#,]|\\s*,?${AVV}\\s+(?:${VERBO_SBLOCCO}(?![\\p{L}])(?:${AVV}\\s+${PARTICIPIO})?|${AUSILIARE}${AVV}\\s+${PARTICIPIO})`
+    + `(?![\\p{L}])(?:\\s*[:=])?${AVV}(?:\\s+(?:il|el|le|o|the))?)`;
+  const CHIUDE_CORPO = `${CHIUDE_VERO}?`;
+  const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
+  // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung», «13»): elencate, perché dopo
+  // «phone» può venire «number»; e solo col verbo dopo: «codice del mio telefono nuovo serie 71034» è un altro dato.
+  const DOPO_APPARECCHIO = '(?:\\s+(?:(?:di|de|da|du|del|of|for|para|pour|f[üu]r)\\s+)?(?:nuov\\p{L}*|vecchi\\p{L}*|aziendal\\p{L}*|personal\\p{L}*'
+    + '|privat\\p{L}*|fisso|portatile|principale|attuale|lavoro|ufficio|casa|nuev\\p{L}*|viej\\p{L}*|trabajo|nouve(?:au|l|lle)|vieux|ancien\\p{L}*'
+    + '|travail|bureau|perso|pro|professionnel\\p{L}*|new|old|work|office|home|current|main|neu\\p{L}*|alt\\p{L}*|arbeit|dienst\\p{L}*|nieuw\\p{L}*'
+    + '|oud\\p{L}*|werk|novo|nova|antigo|velho|móvil|movil|portable|cellulare|celular|samsung|galaxy|iphone|pixel|xiaomi|redmi|huawei|honor'
+    + '|oppo|oneplus|motorola|moto|nokia|sony|lg|realme|vivo|apple|macbook|dell|hp|lenovo|thinkpad|asus|acer|surface|pro|max|plus|mini'
+    + '|ultra|air|se|lite|\\d{1,3})(?![\\p{L}\\d]))'
+    + '{1,2}';
+  const UN_APPARECCHIO = `${AGGETTIVO}${APPARECCHIO}(?:\\s*(?:,|e|and|et|y|und|en|i|o|or|ou)\\s+(?:${LEGAME_SBLOCCO}\\s+)*${POSSESSIVO}`
+    + `\\s+${AGGETTIVO}${APPARECCHIO})?`;
+  const TRA_NOME_E_APPARECCHIO = `(?:\\s+(?:${LEGAME_SBLOCCO}|${QUALIFICA_SBLOCCO}))*`;
+  const NUCLEO_COL_NOME = `(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${POSSESSIVO}\\s+${UN_APPARECCHIO}`
+    + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${UN_APPARECCHIO})`;
+  const NUCLEO = `(?:${NUCLEO_COL_NOME}`
+    + `|${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}(?:['’]s)?(?:\\s+(?:ha|has|hat|heeft|tiene|tem|ma)(?:\\s+(?:il|un|the|a|el|o|den|einen|de))?)?`
+    + `(?:\\s+(?:(?:unlock|lock|screen|access)\\s+)?|-)?${NOME_SBLOCCO})`;
+  const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])(?:${NUCLEO_COL_NOME}${DOPO_APPARECCHIO}${CHIUDE_VERO}|${NUCLEO}${CHIUDE_CORPO})\\s*$`, 'iu');
+  const NON_UN_PREZZO = '(?![\\d\\p{L}]|\\s?(?:€|%|euro\\b|eur\\b|usd\\b|\\$))';
+  // Il numero prima del nome: «4829 è il codice del mio telefono», «4829 is my phone code».
+  const DOPO_IL_NUMERO = new RegExp(`^\\s*(?:[:=-]\\s*)?${VERBO_SBLOCCO}\\s+(?:(?:il|lo|la|the|le|el|o|der|de|het)\\s+)?${NUCLEO}(?![\\p{L}])`, 'iu');
+  // «Quello del pc è 5512» dopo il codice del telefono, nella frase o in quella dopo: il pronome sta per il codice.
+  const QUELLO_DEL_MIO = new RegExp(`(?<![\\p{L}])(?:quell[oa]|celui|celle|the\\s+one|that|der|die|el|la)\\s+(?:${LEGAME_SBLOCCO}\\s+)*`
+    + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
+  const NUCLEO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${NUCLEO}`, 'iu');
+  // Lo sblocco detto col verbo, senza «codice»: «Per sbloccare il mio telefono uso 6118», «I unlock my phone with 6215».
+  const SBLOCCO_COL_NUMERO = new RegExp(`(?<![\\p{L}])${SBLOCCA}\\s+(?:${LEGAME_SBLOCCO}\\s+)*(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}`
+    + '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)'
+    + `\\s*[:=]?\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
+  // Le regole lunghe partono solo dove c'è un apparecchio: su una riga di 120.000 caratteri senza, costerebbero secondi.
+  const UN_APPARECCHIO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${APPARECCHIO}`, 'iu');
+  function codiceDelMioApparecchio(s, out) {
+    if (!UN_APPARECCHIO_NEL_TESTO.test(s)) return;
+    for (const m of s.matchAll(QUELLO_DEL_MIO)) {
+      if (NUCLEO_NEL_TESTO.test(s.slice(Math.max(0, m.index - 200), m.index))) out.push({ valore: m[1], regola: 'codice' });
+    }
+    for (const m of s.matchAll(SBLOCCO_COL_NUMERO)) out.push({ valore: m[1], regola: 'codice' });
+  }
+  // «The serial code of my phone»: un nome comune davanti a «code» ne fa un identificativo, come nell'etichetta inglese.
+  const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
+  const DAVANTI_AL_NOME = /^(?:il|lo|la|le|el|un|the|and|gli|una|une|uno|los|las|der|die|das|den|dem|des|het|een|ein\w*|unlock|lock|screen|access|pin|puk|sim|what|what['’]?s|here|ecco|anche|also|plus)$/i;
+  const delMioApparecchio = (coda) => {
+    if (!UN_APPARECCHIO_NEL_TESTO.test(coda)) return false;
+    const m = DEL_MIO_APPARECCHIO.exec(coda);
+    if (!m || !INIZIA_COL_NOME.test(m[0])) return !!m;
+    const w = /([A-Za-z][A-Za-z'-]{2,}|[A-Z]{2,})\s+$/.exec(coda.slice(0, m.index));
+    return !w || DAVANTI_AL_NOME.test(w[1]) || RESTA_UN_CODICE.test(w[1]) || SEGNO_FORTE.test(w[1]) || UN_VERBO.test(w[1])
+      || POSSESSIVO_SOLO.test(w[1]);
+  };
+  const POSSESSIVO_SOLO = new RegExp(`^${POSSESSIVO}$`, 'iu');
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
+    if (delMioApparecchio(prima.slice(-160))) return { apre: true, solo: true };
     const it = [...prima.matchAll(/\b(?:codic[ei]|pin)\b/gi)].pop();
     const en = [...prima.matchAll(/\b([A-Za-z-]+)\s+(?:codes?|pin)\b/g)].pop();
     if (en && (!it || en.index > it.index) && NOME_CHE_APRE.test(en[1])) {
@@ -147,10 +233,12 @@
   const etichettaDiUnIdentificativo = (prima) => {
     const m = ETICHETTA_IT.exec(prima) || ETICHETTA_EN.exec(prima);
     if (m && !UN_VERBO.test(m[1])) {
-      return !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]) && !APRE.test(m[1]) && !/^port[ae]$/.test(m[1]);
+      return !RESTA_UN_CODICE.test(m[1]) && !SEGNO_FORTE.test(m[1]) && !APRE.test(m[1]) && !/^port[ae]$/.test(m[1])
+        && !APPARECCHIO_SOLO.test(m[1]);
     }
     const a = ETICHETTA_ALTRE.exec(prima) || ETICHETTA_DE.exec(prima);
-    return !!a && !UN_VERBO.test(a[1]) && !RESTA_ALTRE.test(a[1]) && !APRE_ALTRE_SOLO.test(a[1]) && !SEGNO_FORTE.test(a[1]);
+    return !!a && !UN_VERBO.test(a[1]) && !RESTA_ALTRE.test(a[1]) && !APRE_ALTRE_SOLO.test(a[1]) && !SEGNO_FORTE.test(a[1])
+      && !APPARECCHIO_SOLO.test(a[1]);
   };
   // Il valore sulla riga sotto si cerca solo per un codice che non ha già il suo numero sulla sua riga, dopo di lui:
   // in «Codice evento | 739204» la riga sotto è un altro dato. Un pezzo di telefono o un anno non sono il suo numero.
@@ -191,6 +279,8 @@
     // Una relativa fra virgole non chiude la frase del codice («Der Code, den du erhalten hast, ist 482913»).
     const fra = prima.slice(n.index + n[0].length).replace(RELATIVA, ' ');
     if (!fra.trim()) return true;
+    // Il codice del proprio apparecchio ha la sua etichetta, con le sue virgole e i suoi refusi («, c'est», «e» senza accento).
+    if (!/\d/.test(fra) && delMioApparecchio(prima.slice(-160))) return true;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
     if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
     if (CHIUDE_ETICHETTA.test(fra) || (/^kod/i.test(n[0]) && CHIUDE_KOD.test(fra))) return true;
@@ -246,7 +336,10 @@
             for (const { m, v, lettere } of trovati) {
               const prima = z.slice(Math.max(0, m.index - CODA), m.index).replace(SENZA_VIRGOLETTA, '');
               const etichetta = inTesta ? frase.slice(-CODA) : prima;
-              const chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
+              let chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
+              if (nome && !chiave.apre && !inTesta && DOPO_IL_NUMERO.test(z.slice(m.index + m[0].length, m.index + m[0].length + 160))) {
+                chiave = { apre: true, solo: true };
+              }
               // Il PIN conta se è lui il nome più vicino al numero: in «Codice cliente 4829, numero segreto…» il numero è del cliente.
               const ultimo = pinNellaFrase ? [...etichetta.matchAll(NOMI_CODICE)].pop() : null;
               const pin = !!ultimo && NOME_PIN.test(ultimo[0]);
@@ -862,6 +955,7 @@
     }
     for (const m of s.matchAll(PIN)) out.push({ valore: m[1], regola: 'codice' });
     codiciVicini(s, out);
+    codiceDelMioApparecchio(s, out);
     codiciDiRecupero(s, out);
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);

@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.307', date: '2026-11-26',
+      fixes: [
+        { testo: 'Il codice che sblocca il tuo telefono o il tuo computer, scritto come «il codice del mio telefono è 4829» o «my phone code is 4829», non arriva più a nessun modello, in italiano come in francese, spagnolo, inglese e nelle altre lingue.', segnalazione: 1403 },
+      ],
+    },
+    {
       version: '0.2.306', date: '2026-11-26',
       fixes: [
         { testo: 'Una password di più parole scritta dopo «Password:» senza virgolette, come «la casa al mare» o una frase lunga, non arriva più a nessun modello.', segnalazione: 2678 },
