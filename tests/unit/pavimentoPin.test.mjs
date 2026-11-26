@@ -8,7 +8,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
 const P = require('../../src/shared/pavimento.js');
-const G = require('../../src/shared/guardianoStatico.js');
+require('../../src/shared/guardianoStatico.js');
+const G = globalThis.SN_GUARDIANO_STATICO;
 const S = P.SEGNAPOSTO;
 
 test('il PIN di una cosa nominata diventa il segnaposto, anche fra virgolette, anche se ha la forma di un anno', () => {
