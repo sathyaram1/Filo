@@ -200,7 +200,7 @@
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
-    if (delMioApparecchio(prima.slice(-120))) return { apre: true, solo: true };
+    if (delMioApparecchio(prima.slice(-160))) return { apre: true, solo: true };
     const it = [...prima.matchAll(/\b(?:codic[ei]|pin)\b/gi)].pop();
     const en = [...prima.matchAll(/\b([A-Za-z-]+)\s+(?:codes?|pin)\b/g)].pop();
     if (en && (!it || en.index > it.index) && NOME_CHE_APRE.test(en[1])) {
