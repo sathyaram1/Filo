@@ -81,9 +81,16 @@ const CHIESTA_IN_CHAT = `${ETICHETTE_CORTE}|(?<![\\p{L}\\p{N}])credenziali(?![\\
 // Il punto di domanda anche delle altre scritture: quello a tutta larghezza, l'arabo, il greco.
 const DOMANDA = new RegExp('[?？؟\\u037E]', 'u');
 const FINE_FRASE = new RegExp(`[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'gu');
-// Il testo come lo leggono le regole: minuscolo, i due punti a tutta larghezza come i nostri, e il punto e virgola di
-// una riga in greco come punto di domanda (in greco è quello). Stessa lunghezza: le posizioni restano.
-const minuscolo = (t) => String(t == null ? '' : t).toLowerCase().replace(/：/g, ':')
+// L'enfasi del Markdown («**Password:** …», «__PIN:__ …», «- **Wi-Fi password:**») è forma, non testo: le regole la
+// leggono come spazi, con gli stessi indici. Solo i segni a confine di parola e sulla stessa riga (#2673.5).
+const ENFASI = /(?<![^\s|>(\[«"'“‘-])(\*{1,3}|_{1,3})(?=[^\s*_])((?:(?!\1)[^\n]){1,120}?)(?<=[^\s*_])\1(?![\p{L}\p{N}*_])/gu;
+const senzaEnfasi = (t) => {
+  const s = String(t == null ? '' : t);
+  return /[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s;
+};
+// Il testo come lo leggono le regole: senza enfasi, minuscolo, i due punti a tutta larghezza come i nostri, e il punto e
+// virgola di una riga in greco come punto di domanda (in greco è quello). Stessa lunghezza: le posizioni restano.
+const minuscolo = (t) => senzaEnfasi(t).toLowerCase().replace(/：/g, ':')
   .replace(/^.*\p{Script=Greek}.*$/gmu, (riga) => riga.replace(new RegExp('[;\\u037E]', 'gu'), '?'));
 const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
