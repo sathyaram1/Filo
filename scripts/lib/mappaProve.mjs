@@ -260,7 +260,8 @@ export function proveDelCambio(mappa, cambi) {
       if (prese.has(chiave)) continue;
       prese.add(chiave);
       const insieme = meglio ? meglio[2] : f.carico;
-      const vera = meglio && meglio !== intero && !(meglio[0] <= 1 && meglio[1] >= intero[1]);
+      // Il modulo intero, o l'IIFE che lo avvolge, gira a ogni caricamento: vale come il file, non come una funzione.
+      const vera = Boolean(meglio) && (meglio[1] - meglio[0] + 1) < 0.9 * intero;
       dai(insieme, vera ? 'funzione' : 'file', 1 / Math.max(1, mappa.insiemi[insieme].length));
     }
     for (const p of mappa.insiemi[f.carico] || []) punti.get(p)?.file.add(rel);
