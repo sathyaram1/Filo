@@ -12,8 +12,10 @@ import {
   rigaSullaMappa, unisciRegistrazioni,
 } from './lib/mappaProve.mjs';
 import { repoDaRemoto } from './rossi-della-suite.mjs';
+import { absolutizeOutput, pinnedRepoRoot } from './lib/tools-pin.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// Dalla copia degli strumenti il ramo da guardare è quello del lavoro, non la copia.
+const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : (pinnedRepoRoot() || resolve(dirname(fileURLToPath(import.meta.url)), '..'));
 const TETTO_BYTE = 256 * 1024 * 1024;
 // La mappa nasce a ogni corsa: se nelle ultime cinque non c'è, il guasto è suo e cercarla più indietro costa e basta.
 const CORSE_GUARDATE = 5;
