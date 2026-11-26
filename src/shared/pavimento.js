@@ -122,7 +122,7 @@
   const POSSESSIVO = `(?:mi[oaei]|tu[oaei]|su[oaei]|nostr[oaei]|vostr[oaei]|loro|my|your|his|her|our|their|${POSSESSIVO_ALTRE}`
     + '|(?:mein|dein|sein|ihr|unser|eur)\\p{L}*|mijn|jouw|je|uw|zijn|haar|onze?)';
   const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
-    + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|smartphones?|i-?phones?'
+    + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
     + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
     + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
     + '|devices?|appareils?|ger[äa]te?s?|urz[ąa]dzeni[ea]|apparaats?)';
