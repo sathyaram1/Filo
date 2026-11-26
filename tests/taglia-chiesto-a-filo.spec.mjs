@@ -118,7 +118,7 @@ test('dopo Incolla col tasto destro in un campo, «modifica» chiesto a Filo ris
 
 test('«taglia» chiesto a Filo con una password selezionata non la porta negli appunti, e Filo lo dice', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
-  const page = await testServer.openReady(openTab, CAMPI);
+  const page = await apriCampi(app, openTab, testServer);
   await app.evaluate(({ clipboard }) => clipboard.writeText('come prima'));
   await page.locator('#segreta').focus();
   await page.keyboard.press('Control+a');
