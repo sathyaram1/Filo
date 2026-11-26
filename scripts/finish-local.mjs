@@ -502,7 +502,8 @@ export function specDellaScelta({ changed, base, root = ROOT, mappa = null }) {
 
 /**
  * Gli spec della mappa per le righe che il ramo cambia in `file`: si lanciano quelli che passano dalle funzioni
- * cambiate; quelli che caricano soltanto i file si elencano, e li corre la suite su main (#2502).
+ * cambiate; quelli che caricano soltanto i file, o passano da funzioni che quasi tutti eseguono, si elencano e li corre
+ * la suite su main (#2502).
  */
 export function sceltaDallaMappa({ mappa, file, base, root = ROOT }) {
   if (!file.length) return { specs: [], soloCaricano: [], nota: '' };
