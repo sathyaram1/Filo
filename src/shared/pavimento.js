@@ -954,7 +954,9 @@
     const y = { ...x };
     if (Number.isInteger(x.inizio) && x.inizio >= 0 && x.inizio <= piano.length) y.inizio = posto[x.inizio];
     const k = Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio) ? x.inizio : piano.indexOf(v);
-    if (k >= 0 && !vero.includes(v)) y.valore = vero.slice(posto[k], posto[k + v.length - 1] + 1);
+    if (k < 0 || vero.includes(v)) return y;
+    const da = posto[k] - (v[0] === '\n' && vero[posto[k] - 1] === '\r' ? 1 : 0);
+    y.valore = vero.slice(da, posto[k + v.length - 1] + 1);
     return y;
   }
 
