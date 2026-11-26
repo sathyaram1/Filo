@@ -92,6 +92,12 @@
     if (en && (!it || en.index > it.index) && NOME_CHE_APRE.test(en[1])) {
       return { apre: true, solo: /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length)) };
     }
+    const altro = [...prima.matchAll(NOME_ALTRE)].pop();
+    if (altro && (!it || altro.index > it.index)) {
+      const coda = prima.slice(altro.index + altro[0].length).replace(LEGAMI_ALTRE, '');
+      const p = /^[\p{L}-]+/u.exec(coda);
+      if (p && APRE_ALTRE_SOLO.test(p[0])) return { apre: true, solo: DOPO_IL_NOME.test(coda.slice(p[0].length)) };
+    }
     if (!it) return { apre: false, solo: false };
     const coda = prima.slice(it.index + it[0].length).replace(LEGAMI, '');
     return { apre: NOME_CHE_APRE.test(coda), solo: NOME_CHE_APRE_SOLO.test(coda) };
