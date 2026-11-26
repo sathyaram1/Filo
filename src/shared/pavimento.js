@@ -23,7 +23,8 @@
   // falso allarme ferma un'azione; qui un falso allarme toglie un numero, e il codice di verifica non esce.
   // Le cifre in coda a una parola («Girasole2024») non sono il codice: è la password intera, e la toglie la regola delle
   // etichette; togliere solo «2024» lascerebbe il resto e cancellerebbe l'anno da tutto il messaggio.
-  const CODICE_ACCESSO = /\b(?:codice|code|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo))*\s+(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
+  // Anche nelle lingue delle etichette (#1403.13): «le code d'accès 482913», «el código de acceso 482913».
+  const CODICE_ACCESSO = /\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const CODICE_ACCESSO_EN = /\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
   const PIN = /\bpin\b\s*(?:[:=]|è|e'|is)?\s*(\d{4,8})\b/gi;
   // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
