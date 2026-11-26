@@ -99,7 +99,7 @@ for (const campo of ['#prima', '#segreta']) {
 
 test('dopo Incolla col tasto destro in un campo, «modifica» chiesto a Filo riscrive la selezione di adesso', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, CAMPI);
+  const page = await apriCampi(app, openTab, testServer);
   await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti'));
   await incollaColTastoDestro(page, '#prima');
 
