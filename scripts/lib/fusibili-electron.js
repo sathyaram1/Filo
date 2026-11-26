@@ -77,20 +77,18 @@ function spegniPrivilegiFile(eseguibile, { firma = false, piattaforma = process.
   return true;
 }
 
-// L'eseguibile dentro la cartella di un pacchetto appena fatto, come lo nomina electron-builder.
+// L'eseguibile dentro la cartella di un pacchetto appena fatto: Mac e Linux col conto dei loro passi, che lo toccano dopo.
 function eseguibileDelPacchetto(context) {
-  const nome = context.packager.appInfo.productFilename;
   switch (context.electronPlatformName) {
     case 'darwin':
     case 'mas':
-      return path.join(context.appOutDir, `${nome}.app`);
+      return require('../after-pack-mac').appDelPacchetto(context);
     case 'win32':
-      return path.join(context.appOutDir, `${nome}.exe`);
+      return path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.exe`);
     default: {
-      // Su Linux, dopo il lanciatore (una seconda passata sulla stessa cartella), il programma vero ha il suffisso.
-      const p = path.join(context.appOutDir, context.packager.executableName || nome);
-      const vero = p + require('../after-pack-linux').SUFFISSO;
-      return fs.existsSync(vero) ? vero : p;
+      // Dopo il lanciatore (una seconda passata sulla stessa cartella) il programma vero è quello col suffisso.
+      const { programma, vero } = require('../after-pack-linux').programmiDelPacchetto(context);
+      return fs.existsSync(vero) ? vero : programma;
     }
   }
 }
