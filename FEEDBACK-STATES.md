@@ -273,7 +273,7 @@ all'owner, il freno.
   a qualunque priorità da 0 a 2, fuori solo una 3; un ordine vuoto o senza lavori pronti vale come nessun ordine, e
   solo in quella coda per urgenza le 0 e le 1 restano chiuse fino all'ultimo giorno prima del rinnovo. L'ordine
   porta anche i compiti senza feedback (`C-12`), e un feedback può aspettare un compito (`waitsFor` col suo id:
-  l'attesa si scioglie quando il compito chiude). I giudici assegnano 3 o lasciano 1. Una 3 il manutentore la
+  l'attesa si scioglie quando il compito chiude). I giudici assegnano 3 o lasciano 1 (una 2 sola, nel pattern della priorità). Una 3 il manutentore la
   può creare, non abbassare né archiviare: la toglie solo l'owner, e il limite vale per ogni automazione,
   riordino del lunedì compreso, giudice di priorità e risposte
   automatiche delle domande (#2000, #2291; regola unica in `src/shared/prioritaTre.js`, che il server incorpora e
