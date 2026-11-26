@@ -364,8 +364,9 @@
     if (presentaCodice) return presentaCodice;
     if (!global.SN_PAVIMENTO && typeof require === 'function') require('./pavimento.js');
     const pin = global.SN_PAVIMENTO ? `${global.SN_PAVIMENTO.NOMI_DEL_PIN}|` : '';
-    presentaCodice = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${pin}pin|codice|code|c[oó]digo|combinazione|otp)(?![\\p{L}\\p{N}_])`, 'giu');
-    return presentaCodice;
+    const re = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${pin}pin|codice|code|c[oó]digo|combinazione|otp)(?![\\p{L}\\p{N}_])`, 'giu');
+    if (pin) presentaCodice = re;
+    return re;
   };
   const PAROLE_DOPO = 8;
   const RIEMPITIVI = new Set([
