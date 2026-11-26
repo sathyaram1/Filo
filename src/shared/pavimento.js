@@ -206,7 +206,8 @@
             }
           }
           for (const { z, inTesta } of zona) {
-            const nonApre = NON_APRE.test(`${frase} ${z}`);
+            const predefinito = PREDEFINITO.test(`${frase} ${z}`);
+            const nonApre = predefinito || NON_APRE.test(`${frase} ${z}`);
             const trovati = [...z.matchAll(FORMA_CODICE)].map((m) => ({ m, v: m[2] || m[4] }));
             if (nome) for (const m of z.matchAll(CODICE_ALFANUMERICO)) trovati.push({ m, v: m[0], lettere: true });
             for (const { m, v, lettere } of trovati) {
