@@ -193,16 +193,14 @@ class AvvisiSopraPagina {
       vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       this._nascondiSuggerimento();
       this.altezza = 0;
-      this.larghezza = 0;
-      this._riserva(0, 0);
+      this._riserva(0);
       return;
     }
     vista.setBounds({ x: W - w, y: H - h, width: w, height: h });
     this._inCima();
     vista.setVisible(true);
     this.altezza = h;
-    this.larghezza = w;
-    this._riserva(h, w);
+    this._riserva(h);
     const sotto = this._sottoIlVuoto();
     if (sotto) this.vuoto.segui(sotto.webContents);
   }
