@@ -332,7 +332,19 @@
   // Una password di sole lettere o un PIN di quattro cifre sono parole qualunque: li riconosce la parola che li
   // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
-  const PRESENTA_PASSWORD = /\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\b/g;
+  // I nomi della password nelle altre lingue, con le loro desinenze: un posto solo per la chat (qui e
+  // riservatiNelTesto.js) e per le etichette del pavimento (pavimento.js). Il confine lo porta la lista, perché \b non
+  // vede le lettere fuori dall'ASCII («şifre», «пароль»); le scritture senza spazi non ne hanno. Prove:
+  // tests/unit/passwordAltreLingue.test.mjs.
+  const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u052F\\u1E00-\\u1EFF]';
+  const NOMI_PASSWORD = `(?:(?<!${LETTERA})(?:${[
+    'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]a', 'contrasenya', 'clave', 'senha', 'palavra-passe',
+    'wachtwoord', 'has[łl]o', 'l[öo]senord', 'passord', 'adgangskode', 'kodeord', 'salasan', 'jelsz[óo]', 'jelszav',
+    'hesl[oaeu]', 'gesl[oaeu]', '[şs]ifre', 'parol(?:ă|ei)', 'parool', 'lozink', 'slapta[žz]od', 'm[ậa]t\\s+kh[ẩa]u',
+    'kata\\s+(?:sandi|laluan)', 'парол', 'лозинк', 'κωδικ', 'συνθηματικ',
+  ].join('|')})${LETTERA}*`
+    + '|密码|密碼|口令|パスワード|暗証番号|비밀번호|패스워드|암호|كلمة\\s+(?:المرور|السر)|סיסמ[הא]|पासवर्ड|รหัสผ่าน|رمز\\s+عبور)';
+  const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
   const PRESENTA_CODICE = /\b(?:pin|codice|code|combinazione|otp)\b/g;
   const PAROLE_DOPO = 8;
   const RIEMPITIVI = new Set([
