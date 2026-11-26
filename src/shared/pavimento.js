@@ -156,8 +156,9 @@
     if (!m || !INIZIA_COL_NOME.test(m[0])) return !!m;
     const w = /([A-Za-z][A-Za-z'-]{2,})\s+$/.exec(coda.slice(0, m.index));
     return !w || DAVANTI_AL_NOME.test(w[1]) || RESTA_UN_CODICE.test(w[1]) || SEGNO_FORTE.test(w[1]) || UN_VERBO.test(w[1])
-      || new RegExp(`^${POSSESSIVO}$`, 'iu').test(w[1]);
+      || POSSESSIVO_SOLO.test(w[1]);
   };
+  const POSSESSIVO_SOLO = new RegExp(`^${POSSESSIVO}$`, 'iu');
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
