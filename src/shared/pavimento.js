@@ -54,9 +54,16 @@
   // Le stesse due regole nelle lingue dei nomi del codice (#1403.13): «Le code de suivi est …», «El código del pedido es …»,
   // «Kod rabatowy to …», «Der Code der Bestellung ist …». «Code» solo col complemento, perché da solo è anche inglese.
   const SEPARA_ALTRE = `(?:\\s*[:=#]|\\s+(?:${VERBO}|${FUTURO}|to)(?![\\p{L}]))?\\s*$`;
-  const ETICHETTA_ALTRE = new RegExp(`(?:\\b[Cc]ode\\s+(?:(?:de|du|des|van)\\s+(?:(?:la|les|le|de|het)\\s+|l['’]\\s*)?|d['’]\\s*)`
-    + `|\\b(?:[Cc][óo]digo|[Kk]od)\\s+(?:(?:de|del|do|da|dos|das)\\s+(?:(?:la|las|los|el|o|a|os|as)\\s+)?)?)([\\p{Ll}][\\p{Ll}-]{2,})${SEPARA_ALTRE}`, 'u');
-  const ETICHETTA_DE = new RegExp(`\\b[Cc]odes?\\s+(?:der|des|vom|zur|zum|für\\s+(?:die|den|das))\\s+(\\p{Lu}\\p{Ll}+)${SEPARA_ALTRE}`, 'u');
+  // Il possessivo vale l'articolo («Le code de mon colis», «Kod mojej paczki»); «code» senza complemento solo dopo un
+  // articolo francese o in testa alla riga. Una sigla («Le code NAF») è un nome come un altro, salvo quelle del monouso.
+  const POSSESSIVO_ALTRE = '(?:mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leurs?|mis|mi|tus?|sus?|nuestr[oa]s?|vuestr[oa]s?'
+    + '|meus?|minhas?|teus?|tuas?|seus?|suas?|noss[oa]s?|moj\\p{L}*|mój|twoj\\p{L}*|twój|swoj\\p{L}*|swój|nasz\\p{L}*|wasz\\p{L}*)';
+  const ETICHETTA_ALTRE = new RegExp(`(?:\\b[Cc]ode\\s+(?:(?:de|du|des|van)\\s+(?:(?:la|les|le|de|het)\\s+|l['’]\\s*|${POSSESSIVO_ALTRE}\\s+)?|d['’]\\s*)`
+    + `|\\b(?:[Cc][óo]digo|[Kk]od)\\s+(?:(?:de|del|do|da|dos|das)\\s+(?:(?:la|las|los|el|o|a|os|as)\\s+)?)?(?:${POSSESSIVO_ALTRE}\\s+)?`
+    + `|(?:(?:^|[\\n|\\t])[ \\t]*|\\b(?:[Ll]e|[Uu]n|[Cc]e|[Vv]otre|[Tt]on|[Mm]on|[Ss]on|[Nn]otre|[Ll]eur)\\s+)[Cc]ode\\s+(?!(?:de|du|des|van)\\s))`
+    + `([\\p{Ll}][\\p{Ll}-]{2,}|\\p{Lu}{2,6}(?![\\p{L}]))${SEPARA_ALTRE}`, 'u');
+  const ETICHETTA_DE = new RegExp(`\\b[Cc]odes?\\s+(?:der|des|vom|zur|zum|für\\s+(?:die|den|das|(?:mein|dein|sein|ihr|Ihr|unser|eur)(?:e|en)?)`
+    + `|(?:[Mm]ein|[Dd]ein|[Ss]ein|[Ii]hr|[Uu]nser|[Ee]ur)e[rs])\\s+(\\p{Lu}\\p{Ll}+)${SEPARA_ALTRE}`, 'u');
   const UN_VERBO = new RegExp(`^(?:${VERBO}|${FUTURO}|sono|sont|son|são|sind|zijn|fue|foi|to)$`, 'iu');
   const RESTA_ALTRE = new RegExp('^(?:acc[èe]s|acceso|acesso|dost[ęe]p\\p{L}*|v[ée]rifica\\p{L}*|weryfikac\\p{L}*|s[ée]curit[ée]|seguridad|seguran[çc]a'
     + '|zabezpiecz\\p{L}*|bezpiecze\\p{L}*|beveiliging|confirma\\p{L}*|potwierdz\\p{L}*|bevestiging|activa\\p{L}*|ativa[çc][ãa]o|aktywac\\p{L}*'
