@@ -7,6 +7,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
 const P = require('../../../src/shared/pavimento.js');
+require('../../../src/shared/guardianoStatico.js');
+const G = globalThis.SN_GUARDIANO_STATICO;
 
 test('r1 un inciso fra virgole fra «pin» e il verbo non lascia passare il PIN', () => {
   for (const [frase, valore] of [
