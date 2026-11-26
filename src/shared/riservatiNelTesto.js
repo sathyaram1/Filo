@@ -64,8 +64,12 @@ const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|
   + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
 const CHIESTA_IN_CHAT = `${ETICHETTE_CORTE}|(?<![\\p{L}\\p{N}])credenziali(?![\\p{L}\\p{N}])`;
 // Il punto di domanda anche delle altre scritture: quello a tutta larghezza, l'arabo, il greco.
-const DOMANDA = /[?？؟;]/;
-const FINE_FRASE = /[.!?؟;]+(?=\s|$)|[。！？]+|\n/g;
+const DOMANDA = new RegExp('[?？؟\\u037E]', 'u');
+const FINE_FRASE = new RegExp(`[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'gu');
+// Il testo come lo leggono le regole: minuscolo, i due punti a tutta larghezza come i nostri, e il punto e virgola di
+// una riga in greco come punto di domanda (in greco è quello). Stessa lunghezza: le posizioni restano.
+const minuscolo = (t) => String(t == null ? '' : t).toLowerCase().replace(/：/g, ':')
+  .replace(/^.*\p{Script=Greek}.*$/gmu, (riga) => riga.replace(/[;\\u037E]/gu, '?'));
 const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
