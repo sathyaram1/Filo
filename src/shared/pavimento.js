@@ -90,9 +90,9 @@
     + '|nuevo|novo|nowy|[úu]nico|jednorazow\\p{L}*|sms|e-?mail|correo|envoy[ée]|enviado|recibido|re[çc]u|recebido|siguiente|seguinte'
     + '|num[ée]ric[oa]|personnel|personal|pin|otp|blik|tan|validation|validaci[óo]n|valida[çc][ãa]o'
     + '|din[áa]mico|dynamique|transac\\p{L}*|transa[çc][ãa]o|identifica\\p{L}*|identyfikac\\p{L}*'
-    // Le cose il cui codice è un segreto (carta, conto, telefono, app) e gli aggettivi di un codice d'accesso.
-    + '|cartes?|tarjetas?|cart[ãa]o|cart[õo]es|\\p{L}*kart\\p{L}*|comptes?|cuentas?|contas?|kont[aouy]s?|account|t[ée]l[ée]phone|portable'
-    + '|m[óo]vil|celular|tel[ée]fono|telem[óo]vel|telefon\\p{L}*|handys?|smartphone|appli\\p{L}*|app|aplicaci[óo]n|aplicativo'
+    // Le cose il cui codice è un segreto (carta, conto, app; gli apparecchi in APPARECCHIO) e gli aggettivi di un codice d'accesso.
+    + '|cartes?|tarjetas?|cart[ãa]o|cart[õo]es|\\p{L}*kart\\p{L}*|comptes?|cuentas?|contas?|kont[aouy]s?|account'
+    + '|appli\\p{L}*|app|aplicaci[óo]n|aplicativo'
     + '|confidenti\\p{L}*|confidencial|poufn\\p{L}*|priv[ée]e?|privad[oa]|prywatn\\p{L}*|pessoal|osobist\\p{L}*|provisoire|provisional'
     + '|provis[óo]rio|unique|num[ée]rique|suivant|ci-dessous|habituel|habitual|actuel|actual|atual|initial|inicial|parental'
     + '|ma[îi]tre|maestro|mestre|administra\\p{L}*|admin|utilisateur|usuario|usu[áa]rio|verrouillage|bloqueo|bloqueio|blokad\\p{L}*'
