@@ -366,11 +366,23 @@
     'scritto', 'cambiata', 'cambiato', 'router', 'account', 'email', 'casella', 'banca', 'bancomat', 'carta', 'portone',
     'cancello', 'allarme', 'telefono', 'cellulare', 'computer', 'invece', 'perché', 'perche', 'quindi', 'anche', 'about',
   ]);
+  // Le virgolette, un posto solo per qui e per pavimento.js. Con lo spazio dentro («la password è « Mela!Verde77 »», la
+  // grafia francese) il valore è quello senza spazi (#1403.11). L'apostrofo attaccato a una parola («dell'altra») non
+  // apre né chiude; le altre virgolette sì, anche dopo «は». Dentro il valore un apostrofo fra due lettere o cifre
+  // («« l'Albero77 »») è della password, non la chiude. Gruppi: apertura, spazi, valore, spazi, chiusura.
+  const VIRGOLETTE = '«»“”„‚‘’‹›"\'「」『』';
+  const FRA_VIRGOLETTE = new RegExp(`((?<![\\p{L}\\p{N}])['‘‚]|[«»“„‹›"「『])([^\\S\\n]*)([^\\s${VIRGOLETTE}](?:(?:[^\\n${VIRGOLETTE}]|(?<=[\\p{L}\\p{N}])['’‘](?=[\\p{L}\\p{N}])){0,254}[^\\s${VIRGOLETTE}])?)([^\\S\\n]*)([»«”“›‹"」』]|['’‘](?![\\p{L}\\p{N}]))`, 'gu');
+  // Fra virgolette la punteggiatura è della password («la password è «Mela! Verde77»»): la frase finisce fuori (#1403.27).
+  const fineFrase = (coda) => {
+    const fuori = coda.replace(FRA_VIRGOLETTE, (q) => q.replace(/[.,;!?]/g, '_'));
+    const k = fuori.search(/\n|[.,;!?](?=\s|$)/);
+    return k < 0 ? coda : coda.slice(0, k);
+  };
   function segretiDetti(testo) {
     const out = [];
     const prendi = (re, soloCifre) => {
       for (const m of testo.matchAll(re)) {
-        const coda = testo.slice(m.index + m[0].length, m.index + m[0].length + 200).split(/\n|[.,;!?](?=\s|$)/)[0];
+        const coda = fineFrase(testo.slice(m.index + m[0].length, m.index + m[0].length + 200));
         for (const w of coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO)) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
           const cifre = /\d/.test(t);
