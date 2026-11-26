@@ -91,16 +91,14 @@ const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvi
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
   'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks', 'ecco',
   'volontiers', 'voilà', 'voila', 'tiens', 'natürlich', 'gerne', 'bitte', 'claro', 'aquí', 'aqui']);
-// Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero»): l'elenco del filtro delle
-// pagine, che il correttore chiama nello stesso giro.
+// Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero», «c'est …»): l'elenco del
+// guardiano, lo stesso del pavimento (#1403.33).
 const ANNUNCI = guardiano().ANNUNCI;
 const ANNUNCIO = `(?:${ANNUNCI.map(esc).join('|')})(?!\\p{L})`;
-// «c'est», «ist», «es»: come «è» nelle altre lingue della richiesta (#1403.14).
-const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo',
-  "c'est", 'c’est', 'est', 'ist', 'lautet', 'es', 'é', 'это']);
-// Dentro una risposta queste aprono quasi sempre altro («sono stanco», «vale poco», «sono arrivato»): non presentano
-// la parola dopo, né fanno di una riga la risposta.
-const NON_IN_RISPOSTA = new Set(['sono', 'are', 'vale', 'risulta', 'here']);
+const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'eccola', 'eccolo', 'eccotela', 'eccotelo']);
+// Dentro una risposta queste aprono quasi sempre altro («sono stanco», «vale poco», «a domani sera», «war»): non
+// presentano la parola dopo, né fanno di una riga la risposta.
+const NON_IN_RISPOSTA = new Set(['sono', 'are', 'vale', 'risulta', 'here', 'sera', 'war', 'jest']);
 const PRESENTA_RISPOSTA = new Set([...PRESENTA_DATO].filter((w) => !NON_IN_RISPOSTA.has(w)));
 // «check-in», «self-service»: parole col trattino, non password.
 const formaDiPassword = (v) => !!guardiano().sembraPassword(v) && !/^\p{L}+(?:-\p{L}+)+$/u.test(v);

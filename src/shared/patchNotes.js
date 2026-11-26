@@ -23,6 +23,7 @@
         { testo: 'Una password scritta dopo «пароль:», «κωδικός:», «密码：» o la stessa parola in arabo, ebraico, hindi, thai, giapponese o coreano resta tua come dopo «Password:»: non arriva ai modelli, e se è in un log che alleghi a un feedback Filo te lo dice prima che parta.', segnalazione: 1403 },
         { testo: 'Un PIN, un CVV o un codice scritti fra parentesi, come «il PIN è (4821)», non arrivano più a nessun modello, come quando li scrivi senza.', segnalazione: 2689 },
         { testo: 'Una password con uno spazio dentro scritta fra virgolette, come «Mela! Verde77» o una frase intera, non arriva ai modelli nemmeno a metà: Filo toglie tutto quello che sta fra le virgolette, anche a metà di un messaggio.', segnalazione: 1403 },
+        { testo: 'Una password o un codice scritti come «la password é …», «sarebbe …», «risulta …» o «der PIN wird …» non arrivano ai modelli e non partono verso un sito senza che tu lo confermi, come quando scrivi «è».', segnalazione: 1403 },
       ],
     },
     {
