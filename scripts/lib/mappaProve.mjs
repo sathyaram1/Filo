@@ -264,9 +264,10 @@ export function rigaSullaMappa(r, blocchi) {
  * funzione vera eseguita da non più di `soglia` spec, `larga` se la eseguono quasi tutti (come un modulo che oltre
  * quella soglia di spec usano: è la suite intera), `file` se è solo il caricamento del modulo. Ordine: per livello,
  * poi quanto il legame è stretto (insiemi piccoli pesano di più), poi i più brevi. `senzaProve`: i file che nessuna
- * prova fa eseguire.
+ * prova carica. Con `sorgente(rel)` (il testo al commit della mappa) una riga fuori dalle funzioni vale anche per le
+ * righe che usano i nomi che dichiara (righeDeiNomi).
  */
-export function proveDelCambio(mappa, cambi, { soglia = SOGLIA_SPEC_DI_UN_MODULO } = {}) {
+export function proveDelCambio(mappa, cambi, { soglia = SOGLIA_SPEC_DI_UN_MODULO, sorgente = null } = {}) {
   const punti = new Map();
   const senzaProve = [];
   const dai = (insieme, livello, rel) => {
