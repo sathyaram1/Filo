@@ -525,13 +525,14 @@ test('tasto destro su un documento della carta: il menu è di quel documento', a
   await home(app);
   const voce = page.locator('#tieni .dash-carta[data-tipo="editor"] .dash-carta-voce', { hasText: 'Ricette' });
   await voce.click({ button: 'right' });
-  const menu = page.locator('.dash-menu');
-  await expect(menu.locator('.dash-menu-voce')).toHaveText(['Apri «Ricette»', 'Apri nel filo']);
-  await menu.locator('.dash-menu-voce', { hasText: 'Apri nel filo' }).click();
+  // Un verbo, un'icona (#2555): «Apri nel filo» è la variante di «Apri «Ricette»», nel menu dell'icona.
+  const menu = menuDi(page);
+  await expect.poll(() => menu.scritte()).toEqual(['Apri «Ricette»']);
+  await menu.variante('Apri «Ricette»', 'Apri nel filo');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Il documento «Ricette» è nell’Editor' })).toBeVisible();
   await voce.focus();
   await page.keyboard.press('Shift+F10');
-  await expect(menu.locator('.dash-menu-voce').first()).toHaveText('Apri «Ricette»');
+  await expect(menu.primaVoce).toHaveAttribute('aria-label', 'Apri «Ricette»');
   await page.keyboard.press('Enter');
   const ed = await finestraCon(app, 'filo://editor/editor.html');
   expect(ed.url()).toContain('file=b');
