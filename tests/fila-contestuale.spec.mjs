@@ -389,12 +389,14 @@ test('a parole: Filo mette un\'icona nella fila di un contesto, come il trascina
   const page = await testServer.openReady(openTab, SITO(testServer.asset(PNG, 'image/png')));
   const esegui = (azione) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), azione);
 
-  let r = await esegui({ type: 'SPOSTA_ICONA', icona: 'immagine:search', dove: 'fila' });
+  // Trascrivi sta nel «+» di partenza dell'immagine (#2555): a parole va in fondo alla fila.
+  let r = await esegui({ type: 'SPOSTA_ICONA', icona: 'immagine:transcribe', dove: 'fila' });
   expect(r.executed).toBe(true);
-  await expect.poll(async () => (await salvata(app))['fila:immagine']).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask', 'immagine:openTab', 'immagine:search']);
+  await expect.poll(async () => (await salvata(app))['fila:immagine'].at(-1)).toBe('immagine:transcribe');
+  expect((await salvata(app))['altro:immagine']).not.toContain('immagine:transcribe');
   await page.locator('#foto').click({ button: 'right' });
   const menu = menuDi(page);
-  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:search"]')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:transcribe"]')).toBeVisible();
   await page.keyboard.press('Escape');
 
   // Un'icona della barra nella fila del testo: lascia la barra.
