@@ -106,9 +106,9 @@ test('con la ricerca aperta il clic su un punto vuoto rimette il fuoco nella ric
   await expect.poll(fuoco).toBe('input');
   // Un menu aperto col tasto destro tiene il suo fuoco: il campo non glielo ruba.
   await page.locator('#altro .dash-altro-app[data-id="impostazioni"]').click({ button: 'right' });
-  await expect(page.locator('.dash-menu')).toBeVisible();
+  await expect(menuDi(page).principale).toBeVisible();
   await page.waitForTimeout(200);
-  await expect(page.locator('.dash-menu')).toBeVisible();
+  await expect(menuDi(page).principale).toBeVisible();
   await page.keyboard.press('Escape');
 });
 
