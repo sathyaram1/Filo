@@ -542,6 +542,58 @@
     }
   }
 
+  // Un indirizzo con la codifica percentuale («?q=la%20password%20%C3%A8%20Mela!Verde77») dice al modello quello che dice
+  // decodificato, come lo legge il controllo in uscita (urlExfil.js): ogni pezzo fra «/ ? # & ; =» si legge anche
+  // decodificato, una riga a pezzo, fino a tre codifiche, e dal testo si toglie la sua forma codificata (#1403.74).
+  const CODIFICHE = 3;
+  function codificatiNellIndirizzo(url, inizioUrl, out, giro) {
+    if (giro >= CODIFICHE || !/%[0-9A-Fa-f]{2}|[?#][^\s]*\+/.test(url)) return;
+    if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
+    const decodifica = global.SN_URL_EXFIL && global.SN_URL_EXFIL.decodificaConPosti;
+    if (!decodifica) return;
+    const host = (url.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i) || [''])[0].length;
+    const query = url.search(/[?#]/);
+    const pezzi = [];
+    for (const m of url.slice(host).matchAll(/[^/?#&;=]+/g)) {
+      const da = host + m.index;
+      pezzi.push({ da, testo: m[0], inizi: [...m[0]].map((_, i) => i).slice(0, m[0].length), fini: null, piu: query >= 0 && da > query });
+    }
+    for (const p of pezzi) {
+      p.inizi = Array.from({ length: p.testo.length }, (_, i) => i);
+      p.fini = p.inizi.map((i) => i + 1);
+    }
+    for (let livello = 0; livello < CODIFICHE; livello++) {
+      let cambiato = false;
+      for (const p of pezzi) {
+        const d = decodifica(p.testo, { piu: p.piu && livello === 0 });
+        if (d.testo === p.testo) continue;
+        cambiato = true;
+        p.inizi = d.da.map((i) => p.inizi[i]);
+        p.fini = d.a.map((j) => p.fini[j - 1]);
+        p.testo = d.testo;
+      }
+      if (!cambiato) return;
+      let righe = '';
+      const dove = pezzi.map((p) => { const k = righe.length; righe += `${p.testo}\n`; return k; });
+      for (const x of trova(righe, { giro: giro + 1 })) {
+        const v = String(x.valore);
+        const posti = Number.isInteger(x.inizio) && righe.startsWith(v, x.inizio) ? [x.inizio] : [];
+        if (!posti.length) for (let k = righe.indexOf(v); k >= 0; k = righe.indexOf(v, k + 1)) posti.push(k);
+        let messo = false;
+        for (const k of posti) {
+          const n = dove.findIndex((r, i) => k >= r && k + v.length <= r + pezzi[i].testo.length);
+          if (n < 0) continue;
+          const p = pezzi[n];
+          const da = p.da + p.inizi[k - dove[n]];
+          const a = p.da + p.fini[k - dove[n] + v.length - 1];
+          out.push({ valore: url.slice(da, a), regola: x.regola, ...(Number.isInteger(x.inizio) ? { inizio: inizioUrl + da } : {}) });
+          messo = true;
+        }
+        if (!messo) out.push({ valore: v, regola: x.regola });
+      }
+    }
+  }
+
   const TESTA_VALORE = new RegExp(`^[${APERTE}(]+`);
   const CODA_VALORE = new RegExp(`[.,;:)${CHIUSE}]+$`);
   function valorePassword(grezzo, { forma = false } = {}) {
