@@ -23,15 +23,18 @@
   const TRATTINO = '[-–—→](?=[ \\t])';
   // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности».
   const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F';
-  // Il nome del CVV nelle lingue delle etichette, quelle del verbo. CVV_ALTRE_LINGUE (#2681.1) è la parte che va anche ai
-  // campi dei moduli (da etichette() di campiSegreti.js) e agli indizi di pagamento (copia autonoma in safebrowseHints.js,
-  // uguale per tests/unit/cvvAltreLingue.test.mjs): coi separatori dei nomi di campo («codigo_de_seguridad»).
+  // CVV_ALTRE_LINGUE (#2681.1) è la parte che va anche ai campi dei moduli (da etichette() di campiSegreti.js) e agli
+  // indizi di pagamento (copia autonoma in safebrowseHints.js, uguale per tests/unit/cvvAltreLingue.test.mjs): coi
+  // separatori dei nomi di campo («codigo_de_seguridad»).
   const CVV_ALTRE_LINGUE = 'cryptogramme|code[\\s_-]*(?:de[\\s_-]*)?s[ée]curit[ée]|c[óo]digo[\\s_-]*(?:de[\\s_-]*)?(?:seguridad|seguran[çc]a)|(?:karten)?pr(?:ü|ue|u)f(?:nummer|ziffer)|sicherheits[\\s_-]*code|beveiligings[\\s_-]*code|kod[\\s_-]*bezpiecze[ńn]stwa';
-  const NOME_CVV = `(?<![${LETTERE}])(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:code|value|number)`
-    + '|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?|cryptogrammes?(?:\\s+visuels?)?|code\\s+de\\s+s[ée]curit[ée]'
-    + '|c[óo]digos?\\s+de\\s+(?:seguridad|seguran[çc]a)|(?:karten)?pr[üu]f(?:nummer|ziffern?|zahl|code)|sicherheits(?:code|nummer)'
-    + '|beveiligingscode|kaartverificatiecode|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa)'
-    + `|${CVV_ALTRE_LINGUE}|код\\s+(?:безопасности|проверки))(?![${LETTERE}])`;
+  // I nomi a parole in tutte le lingue delle etichette (#1403.61), anche senza accenti; li usano anche i campi dei moduli.
+  const NOMI_CVV = '(?:(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:code|value|number)'
+    + '|codice\\s+(?:di\\s+)?sicurezza|cryptogrammes?(?:\\s+visuels?)?|code\\s+(?:de\\s+)?s[ée]curit[ée]'
+    + '|c[óo]digos?\\s+(?:de\\s+)?segur(?:idad|an[çc]a)|(?:karten-?)?pr(?:ü|ue?)f(?:nummer|ziffern?|zahl|code)'
+    + '|(?:karten)?sicherheits-?(?:code|nummer)|(?:beveiligings|veiligheids)code|kaartverificatiecode'
+    + '|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa)|код\\s+(?:безопасности|проверки))';
+  const DELLA_CARTA = '(?:\\s+(?:(?:della|de\\s+la|de|do|da|der|van\\s+de|of\\s+the)\\s+(?:carta|carte|tarjeta|cart[ãa]o|karte|kaart|card)|karty))?';
+  const NOME_CVV = `(?<![${LETTERE}])(?:cvv2?|cvc2?|csc|cid|${NOMI_CVV}${DELLA_CARTA}|${CVV_ALTRE_LINGUE})(?![${LETTERE}])`;
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
   const APERTE = '«"\'“‘„';
