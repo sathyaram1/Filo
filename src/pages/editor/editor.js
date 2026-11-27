@@ -1469,6 +1469,8 @@
   }
   function onDocPopOutside(e) {
     if (titleMenuEl && titleMenuEl.contains(e.target)) return;
+    // Il menu a icone del documento (#2555) sta fuori dall'elenco: sceglierci una voce non lo chiude.
+    if (e.target && e.target.closest && e.target.closest('.sn-menu')) return;
     if (docbarEl && !docbarEl.contains(e.target)) closeDocPop();
   }
   if (docSwitchBtn) {
