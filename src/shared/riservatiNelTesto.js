@@ -460,6 +460,46 @@ const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:${AVVE
 const PONTE = new RegExp(`^(?:${AVVERBI}|${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO}|${CAMBIATA}|${guardiano().CAMBI})$`, 'u');
 const ACCANTO = /^\s*$/u;
 
+// La password detta prima del suo nome (#2695.8): «gattonero è la password», «usa Gatto2024 come password del wifi». Con
+// cifre, simboli o virgolette il valore conta sempre; di sole lettere solo dove una parola qualunque non sta: non dopo un
+// articolo («il problema è la password»), non come «quello che serve è …», e prima di «come» solo dopo il verbo che la
+// mette («usa gattonero come password», non «vale come password»). Prove: tests/unit/passwordPrimaDelNome.test.mjs.
+const DAVANTI_AL_NOME = "(?:(?:l['’]|(?:la|il|lo|le|the|a|an|una|un|my|your|our|his|her|their|mia|mio|tua|tuo|sua|suo"
+  + '|nostra|nostro|vostra|vostro|loro|nuova|nuovo|vecchia|vecchio|attuale|vera|vero|giusta|giusto|corretta|solita|stessa'
+  + '|unica|new|old|current|real|right|correct|usual|same|only)[^\\S\\n]+))*';
+const PRIMA_DEL_NOME = new RegExp(`(?:^|[^\\S\\n])(\\S{1,128})[^\\S\\n]+(?:${AVVERBI}[^\\S\\n]+)?`
+  + `(?:(?<verbo>è|e['’]|é|era|sarà|sara|sia|fosse|resta|rimane|diventa|is|was|becomes|will[^\\S\\n]+be)(?:[^\\S\\n]+${AVVERBI})?`
+  + `|(?<come>come|as))[^\\S\\n]+${DAVANTI_AL_NOME}$`, 'u');
+// «Bitwarden è il password manager»: il nome è di un'altra cosa.
+const NOME_DI_ALTRO = /^[^\S\n]*-?[^\S\n]*(?:manager|policy|hint|reset|field|generator|strength|length|recovery|vault|checker|hash)(?![\p{L}\p{N}])/u;
+const NON_UN_VALORE = /^(?:quest[aoie]|quell[aoie]|quale|qual|cosa|che|chi|dove|come|non|ecco|qui|qua|ciò|cio|lei|lui|ess[ao]|tutto|niente|nulla|sol[oa]|soltanto|anche|perché|perche|quando|forse|allora|dunque|quindi|this|that|what|which|here|there|it|nothing|everything|something|who|where|how|why|then|also|only|not|mine|yours|ours|mia|tua|sua|nostra|vostra|loro)$/u;
+const ARTICOLO = /^(?:il|lo|la|i|gli|le|un|uno|una|del|della|dello|dei|degli|delle|di|da|dal|dalla|al|alla|nel|nella|sul|sulla|con|per|tra|fra|ogni|quel|mio|mia|tuo|tua|suo|sua|nostro|nostra|vostro|vostra|the|an|of|my|your|his|her|our|their|these|those|every|each|any|some)$|^(?:dell|nell|sull|dall|all|un|l|quell)['’]/u;
+const RELATIVO = /^(?:che|chi|cui|which|that|what|who)$/u;
+const METTE = /^(?:us[aoi]|usare|usate|usiamo|usat[aoie]|mett[iao]|mettere|mettete|mess[aoie]|impost[aoi]|impostare|impostat[aoie]|scegl[iao]|scegliere|scelt[aoie]|scriv[iao]|scrivere|inserisc[ia]|inserire|inserit[aoie]|digit[aoi]|digitare|prov[aoi]|provare|use|using|used|set|put|try|choose|chose|chosen|pick|picked|type|enter|entered)$/u;
+const APRE_VIRGOLETTA = /^[«“„‘"']/u;
+function primaDelNome(testo) {
+  const l = minuscolo(testo);
+  const out = [];
+  for (const n of menzioni(l)) {
+    if (n.tipo !== 'password' || /credenziali/u.test(l.slice(n.i, n.j)) || NOME_DI_ALTRO.test(l.slice(n.j, n.j + 40))) continue;
+    const prima = l.slice(Math.max(0, n.i - 200), n.i);
+    const m = PRIMA_DEL_NOME.exec(prima);
+    if (!m || /[,;:.!?…]$/u.test(m[1])) continue;
+    const v = pulito(m[1]);
+    if (v.length < 4) continue;
+    const virgolette = APRE_VIRGOLETTA.test(m[1]);
+    if (!virgolette && !/[^\p{L}'’]/u.test(v)) {
+      const davanti = prima.slice(0, m.index + m[0].indexOf(m[1])).split(/\s+/).filter(Boolean).slice(-2).map(pulito);
+      const w1 = davanti[davanti.length - 1] || '';
+      if (NON_UN_VALORE.test(v) || PONTE.test(v) || AVVII.has(v) || PRESENTA_DATO.has(v) || nomeDiPassword(v)) continue;
+      if (m.groups.come ? !(METTE.test(w1) || (PONTE.test(w1) && METTE.test(davanti[0] || ''))) : davanti.some((w) => ARTICOLO.test(w))) continue;
+      if (m.groups.verbo && RELATIVO.test(w1) && !/^(?:sia|fosse)$/u.test(m.groups.verbo)) continue;
+    }
+    out.push({ valore: v, virgolette });
+  }
+  return out;
+}
+
 function formeLibere(testo) {
   const X = exfil();
   const G = guardiano();
