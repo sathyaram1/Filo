@@ -506,8 +506,7 @@
           out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
         }
         if (coda.length < 200) {
-          const dopo = dopoIlRinvio(testo.slice(da + coda.length, da + coda.length + 200), { soloCifre, spiega });
-          if (dopo) out.push(dopo);
+          out.push(...dopoIlRinvio(testo.slice(da + coda.length, da + coda.length + 200), { soloCifre, spiega }));
         }
       }
     };
