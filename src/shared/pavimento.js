@@ -1408,9 +1408,9 @@
     const R = global.SN_RISERVATI_TESTO;
     const copia = aCapo(vero);
     const piano = copia ? copia.piano : vero;
-    // L'enfasi del Markdown e i tag HTML fra etichetta e valore («**Password:** …», «<b>PIN:</b> …») si leggono come
-    // spazi; un commento HTML in due letture, con e senza il suo testo (riservatiNelTesto.js).
-    // Un avverbio fra il verbo e il valore («il pin è ancora 4821») si legge come spazi, come l'enfasi (guardianoStatico.js).
+    // L'enfasi e i segni di blocco del Markdown e i tag HTML fra etichetta e valore («**Password:** …», «- …» o «```»
+    // sotto l'etichetta, «<b>PIN:</b> …») si leggono come spazi; un commento HTML in due letture, con e senza il suo
+    // testo (riservatiNelTesto.js). Un avverbio fra il verbo e il valore («il pin è ancora 4821») anche (guardianoStatico.js).
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
     // Un refuso del nome («pasword») o del verbo («diventta») si legge giusto, alla stessa lunghezza, e un inciso fra nome
