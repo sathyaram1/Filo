@@ -2290,7 +2290,7 @@
           const cur = currentDetailCard();
           if (cur) renderDetailModule(cur);
         },
-      })));
+      })), { valori: true });
     };
     $('previewModule').addEventListener('contextmenu', openModuleMenu);
     $('carouselModule').addEventListener('contextmenu', openModuleMenu);
