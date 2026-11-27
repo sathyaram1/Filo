@@ -47,7 +47,8 @@ Il fusibile è del binario, non della sessione, e va spento dappertutto:
 - nelle prove, dal globalSetup: sul posto se `node_modules/electron` è di questo checkout, altrimenti (i cloni delle
   routine usano i moduli della cartella della sessione) una copia spenta nella cache dell'utente, passata con
   `ELECTRON_OVERRIDE_DIST_PATH`; sul Mac la copia o il binario modificato si rifirmano in locale;
-- in `npm start`, dal prestart, sul posto.
+- in `npm start` e `npm run dev`, dal lanciatore `scripts/avvia-electron.mjs`, con la stessa regola delle prove: chi
+  prova a mano da un'altra cartella di lavoro vede quello che riceve l'utente.
 
 Un motore rimasto acceso (un `test:shoot` fuori da Playwright) non apre buchi verso fuori: la rete che manca resta, e
 per questo nessuno dei tre strati si toglie.
