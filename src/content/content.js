@@ -2172,18 +2172,17 @@
   async function openSpellMarksMenu(editableEl, { errore, suggerimento }, mouseEvent, sito = null) {
     // Su un suggerimento «Valuta» sta col suggerimento, e una volta sola nel menu.
     const valutaQui = suggerimento ? campoDaValutare(editableEl) : null;
-    const items = await buildBaseItemsAt(mouseEvent, { senzaValuta: !!valutaQui });
     const sopra = [];
-    const annulla = voceAnnullaCorrezione(editableEl, mouseEvent);
-    if (annulla) sopra.push(annulla, { type: 'separator' });
     if (errore) sopra.push(...vociErrore(editableEl, errore));
     if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento, valutaQui));
+    const { testo, azioni } = separaLeAzioni(sopra);
+    // «Correggi tutto» serve solo se c'è un altro errore oltre a questo.
     const correggibile = (s) => s && !s.dubbio && (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando && s.correzioni?.length));
-    const tutti = voceCorreggiTutti(editableEl, 1 + [errore, suggerimento].filter(correggibile).length);
-    const controlla = voceControlla(editableEl);
-    if (tutti || controlla) sopra.push(...[controlla, tutti].filter(Boolean), { type: 'separator' });
-    items.unshift(...sopra);
-    conMenuDelSito(items, sito);
+    const minimoCorreggi = 1 + [errore, suggerimento].filter(correggibile).length;
+    const items = await buildBaseItemsAt(mouseEvent, { senzaValuta: !!valutaQui, sito, minimoCorreggi, scritte: azioni });
+    // La griglia in cima, poi le proposte e le spiegazioni del segno.
+    const griglia = items.findIndex((it) => it && it.type === 'row');
+    items.splice(griglia + 1, 0, ...testo);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
   }
 
