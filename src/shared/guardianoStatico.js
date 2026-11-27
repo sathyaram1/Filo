@@ -664,6 +664,7 @@
   const LUOGO_DEL_CAMBIO = /^(?:in|su|on|a)$/i;
   // «con quella di Gmail2024»: dopo «di» c'è di chi è, non il valore.
   const DI_CHI = /^(?:di|del|della|dello|dell|of|for|per)$/i;
+  const PREDEFINITO_DEL_VALORE = /(?<![\p{L}])(?:predefinit[oaie]|di\s+fabbrica|default|factory)(?![\p{L}])/iu;
   function valoriDopoIlNome(testoIntero, { uscita = false } = {}) {
     const s = testo(testoIntero);
     const out = [];
