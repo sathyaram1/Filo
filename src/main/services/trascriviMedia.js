@@ -246,7 +246,7 @@ function durata(s) {
   const m = Math.floor((t % 3600) / 60);
   const ss = String(t % 60).padStart(2, '0');
   return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
-};
+}
 
 function suggerimentoStreaming(url) {
   let host = '';
