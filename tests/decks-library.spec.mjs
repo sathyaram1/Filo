@@ -143,8 +143,10 @@ test('Esporta… dal tasto destro sulla scheda dà lo stesso testo dell\'export 
   await seedLibrary(app, page);
 
   await scheda(page, 'Fulmini').click({ button: 'right' });
-  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveText(['Duplica', 'Esporta…', 'Rinomina…', 'Elimina…']);
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Esporta…' }).click();
+  // A icone (#2555): le stesse azioni nello stesso ordine, accanto a quelle di ogni menu.
+  const azioni = ['Duplica', 'Esporta…', 'Rinomina…', 'Elimina…'];
+  await expect.poll(async () => (await menuDi(page).nomi()).filter((n) => azioni.includes(n))).toEqual(azioni);
+  await menuDi(page).scegli('Esporta…');
   const ta = page.locator('.dk-io-overlay .dk-io-textarea');
   await expect(ta).toHaveValue(/1 Lightning Bolt/);
   const dallaLibreria = await ta.inputValue();
