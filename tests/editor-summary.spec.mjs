@@ -15,6 +15,7 @@
 // memoria vuota — nessuna chiave modello richiesta.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 import { mkdirSync } from 'node:fs';
 import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 
