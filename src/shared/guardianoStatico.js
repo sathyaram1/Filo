@@ -571,7 +571,8 @@
     const P = global.SN_PAVIMENTO;
     if (!P || typeof P.trova !== 'function') return [];
     const out = [];
-    for (const x of P.trova(s)) {
+    // Il valore di un parametro si legge come una riga sua: «?t=La password del mio pc è …» è la frase, non un campo.
+    for (const x of P.trova(s.replace(/[?&#][\w.%[\]-]{0,64}=/g, '\n'))) {
       const regola = DAL_PAVIMENTO[x.regola] ? DAL_PAVIMENTO[x.regola](x) : '';
       if (regola) out.push({ valore: String(x.valore), regola });
     }
