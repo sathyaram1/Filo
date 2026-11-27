@@ -47,7 +47,7 @@ async function destroSulCampo(page, sel) {
 test('Taglia nella fila toglie la parola come il sistema: Ctrl+Z la rimette, e vale anche in una casella per l\'email o per un numero', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, CAMPI);
   const menu = menuDi(page);
-  const fila = menu.locator('.sn-menu-row');
+  const fila = menu.locator('.sn-menu-row:not(.sn-menu-altro)');
 
   // Una parola sola, all'inizio della casella: il tasto destro le sta sopra.
   await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
@@ -83,7 +83,7 @@ test('in un campo password la fila e le voci non offrono Taglia e Copia, come il
   const menu = menuDi(page);
   await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti'));
   await destroSulCampo(page, '#segreta');
-  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   expect(await iconeDellaFila(menu)).toEqual(['campo:paste']);
   await expect(menu.incolla).toHaveAttribute('aria-label', 'Incolla');
   await expect(menu.voce('Taglia')).toHaveCount(0);
@@ -96,7 +96,7 @@ test('in un campo password la fila e le voci non offrono Taglia e Copia, come il
 test('in una casella senza formattazione la fila dà Taglia, Copia e Incolla, con Cerca nel «+»; in un campo ricco la formattazione', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, CAMPI);
   const menu = menuDi(page);
-  const fila = menu.locator('.sn-menu-row');
+  const fila = menu.locator('.sn-menu-row:not(.sn-menu-altro)');
   for (const sel of ['#cerca', '#area', '#piano']) {
     await destroSulCampo(page, sel);
     await expect(fila).toBeVisible();
@@ -216,13 +216,13 @@ test('un\'icona della finestra portata nella fila a menu aperto ci compare subit
   // Dalla barra, col mouse: Home lascia la barra e arriva nella fila.
   const barra = await barraPage(app);
   await page.locator('#vuoto').click({ button: 'right' });
-  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   const src = await barra.locator('#nav .ico[data-id="home"]').boundingBox();
   const s = await statoBarra(app);
   const alto = s.bounds.y - s.alto;
-  const fila = await fermo(menu.locator('.sn-menu-row'));
+  const fila = await fermo(menu.locator('.sn-menu-row:not(.sn-menu-altro)'));
   await barra.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
   await barra.mouse.down();
   await barra.mouse.move(src.x + 30, src.y + 10, { steps: 3 });
@@ -268,7 +268,7 @@ test.describe('col menu nello strato sopra la scheda', () => {
     await page.keyboard.press('Escape');
     await page.locator('#vuoto').click({ button: 'right' });
     await expect(menu.principale).toBeVisible();
-    await expect(menu.locator('.sn-menu-row')).toBeHidden();
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeHidden();
     await comandaBarra(app, 'clic');
     await pannelloFermo(barra);
     const src = await barra.locator('#nav .ico[data-id="saveForLater"]').boundingBox();
@@ -279,8 +279,8 @@ test.describe('col menu nello strato sopra la scheda', () => {
     await barra.mouse.down();
     await barra.mouse.move(src.x + 30, src.y + 10, { steps: 3 });
     await barra.mouse.move(box.x + 40, box.y + 12 - alto, { steps: 10 });
-    await expect(menu.locator('.sn-menu-row')).toBeVisible();
-    const fila = await fermo(menu.locator('.sn-menu-row'));
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
+    const fila = await fermo(menu.locator('.sn-menu-row:not(.sn-menu-altro)'));
     await barra.mouse.move(fila.x + 20, fila.y + fila.height / 2 - alto, { steps: 4 });
     await barra.mouse.up();
     await expect.poll(async () => (await salvata(app))['fila:pagina']).toEqual(['saveForLater']);
