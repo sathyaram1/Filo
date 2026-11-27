@@ -149,7 +149,7 @@ test('lo strumento: opzioni capite, e il testo dice i due livelli, i tempi e i f
   const t = testoScelta({ prove, senzaProve, nuovi: ['src/n.js'], mappa: m, fonte: 'corsa 1' });
   assert.match(t, /passano dalle funzioni cambiate \(1, circa 3 s\)/);
   assert.match(t, /caricano solo i file cambiati \(1, circa 1 s\)/);
-  assert.match(t, /Nessuna prova li fa eseguire.*src\/n\.js/);
+  assert.match(t, /Nessuna prova li carica.*src\/n\.js/);
   assert.match(t, /In tutto 2 spec, circa 4 s/);
 });
 
