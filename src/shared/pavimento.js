@@ -774,10 +774,21 @@
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
   const TEMPO = /^(?:gen(?:naio)?|feb(?:braio)?|mar(?:zo)?|apr(?:ile)?|mag(?:gio)?|giu(?:gno)?|lug(?:lio)?|ago(?:sto)?|set(?:tembre)?|ott(?:obre)?|nov(?:embre)?|dic(?:embre)?|jan(?:uary)?|february|march|april|may|june?|july?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|dec(?:ember)?|fa|ago|giorn[oi]|settiman[ae]|mes[ei]|ann[oi]|or[ae]|minut[oi]|days?|weeks?|months?|years?|hours?|minutes?|ieri|oggi|yesterday|today)[.,;:]?$/i;
-  // Misura e data solo con un numero («min 8 caratteri», «otto caratteri», «2 mesi fa»): «ci vediamo ogni giorno», «una
-  // rondine non fa primavera», «may the force be with you» sono frasi-password.
+  // Misura e data solo con un numero e in testa alla frase («min 8 caratteri», «otto caratteri», «12 mar 2024», «ultima
+  // modifica 2 mesi fa»): «ci vediamo ogni giorno», «may the force be with you», «ci vediamo tra due giorni» e «il mio
+  // cane ha tre anni» sono frasi-password (#2678.14).
   const NUMERO = /\d|^(?:due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|quindici|venti|trenta|two|three|four|five|six|seven|eight|nine|ten|twelve|sixteen|twenty|thirty)$/i;
-  const misuraODate = (parole) => parole.some((x) => NUMERO.test(x)) && parole.some((x) => MISURA.test(x) || TEMPO.test(x));
+  const APRE_MISURA = /^(?:almeno|circa|minimo|min|massimo|max|oltre|più|entro|ogni|per|valida|valido|validità|durata|lunghezza|scadenza|ultim[ao]|modifica|cambio|aggiornamento|at|least|most|about|around|every|within|for|over|up|to|last|valid)$/i;
+  const FRA_NUMERI = /^(?:o|or|più|more|a|to|e|and|-|–|fino)$/i;
+  const misuraODate = (parole) => {
+    const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
+    let i = ARTICOLO.test(p[0]) ? 1 : 0;
+    while (i < p.length && APRE_MISURA.test(p[i])) i++;
+    if (TEMPO.test(p[i] || '') && NUMERO.test(p[i + 1] || '')) return true;
+    if (!NUMERO.test(p[i] || '')) return false;
+    while (i < p.length && (NUMERO.test(p[i]) || FRA_NUMERI.test(p[i]))) i++;
+    return MISURA.test(p[i] || '') || TEMPO.test(p[i] || '');
+  };
   const ARTICOLO = /^(?:la|il|lo|i|le|gli|una?|the|an?|el|der|die|das|de|het)$/i;
   // Davanti a un verbo «la», «lo», «le» sono un pronome, e la frase dice dove trovarla: «Password: la trovi sul modem».
   const DOPO_PRONOME = /^(?:trov[aio]|trovate|troverai|troverete|ricevi|riceve|ricevete|riceverai|riceverete|mando|mandiamo|manderò|manderemo|invio|inviamo|invierò|invieremo|chiedi|chiedete|sai|sa|sanno|conosci|conosce|ha|hai|hanno|abbiamo|avete|cambi|cambia|cambierai|scegli|sceglierai|imposti|imposterai|scrivo|scriverò|dico|dirò|diamo|daremo|do|darò|one|ones)$/i;
