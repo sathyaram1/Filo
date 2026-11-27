@@ -433,8 +433,6 @@
     // Il codice del proprio apparecchio ha la sua etichetta, con le sue virgole e i suoi refusi («, c'est», «e» senza accento).
     if (!/\d/.test(fra) && (delMioApparecchio(prima.slice(-160)) || etichettaSbloccabile(prima.slice(-160)))) return true;
     if (entra && !/\d/.test(fra) && fra.length <= 60 && !/[;!?]/.test(fra) && chiudeChiEntra(fra)) return true;
-    // Un «diventa» dopo un'altra frase parla d'altro: «il pin non funziona e il prezzo diventa 4821» (#2714).
-    if (G.finisceColCambio(fra)) return false;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
     if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
     if (CHIUDE_ETICHETTA.test(fra) || (nomePolacco(n[0], prima.slice(Math.max(da, n.index - 60), n.index)) && CHIUDE_KOD.test(fra))) return true;
