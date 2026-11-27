@@ -101,7 +101,7 @@ test('in una casella senza formattazione la fila dà Taglia, Copia e Incolla, co
   for (const sel of ['#cerca', '#area', '#piano']) {
     await destroSulCampo(page, sel);
     await expect(fila).toBeVisible();
-    expect(await iconeDellaFila(menu), sel).toEqual(['campo:cut', 'campo:copy', 'campo:paste']);
+    expect(await iconeDellaFila(menu), sel).toEqual(['campo:cut', 'campo:copy', 'campo:paste', 'campo:dictate', 'campo:edit', 'campo:help']);
     await fila.locator('.sn-menu-row-overflow').click();
     await expect(menu.locator('.sn-menu-altro [data-sn-icon-id="campo:search"]'), sel).toBeVisible();
     await page.keyboard.press('Escape');
