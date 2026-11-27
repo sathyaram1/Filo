@@ -279,6 +279,13 @@ try {
   if (/^https?:/i.test(loc)) require('./collegamento-aperto.js').installa({ webFrame });
 } catch (_) { /* mai bloccare il caricamento */ }
 
+// #1660 — l'audio che la pagina suona fuori dal documento (il vocale di WhatsApp Web), per «Trascrivi»: la sonda sta in
+// preload/media-staccati.js, il nome del suo evento lo legge actions.js. In ogni frame http(s).
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) require('./media-staccati.js').installa({ webFrame });
+} catch (_) { /* mai bloccare il caricamento */ }
+
 // #1974 — le pubblicità di YouTube tolte prima che partano, in ogni frame di YouTube (anche i video incorporati), prima
 // degli script del sito; la guardia rimanda al solo «Salta» quando le regole non reggono. Regole in preload/youtube-guardia.js.
 try {
