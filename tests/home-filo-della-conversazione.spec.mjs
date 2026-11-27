@@ -126,7 +126,7 @@ test('#869.2 due schede home continuano una conversazione sola, da tutte e due l
   const [orche] = await chatDi(app, 'come cacciano le orche?');
   await expect.poll(() => chatDi(app, 'e le balene?')).toEqual([orche]);
 
-  await shell.locator('.tab').first().click();
+  await davanti(shell, prima, 0);
   await chiedi(prima, 'e i delfini?');
   await expect(prima.locator('.dash-bubble-filo', { hasText: 'Anche i delfini' })).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => chatDi(app, 'e i delfini?')).toEqual([orche]);
