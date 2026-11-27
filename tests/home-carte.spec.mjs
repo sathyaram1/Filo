@@ -506,7 +506,7 @@ test('una carta tolta in incognito non cambia la home della finestra normale', a
   const normale = await home(app);
   const inc = await homeIncognito(app, shell, normale);
   await inc.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
-  await inc.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await menuDi(inc).scegli('Togli dalla home');
   await expect(inc.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
   await normale.waitForTimeout(1_000);
   await expect(normale.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(1);
