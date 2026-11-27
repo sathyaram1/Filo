@@ -628,10 +628,8 @@ test('#496 — il tasto destro su un numero offre di vedere cosa ha contato', as
   });
   await page.locator('[data-fs-range="30g"]').click();
   await page.locator('[data-fs-id="ricevuti"]').click({ button: 'right' });
-  const menu = page.locator('.mg-ctxmenu');
-  await expect(menu).toBeVisible();
-  await expect(menu).toContainText('Copia riga e numero');
-  await menu.locator('.sn-select-option', { hasText: 'Mostra' }).click();
+  expect(await testoDelMenu(page)).toContain('Copia riga e numero');
+  await menuDi(page).scegli('Mostra');
   await expect(page.locator('#mgFsDrillList .mg-fs-drill-row')).toHaveCount(2);
 });
 
