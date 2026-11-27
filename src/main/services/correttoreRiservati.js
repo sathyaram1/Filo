@@ -120,6 +120,12 @@ function oscura(testo, valori = null) {
   return v;
 }
 
+// Il campo è il messaggio sotto il testo sopra: il pavimento lo legge lì, come il cancello dei modelli legge la
+// conversazione intera, così la risposta a «mi dici il puk?» non parte nemmeno se la domanda sta fuori dal campo (#2692.5).
+function sottoLaDomanda(sopra, campo) {
+  try { return PAV().trova(/\n\s*$/.test(sopra) ? sopra + campo : `${sopra}\n${campo}`).map((x) => String(x.valore)); } catch (_) { return []; }
+}
+
 // I pezzi contigui del campo (prima, nuovo, dopo), oscurati sul campo intero: la parola che presenta una password, o
 // metà di un numero di carta, può stare in un pezzo diverso dal valore, o fuori dai pezzi. `campo` e `campoDa` (dove
 // comincia il primo pezzo) li manda la pagina; se non tornano coi pezzi vale il loro testo unito.
