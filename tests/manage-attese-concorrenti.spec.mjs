@@ -123,7 +123,7 @@ test('«Non aspettare più» toglie quelle che l\'owner vede, non quella scritta
   await routineScrive(app, 14);
   await page.locator('.mg-tab[data-tab="waiting"]').click();
   await page.locator('.mg-item[data-id="f903"]').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Non aspettare più' }).click();
+  await menuDi(page).scegli('Non aspettare più');
   await expect(page.locator('#mgManageMsg')).toHaveText(/Da ora #903 aspetta #14/);
   expect(await sulServer(app)).toEqual(['14']);
 });
