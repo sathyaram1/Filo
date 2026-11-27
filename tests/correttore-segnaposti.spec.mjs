@@ -645,7 +645,7 @@ test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuov
   const menu = await tastoDestroSu(page, ocra(page, 'xx'));
   await expect(menu.locator('.sn-menu-segno')).toContainText('La ricerca non è riuscita', { timeout: 3000 });
   await app.evaluate(() => { globalThis.__reteGiu = false; });
-  await menu.voce('Cerca di nuovo').click();
+  await menu.scegli('Cerca di nuovo');
   await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
   await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1 });
   expect(await voceOggi(app, 'correttore_segnaposto', 'da_solo')).toEqual({ cercato: 1, fallito: 1 });
