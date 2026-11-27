@@ -240,7 +240,8 @@ test('le voci del menu della scheda si accendono al passaggio del mouse', async 
   await scheda(page, 'Fulmini').click({ button: 'right' });
   const voce = menuDi(page).voce('Rinomina…');
   const fondo = () => voce.evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(await voce.evaluate((el) => getComputedStyle(el).transitionProperty)).toContain('background-color');
+  // L'icona del menu (#2555) anima `background`, che comprende il colore di fondo.
+  expect(await voce.evaluate((el) => getComputedStyle(el).transitionProperty)).toMatch(/\bbackground(-color)?\b/);
   await page.mouse.move(0, 0);
   const prima = await fondo();
   await voce.hover();
