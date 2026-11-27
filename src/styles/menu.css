@@ -107,6 +107,7 @@
   margin-bottom: 4px;
 }
 .sn-menu-griglia:last-child { margin-bottom: 0; }
+.sn-menu:has(> .sn-menu-griglia) { max-width: none; }
 .sn-menu-row {
   display: grid;
   grid-template-columns: repeat(var(--sn-colonne, 6), var(--sn-cella, 34px));
