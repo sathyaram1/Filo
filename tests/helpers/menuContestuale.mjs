@@ -84,6 +84,20 @@ export function menuDi(scheda) {
     scegli,
     /** Tasto destro sull'icona (nome o locator) e clic sulla variante col testo dato. */
     variante,
+    /** Le voci scritte dalla pagina come le elencava il menu a testo: ogni icona seguita dalle sue varianti. */
+    vociScritte: async () => {
+      const icone = locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow):not([data-sn-icon-id])');
+      const out = [];
+      for (let i = 0, n = await icone.count(); i < n; i++) {
+        const b = icone.nth(i);
+        out.push(await b.getAttribute('aria-label'));
+        if ((await b.getAttribute('data-sn-varianti')) !== '1') continue;
+        await scegli(b, { button: 'right' });
+        await locator('.sn-menu-sub').first().waitFor({ state: 'visible', timeout: 2000 });
+        out.push(...(await locator('.sn-menu-sub .sn-menu-item').allTextContents()).map((t) => t.trim()));
+      }
+      return out;
+    },
     /** Vero se `testo` è un'icona del menu o una variante nel menu di un'icona (che resta aperto). */
     haVoce: async (testo) => (await voce(testo).count()) > 0 || !!(await fraLeVarianti(testo)),
     /** I nomi delle icone del menu principale, in ordine, anche quelle dietro il «+» (per `expect.poll`). */
