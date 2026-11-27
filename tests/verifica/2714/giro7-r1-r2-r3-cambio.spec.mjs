@@ -48,6 +48,9 @@ test('r2 la password o il PIN detti dopo la domanda sono un segreto in uscita, c
     ['Ti ricordi il pin? Era 4821', '4821'],
     ['la password diventa: Mela!Verde77', 'Mela!Verde77'],
     ['la password è diventata: Mela!Verde77', 'Mela!Verde77'],
+    ['ho sostituito la password con Mela!Verde77', 'Mela!Verde77'],
+    ['la password è divenuta Mela!Verde77', 'Mela!Verde77'],
+    ['the password remained Mela!Verde77', 'Mela!Verde77'],
   ]) if (!valori(t).includes(v)) mancati.push(t);
   expect(mancati).toEqual([]);
   expect(valori('Hai cambiato la password? Era ora!')).toEqual([]);
