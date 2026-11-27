@@ -27,13 +27,6 @@ try {
   console.log(`[prestart] controllo dei pacchetti saltato: ${e && e.message ? e.message : e}`);
 }
 
-// Le pagine file:// come nel pacchetto (scripts/lib/fusibili-electron.js): il motore di node_modules si spegne sul posto.
-try {
-  const { createRequire } = await import('node:module');
-  const m = createRequire(import.meta.url)('./lib/fusibili-electron.js').motoreSenzaPrivilegi({ radice: ROOT });
-  if (m.errore) console.log(`[prestart] Electron resta coi privilegi file:// di fabbrica: ${m.errore}`);
-} catch (e) {
-  console.log(`[prestart] fusibile di Electron non controllato: ${e && e.message ? e.message : e}`);
-}
-
+// Il fusibile file:// del motore lo spegne chi lancia (scripts/avvia-electron.mjs): da un clone senza moduli suoi
+// serve la copia nella cache, che vale solo per il processo che la riceve.
 process.exit(0);
