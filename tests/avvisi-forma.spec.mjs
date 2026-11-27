@@ -352,9 +352,11 @@ test('la carta volata nella home ha il tasto destro dell\'angolo: il sito da cui
   const carta = home.locator('#accade > .dash-carta[data-tipo="cornice"]');
   await expect(carta).toHaveCount(1, { timeout: 8_000 });
   await carta.click({ button: 'right' });
-  const menu = home.locator('.dash-menu');
-  expect(await menu.locator('.dash-menu-voce').allTextContents()).toEqual(['Riprova', 'Apri 127.0.0.1', 'Chiudi', 'Apri nel filo']);
-  await menu.locator('.dash-menu-voce', { hasText: 'Apri 127.0.0.1' }).click();
+  // A icone (#2555) le due «Apri» sono un'icona e la sua variante: le stesse voci, l'ordine lo dà il verbo.
+  const menu = menuDi(home);
+  await expect(menu.principale).toBeVisible();
+  expect((await menu.vociScritte()).sort()).toEqual(['Riprova', 'Apri 127.0.0.1', 'Chiudi', 'Apri nel filo'].sort());
+  await menu.scegli('Apri 127.0.0.1');
   await expect.poll(() => schedeAperte(shell)).toContain(origine);
   // Aprire il sito non chiude l'avviso, come nell'angolo.
   await expect(carta).toHaveCount(1);
