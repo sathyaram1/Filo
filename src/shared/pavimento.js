@@ -249,9 +249,7 @@
     if (altro && (!it || altro.index > it.index)) {
       const coda = prima.slice(altro.index + altro[0].length).replace(LEGAMI_ALTRE, '');
       const p = /^[\p{L}-]+/u.exec(coda);
-      const solo = !!p && DOPO_IL_NOME.test(coda.slice(p[0].length));
-      if (p && APRE_ALTRE_SOLO.test(p[0])) return { apre: true, solo };
-      if (solo && SI_SBLOCCA_SOLO.test(p[0])) return { apre: true, solo };
+      if (p && APRE_ALTRE_SOLO.test(p[0])) return { apre: true, solo: DOPO_IL_NOME.test(coda.slice(p[0].length)) };
     }
     if (!it) return { apre: false, solo: false };
     // Un PIN non è mai un identificativo, di qualunque cosa sia: «il pin del telefono è 4821», anche se è un anno (#2678.3).
