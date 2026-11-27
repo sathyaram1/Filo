@@ -437,7 +437,7 @@
     const r = RINVIO.exec(resto);
     if (!r) return null;
     const G = global.SN_GUARDIANO_STATICO;
-    if (!avverbio && G) avverbio = new RegExp(`^(?:${G.AVVERBIO}|${G.AVVERBI})$`, 'u');
+    if (!avverbio && G) avverbio = new RegExp(`^(?:${G.AVVERBIO}|${G.AVVERBI}|${G.MODALI})$`, 'u');
     const seguito = fineFrase(resto.slice(r[0].length).replace(/^\s+/, ''));
     const parole = seguito.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
     let annunciato = false;
