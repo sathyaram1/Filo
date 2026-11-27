@@ -890,3 +890,6 @@ module.exports = function register(on, ctx) {
     }
   });
 };
+
+// La trascrizione di un audio della pagina (src/main/services/trascriviMedia.js) scarica come «Salva audio come».
+module.exports.fetchToFile = fetchToFile;
