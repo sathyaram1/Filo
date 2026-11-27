@@ -228,13 +228,17 @@ test('segnalato dai giudici o dal filtro: «Segna fidato» dal tasto destro avve
   await page.evaluate((i) => window.__mgTest.openDetail(i), 's-4');
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /Attenzione: .*attacco.*guardalo prima/);
   await page.locator('.mg-item[data-id="s-4"]').click({ button: 'right' });
-  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Segna fidato' });
-  await expect(voce).toHaveAttribute('title', /Attenzione: .*attacco.*guardalo prima/);
-  await page.keyboard.press('Escape');
+  // A icone (#2555): l'avvertimento deve arrivare a chi sta per scegliere l'icona, come arrivava col fumetto della voce.
+  const menu = menuDi(page);
+  const voce = menu.voce('Segna fidato');
+  await expect(voce).toHaveCount(1);
+  await voce.hover();
+  await expect(menu.principale).toContainText(/Attenzione: .*attacco.*guardalo prima/);
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
   await page.locator('.mg-item[data-id="s-5"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toBeVisible();
-  await expect(page.locator('.mg-ctxmenu')).not.toContainText(/[Ll]avoro server/);
-  await page.keyboard.press('Escape');
+  await expect(menu.principale).toBeVisible();
+  expect((await menu.vociScritte()).join('\n')).not.toMatch(/[Ll]avoro server/);
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
   expect(await page.evaluate(() => window.__updates.filter((u) => 'localOnly' in u))).toEqual([]);
 });
 
