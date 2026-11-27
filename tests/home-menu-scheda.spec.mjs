@@ -149,20 +149,22 @@ test('da tastiera: Maiusc+F10 e il tasto Menu aprono il menu, le frecce scelgono
   // Senza categorie «Sposta in…» non c'è.
   await scheda(home, 'a').focus();
   await home.keyboard.press('Shift+F10');
-  await expect(home.locator('.home-ctxmenu')).toBeVisible();
-  expect(await vociMenu(home)).toEqual(['Apri', 'Apri e tienila in lista', 'Copia link', 'Rimuovi']);
-  await home.keyboard.press('ArrowDown');
-  await expect(home.locator('.home-ctxmenu .sn-select-option').first()).toBeFocused();
+  await expect(menuDi(home).principale).toBeVisible();
+  expect(await menuDi(home).scritte()).toEqual(['Apri', 'Copia link', 'Rimuovi']);
+  // Le frecce scelgono fra le icone (#2555): da destra a sinistra si torna alla prima.
+  await home.keyboard.press('ArrowRight');
+  await home.keyboard.press('ArrowLeft');
+  await expect.poll(() => iconaFocalizzata(home)).toBe('Apri');
   await home.screenshot({ path: 'tests/.shots/home-menu-scheda-scuro.png' }).catch(() => {});
   await home.keyboard.press('Escape');
-  await expect(home.locator('.home-ctxmenu')).toHaveCount(0);
+  await expect(menuDi(home).pannelli).toHaveCount(0);
   await expect(scheda(home, 'a')).toBeFocused();
 
   // Tasto Menu, Fine → «Rimuovi», Invio: la scheda va via e il fuoco passa ad «Annulla».
   await home.keyboard.press('ContextMenu');
-  await expect(home.locator('.home-ctxmenu')).toBeVisible();
+  await expect(menuDi(home).principale).toBeVisible();
   await home.keyboard.press('End');
-  await expect(home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Rimuovi' })).toBeFocused();
+  await expect.poll(() => iconaFocalizzata(home)).toBe('Rimuovi');
   await home.keyboard.press('Enter');
   await expect(scheda(home, 'a')).toHaveCount(0);
   await expect(annullaVivo(home)).toBeFocused();
