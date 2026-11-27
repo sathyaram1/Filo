@@ -2211,7 +2211,6 @@
       { type: 'correction', ...riga(mostrata, native.slice(1)), onMount: (_root, update) => { updateCorrection = update; } },
       { type: 'separator', hidden: !mostrata },
     );
-    conMenuDelSito(items, sito);
     // Chiuso senza una scelta: la proposta è ignorata. Dopo, perché il clic che lo chiude arriva prima di chiuderlo.
     Menu.open({
       x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true,
