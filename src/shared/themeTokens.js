@@ -189,6 +189,14 @@
       dashCss: ['--dash-filo-nodo'],
       default: '450ms',
     },
+    // Il campo della home che si allarga fino a diventare l'Editor, e il ritorno (#2389): a 0 si apre senza animazione.
+    'editor.campo.durata': {
+      label: 'Durata del campo che diventa l\'Editor',
+      type: 'time',
+      css: '--sn-editor-campo',
+      dashCss: ['--dash-editor-campo'],
+      default: '450ms',
+    },
     'filo.gomitolo.durata': {
       label: 'Durata del filo che si avvolge in gomitolo',
       type: 'time',
