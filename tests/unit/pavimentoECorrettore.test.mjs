@@ -198,4 +198,8 @@ test('sotto l\'etichetta un valore in una voce d\'elenco, una citazione o un blo
     assert.equal(P.oscura(testo), testo, 'pavimento');
     assert.equal(alCorrettore(testo), testo, 'correttore');
   }
+  // Mille voci vuote non diventano una fila di spazi: le etichette la rileggerebbero all'indietro (6 s invece di 70 ms).
+  const t0 = Date.now();
+  P.oscura(`x\n${'\n- '.repeat(4000)}`);
+  assert.ok(Date.now() - t0 < 2000, `${Date.now() - t0} ms`);
 });
