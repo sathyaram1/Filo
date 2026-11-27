@@ -16,7 +16,8 @@ const RATE = T.RATE;
 
 function tono(secondi, amp = 0.5) {
   const out = new Float32Array(Math.round(secondi * RATE));
-  for (let i = 0; i < out.length; i++) out[i] = amp * Math.sin(i / 7);
+  // Energia uguale in ogni finestra: senza pause vere il taglio non ha un posto migliore di un altro.
+  for (let i = 0; i < out.length; i++) out[i] = i % 2 ? amp : -amp;
   return out;
 }
 
