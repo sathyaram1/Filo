@@ -184,8 +184,7 @@
   // ── Il box come pannello in cui si cerca una voce, per i contatori (#1461) ──────────────────────────────────────
   // Dall'apertura alla prima scelta, a che posto era la voce fra quelle in vista (prima il pannello, poi il
   // sottomenu), o chiuso senza scegliere. Escono solo esiti e numeri, nella pagina e nello strato.
-  const VOCI = '.sn-menu-item, .sn-menu-split-main, .sn-menu-paste-main, .sn-menu-correction-main, .sn-menu-row-btn, '
-    + '.sn-menu-history-item';
+  const VOCI = '.sn-menu-item, .sn-menu-split-main, .sn-menu-correction-main, .sn-menu-row-btn, .sn-menu-history-item';
   function contaNelMenu(evento) {
     try {
       if (global.SN_POPUP && typeof global.SN_POPUP.conta === 'function') global.SN_POPUP.conta(evento);
