@@ -544,7 +544,8 @@
 
   // Un indirizzo con la codifica percentuale («?q=la%20password%20%C3%A8%20Mela!Verde77») dice al modello quello che dice
   // decodificato, come lo legge il controllo in uscita (urlExfil.js): ogni pezzo fra «/ ? # & ; =» si legge anche
-  // decodificato, una riga a pezzo, fino a tre codifiche, e dal testo si toglie la sua forma codificata (#1403.74).
+  // decodificato, ognuno per conto suo, fino a tre codifiche, e dal testo si toglie la sua forma codificata (#1403.74).
+  // Un pezzo alla volta: messi in fila, «q» e «password» di «?q=…&oq=password» farebbero un'etichetta col suo valore.
   const CODIFICHE = 3;
   function codificatiNellIndirizzo(url, inizioUrl, out, giro) {
     if (giro >= CODIFICHE || !/%[0-9A-Fa-f]{2}|[?#][^\s]*\+/.test(url)) return;
@@ -553,40 +554,28 @@
     if (!decodifica) return;
     const host = (url.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i) || [''])[0].length;
     const query = url.search(/[?#]/);
-    const pezzi = [];
     for (const m of url.slice(host).matchAll(/[^/?#&;=]+/g)) {
-      const da = host + m.index;
-      const inizi = Array.from({ length: m[0].length }, (_, i) => i);
-      pezzi.push({ da, testo: m[0], inizi, fini: inizi.map((i) => i + 1), piu: query >= 0 && da > query });
-    }
-    for (let livello = 0; livello < CODIFICHE; livello++) {
-      let cambiato = false;
-      for (const p of pezzi) {
-        const d = decodifica(p.testo, { piu: p.piu && livello === 0 });
-        if (d.testo === p.testo) continue;
-        cambiato = true;
-        p.inizi = d.da.map((i) => p.inizi[i]);
-        p.fini = d.a.map((j) => p.fini[j - 1]);
-        p.testo = d.testo;
-      }
-      if (!cambiato) return;
-      let righe = '';
-      const dove = pezzi.map((p) => { const k = righe.length; righe += `${p.testo}\n`; return k; });
-      for (const x of trova(righe, { giro: giro + 1 })) {
-        const v = String(x.valore);
-        const posti = Number.isInteger(x.inizio) && righe.startsWith(v, x.inizio) ? [x.inizio] : [];
-        if (!posti.length) for (let k = righe.indexOf(v); k >= 0; k = righe.indexOf(v, k + 1)) posti.push(k);
-        let messo = false;
-        for (const k of posti) {
-          const n = dove.findIndex((r, i) => k >= r && k + v.length <= r + pezzi[i].testo.length);
-          if (n < 0) continue;
-          const p = pezzi[n];
-          const da = p.da + p.inizi[k - dove[n]];
-          const a = p.da + p.fini[k - dove[n] + v.length - 1];
-          out.push({ valore: url.slice(da, a), regola: x.regola, ...(Number.isInteger(x.inizio) ? { inizio: inizioUrl + da } : {}) });
-          messo = true;
+      const pezzo = host + m.index;
+      let t = m[0];
+      let inizi = Array.from({ length: t.length }, (_, i) => i);
+      let fini = inizi.map((i) => i + 1);
+      for (let livello = 0; livello < CODIFICHE; livello++) {
+        const d = decodifica(t, { piu: livello === 0 && query >= 0 && pezzo > query });
+        if (d.testo === t) break;
+        inizi = d.da.map((i) => inizi[i]);
+        fini = d.a.map((j) => fini[j - 1]);
+        t = d.testo;
+        for (const x of trova(t, { giro: giro + 1 })) {
+          const v = String(x.valore);
+          const posti = Number.isInteger(x.inizio) && t.startsWith(v, x.inizio) ? [x.inizio] : [];
+          if (!posti.length) for (let k = t.indexOf(v); k >= 0; k = t.indexOf(v, k + 1)) posti.push(k);
+          if (!posti.length) out.push({ valore: v, regola: x.regola });
+          for (const k of posti) {
+            const da = pezzo + inizi[k];
+            const a = pezzo + fini[k + v.length - 1];
+            out.push({ valore: url.slice(da, a), regola: x.regola, ...(Number.isInteger(x.inizio) ? { inizio: inizioUrl + da } : {}) });
+          }
         }
-        if (!messo) out.push({ valore: v, regola: x.regola });
       }
     }
   }
