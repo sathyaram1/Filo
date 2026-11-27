@@ -534,6 +534,12 @@
     return li;
   }
 
+  // Con una bozza nel campo della chat l'Editor nasce da lei (#2389); col campo vuoto si apre come sempre.
+  function apriEditor() {
+    if (d.editorDalCampo && d.editorDalCampo()) return;
+    apri(URL_EDITOR);
+  }
+
   function cartaEditor() {
     const e = dati.editor;
     const file = (e && e.file) || [];
