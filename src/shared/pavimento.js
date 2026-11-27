@@ -638,7 +638,7 @@
   const VIRGOLETTATO_MESSA = new RegExp(`${ETICHETTA}${ACCANTO}${MESSA}${FRA_VIRGOLETTE}`, 'gid');
   const VIRGOLETTATO_RISPOSTA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}${FRA_VIRGOLETTE}${FINE_RISPOSTA}`, 'gid');
   // Il nome fra virgolette di cosa protegge («la password di «Netflix» è «…»») non è il valore: il valore è quello dopo.
-  const VIRGOLETTATO_DI = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]+(?:di|del|della|dello|per|for|of|on|su|sul)|[ \\t]+dell['’])(?:[ \\t]+[A-Za-zÀ-ÿ]+)?${FRA_VIRGOLETTE}`, 'gid');
+  const VIRGOLETTATO_DI = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]+(?:di|del|della|dello|per|for|of|on|su|sul)|[ \\t]+dell['’][A-Za-zÀ-ÿ]*)(?:[ \\t]+[A-Za-zÀ-ÿ]+)?${FRA_VIRGOLETTE}`, 'gid');
   // Dopo la sola domanda («Ti ricordi la password? «…»») conta la forma della password, come senza verbo.
   const VIRGOLETTATO_DOMANDA = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*\\?+${FRA_VIRGOLETTE}`, 'gid');
   const RISPOSTA_NUDA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
