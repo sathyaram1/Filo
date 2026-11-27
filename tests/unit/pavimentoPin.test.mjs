@@ -122,3 +122,33 @@ test('in uscita il PIN col complemento si riconosce, e il primo verbo chiude il 
     assert.deepEqual(codici(frase), [], frase);
   }
 });
+
+// #1403.79 — di due PIN detti nella stessa frase si toglieva solo il primo.
+test('più PIN, codici o CVV in elenco nella stessa frase si tolgono tutti, al modello e in uscita', () => {
+  for (const [frase, atteso] of [
+    ['Il pin è 4829 e 1234', `Il pin è ${S} e ${S}`],
+    ['I pin sono 4829 e 1234', `I pin sono ${S} e ${S}`],
+    ['i pin sono 4829, 1234 e 5678', `i pin sono ${S}, ${S} e ${S}`],
+    ['il pin è 4829 o 1234', `il pin è ${S} o ${S}`],
+    ['il pin è «4829» e «1234»', `il pin è «${S}» e «${S}»`],
+    ['il pin è 4829 / 123456', `il pin è ${S} / ${S}`],
+    ['il pin del telefono è 4829 e 1234', `il pin del telefono è ${S} e ${S}`],
+    ['codice di verifica 482913 oppure 123456', `codice di verifica ${S} oppure ${S}`],
+    ['il cvv è 123 e 456', `il cvv è ${S} e ${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+  const codici = (t) => G.segretiInUscita(t).filter((x) => x.regola === 'codice').map((x) => x.valore);
+  for (const frase of ['Il pin è 4829 e 1234', 'I pin sono 4829 e 1234', 'pin%20%C3%A8%204829%20e%201234']) {
+    assert.deepEqual(codici(frase), ['4829', '1234'], frase);
+  }
+});
+
+test('accanto al PIN un numero che non ha la sua forma resta', () => {
+  for (const [frase, atteso] of [
+    ['il pin è 4829 e 2 volte l\'ho sbagliato', `il pin è ${S} e 2 volte l'ho sbagliato`],
+    ['il pin è 4829 e 1234,50 euro di spesa', `il pin è ${S} e 1234,50 euro di spesa`],
+    ['il pin è 4829 e 12/05 la scadenza', `il pin è ${S} e 12/05 la scadenza`],
+    ['il pin è 4829 e 1234567890 il telefono', `il pin è ${S} e 1234567890 il telefono`],
+    ['il pin è 4829 1234 la via', `il pin è ${S} 1234 la via`],
+    ['il cvv è 123 e 4567890 il conto', `il cvv è ${S} e 4567890 il conto`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+});
