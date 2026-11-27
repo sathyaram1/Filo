@@ -147,7 +147,7 @@ test('vista tag, rilascio su "Senza tag" rimuove tutti i tag', async ({ app, ope
 
   await dragCardOnto(page, 'c-solring', 'Senza tag');
   await expect.poll(() => tagsOf(page, deckId, 'c-solring')).toEqual([]);
-  await expect(page.locator('.dk-ctxmenu')).toHaveCount(0);
+  await expect(menuDi(page).pannelli).toHaveCount(0);
 });
 
 test('vista per tipo, trascinare forza il gruppo (parità con "Sposta in gruppo")', async ({ app, openTab }) => {
