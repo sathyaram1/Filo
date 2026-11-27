@@ -202,9 +202,44 @@ test('sotto l\'etichetta un valore in una voce d\'elenco, una citazione o un blo
     assert.equal(P.oscura(testo), testo, 'pavimento');
     assert.equal(alCorrettore(testo), testo, 'correttore');
   }
-  // Mille voci vuote non diventano una fila di spazi: le etichette la rileggerebbero all'indietro (6 s invece di 70 ms).
-  const c = costoInUnita(() => P.oscura(`x\n${'\n- '.repeat(4000)}`), { tetto: TETTO_VOCI_VUOTE });
-  assert.ok(c.entro, c.come);
+});
+
+// Giro 4: la riga citata vuota, la riga di separazione, il titolo sottolineato e la definizione fra etichetta e valore;
+// la password che comincia coi segni di un blocco non è un'apertura, e resta coperta come prima.
+test('una riga di sola struttura Markdown fra etichetta e valore non prende il posto della password', () => {
+  for (const testo of ['Password:\n>\n> Nyckel!2024', '> **Password:**\n>\n> Nyckel!2024', '> Password:\n> \n> Nyckel!2024',
+    '>> Password:\n>>\n>> Nyckel!2024', '> PIN:\n>\n> 4821', 'Password:\n~~~Nyckel2024', 'Password:\n```Nyckel2024',
+    'Password:\n---\nNyckel!2024', 'Password:\n___\nNyckel!2024', 'Password:\n* * *\nNyckel!2024',
+    '**Password:**\n\n---\n\nNyckel!2024', 'Password\n========\nNyckel!2024', 'Password:\n: Nyckel!2024',
+    'Password:\r\n>\r\n> Nyckel!2024', 'Password:\r\n---\r\nNyckel!2024', 'Password:\n\n---\n\n```bash\nNyckel!2024\n```']) {
+    assert.doesNotMatch(P.oscura(testo), /Nyckel|4821/, `pavimento: ${testo}`);
+    assert.doesNotMatch(alCorrettore(testo), /Nyckel|4821/, `correttore: ${testo}`);
+  }
+  assert.equal(P.oscura('Password:\n---\nNyckel!2024'), `Password:\n---\n${S}`);
+  for (const testo of ['# Titolo\n\n---\n\nTesto normale qui', 'Password:\n\n---\n\nLa trovi nel cassetto']) {
+    assert.equal(P.oscura(testo), testo);
+  }
+});
+
+// Le righe di apertura e chiusura di un blocco non contano come righe vuote: le righe vuote fra etichetta e valore sono
+// le stesse per la parola sola e per la frase.
+test('una password di più parole in un blocco di codice dopo una riga vuota non arriva al modello', () => {
+  for (const testo of ['Password:\n\n```\ncasa mia al mare 2019\n```', 'Password:\n```\ncasa mia al mare 2019\n```',
+    'Password:\n\n\n\ncasa mia al mare 2019', 'Password:\n\n\n\nNyckel!2024']) {
+    assert.doesNotMatch(P.oscura(testo), /casa mia|Nyckel/, `pavimento: ${testo}`);
+    assert.doesNotMatch(alCorrettore(testo), /casa mia|Nyckel/, `correttore: ${testo}`);
+  }
+});
+
+// Una fila lunga di spazi, scritti o nati dai segni Markdown letti come spazi, si legge in un tempo che cresce con la
+// lunghezza: un controllo all'indietro davanti a una parola rileggeva tutta la fila a ogni posto (secondi invece di ms).
+test('righe lunghe di segni Markdown o di spazi non fermano il cancello dei modelli', () => {
+  for (const testo of [`x\n${'\n- '.repeat(4000)}`, `x\n${'- '.repeat(4000)}x`, `x\n${'> '.repeat(4000)}x`,
+    `Password:\n${'```\n'.repeat(2000)}`, `Password:\n${'> ```\n'.repeat(2000)}`, `${'   \n'.repeat(4000)}x`,
+    `${' '.repeat(12000)}x`]) {
+    const c = costoInUnita(() => P.oscura(testo), { tetto: TETTO_VOCI_VUOTE });
+    assert.ok(c.entro, `${JSON.stringify(testo.slice(0, 12))}: ${c.come}`);
+  }
 });
 
 // Le forme più rare dello stesso valore: il blocco di codice citato, più righe vuote, una cella vuota o una barra
