@@ -2478,29 +2478,42 @@
     if (campo) Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) });
   }
 
-  function buildHelpItem() {
-    return {
-      type: 'item',
-      label: I18n.t('menu_help'),
-      shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
-      onClick: () => {
-        Popup.conta({ misura: 'strada', id: 'help', via: 'tasto_destro_altro' });
-        openSurface('help', () => openHelpSidebar());
-      },
-    };
+  // Un'azione della griglia su un oggetto (#2555): lo stesso verbo su più oggetti è un'icona sola, e l'ordine degli
+  // oggetti (quale fa il clic, quali stanno nel menu dell'icona) lo decide l'elenco unico.
+  function suOggetto(azioni, verbo, oggetto, spec) {
+    if (!spec || typeof spec.onClick !== 'function') return;
+    if (!azioni[verbo]) azioni[verbo] = { su: {} };
+    if (!azioni[verbo].su) azioni[verbo] = { su: { [Disp().CONTESTI.pagina.oggetti[verbo]?.[0] || 'elemento']: azioni[verbo] } };
+    azioni[verbo].su[oggetto] = spec;
   }
 
-  // Azioni sull'immagine, senza la sezione «Spiega»: la compone il chiamante, così quando
-  // l'immagine è anche un link non partono due box AI a ogni apertura.
-  function buildImageActionItems(imgEl) {
+  // Le azioni di un'immagine: salva, copia (l'immagine, il suo indirizzo), cerca, trascrivi, chiedi. Senza la
+  // spiegazione: quella la compone il chiamante, una sola anche quando l'immagine è un collegamento.
+  function azioniPerImmagine(imgEl, azioni) {
     const a = azioniDellImmagine(imgEl);
-    return [
-      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image'), onClick: a.copy },
-      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_save_image_as'), onClick: a.save },
-      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image_link'), onClick: a.copyLink },
-      { type: 'item', azione: 'search-image', label: I18n.t('menu_search_image'), onClick: a.search },
-      { type: 'item', azione: 'ocr', label: I18n.t('menu_transcribe'), onClick: a.transcribe },
-    ].filter((v) => typeof v.onClick === 'function');
+    suOggetto(azioni, 'save', 'immagine', { label: I18n.t('menu_save_image_as'), onClick: a.save, misura: 'copy-download-image' });
+    suOggetto(azioni, 'copy', 'immagine', { label: I18n.t('menu_copy_image'), onClick: a.copy, misura: 'copy-download-image' });
+    suOggetto(azioni, 'copy', 'indirizzoImmagine', { label: I18n.t('menu_copy_image_link'), onClick: a.copyLink, misura: 'copy-download-image' });
+    suOggetto(azioni, 'search', 'immagine', { label: I18n.t('menu_search_image'), onClick: a.search, misura: 'search-image' });
+    suOggetto(azioni, 'transcribe', 'immagine', { label: I18n.t('menu_transcribe'), onClick: a.transcribe, misura: 'ocr' });
+    if (aiutoAcceso()) suOggetto(azioni, 'ask', 'immagine', { label: I18n.t('fila_ask_image'), onClick: a.ask });
+  }
+
+  // Le azioni di un collegamento: l'invito per primo dove c'è (#664), apri, salva il file (solo se punta a un file),
+  // copia, per dopo, condividi.
+  function azioniPerLink(linkEl, azioni) {
+    const a = azioniDelLink(linkEl);
+    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(a.indirizzo)) {
+      suOggetto(azioni, 'redeemInvite', 'link', {
+        label: I18n.t('menu_redeem_invite'),
+        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: a.indirizzo }).catch(() => {}); },
+      });
+    }
+    suOggetto(azioni, 'openTab', 'link', { label: I18n.t('menu_open_in_new_tab'), onClick: a.openTab });
+    if (Actions.isDownloadableLink(linkEl)) suOggetto(azioni, 'save', 'file', { label: I18n.t('menu_save_file'), onClick: a.download, misura: 'download-progress' });
+    suOggetto(azioni, 'copy', 'link', { label: I18n.t('menu_copy_link'), onClick: a.copy, misura: 'share-copy-link' });
+    suOggetto(azioni, 'saveForLater', 'link', { label: I18n.t('menu_save_link_for_later'), onClick: a.saveForLater, misura: 'save-link' });
+    suOggetto(azioni, 'share', 'link', { label: I18n.t('menu_share_link'), onClick: a.share, misura: 'share-copy-link' });
   }
 
   // Le azioni di un'immagine e di un collegamento, una volta sola: le voci del menu e le icone della fila (#1434) fanno
