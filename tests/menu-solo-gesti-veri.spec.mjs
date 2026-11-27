@@ -133,20 +133,23 @@ test('il sito non preme Incolla, la freccia o Detta spostandoli fuori dal menu c
     await expect(menuDi(page).locator(sel).first()).toBeVisible();
   };
 
-  await apri('.sn-menu-paste-main');
-  expect(await page.evaluate(() => window.sposta('.sn-menu-paste-main'))).toBe(true); // menu-dal-sito
+  const INCOLLA = '.sn-menu-griglia [data-sn-verbo="paste"]';
+  const DETTA = '.sn-menu-griglia [data-sn-verbo="dictate"]';
+  await apri(INCOLLA);
+  expect(await page.evaluate((s) => window.sposta(s), INCOLLA)).toBe(true); // menu-dal-sito
   await page.waitForTimeout(800);
   expect(await page.locator('#campo').inputValue(), 'il sito non si incolla gli appunti da solo').not.toContain(SEGRETO);
 
+  // La «freccia» di prima è il menu dell'icona Incolla (#2555).
   await page.keyboard.press('Escape');
-  await apri('.sn-menu-paste-arrow');
-  expect(await page.evaluate(() => window.sposta('.sn-menu-paste-arrow'))).toBe(true); // menu-dal-sito
+  await apri(INCOLLA);
+  expect(await page.evaluate((s) => window.sposta(s, true), INCOLLA)).toBe(true); // menu-dal-sito
   await page.waitForTimeout(800);
   expect(await statoCronologia(app, page), 'la freccia premuta dal sito non apre la cronologia').toBeNull();
 
   await page.keyboard.press('Escape');
-  await apri('.sn-menu-split-main');
-  expect(await page.evaluate(() => window.sposta('.sn-menu-split-main'))).toBe(true); // menu-dal-sito
+  await apri(DETTA);
+  expect(await page.evaluate((s) => window.sposta(s), DETTA)).toBe(true); // menu-dal-sito
   await page.waitForTimeout(800);
   const visto = await page.evaluate(() => document.documentElement.innerText);
   expect(visto, 'il sito non accende il microfono da solo').not.toMatch(/Ti ascolto|Microfono/);
