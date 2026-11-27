@@ -684,3 +684,45 @@ test('un collegamento simbolico verso un file fuori dalla cartella non si apre, 
   expect(await pagina.title()).not.toBe('Altra');
   expect(await pagina.locator('body').innerText()).not.toContain('fuori');
 });
+
+test('chiusa la scheda di un file, il titolo non va al modello dell\'archivio né all\'indice né alla ricerca, e la ricerca per parole la trova', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'test-key', tavily: '' },
+      models: { ...globalThis.SN_TEST_MODELS.models },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+    });
+    globalThis.__versoIlModello = [];
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => {
+      globalThis.__versoIlModello.push(...texts);
+      return { vectors: texts.map(() => [0, 1]) };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = async (...a) => {
+      globalThis.__versoIlModello.push(JSON.stringify(a[0] && (a[0].messages || a[0].prompt || a[0])));
+      return { text: '', provider: 'openrouter', model: 'stub', usage: {} };
+    };
+  });
+  const dir = join(cartellaTemporanea('referto-'), 'Documenti');
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, 'referto.html');
+  writeFileSync(file, '<!doctype html><meta charset="utf-8"><title>Referto esami del sangue di Mario Rossi</title><p>emoglobina</p>');
+  await home(app);
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'referto.html')), { timeout: 10_000 }).toBeTruthy();
+  await expect.poll(() => app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.id === i).title, id), { timeout: 10_000 }).toMatch(/Referto/);
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.closeTab(i), id);
+  await expect.poll(() => idInArchivio(app, 'referto.html'), { message: 'la scheda del file è nell\'archivio' }).toBeTruthy();
+  // Una pagina web entrata dopo: la prova che l'indice in sottofondo è passato.
+  await app.evaluate(() => globalThis.SN_ARCHIVED_TABS.archive({ url: 'https://controllo.test/', title: 'Pagina web di controllo' }));
+  await expect.poll(() => app.evaluate(() => globalThis.__versoIlModello.join(' | ')), { timeout: 20_000, message: 'l\'indice è passato' }).toMatch(/Pagina web di controllo/);
+  expect(await app.evaluate(() => globalThis.__versoIlModello.join(' | ')), 'l\'indice lascia il titolo del file sul computer').not.toMatch(/Mario Rossi/);
+
+  const page = await openTab('filo://newtab/');
+  await app.evaluate(() => { globalThis.__versoIlModello = []; });
+  const r = await page.evaluate(async () => chrome.runtime.sendMessage({ type: 'search_archived_tabs', query: 'referto esami' }));
+  expect((r.results || []).map((x) => x.title), 'la ricerca per parole la trova').toContain('Referto esami del sangue di Mario Rossi');
+  expect(await app.evaluate(() => globalThis.__versoIlModello.join(' | ')), 'il riordino della ricerca non la manda al modello').not.toMatch(/Mario Rossi/);
+});
