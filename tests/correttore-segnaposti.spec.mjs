@@ -616,7 +616,7 @@ test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice,
   expect(await voceOggi(app, 'correttore_segnaposto', 'da_solo')).toEqual({ cercato: 1, delicata: 1 });
   const menu = await tastoDestroSu(page, ocra(page, 'xx'));
   await expect(menu.locator('.sn-menu-segno')).toHaveText('Su questa pagina non cerco da solo.', { timeout: 3000 });
-  await menu.voce('Cerca il dato').click();
+  await menu.scegli('Cerca il dato');
   await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
   expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
   await expect.poll(() => voceOggi(app, 'anticipo_privacy', 'segnaposto'), { timeout: 5000 }).toEqual({ saltato: 1, chiesto: 1 });
