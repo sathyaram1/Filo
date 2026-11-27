@@ -58,10 +58,10 @@ test('di sole lettere e senza virgolette il pavimento la lascia, come dopo il no
 });
 
 test('un testo lungo che ripete il nome della password si legge in fretta', () => {
-  const lungo = 'gattonero è la password '.repeat(5000);
-  const t0 = Date.now();
-  const fuori = alCorrettore(lungo);
-  P.oscura(lungo);
-  assert.ok(!fuori.includes('gattonero'));
-  assert.ok(Date.now() - t0 < 8000, `${Date.now() - t0} ms`);
+  const RT = globalThis.SN_RISERVATI_TESTO;
+  assert.ok(!alCorrettore('gattonero è la password '.repeat(200)).includes('gattonero'));
+  // Misurata sulla macchina di chi l'ha scritta: circa 2 unità per 120.000 caratteri; il tetto ne lascia dieci volte tanto.
+  let k = 0;
+  const c = costoInUnita(() => RT.primaDelNome(`${'gattonero è la password '.repeat(5000)}${k++}`), { tetto: 20 });
+  assert.ok(c.unita <= 20, `${c.unita.toFixed(1)} unità`);
 });
