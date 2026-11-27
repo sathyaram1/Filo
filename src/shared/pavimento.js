@@ -1471,8 +1471,10 @@
     if (!R) return;
     const basso = s.toLowerCase();
     const stesso = basso.length === s.length;
-    for (const v of R.trova(s, { sotto: true })) {
-      if (!/[^\p{L}'’]/u.test(v)) continue;
+    // Fra virgolette prima del suo nome («“gattonero” è la password») vale anche di sole lettere, come dopo il nome.
+    const virgolettate = new Set(R.primaDelNome(s).filter((x) => x.virgolette).map((x) => x.valore));
+    for (const v of [...R.trova(s, { sotto: true }), ...virgolettate]) {
+      if (!virgolettate.has(v) && !/[^\p{L}'’]/u.test(v)) continue;
       // Il valore torna minuscolo: si toglie com'è scritto, in ogni punto del testo.
       let i = stesso ? basso.indexOf(v) : -1;
       if (i < 0) { out.push({ valore: v, regola: 'password' }); continue; }
