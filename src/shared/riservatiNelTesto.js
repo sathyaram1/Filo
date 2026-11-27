@@ -123,9 +123,10 @@ const DOPO_LA_RICHIESTA = 1000;
 // un numero più lungo, una data («4-8-2021») o un indirizzo IP restano come sono. Prove: tests/unit/cifreScandite.test.mjs.
 const SEPARA_CIFRE = '[ .\\-–]';
 const CIFRE_SCANDITE = new RegExp(`(?<![\\p{L}\\p{N}]|\\d${SEPARA_CIFRE})\\d(${SEPARA_CIFRE})\\d(?:\\1\\d)+(?![\\p{L}\\p{N}]|${SEPARA_CIFRE}\\d)`, 'gu');
+const FORSE_SCANDITE = new RegExp(`\\d${SEPARA_CIFRE}\\d${SEPARA_CIFRE}\\d`, 'u');
 function cifreAttaccate(testo) {
   const s = String(testo == null ? '' : testo);
-  if (!/\d[ .\-–]\d[ .\-–]\d/u.test(s)) return null;
+  if (!FORSE_SCANDITE.test(s)) return null;
   const tratti = [...s.matchAll(CIFRE_SCANDITE)];
   if (!tratti.length) return null;
   const posto = new Int32Array(s.length + 1);
