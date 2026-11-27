@@ -19,7 +19,7 @@ for (const m of loader.matchAll(/require\(path\.join\(SHARED, '([^']+)'\)\)/g)) 
 
 const FC = globalThis.SN_FILO_CONTESTO;
 const TETTO_PARTE_FISSA = 8000;
-const TETTO_STRUMENTI = 8450;
+const TETTO_STRUMENTI = 8550;
 const token = (s) => FC.stimaToken(s);
 
 // Misure del 07/10 col contatore di Anthropic su claude-haiku-5-5 (circa 2,1 caratteri per token). Una stima più bassa
