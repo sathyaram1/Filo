@@ -1790,11 +1790,18 @@
     documentoEditorAiuto: (documento) => {
       if (!documento || typeof documento !== 'object' || typeof documento.testo !== 'string') return '';
       const titolo = String(documento.titolo || '').slice(0, 300);
+      // #2389 — la parte selezionata è il contesto della domanda, e la sola che «riscrivi» può cambiare (intera, o niente).
+      const selezione = typeof documento.selezione === 'string' && documento.selezione.trim() ? documento.selezione : '';
+      const riscrivibile = selezione && !documento.selezioneTagliata;
       return `\n# Il documento aperto nell'Editor\n`
         + `Qui sei la chat del documento: lo vedi qui sotto, ${documento.avviso ? `${String(documento.avviso).slice(0, 400)} ` : 'intero. '}`
         + `Oltre a rispondere puoi CAMBIARNE LA FORMATTAZIONE quando l'utente lo chiede: aggiungi al tuo JSON il campo "formatta", `
-        + `una lista di azioni, e in "text" una frase breve che dice cosa hai fatto. Le parole del documento non le cambi, e per scriverci `
-        + `non usare "highlight".\n`
+        + `una lista di azioni, e in "text" una frase breve che dice cosa hai fatto. `
+        + (riscrivibile
+          ? `Le parole le cambi solo nella parte selezionata, e solo quando l'utente lo chiede (riscrivere, accorciare, correggere, tradurre): `
+            + `{"op":"riscrivi","target":"selection","testo":"<il testo nuovo che prende il posto di tutta la selezione>"}, un a capo per ogni paragrafo nuovo. `
+          : `Le parole del documento non le cambi: se l'utente ti chiede di riscriverne una parte, digli di selezionarla e di chiedertelo di nuovo. `)
+        + `Per scriverci non usare "highlight".\n`
         + `Ogni azione: {"op":"format","target":…,"style":…,"value":…} oppure {"op":"align","target":…,"value":"left"|"center"|"right"|"justify"}.\n`
         + `- target: "all" (tutto), "headings" (i titoli), "h1"/"h2"/"h3", "paragraphs", "lists", "selection" (il testo selezionato), `
         + `oppure {"contains":"testo"} per i blocchi che contengono quel testo.\n`
