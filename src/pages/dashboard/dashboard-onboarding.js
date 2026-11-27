@@ -66,6 +66,7 @@
     try {
       const fuori = !paginaDellIntervista();
       const r = await send({ type: MSG.FILO_GET_ONBOARDING, ...(fuori ? { fuori: true } : {}) });
+      modelloPronto = Boolean(r?.ok && r.ready);
       // `ready: false` = nessun modello disponibile ancora (niente accesso,
       // niente chiave): l'intervista aspetta e la home spiega come attivare
       // Filo, invece di accoglierlo con una chat che non può rispondere.
