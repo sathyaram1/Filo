@@ -136,8 +136,8 @@ test('nel riquadro del feedback su un sito: Ctrl+Z annulla invece di tornare ind
   await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti 1071'));
   const campo = await statoDi(app, page, '.sn-fb-text');
   await dove.mouse.click(campo.x + 20, campo.y + 15, { button: 'right' });
-  await expect(menuDi(dove).locator('.sn-menu .sn-menu-paste-main').first()).toBeVisible({ timeout: 8000 });
-  await menuDi(dove).locator('.sn-menu .sn-menu-paste-main').first().click();
+  await expect(menuDi(dove).incolla).toBeVisible({ timeout: 8000 });
+  await menuDi(dove).incolla.click();
   await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.valore).toContain('dagli appunti 1071');
   // L'Incolla di Filo lo sente anche il riquadro, chiuso ai gesti finti: la bozza lo salva.
   await expect.poll(() => bozzaSalvata(app, chiaveBozza(testServer.origin))).toContain('dagli appunti 1071');
