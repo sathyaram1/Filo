@@ -188,7 +188,8 @@ test('tasto destro sulla bolla in attesa o sull\'intestazione della chat: «Ferm
   await expect(page.locator('.dk-msg-bot').last().locator('.dk-msg-pending')).toHaveText('Risposta fermata.');
   await expect.poll(() => app.evaluate(() => globalThis.__annullate)).toBe(2);
   await page.locator('#chatHead').click({ button: 'right' });
-  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveText(['Svuota la chat…']);
+  await expect.poll(() => menu.nomi()).toContain('Svuota la chat…');
+  expect(await menu.nomi()).not.toContain('Ferma la risposta');
 });
 
 test('fermata a metà, il mazzo non cambia: commander e budget chiesti nel turno non si applicano', async ({ app, openTab }) => {
