@@ -545,36 +545,37 @@
   }
 
   // Un indirizzo con la codifica percentuale («?q=la%20password%20%C3%A8%20Mela!Verde77») dice al modello quello che dice
-  // decodificato, come lo legge il controllo in uscita (urlExfil.js): ogni pezzo fra «/ ? # & ; =» si legge anche
-  // decodificato, ognuno per conto suo, fino a tre codifiche, e dal testo si toglie la sua forma codificata (#1403.74).
+  // decodificato, con le regole del controllo in uscita (urlExfil.js: giri e «+»): ogni pezzo fra «/ ? # & ; =» si legge
+  // anche decodificato, ognuno per conto suo, e dal testo si toglie la sua forma codificata (#1403.74).
   // Un pezzo alla volta: messi in fila, «q» e «password» di «?q=…&oq=password» farebbero un'etichetta col suo valore.
-  const CODIFICHE = 3;
   function codificatiNellIndirizzo(url, inizioUrl, out, giro) {
-    if (giro >= CODIFICHE || !/%[0-9A-Fa-f]{2}|[?#][^\s]*\+/.test(url)) return;
     if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
-    const decodifica = global.SN_URL_EXFIL && global.SN_URL_EXFIL.decodificaConPosti;
-    if (!decodifica) return;
+    const U = global.SN_URL_EXFIL;
+    if (!U || !U.giroDiDecodifica || giro >= U.GIRI_DI_DECODIFICA || !/%[0-9A-Fa-f]{2}|\+/.test(url)) return;
     const host = (url.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i) || [''])[0].length;
-    const query = url.search(/[?#]/);
     for (const m of url.slice(host).matchAll(/[^/?#&;=]+/g)) {
       const pezzo = host + m.index;
       let t = m[0];
       let inizi = Array.from({ length: t.length }, (_, i) => i);
       let fini = inizi.map((i) => i + 1);
-      for (let livello = 0; livello < CODIFICHE; livello++) {
-        const d = decodifica(t, { piu: livello === 0 && query >= 0 && pezzo > query });
+      for (let livello = 0; livello < U.GIRI_DI_DECODIFICA; livello++) {
+        const d = U.giroDiDecodifica(t);
         if (d.testo === t) break;
+        const soloLettere = soloLettereAccentate(t, d);
         inizi = d.da.map((i) => inizi[i]);
         fini = d.a.map((j) => fini[j - 1]);
         t = d.testo;
+        if (soloLettere) break;
         for (const x of trova(t, { giro: giro + 1 })) {
           const v = String(x.valore);
-          const posti = Number.isInteger(x.inizio) && t.startsWith(v, x.inizio) ? [x.inizio] : [];
-          if (!posti.length) for (let k = t.indexOf(v); k >= 0; k = t.indexOf(v, k + 1)) posti.push(k);
+          const posti = Number.isInteger(x.inizio) && t.startsWith(v, x.inizio) ? [{ k: x.inizio, n: v.length }] : [];
+          if (!posti.length) for (let k = t.indexOf(v); k >= 0; k = t.indexOf(v, k + 1)) posti.push({ k, n: v.length });
+          // Una carta trovata torna senza spazi né trattini: si cerca com'è scritta (formaDelValore).
+          if (!posti.length) for (const f of t.matchAll(new RegExp(formaDelValore(v), 'gu'))) posti.push({ k: f.index, n: f[0].length });
           if (!posti.length) out.push({ valore: v, regola: x.regola });
-          for (const k of posti) {
+          for (const { k, n } of posti) {
             const da = pezzo + inizi[k];
-            const a = pezzo + fini[k + v.length - 1];
+            const a = pezzo + fini[k + n - 1];
             out.push({ valore: url.slice(da, a), regola: x.regola, ...(Number.isInteger(x.inizio) ? { inizio: inizioUrl + da } : {}) });
           }
         }
