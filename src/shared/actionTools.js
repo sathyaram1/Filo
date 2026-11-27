@@ -384,7 +384,7 @@
     },
     TRASCRIVI_MEDIA: {
       via: ['web', 'trascrivi'], risultato: true,
-      description: 'il parlato di un audio o un video (url di un file o di una pagina che lo contiene, o scheda aperta per numero); da: il seguito.',
+      description: 'il parlato di un audio o video (file, pagina o scheda); da: il seguito.',
       properties: { url: S(), scheda: I(), da: I() }, required: [],
     },
 
