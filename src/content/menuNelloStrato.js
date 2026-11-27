@@ -170,11 +170,6 @@
         voci.push(D.descrivi({ ...it, items: perLoStrato(it.items), altro: it.altro ? { ...it.altro, items: perLoStrato(it.altro.items) } : null }, op));
         return;
       }
-      // Incolla e la sua cronologia li fa il main con lo strato: qui non arrivano né gli appunti né le voci.
-      if (it.type === 'paste') {
-        voci.push({ type: 'paste', label: String(it.label || ''), shortcut: it.shortcut ? String(it.shortcut) : '', disabled: !!it.disabled, $incolla: true });
-        return;
-      }
       voci.push(D.descrivi(it, op));
     });
     // Il punto del tasto destro qui e lo zoom: lo strato ci riporta i contorni degli oggetti (#2555), che sono in px di
