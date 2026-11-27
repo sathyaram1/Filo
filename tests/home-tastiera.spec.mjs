@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { home, modelloFinto } from './helpers/chatFinta.mjs';
 import { homeIntera } from './helpers/tastiHome.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 mkdirSync(SHOTS, { recursive: true });
