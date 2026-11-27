@@ -240,7 +240,7 @@ async function inStreaming({ payload, origin, signal, onDelta, onMeta }) {
 // Iniettabile nelle prove: quello vero rifiuta gli indirizzi della rete locale, compreso il mini server.
 const _dip = { scarica: safeFetch };
 
-const durata = (s) => {
+function durata(s) {
   const t = Math.round(Number(s) || 0);
   const h = Math.floor(t / 3600);
   const m = Math.floor((t % 3600) / 60);
