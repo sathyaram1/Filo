@@ -47,7 +47,8 @@ async function geometria(page) {
   return menuDi(page).valuta(() => {
     const menu = document.querySelector('.sn-menu:not(.sn-menu-sub)');
     if (!menu) return { error: 'menu chiuso' };
-    const voci = menu.querySelectorAll('.sn-menu-item');
+    // Le voci a schermo: le icone rare dietro il «+» chiuso non contano, il «+» non è un'azione (#2555).
+    const voci = [...menu.querySelectorAll('.sn-menu-item:not(.sn-menu-row-overflow)')].filter((v) => v.getClientRects().length);
     const ultima = voci[voci.length - 1];
     const m = menu.getBoundingClientRect();
     const u = ultima ? ultima.getBoundingClientRect() : null;
