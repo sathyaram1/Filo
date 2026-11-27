@@ -452,7 +452,8 @@
   }
 
   global.SN_DISPOSIZIONE_ICONE = {
-    ZONE, ZONE_FILA, TUTTE, GLOBALI, ICONE, AZIONI, CONTESTI, DEFAULT, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
+    ZONE, ZONE_FILA, TUTTE, GLOBALI, ICONE, AZIONI, CONTESTI, DEFAULT, RITIRATE, AGGIUNTE, IN_CIMA, DOVE, VERBI, OGGETTI, COMUNI,
+    verboDellEtichetta,
     noto, esiste, descrizione, ammessa, nome, risolvi, nomeZona, parolaDove, zonaDaDove, zonaDellAzione, doveDaZona, contestoDiZona, zonaFila, zonaAltro, filaDi,
     valida, migra, applicaPosa, aspettoAiuto, posizione, spostate, posaPer,
   };
