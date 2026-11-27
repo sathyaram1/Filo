@@ -8,7 +8,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
 const P = require('../../src/shared/pavimento.js');
-const U = require('../../src/shared/urlExfil.js');
+require('../../src/shared/urlExfil.js');
+const U = globalThis.SN_URL_EXFIL;
 const S = P.SEGNAPOSTO;
 
 test('la password scritta in una query codificata non arriva al modello; indirizzo e frase restano', () => {
