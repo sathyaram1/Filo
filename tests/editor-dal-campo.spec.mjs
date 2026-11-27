@@ -60,6 +60,12 @@ test('la bozza del campo diventa un documento nuovo, il campo si svuota e l\'Aiu
   await expect.poll(() => h.evaluate(() => !document.querySelector('.dash-velo-editor'))).toBe(true);
   const prima = await documenti(ed);
   await h.fill('#input', 'Seconda lettera\n\nCon due paragrafi');
+  h.on('console', (m) => console.log('PAGINA', m.text()));
+  await h.evaluate(() => {
+    const E = window.SN_DASH_EDITOR_CAMPO; const o = E.apri;
+    E.apri = () => { console.log('apri chiamato'); const r = o(); console.log('apri ->', r); return r; };
+    document.addEventListener('click', (e) => console.log('click su', e.target.className), true);
+  });
   await h.locator('#tieni .dash-carta[data-tipo="editor"]').click({ position: { x: 150, y: 20 } });
   await h.waitForTimeout(3000);
   console.log('DEBUG', await h.evaluate(() => ({ v: document.getElementById('input').value, s: window.SN_DASH_EDITOR_CAMPO._stato() })),
