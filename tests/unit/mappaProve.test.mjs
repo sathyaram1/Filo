@@ -11,10 +11,13 @@ import { leggiArgomenti, testoScelta, leggiMappa } from '../../scripts/mappa-pro
 import { specDellaScelta, testoDellaMappa, stimaDurataControlli } from '../../scripts/finish-local.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
-const ROOT = '/repo/Filo';
+// Il repo e i suoi file:// nella forma del sistema che gira: su Windows `file:///repo/…` senza disco non è un percorso.
+const ROOT = resolve('/repo/Filo');
+const urlDi = (rel) => pathToFileURL(join(ROOT, rel)).href;
 
 test('gli indirizzi delle pagine e dei preload diventano file del repo, gli altri no', () => {
   assert.equal(percorsoDaIndirizzo('filo://shell/shell.js', ROOT), 'src/renderer/shell.js');
@@ -22,10 +25,10 @@ test('gli indirizzi delle pagine e dei preload diventano file del repo, gli altr
   assert.equal(percorsoDaIndirizzo('filo://options/options.js', ROOT), 'src/pages/options/options.js');
   assert.equal(percorsoDaIndirizzo('filo://newtab/', ROOT), 'src/pages/dashboard/dashboard.html');
   assert.equal(percorsoDaIndirizzo('filo://src/content/leggi.js', ROOT), 'src/content/leggi.js');
-  assert.equal(percorsoDaIndirizzo('/repo/Filo/src/preload/shell-preload.js', ROOT), 'src/preload/shell-preload.js');
-  assert.equal(percorsoDaIndirizzo('file:///repo/Filo/src/main/tabs.js', ROOT), 'src/main/tabs.js');
+  assert.equal(percorsoDaIndirizzo(join(ROOT, 'src', 'preload', 'shell-preload.js'), ROOT), 'src/preload/shell-preload.js');
+  assert.equal(percorsoDaIndirizzo(urlDi('src/main/tabs.js'), ROOT), 'src/main/tabs.js');
   assert.equal(percorsoDaIndirizzo('C:\\repo\\Filo\\src\\main\\tabs.js', 'C:\\repo\\Filo'), 'src/main/tabs.js');
-  for (const fuori of ['node:events', 'node:electron/js2c/sandbox_bundle', '', 'filo://asset/icona.svg', '/repo/Filo-altro/src/x.js', '/repo/Filo/tests/x.mjs', 'https://example.org/a.js', '/repo/Filo/src/../../etc/passwd']) {
+  for (const fuori of ['node:events', 'node:electron/js2c/sandbox_bundle', '', 'filo://asset/icona.svg', join(dirname(ROOT), 'Filo-altro', 'src', 'x.js'), join(ROOT, 'tests', 'x.mjs'), 'https://example.org/a.js', `${ROOT}/src/../../etc/passwd`]) {
     assert.equal(percorsoDaIndirizzo(fuori, ROOT), null, fuori);
   }
 });
