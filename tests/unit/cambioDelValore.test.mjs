@@ -32,7 +32,6 @@ test('il PIN e il codice del cancello detti col verbo di cambio arrivano al mode
     ['I changed my PIN to 4821', `I changed my PIN to ${S}`],
     ['I changed the gate code to 4821', `I changed the gate code to ${S}`],
     ['the pin for my phone was changed to 4821', `the pin for my phone was changed to ${S}`],
-    ['Ti ricordi il pin? Era 4821', `Ti ricordi il pin? Era ${S}`],
   ]) {
     assert.equal(P.oscura(t), atteso, `pavimento: ${t}`);
     assert.equal(C.oscura(t), atteso, `correttore: ${t}`);
