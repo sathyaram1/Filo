@@ -431,7 +431,7 @@
     + "|it['’]?s\\s+now|it\\s+is\\s+now|from\\s+now\\s+on|(?:set|change)\\s+it\\s+to|here\\s+it\\s+is|here['’]?s"
     + "|(?:la\\s+|le\\s+)?nouve(?:lle|au)|essaie|essayez|maintenant|(?:la\\s+|el\\s+)?nuev[ao]"
     + "|prueba|ahora|(?:das\\s+|die\\s+|der\\s+)?neue[sr]?|versuch(?:e|s)?|jetzt"
-    + "|è|e['’]|é|sarà|is|est|es|ist"
+    + "|(?<annuncio>è|e['’]|é|sarà|is|est|es|ist)"
     + ')(?![\\p{L}\\p{N}])', 'u');
   // Dopo il rimando annuncio, due punti, avverbi e modali si saltano, e il valore è la parola dopo. Di sole lettere senza
   // annuncio solo se chiude la frase: «prova gattonero» sì, «adesso vado a cambiarla» no.
