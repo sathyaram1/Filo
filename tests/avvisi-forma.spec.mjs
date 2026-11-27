@@ -120,10 +120,12 @@ test('nella home un avviso senza carta: angolo, poi volo in cima alla colonna; a
   expect(larghezze).toHaveLength(1);
 
   await carta.click({ button: 'right' });
-  const menu = home.locator('.dash-menu');
-  // Le voci dell'angolo, una chiusura sola; in più quello che ogni carta della home sa fare.
-  expect(await menu.locator('.dash-menu-voce').allTextContents()).toEqual(['Riprova', 'Chiudi', 'Apri nel filo']);
-  await menu.locator('.dash-menu-voce', { hasText: 'Riprova' }).click();
+  // Le voci dell'angolo, una chiusura sola; in più quello che ogni carta della home sa fare. A icone (#2555): ogni
+  // icona seguita dalle varianti del suo verbo.
+  const menu = menuDi(home);
+  await expect(menu.principale).toBeVisible();
+  expect(await menu.vociScritte()).toEqual(['Riprova', 'Chiudi', 'Apri nel filo']);
+  await menu.scegli('Riprova');
   await expect.poll(() => shell.evaluate(() => window.__riprovato)).toBe(1);
   await expect(carta).toHaveCount(0, { timeout: 5_000 });
 
