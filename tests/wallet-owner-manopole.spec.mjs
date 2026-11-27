@@ -643,7 +643,7 @@ test('il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regal
   await expect(menu).toContainText('Copia lo pseudonimo');
 
   // Dal menu si regala a questa persona senza copiare niente a mano.
-  await menu.getByText('Regala crediti a questa persona').click();
+  await menuDi(page).scegli('Regala crediti a questa persona');
   await expect(menu).toHaveCount(0);
   await expect(page.locator('#ownerGrantPseudonym')).toHaveValue(PSEUDONIMO);
 
