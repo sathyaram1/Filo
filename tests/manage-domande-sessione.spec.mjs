@@ -54,10 +54,12 @@ test('la risposta registrata da una sessione locale si distingue da quella data 
 
   await expect(riga(page, 'D-70').locator('.mg-domanda-sotto')).toHaveText('risposta da una sessione');
   await expect(riga(page, 'D-71').locator('.mg-domanda-sotto')).toHaveCount(0);
-  const menu = page.locator('.mg-ctxmenu, .sn-select-pop').last();
+  // A icone (#2555): «Riapri» è un'icona del menu, o una variante nel menu di un'icona.
+  const menu = menuDi(page);
   await riga(page, 'D-70').click({ button: 'right' });
-  await expect(menu).toContainText('Riapri');
-  await page.keyboard.press('Escape');
+  await expect(menu.principale).toBeVisible();
+  expect(await menu.haVoce('Riapri')).toBe(true);
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
 
   await riga(page, 'D-70').click();
   const k = dq(page, 'D-70');
