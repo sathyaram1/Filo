@@ -534,9 +534,10 @@ html.pd-aperto .ed-toasts { right: calc(18px + var(--pd-destra, 0px) + var(--pd-
 
 /* L'editor nato dal campo (#2389): il velo della home disegna foglio, testo e colonna dell'Aiuto; il resto entra piano
    quando l'editor viene davanti. */
-.ed-docbar, .ed-topbar, .pd-striscia, html > .sn-sidebar > * {
-  transition: opacity calc(200ms * var(--sn-motion, 1)) ease-out;
-}
+html.ed-dal-campo-entra .ed-docbar,
+html.ed-dal-campo-entra .ed-topbar,
+html.ed-dal-campo-entra .pd-striscia,
+html.ed-dal-campo-entra > .sn-sidebar > * { transition: opacity calc(200ms * var(--sn-motion, 1)) ease-out; }
 html.ed-dal-campo .ed-docbar,
 html.ed-dal-campo .ed-topbar,
 html.ed-dal-campo .pd-striscia,
