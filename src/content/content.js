@@ -2834,14 +2834,15 @@
       azioniPerLink(contesto.link, azioni);
     } else if (nome === 'media' && contesto.media) {
       const m = Actions.azioniDelMedia(contesto.media, contesto.link || null);
-      const misura = 'video-audio-controls';
-      azioni.playPause = { label: m.playPause.label, nome: m.playPause.label, icona: m.playPause.icona, onClick: m.playPause.onClick, misura };
+      // `azione`: quella del catalogo delle capacità, che il menu misura dal clic alla fine (#1461).
+      const comandi = { azione: 'video-audio-controls' };
+      azioni.playPause = { label: m.playPause.label, nome: m.playPause.label, icona: m.playPause.icona, onClick: m.playPause.onClick, ...comandi };
       // Acceso o spento: l'icona dice com'è l'audio adesso, il nome cosa farà il clic.
-      azioni.mute = { label: m.mute.label, icona: contesto.media.muted ? 'volumeMute' : 'volume', acceso: !contesto.media.muted, onClick: m.mute.onClick, misura };
-      if (m.speed) azioni.speed = { label: m.speed.label, valore: m.speed.valore, onClick: m.speed.onClick, misura };
-      azioni.loop = { label: m.loop.label, acceso: !!contesto.media.loop, onClick: m.loop.onClick, misura };
-      if (m.pip) azioni.pip = { label: m.pip.label, acceso: !!m.pip.acceso, onClick: m.pip.onClick, misura: 'video-pip' };
-      azioni.controls = { label: m.controls.label, acceso: !!contesto.media.controls, onClick: m.controls.onClick, misura };
+      azioni.mute = { label: m.mute.label, icona: contesto.media.muted ? 'volumeMute' : 'volume', acceso: !contesto.media.muted, onClick: m.mute.onClick, ...comandi };
+      if (m.speed) azioni.speed = { label: m.speed.label, valore: m.speed.valore, onClick: m.speed.onClick, ...comandi };
+      azioni.loop = { label: m.loop.label, acceso: !!contesto.media.loop, onClick: m.loop.onClick, ...comandi };
+      if (m.pip) azioni.pip = { label: m.pip.label, acceso: !!m.pip.acceso, onClick: m.pip.onClick, azione: 'video-pip' };
+      azioni.controls = { label: m.controls.label, acceso: !!contesto.media.controls, onClick: m.controls.onClick, ...comandi };
       suOggetto(azioni, 'save', 'media', { label: m.save.label, onClick: m.save.onClick, misura: 'copy-download-video' });
       suOggetto(azioni, 'copy', 'indirizzoMedia', { label: m.copyLink.label, onClick: m.copyLink.onClick, misura: 'copy-download-video' });
       if (contesto.link) azioniPerLink(contesto.link, azioni);
