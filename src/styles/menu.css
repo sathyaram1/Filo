@@ -131,9 +131,8 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-bottom: 1px solid var(--sn-border);
 }
-.sn-menu-griglia:last-child .sn-menu-nome { border-bottom: 0; }
+.sn-menu-griglia-con-seguito .sn-menu-nome { border-bottom: 1px solid var(--sn-border); }
 .sn-menu-nome.sn-menu-nome-riposo { color: var(--sn-muted); }
 .sn-menu-nome[hidden] { display: none; }
 .sn-menu-label-nascosta {
