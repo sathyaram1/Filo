@@ -118,7 +118,7 @@ test('«Duplica» due volte di fila e dopo un collegamento a una pagina accanto 
   const [c1, c2] = await tm(app, (t, i) => Promise.all([t.duplicateTab(i), t.duplicateTab(i)]), id);
   for (const c of [c1, c2]) {
     expect(c, 'la copia nasce').toBeTruthy();
-    const p = await paginaDellaScheda(app, c, (x) => x.url().endsWith('seconda.html'));
+    const p = await paginaDi(app, c, 'seconda.html');
     await expect(p).toHaveTitle('Seconda', { timeout: 10_000 });
     await expect.poll(() => p.evaluate(() => document.getElementById('i').naturalWidth), { message: 'la copia vede la foto' }).toBeGreaterThan(0);
   }
