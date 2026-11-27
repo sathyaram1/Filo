@@ -2,6 +2,7 @@
 // la superata dice in quale è finita e la apre, quella che assorbe elenca le assorbite e le apre. Il main è finto.
 import { test, expect } from './fixtures/electron.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, mainFinto, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const ora = Date.now();
 
