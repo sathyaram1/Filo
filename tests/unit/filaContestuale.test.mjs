@@ -22,10 +22,12 @@ const tutte = (l) => D.TUTTE.flatMap((z) => l[z]);
 test('di partenza: le azioni dell\'elemento nella fila, nessuna azione della pagina intera', () => {
   const l = D.migra(undefined).layout;
   assert.deepEqual(D.filaDi(l, 'scrivibile').fila.slice(0, 2), ['scrivibile:bold', 'scrivibile:italic']);
-  assert.deepEqual(D.filaDi(l, 'scrivibile').fila, ['scrivibile:bold', 'scrivibile:italic', 'scrivibile:underline', 'scrivibile:link', 'scrivibile:highlight']);
-  assert.deepEqual(D.filaDi(l, 'testo').fila, ['testo:copy', 'testo:translate', 'testo:search']);
-  assert.deepEqual(D.filaDi(l, 'immagine').fila, ['immagine:save', 'immagine:copy', 'immagine:ask', 'immagine:openTab']);
-  assert.deepEqual(D.filaDi(l, 'link').fila, ['link:openTab', 'link:copy']);
+  // Col menu a icone (#2555) la fila è la griglia intera: le azioni dell'elemento, poi quelle comuni a ogni elemento.
+  const dellElemento = (ctx) => D.filaDi(l, ctx).fila.filter((id) => !D.COMUNI.fila.includes(D.AZIONI[id].azione));
+  assert.deepEqual(dellElemento('scrivibile').slice(0, 5), ['scrivibile:bold', 'scrivibile:italic', 'scrivibile:underline', 'scrivibile:link', 'scrivibile:highlight']);
+  assert.deepEqual(dellElemento('testo'), ['testo:copy', 'testo:translate', 'testo:search', 'testo:readAloud']);
+  assert.deepEqual(dellElemento('immagine'), ['immagine:redeemInvite', 'immagine:save', 'immagine:copy', 'immagine:openTab', 'immagine:ask', 'immagine:search']);
+  assert.deepEqual(dellElemento('link'), ['link:redeemInvite', 'link:openTab', 'link:copy', 'link:save', 'link:saveForLater', 'link:share']);
   for (const ctx of Object.keys(D.CONTESTI)) {
     const { fila, altro } = D.filaDi(l, ctx);
     for (const id of [...fila, ...altro]) assert.equal(D.descrizione(id).tipo, 'contesto', `${id} nella fila di ${ctx}`);
