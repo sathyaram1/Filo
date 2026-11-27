@@ -44,6 +44,8 @@
   // l'intervista è aperta e, se sì, ricomponiamo la conversazione com'era.
   // Niente flag scritto qui: il segno "già accolto" lo scrive la CHIUSURA.
   let onboardingActive = false;
+  // L'ultima lettura dell'intervista diceva che Filo ha un modello da chiamare.
+  let modelloPronto = false;
 
   // Rifatta o ripresa, l'intervista sta solo nelle pagine che l'hanno chiesta (Preferenze, «Riprendiamola»): le altre,
   // ricaricate o aperte da un collegamento, restano il filo dell'utente (#1297). Il segno sta nell'indirizzo.
