@@ -667,6 +667,7 @@
       root.appendChild(el);
     }
 
+    if (items.some((x) => x && x.type === 'row' && x.sopra)) root.style.zIndex = '2147483647';
     monta(root);
     try { global.SN_POPUP?.sottoIlMenu?.(true); } catch (_) {}
 
