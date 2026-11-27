@@ -394,7 +394,7 @@
   const UN_VERBO_PRIMA = new RegExp(`(?<![\\p{L}\\p{N}])${VERBO}(?![\\p{L}\\p{N}])`, 'iu');
   const UN_ALTRO_SOGGETTO = /(?:,|\s(?:e|ed|ma|and|but))\s+(?:il|lo|la|l['’]|i|gli|le|un[oa]?|the|an?|my|your|his|her|its)\s*[\p{L}-]+\s*$/iu;
   const chiusoPrima = (fra) => {
-    const fine = new RegExp(`${CHIUDE_VERO}\\s*$`, 'iu').exec(fra);
+    const fine = CHIUDE_CHI_ENTRA.exec(fra);
     if (!fine || /\d/.test(fra)) return false;
     const testa = fra.slice(0, fine.index);
     if (DOPO_CHE_SI_APRE.test(testa)) return false;
