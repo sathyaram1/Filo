@@ -1501,8 +1501,10 @@
 
   // Quello che il menu chiede al main prima di aprirsi, insieme: la cronologia degli appunti e lo stato delle icone della
   // finestra portate nella fila (Indietro spento senza dove tornare).
-  async function primaDelMenu() {
-    const [cronologia] = await Promise.all([Actions.getClipboardHistory(), Promise.resolve(MenuIcons?.prepara?.()).catch(() => {})]);
+  async function primaDelMenu(sito = null) {
+    const [cronologia] = await Promise.all([
+      Actions.getClipboardHistory(), Promise.resolve(MenuIcons?.prepara?.()).catch(() => {}), chiediIconaDelSito(sito),
+    ]);
     return cronologia;
   }
 
