@@ -8,6 +8,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 test.use({ riservaNuovaScheda: true });
 
