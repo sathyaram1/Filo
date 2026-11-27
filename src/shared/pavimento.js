@@ -916,10 +916,12 @@
   const VIRGOLETTATO_DOMANDA = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*\\?+${FRA_VIRGOLETTE}`, 'gid');
   const RISPOSTA_NUDA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
   // «e» senza accento è anche la congiunzione: vale «è» solo subito dopo il nome e di cosa è, e col valore che ha la
-  // forma di una password («la password e Mela!Verde77», non «la password e il nome utente», #2678.21).
+  // forma di una password («la password e Mela!Verde77», non «la password e il nome utente», #2678.21). Un verbo al
+  // plurale dopo il valore dice che era la congiunzione («la password e Office365 sono collegati»).
   const E_SENZA_ACCENTO = `${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]+e`;
-  const VIRGOLETTATO_E = new RegExp(`${E_SENZA_ACCENTO}${FRA_VIRGOLETTE}`, 'gid');
-  const E_NUDA = new RegExp(`${E_SENZA_ACCENTO}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
+  const PLURALE_DOPO = '(?![ \\t]+(?:(?:non|not)[ \\t]+)?(?:sono|erano|saranno|siano|vanno|stanno|hanno|funzionano|restano|rimangono|coincidono|li|le|ne|are|were|have|do|don[\'’]t)(?![A-Za-zÀ-ÿ]))';
+  const VIRGOLETTATO_E = new RegExp(`${E_SENZA_ACCENTO}${FRA_VIRGOLETTE}${PLURALE_DOPO}`, 'gid');
+  const E_NUDA = new RegExp(`${E_SENZA_ACCENTO}[ \\t]+([^\\s|\\[]{6,64})(?![^\\s|\\[])${PLURALE_DOPO}`, 'gi');
   // Dopo una password fra virgolette, nella stessa frase, la seconda che le si lega con un annuncio o una preposizione
   // («da «…» a «…»», «era «…», l'ho cambiata in «…»», «la vecchia era «…» e la nuova è «…»»). Un altro campo nominato
   // in mezzo («e il nome utente è «…»») non è la password.
