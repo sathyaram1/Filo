@@ -901,7 +901,7 @@
           ? `${cardName} ${done} in "${d.nome}" (copie sommate a quelle già presenti).`
           : `${cardName} ${done} in "${d.nome}".`);
       },
-    })));
+    })), { valori: true });
   }
 
   // Imposta, cambia o toglie (id vuoto) il commander (§8.4): chi esce dall'elenco e chi ci rientra lo decide il main
