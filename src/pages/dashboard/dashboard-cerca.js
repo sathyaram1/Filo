@@ -354,7 +354,7 @@
     if (r.k === 'nascosta') {
       return [
         { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { usa(r).catch(() => {}); } },
-        { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
+        { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { copiaIntero(r); } },
       ];
     }
     if (r.k === 'pagina') {
