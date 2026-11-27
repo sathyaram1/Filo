@@ -137,14 +137,14 @@ test('ripetizione e controlli si attivano davvero, e la voce racconta lo stato',
   // Invariante UX: se si può attivare, si deve poter disattivare — la voce ora
   // propone l'azione opposta.
   menu = await openMenuOn(page, '#v');
-  await menu.locator('button', { hasText: 'Non ripetere' }).first().click();
+  await menu.scegli('Non ripetere');
   await expect.poll(() => page.evaluate(() => document.getElementById('v').loop)).toBe(false);
 
   menu = await openMenuOn(page, '#v');
-  await menu.locator('button', { hasText: 'Mostra i controlli' }).first().click();
+  await menu.scegli('Mostra i controlli');
   await expect.poll(() => page.evaluate(() => document.getElementById('v').controls)).toBe(true);
   menu = await openMenuOn(page, '#v');
-  await menu.locator('button', { hasText: 'Nascondi i controlli' }).first().click();
+  await menu.scegli('Nascondi i controlli');
   await expect.poll(() => page.evaluate(() => document.getElementById('v').controls)).toBe(false);
 });
 
