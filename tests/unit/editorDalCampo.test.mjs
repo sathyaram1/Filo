@@ -13,6 +13,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'messages.js'));
 const D = require(join(ROOT, 'src', 'main', 'services', 'editorDalCampo.js'));
 const { MSG } = globalThis.SN_MSG;
+const pulisci = () => { for (const a of D._attese.values()) clearTimeout(a.timer); D._attese.clear(); };
 
 function wc() { return { mandati: [], send(_c, m) { this.mandati.push(m); }, isDestroyed: () => false }; }
 function schede() {
@@ -48,7 +49,7 @@ test('la bozza la prende una volta sola l\'editor preparato, poi l\'editor viene
   D.veloPronto(r.id, home.view.webContents);
   assert.deepEqual(t.attivate, [editor.id]);
   assert.equal(t.sotto, null);
-  D._attese.clear();
+  pulisci();
 });
 
 test('senza velo l\'editor viene davanti appena ha disegnato; un editor già aperto si rinaviga', () => {
@@ -61,7 +62,7 @@ test('senza velo l\'editor viene davanti appena ha disegnato; un editor già ape
   D.prendi(r.id, editor);
   D.editorPronto(r.id, editor, null);
   assert.deepEqual(t.attivate, [editor.id]);
-  D._attese.clear();
+  pulisci();
 });
 
 test('una bozza mai presa torna nel campo, e una home lasciata non si vede strappare via', async (c) => {
@@ -80,7 +81,7 @@ test('una bozza mai presa torna nel campo, e una home lasciata non si vede strap
   D.editorPronto(r2.id, editor, null);
   assert.deepEqual(t.attivate, []);
   c.mock.timers.reset();
-  D._attese.clear();
+  pulisci();
 });
 
 test('rifiuta il campo vuoto e dice il tetto quando lo supera', () => {
