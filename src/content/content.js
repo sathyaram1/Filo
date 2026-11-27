@@ -2506,7 +2506,7 @@
       });
     }
     suOggetto(azioni, 'openTab', 'link', { label: I18n.t('menu_open_in_new_tab'), onClick: a.openTab });
-    if (Actions.isDownloadableLink(linkEl)) suOggetto(azioni, 'save', 'file', { label: I18n.t('menu_save_file'), onClick: a.download, misura: 'download-progress' });
+    if (Actions.isDownloadableLink(linkEl)) suOggetto(azioni, 'save', 'file', { label: I18n.t('menu_save_file'), onClick: a.download, azione: 'download-progress' });
     suOggetto(azioni, 'copy', 'link', { label: I18n.t('menu_copy_link'), onClick: a.copy, azione: 'share-copy-link' });
     suOggetto(azioni, 'saveForLater', 'link', { label: I18n.t('menu_save_link_for_later'), onClick: a.saveForLater, misura: 'save-link' });
     suOggetto(azioni, 'share', 'link', { label: I18n.t('menu_share_link'), onClick: a.share, azione: 'share-copy-link' });
