@@ -60,8 +60,9 @@ test('la bozza del campo diventa un documento nuovo, il campo si svuota e l\'Aiu
   await expect.poll(() => h.evaluate(() => !document.querySelector('.dash-velo-editor'))).toBe(true);
   const prima = await documenti(ed);
   await h.fill('#input', 'Seconda lettera\n\nCon due paragrafi');
-  // Il clic sulla carta, non sul suo bottone: la stessa strada.
-  await h.locator('#tieni .dash-carta[data-tipo="editor"] .dash-carta-tit').click();
+  // Dalla tastiera, Invio sulla carta: la stessa strada del bottone.
+  await h.locator('#tieni .dash-carta[data-tipo="editor"]').focus();
+  await h.keyboard.press('Enter');
   await expect.poll(() => davanti(app), { timeout: 10_000 }).toMatch(/^filo:\/\/editor\//);
   const ed2 = await finestraCon(app, (u) => u.startsWith('filo://editor/'));
   await expect(ed2.locator('#doc p')).toHaveText(['Seconda lettera', '', 'Con due paragrafi']);
