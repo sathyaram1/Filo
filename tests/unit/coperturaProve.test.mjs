@@ -11,6 +11,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { percorsoDaIndirizzo } from '../../scripts/lib/mappaProve.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const require_ = createRequire(import.meta.url);
 
 test('il main registra le funzioni di src/ che ha eseguito, col nome della prova, alla chiusura', () => {
   const dir = cartellaTemporanea('filo-copertura-');
