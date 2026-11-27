@@ -235,7 +235,8 @@ test('grandezza delle icone e icone per riga si cambiano dalle Preferenze, e il 
   const prima = await misura();
   expect(prima.cella).toBeGreaterThanOrEqual(32);
   await page.keyboard.press('Escape');
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ menuIcone: { icona: 28, colonne: 3 } }); });
+  // La stessa porta di Preferenze e della chat: il cambio arriva alle pagine aperte.
+  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ menuIcone: { icona: 28, colonne: 3 } }));
   await expect.poll(async () => {
     await page.locator('#film').click({ button: 'right' });
     await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
