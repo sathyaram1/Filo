@@ -1768,6 +1768,18 @@ export function verifierReplyText(reply, id = '<id>') {
       'A giro chiuso, rilascia il biglietto.',
     ].filter((l) => l !== null).join('\n');
   }
+  // #2704: dopo un rifiuto del cancello per unit rossi del ramo, i rilievi messi da parte vanno al correttore.
+  if (r.outcome === 'stop' && r.motivo === 'rossi_del_ramo') {
+    return [
+      '══ RISPOSTA DEL SERVER: i rilievi vanno al correttore ══',
+      provvRiga,
+      typeof r.testo === 'string' && r.testo ? r.testo : null,
+      fmt(r.blocking),
+      derivati.length ? `Feedback derivati aperti dal server:\n${derivatiRighe(derivati)}` : null,
+      budgets ? `Bilanci: ${budgets}` : null,
+      'Non c\'è niente da correggere adesso: rilascia il biglietto.',
+    ].filter((l) => l !== null).join('\n');
+  }
   if (r.outcome === 'stop') {
     // Fermo per la domanda allegata, o per un rilievo che decide l'owner:
     // in tutti e due i casi i rilievi non bloccanti restano davanti a chi riprende.
