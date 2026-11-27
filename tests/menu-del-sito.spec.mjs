@@ -61,9 +61,9 @@ const riservaAperta = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow
 const sitiScelti = (app) => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).menuDelSito.siti);
 
 async function primaVoce(page) {
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  return (await menu.locator('button .sn-menu-label').first().innerText()).trim();
+  const prima = menuDi(page).primaVoce;
+  await expect(prima).toBeVisible();
+  return (await prima.getAttribute('aria-label')).trim();
 }
 
 // La scelta arriva alla scheda con la spinta delle impostazioni: si riprova finché il tasto destro non apre `atteso`.
