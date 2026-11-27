@@ -188,7 +188,10 @@ class StratoDelMenu {
     if (this.menu) this.nascondi();
     const m = { id: r.id, wc: r.wc, frame: r.frame, nodo: r.nodo, cronologia: null, pronto: false, coda: r.coda };
     this.menu = m;
-    const conIncolla = r.menu.items.some((it) => it && it.$incolla === true);
+    // L'icona Incolla sta nella griglia a icone (#2555), fra le icone in vista o dietro il «+».
+    const incollaIn = (lista) => (Array.isArray(lista) ? lista : []).some((it) => it && it.$incolla === true);
+    const conIncolla = incollaIn(r.menu.items)
+      || r.menu.items.some((it) => it && it.type === 'row' && (incollaIn(it.items) || incollaIn(it.altro && it.altro.items)));
     // Un tasto destro appena aperto Filo trova lo strato ancora in caricamento: lo aspetta, non perde il menu.
     const [impostazioni, cronologia] = await Promise.all([
       require('./services/handlers').getEffectiveSettings().catch(() => null),
