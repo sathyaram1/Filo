@@ -3,6 +3,7 @@
 // (#14); la scrittura dell'owner trova il documento cambiato, rilegge, e l'attesa della routine resta.
 import { test, expect } from './fixtures/electron.mjs';
 import { resolve } from 'node:path';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const MAIN = resolve('src/main/main.js');
 const MANAGE = 'filo://manage/manage.html';
