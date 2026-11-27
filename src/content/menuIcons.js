@@ -188,18 +188,22 @@
       const icona = a.icona && typeof global.SN_ICONS[a.icona] === 'function' ? a.icona : d.icona;
       const nome = a.nome || d.nome;
       const oggetto = a.fraseOggetto || fraseOggetto(a.oggetto);
+      // `verbo` è l'azione dell'elenco; `azione` quella del catalogo delle capacità, che il menu misura (#1461).
       const v = {
-        id, azione: d.azione, icon: I(icona), nome, oggetto, tasto: Disp.VERBI[d.azione]?.tasto || '',
+        id, verbo: d.azione, icon: I(icona), nome, oggetto, tasto: Disp.VERBI[d.azione]?.tasto || '',
         label: a.label || nomeConOggetto(nome, oggetto), onClick: a.onClick, tieneAperto: !!a.tieneAperto,
         disabled: !!a.disabled, draggable: true, bersaglio: a.bersaglio || bersaglioDi(a.oggetto),
       };
+      if (a.misura) v.azione = a.misura;
       if (typeof a.acceso === 'boolean') v.acceso = a.acceso;
       if (a.valore) v.valore = a.valore;
       if (a.iconaImg) v.iconaImg = a.iconaImg;
+      if (a.cronologia) v.cronologia = a.cronologia;
       if (altre.length) {
         v.varianti = altre.map((x) => ({
           label: x.label || nomeConOggetto(nome, x.fraseOggetto || fraseOggetto(x.oggetto)),
           onClick: x.onClick, bersaglio: x.bersaglio || bersaglioDi(x.oggetto), disabled: !!x.disabled,
+          ...(x.misura ? { azione: x.misura } : {}),
         }));
       }
       if (Array.isArray(a.varianti)) v.varianti = [...(v.varianti || []), ...a.varianti];
