@@ -275,11 +275,28 @@ function handleTranscription(args) {
   return unUsoContato(ACTIONS.TRANSCRIBE_AUDIO, () => trascrivi(args));
 }
 
-async function trascrivi({ settings, payload, origin, signal }) {
-  const p = payload || {};
+// I tentativi che sanno trascrivere, o l'errore che dice cosa manca: la trascrizione di un audio intero (#1815) lo
+// chiede prima di scaricare e decodificare, la dettatura a ogni spezzone.
+async function catenaDiTrascrizione(settings) {
   const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
   const attempts = buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO);
   await Gate.ensureUnderLimit(settings);
+  const utili = attempts.filter((a) => Gate.supports(a.provider, 'transcribe') && a.model);
+  if (!utili.length) {
+    const e = new Error('Nessun fornitore ammesso sa trascrivere col modello scelto per la dettatura: scegline un altro in Opzioni → Modelli per azione.');
+    e.code = 'NO_TRANSCRIBE_HOST';
+    throw e;
+  }
+  return { attempts, model: utili[0].model, provider: utili[0].provider };
+}
+
+async function controllaTrascrizione() {
+  return catenaDiTrascrizione(await settingsForOwnerAction(await getEffectiveSettings(), ACTIONS.TRANSCRIBE_AUDIO));
+}
+
+async function trascrivi({ settings, payload, origin, signal }) {
+  const p = payload || {};
+  const { attempts } = await catenaDiTrascrizione(settings);
   ContatoriServizio.misura('catena', ACTIONS.TRANSCRIBE_AUDIO, attempts);
   let audioBase64 = typeof p.audioBase64 === 'string' ? p.audioBase64 : '';
   let format = typeof p.format === 'string' && p.format ? p.format : 'wav';
