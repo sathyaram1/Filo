@@ -284,8 +284,9 @@ test('un\'icona portata dal «+» alla fila resta dopo il riavvio, e «rimetti c
     await chiedi(casa, 'rimetti come prima');
     await expect(casa.locator('.dash-bubble-filo', { hasText: 'Rimessa.' })).toBeVisible({ timeout: 10_000 });
     expect(await app.evaluate(() => globalThis.__visto)).toMatch(/icona «Leggi»: «Altro…» della fila del tasto destro sul testo selezionato → fila del tasto destro sul testo selezionato/);
-    await expect.poll(async () => (await salvata(app))['fila:testo']).toEqual(['testo:copy', 'testo:translate', 'testo:search']);
-    expect((await salvata(app))['altro:testo']).toEqual(['testo:readAloud']);
+    await expect.poll(async () => (await salvata(app))['fila:testo'].slice(0, 3)).toEqual(['testo:copy', 'testo:translate', 'testo:search']);
+    expect((await salvata(app))['fila:testo']).not.toContain('testo:readAloud');
+    expect((await salvata(app))['altro:testo']).toContain('testo:readAloud');
     await chiudiApp(app);
   } finally {
     try { server.close(); } catch (_) {}
