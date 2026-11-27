@@ -8,7 +8,7 @@ import { menuDi } from './helpers/menuContestuale.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
-const iconeDellaFila = (menu) => menu.locator('.sn-menu-row .sn-menu-row-btn[data-sn-icon-id]')
+const iconeDellaFila = (menu) => menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-btn[data-sn-icon-id]')
   .evaluateAll((els) => els.map((e) => e.dataset.snIconId));
 const appunti = (app) => app.evaluate(({ clipboard }) => clipboard.readText());
 const salvata = (app) => app.evaluate(async () => globalThis.SN_LAYOUT_ICONE.leggi());
