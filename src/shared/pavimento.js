@@ -556,11 +556,8 @@
     const pezzi = [];
     for (const m of url.slice(host).matchAll(/[^/?#&;=]+/g)) {
       const da = host + m.index;
-      pezzi.push({ da, testo: m[0], inizi: [...m[0]].map((_, i) => i).slice(0, m[0].length), fini: null, piu: query >= 0 && da > query });
-    }
-    for (const p of pezzi) {
-      p.inizi = Array.from({ length: p.testo.length }, (_, i) => i);
-      p.fini = p.inizi.map((i) => i + 1);
+      const inizi = Array.from({ length: m[0].length }, (_, i) => i);
+      pezzi.push({ da, testo: m[0], inizi, fini: inizi.map((i) => i + 1), piu: query >= 0 && da > query });
     }
     for (let livello = 0; livello < CODIFICHE; livello++) {
       let cambiato = false;
