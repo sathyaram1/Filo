@@ -34,7 +34,7 @@ test('Preferenze: «Rimetti di serie» rimette il valore, e la voce si spiega o 
 
   // «Chiedi a Filo» apre l'Aiuto con la domanda da finire, che nomina la voce.
   await page.locator('label', { has: casella }).click({ button: 'right' });
-  await menuDi(page).voce('Chiedi a Filo').first().click();
+  await menuDi(page).scegli('Chiedi a Filo');
   const campo = page.locator('.sn-sidebar-input textarea');
   await expect(campo).toBeVisible({ timeout: 8_000 });
   await expect(campo).toHaveValue(/^Sull'impostazione «.*Anteprima.*»: $/i);
@@ -72,7 +72,7 @@ for (const { id, nome } of [{ id: 'contestoCache', nome: 'Durata della cache' },
     const tendina = page.locator(`#${id}`).locator('xpath=..').locator('.sn-select-button').first();
     await tendina.scrollIntoViewIfNeeded();
     await tendina.click({ button: 'right' });
-    await menuDi(page).voce('Chiedi a Filo').first().click();
+    await menuDi(page).scegli('Chiedi a Filo');
     const campo = page.locator('.sn-sidebar-input textarea');
     await expect(campo).toBeVisible({ timeout: 8_000 });
     await expect(campo).toHaveValue(`Sull'impostazione «${nome}»: `);
@@ -237,7 +237,7 @@ test('Preferenze: se la voce cliccata viene ridisegnata mentre Filo si prepara, 
   await etichetta.evaluate((el) => el.replaceWith(document.getElementById('autoArchiveEnabled').closest('label')));
   await apriImpostazioni(app);
   expect(await etichette(page)).toContain('Chiedi a Filo');
-  await menuDi(page).voce('Chiedi a Filo').first().click();
+  await menuDi(page).scegli('Chiedi a Filo');
   const campo = page.locator('.sn-sidebar-input textarea');
   await expect(campo).toBeVisible({ timeout: 8_000 });
   await expect(campo).toHaveValue(/^Sull'impostazione «.*riordino.*»: $/i);
