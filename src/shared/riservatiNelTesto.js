@@ -300,7 +300,7 @@ function menzioni(l) {
   const out = [];
   const P = presenta();
   for (const [re, tipo] of P) for (const m of l.matchAll(re)) out.push({ i: m.index, j: m.index + m[0].length, tipo });
-  if (P.length) for (const m of l.matchAll(/(?<![\p{L}\p{N}])p\p{L}{4,9}(?![\p{L}\p{N}])/gu)) {
+  if (P.length) for (const m of l.matchAll(/(?<![\p{L}\p{N}])\p{L}{5,10}(?![\p{L}\p{N}])/gu)) {
     if (refusoDiPassword(m[0])) out.push({ i: m.index, j: m.index + m[0].length, tipo: 'password' });
   }
   return out;
