@@ -2491,7 +2491,7 @@
     suOggetto(azioni, 'copy', 'immagine', { label: I18n.t('menu_copy_image'), onClick: a.copy, azione: 'copy-download-image' });
     suOggetto(azioni, 'copy', 'indirizzoImmagine', { label: I18n.t('menu_copy_image_link'), onClick: a.copyLink, azione: 'copy-download-image' });
     suOggetto(azioni, 'search', 'immagine', { label: I18n.t('menu_search_image'), onClick: a.search, azione: 'search-image' });
-    suOggetto(azioni, 'transcribe', 'immagine', { label: I18n.t('menu_transcribe'), onClick: a.transcribe, misura: 'ocr' });
+    suOggetto(azioni, 'transcribe', 'immagine', { label: I18n.t('menu_transcribe'), onClick: a.transcribe, azione: 'ocr' });
     if (aiutoAcceso()) suOggetto(azioni, 'ask', 'immagine', { label: I18n.t('fila_ask_image'), onClick: a.ask });
   }
 
