@@ -172,3 +172,30 @@ test('#2695.7: l\'etichetta in grassetto, in corsivo o fra tag HTML, coi due pun
     assert.equal(alCorrettore(testo), testo, `correttore: ${testo}`);
   }
 });
+
+// #2673.10 — sotto l'etichetta il valore stava in una voce d'elenco o in un blocco di codice: il segno del blocco era
+// letto come la riga sotto, e la password partiva (al posto suo si copriva «```»).
+test('sotto l\'etichetta un valore in una voce d\'elenco, una citazione o un blocco di codice non arriva al modello', () => {
+  for (const v of ['Nyckel!2024', 'gattonero']) {
+    for (const [testo, atteso] of [
+      [`Password:\n- ${v}`, `Password:\n- ${S}`],
+      [`**Password:**\n- ${v}`, `**Password:**\n- ${S}`],
+      [`- **Password:**\n  - ${v}`, `- **Password:**\n  - ${S}`],
+      [`Password:\n* ${v}`, `Password:\n* ${S}`],
+      [`Password:\n1. ${v}`, `Password:\n1. ${S}`],
+      [`Password:\n> ${v}`, `Password:\n> ${S}`],
+      [`Password:\n\`\`\`\n${v}\n\`\`\``, `Password:\n\`\`\`\n${S}\n\`\`\``],
+      [`**Password:**\n\`\`\`text\n${v}\n\`\`\``, `**Password:**\n\`\`\`text\n${S}\n\`\`\``],
+      [`Password:\n~~~\n${v}\n~~~`, `Password:\n~~~\n${S}\n~~~`],
+    ]) {
+      assert.equal(P.oscura(testo), atteso, 'pavimento');
+      assert.equal(alCorrettore(testo), atteso, 'correttore');
+    }
+  }
+  // Un elenco sotto l'etichetta che dice com'è la password resta intero.
+  for (const testo of ['Requisiti della password:\n- almeno 8 caratteri\n- una maiuscola', 'Password:\n- obbligatoria',
+    '## Password\nPer cambiarla vai nelle impostazioni', 'Password:\n```\nvedi sotto\n```']) {
+    assert.equal(P.oscura(testo), testo, 'pavimento');
+    assert.equal(alCorrettore(testo), testo, 'correttore');
+  }
+});
