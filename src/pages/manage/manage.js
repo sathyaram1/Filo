@@ -2498,7 +2498,7 @@
     // Le azioni a icone come il tasto destro di Filo (#2555); un elenco di valori da scegliere (l'ordine) resta testo.
     const I = window.SN_MENU_ICONS;
     if (!voci.some((v) => v.radio) && I && I.apriVoci
-      && I.apriVoci({ x, y, voci: voci.map((v) => ({ label: v.testo, onClick: v.azione })) })) return;
+      && I.apriVoci({ x, y, voci: voci.map((v) => ({ label: v.testo, onClick: v.azione, nota: v.titolo || '' })) })) return;
     sortMenuScorso = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop mg-ctxmenu';
