@@ -555,7 +555,7 @@ test('su un\'immagine o un filmato dentro un collegamento la fila apre il colleg
   const menu = menuDi(page);
   for (const [sel, ctx] of [['#vid', 'media'], ['#foto', 'immagine']]) {
     await page.locator(sel).click({ button: 'right' });
-    await expect(menu.locator(`.sn-menu-row [data-sn-icon-id="${ctx}:openTab"]`)).toHaveAttribute('aria-label', /Apri in nuova tab/);
+    await expect(menu.locator(`.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="${ctx}:openTab"]`)).toHaveAttribute('aria-label', /Apri in nuova tab/);
     await page.keyboard.press('Escape');
   }
   await page.locator('#foto').click({ button: 'right' });
