@@ -41,6 +41,9 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   l'utente ha chiuso apposta (il bottone sotto la risposta, `/clear`: il segno `fine` sulla chiusura) non si
   continuano da qui; una scheda che si chiude o si ricarica non è una chiusura voluta. La scheda la adotta (storico per il turno dopo), ma le bolle le ha già disegnate la coda.
   Chiusa apposta in una home, le altre che la stavano continuando la lasciano subito (l'annuncio `finita`, #1443.2).
+  Il filo è uno fra le schede (#869.2): a ogni invio la scheda chiede al main la conversazione corrente
+  (`FILO_CHAT_CORRENTE`) e continua quella, anche se l'ha cominciata un'altra home; resta sulla sua solo quella
+  riaperta apposta (Cronologia, `?chat=`). Chiudere non tocca la bozza nella casella (#1204.6).
 - **Com'è andata ogni azione** (#1294): la risposta archiviata porta `esiti`, una voce per azione (fatta coi numeri,
   non riuscita col perché, ferma sulla conferma, il file del bottone), scritta da `src/shared/esitoAzione.js` con le
   parole del diario in diretta (`src/shared/righeAttivita.js`, una tabella sola per la home e per l'archivio). Riletta,
