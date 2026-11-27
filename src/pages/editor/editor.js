@@ -638,7 +638,12 @@
     if (!testo) return;
     const html = document.documentElement;
     html.classList.add('ed-dal-campo');
-    const davanti = () => html.classList.remove('ed-dal-campo');
+    const davanti = () => {
+      if (!html.classList.contains('ed-dal-campo')) return;
+      html.classList.add('ed-dal-campo-entra');
+      html.classList.remove('ed-dal-campo');
+      setTimeout(() => html.classList.remove('ed-dal-campo-entra'), 600);
+    };
     chrome.runtime.onMessage.addListener((m) => { if (m && m.type === MSG.EDITOR_ARRIVO && m.id === id && m.davanti) davanti(); });
     setTimeout(davanti, 8000);
     await aiutoAccanto();
