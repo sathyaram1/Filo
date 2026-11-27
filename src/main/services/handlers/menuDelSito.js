@@ -50,6 +50,20 @@ module.exports = function register(on, ctx) {
     return { ok: true, proposto };
   });
 
+  // L'icona della voce «Menu di <sito>» nel tasto destro a icone (#2555): quella che la fila delle schede ha già
+  // scaricato. Solo per il sito della scheda: un riquadro di un altro sito non prende l'icona della pagina che lo ospita.
+  on(MSG.ICONA_DEL_SITO, async (msg, sender, origin) => {
+    if (daFilo(origin, sender)) return { ok: false };
+    const win = winOf(sender);
+    const tab = win && win._filoTabs && Array.isArray(win._filoTabs.tabs)
+      ? win._filoTabs.tabs.find((x) => x.view && x.view.webContents === sender.wc) : null;
+    if (!tab || typeof tab.favicon !== 'string' || !/^data:image\//.test(tab.favicon)) return { ok: false };
+    let pagina = '';
+    try { pagina = tab.view.webContents.getURL() || ''; } catch (_) {}
+    if (!sitoDelMittente(sender) || M.sitoDi(pagina) !== sitoDelMittente(sender)) return { ok: false };
+    return { ok: true, icona: tab.favicon };
+  });
+
   on(MSG.MENU_DEL_SITO_IMPOSTA, async (msg, sender, origin) => {
     const sito = daFilo(origin, sender) ? M.normalizza(msg && msg.sito) : sitoDelMittente(sender);
     if (!sito) return { ok: false, code: 'sito', error: 'Questa pagina non ha un sito a cui legare la scelta' };
