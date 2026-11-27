@@ -1,5 +1,5 @@
-// #2714 — un PIN, un codice o una password detti da un verbo di cambio («diventa», «ho cambiato … in …») o dopo la
-// domanda («ti ricordi la password? Era …») non arrivano ai modelli né escono verso un sito, come dopo «è».
+// #2714 — un PIN, un codice o una password detti da un verbo di cambio («diventa», «ho cambiato … in …») non arrivano
+// ai modelli né escono verso un sito, come dopo «è». Il valore dopo la domanda ha la regola di #1403.67.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
