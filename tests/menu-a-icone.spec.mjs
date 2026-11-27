@@ -195,6 +195,31 @@ test('il menu proprio di una pagina di Filo (il titolo dell\'Editor) è a icone,
   await editor.screenshot({ path: resolve(SHOTS, 'menu-a-icone-editor.png') });
 });
 
+test('un filmato su un sito col suo menu: «Menu di …» ha l\'icona del sito, l\'audio si vede acceso', async ({ openTab, testServer }) => {
+  const icona = testServer.asset(PNG, 'image/png');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Video</title>
+    <meta property="og:site_name" content="YouTube"><link rel="icon" href="${icona}"></head>
+    <body style="margin:0;padding:40px;background:#0f0f0f">
+    <div id="lettore"><video id="film" width="480" height="270" style="background:#222"></video></div>
+    <script>document.getElementById('lettore').addEventListener('contextmenu', (e) => e.preventDefault());</script>
+    </body></html>`);
+  const menu = menuDi(page);
+  // L'icona del sito la scarica la fila delle schede: si aspetta che ci sia prima di aprire il menu.
+  await expect.poll(async () => {
+    await page.locator('#film').click({ button: 'right' });
+    await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
+    const c = await menu.locator('[data-sn-verbo="siteMenu"] img').count();
+    await page.keyboard.press('Escape');
+    return c;
+  }, { timeout: 15_000 }).toBe(1);
+  await page.locator('#film').click({ button: 'right' });
+  await expect(menu.locator('[data-sn-verbo="siteMenu"]')).toHaveAttribute('aria-label', 'Menu di YouTube');
+  await expect(menu.locator('[data-sn-verbo="mute"]')).toHaveAttribute('aria-pressed', 'true');
+  await menu.locator('[data-sn-verbo="siteMenu"]').hover();
+  await expect(menu.locator('.sn-menu-nome')).toContainText('Menu del sito · YouTube');
+  await page.screenshot({ path: resolve(SHOTS, 'menu-a-icone-youtube.png') });
+});
+
 test.describe('col menu nello strato sopra la scheda', () => {
   test.use({ stratoDelMenu: true });
 
