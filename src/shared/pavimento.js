@@ -850,7 +850,13 @@
     for (const re of [ACCANTO_DEBOLE, SOTTO]) {
       for (const m of s.matchAll(re)) {
         const v = valorePassword(m[1], { forma: true });
-        if (v && !INDIRIZZO_O_EMAIL(v)) out.push({ valore: v, regola: 'password' });
+        if (!v || INDIRIZZO_O_EMAIL(v)) continue;
+        out.push({ valore: v, regola: 'password' });
+        // «da Gatto1 a Mela!Verde77»: la nuova subito dopo la vecchia, con la sua forma.
+        SEGUITO_NUDO.lastIndex = m.index + m[0].length;
+        const dopo = re === ACCANTO_DEBOLE && SEGUITO_NUDO.exec(s);
+        const n = dopo && formaVicina(dopo[1]);
+        if (n) out.push({ valore: n, regola: 'password' });
       }
     }
     for (const m of s.matchAll(IN_FRASE)) {
