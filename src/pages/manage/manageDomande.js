@@ -1418,7 +1418,7 @@
       e.preventDefault();
       const voci = [{ testo: 'Apri', azione: () => { apri([d.id]); disegna(); } }];
       // Su un «da fare» l'azione principale è il suo pulsante, «Fatto» (#2229.1): le stesse voci del dettaglio.
-      if (d.stato === 'aperta' && D.daFare(d) && !inCorso.has(d.id)) {
+      if (daRispondere(d) && D.daFare(d) && !inCorso.has(d.id)) {
         (d.opzioni || []).forEach((o, i) => {
           const nome = D.etichettaOpzione(d, i, stato.riferimenti);
           if (nome) voci.push({ testo: nome, azione: () => { apri([d.id]); disegna(); rispondi(d.id, i); } });
