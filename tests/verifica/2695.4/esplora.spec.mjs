@@ -45,3 +45,19 @@ for (const [g, t, s] of CASI) {
     expect(fuori).not.toContain(s);
   });
 }
+
+for (const t of ['the password expired, new one coming', 'password changed, now working', 'the password is wrong, try harder',
+  'password cambiata ieri, adesso dimmi', 'la password è sbagliata, prova Marco']) {
+  test(`FP ${t}`, () => { expect(alCorrettore(t)).toBe(t); });
+}
+
+for (const [n, t] of [['spazi virgola', 'password,' + ' '.repeat(8000) + 'adesso gattonero'], ['spazi senza virgola', 'password' + ' '.repeat(8000) + 'x']]) {
+  test(`T ${n}`, () => {
+    let a = Date.now();
+    alCorrettore(t);
+    const c = Date.now() - a; a = Date.now();
+    P.oscura(t);
+    const p = Date.now() - a;
+    expect({ c: c < 1000, p: p < 1000, c_ms: c, p_ms: p }).toMatchObject({ c: true, p: true });
+  });
+}
