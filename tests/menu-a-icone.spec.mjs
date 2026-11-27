@@ -35,7 +35,7 @@ function statoMenu(menu) {
       tasto: b.dataset.snTasto || '', varianti: b.dataset.snVarianti === '1', rara: !!b.closest('.sn-menu-altro'),
     }));
     // Righe di testo fuori dalla griglia che non sono una spiegazione, una proposta o un dato.
-    const testo = [...m.querySelectorAll('.sn-menu-item, .sn-menu-split, .sn-menu-paste')].filter((x) => x.getClientRects().length)
+    const testo = [...m.querySelectorAll('.sn-menu-item:not(.sn-menu-row-btn), .sn-menu-split')].filter((x) => x.getClientRects().length)
       .map((x) => x.textContent.trim());
     return { icone, testo, nome: m.querySelector('.sn-menu-nome')?.textContent || '' };
   });
