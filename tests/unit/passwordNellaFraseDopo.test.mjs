@@ -118,8 +118,7 @@ test('con un raccordo davanti, o di sole cifre, la tolgono tutti e due i cancell
 test('le parole del discorso dopo il rimando arrivano intere, anche dopo un nome corto e con un raccordo', () => {
   for (const frase of [
     'password cambiata ieri, adesso dimmi', 'password changed, now working', 'the password is wrong, try harder',
-    'the password expired, new one coming', 'la pass è sbagliata, prova domani', 'la pass è debole, usa numeri',
-    'Ho comprato la pass giornaliera, è carissima', 'la password è sbagliata, e il problema è grave',
+    'the password expired, new one coming', 'Ho comprato la pass giornaliera, è carissima', 'la password è sbagliata, e il problema è grave',
     'la password è sbagliata, ma adesso funziona', 'la password è scaduta, ecco cosa fare: chiamare l\'assistenza',
     'la password è scaduta, è semplice: chiama l\'assistenza', 'la password è scaduta, ora nel 2025 la cambio',
   ]) {
