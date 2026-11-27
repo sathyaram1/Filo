@@ -114,7 +114,7 @@ test('dal tasto destro: «Segna fidata…» apre la domanda con le note, «Togli
   await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveText('Fidata');
 
   await riga(page, 'D-80').click({ button: 'right' });
-  await menu.getByText('Togli fiducia').click();
+  await menu.scegli('Togli fiducia');
   await expect(k.locator('.mg-dq-meta .mg-dq-fiducia')).toHaveText('Non fidata');
   expect(await app.evaluate(() => globalThis.__mandati.at(-1))).toEqual({ type: 'domanda_fiducia', id: 'D-80', fidata: false });
 });
