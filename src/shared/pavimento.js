@@ -703,7 +703,7 @@
     for (let i = 0; i < righe.length; i++) {
       for (const m of righe[i].matchAll(AL_POSTO)) {
         // Una parentesi attaccata («password = input(…)») è una chiamata nel codice, non una nota dopo il valore.
-        if (!DA_SOLA.test(m[2]) || m[2].startsWith('(')) continue;
+        if (!DA_SOLA.test(senzaNota(m[2])) || m[2].startsWith('(')) continue;
         const v = valorePassword(m[1]);
         if (v) out.push(alPosto(v, inizi[i] + m.indices[1][0], m[1]));
       }
