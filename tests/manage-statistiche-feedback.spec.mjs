@@ -1442,8 +1442,8 @@ test('#496 «Controlli di sicurezza passati» si apre sulle segnalazioni che ha 
   await page.locator('[data-fs-range="tutto"]').click();
 
   await page.locator('[data-fs-id="audit"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toContainText('Mostra la segnalazione contata');
-  await page.locator('.mg-ctxmenu .sn-select-option').first().click();
+  expect(await testoDelMenu(page)).toContain('Mostra la segnalazione contata');
+  await primaDelMenu(page).click();
   await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
 });
 
