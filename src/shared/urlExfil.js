@@ -425,7 +425,7 @@
     + "|it['’]?s\\s+now|it\\s+is\\s+now|from\\s+now\\s+on|(?:la\\s+)?nouvelle|essaie|essayez|maintenant|(?:la\\s+)?nueva"
     + '|prueba|ahora|(?:das\\s+|die\\s+)?neue|versuch(?:e|s)?|jetzt'
     + ')(?![\\p{L}\\p{N}])', 'u');
-  // Dopo il rimando l'annuncio, i due punti e gli avverbi si saltano, e il valore è la parola dopo. Di sole lettere senza
+  // Dopo il rimando l'annuncio, i due punti, gli avverbi e i modali si saltano, e il valore è la parola dopo. Di sole lettere senza
   // annuncio solo se chiude la frase: «prova gattonero» sì, «adesso vado a cambiarla» no.
   const CONGIUNZIONE = /^(?:e|ed|ma|o|poi|and|but|or|then)$/u;
   // Quello che dopo «prova», «adesso», «the new one is» è il resto del discorso: «prova con calma», «adesso entro»,
