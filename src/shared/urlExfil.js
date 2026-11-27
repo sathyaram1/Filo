@@ -416,13 +416,96 @@
     const k = fuori.search(/\n|[.,;!?](?=\s|$)/);
     return k < 0 ? coda : coda.slice(0, k);
   };
+  // La frase dopo, che rimanda alla password senza nominarla: «la password scade, la nuova è …», «è sbagliata, prova …»,
+  // «expired, new one …», «cambiata ieri, adesso …» (#2695.4). Prove: tests/unit/passwordNellaFraseDopo.test.mjs.
+  // Davanti al rimando possono stare una congiunzione o un avverbio di raccordo: «, e la nuova è …», «, ma ora …»,
+  // «, comunque è …», «, quindi adesso è …». L'annuncio da solo rimanda solo dopo la virgola e con un raccordo o un verbo
+  // di cambio prima: «è cambiata, è …» sì, «la pass giornaliera, è carissima» no.
+  const RACCORDO = "(?<raccordo>(?:(?:e|ed|ma|però|pero|comunque|quindi|allora|poi|inoltre|cmq|and|but|so|anyway|however|et|mais|donc|y|und|aber|also)\\s+){0,2})";
+  let cambioDavanti = null;
+  const RINVIO = new RegExp('^(?:[.,;!?]+|\\n)[^\\S\\n]*' + RACCORDO + '(?:'
+    + "(?:(?:la|il|quella|quello|una|un)\\s+)?(?:nuov[ao]|giust[ao]|corrett[ao]|ver[ao]|vecchi[ao]|attuale|prossim[ao]|definitiv[ao])"
+    + '|(?:ri)?prova(?:\\s+con)?|usa|metti|inserisci|scrivi|digita|adesso|ora|invece|da\\s+(?:oggi|adesso|ora)'
+    + '|(?:ri)?(?:mett|impost|cambi)(?:ila|ilo|ala|alo)(?:\\s+(?:a|in|con|su))?|(?:te|ve|ti|vi|me|ce)\\s+la|eccola'
+    + "|(?:the\\s+)?(?:new|right|correct|real|old|current|next)(?:\\s+one)?|try(?:\\s+with)?|use|enter|type|now|instead"
+    + "|it['’]?s\\s+now|it\\s+is\\s+now|from\\s+now\\s+on|(?:set|change)\\s+it\\s+to|here\\s+it\\s+is|here['’]?s"
+    + "|(?:la\\s+|le\\s+)?nouve(?:lle|au)|essaie|essayez|maintenant|(?:la\\s+|el\\s+)?nuev[ao]"
+    + "|prueba|ahora|(?:das\\s+|die\\s+|der\\s+)?neue[sr]?|versuch(?:e|s)?|jetzt"
+    + "|(?<annuncio>è|e['’]|é|sarà|is|est|es|ist)"
+    + ')(?![\\p{L}\\p{N}])', 'u');
+  // Dopo il rimando annuncio, due punti, avverbi e modali si saltano, e il valore è la parola dopo. Di sole lettere senza
+  // annuncio solo se chiude la frase: «prova gattonero» sì, «adesso vado a cambiarla» no.
+  const CONGIUNZIONE = /^(?:e|ed|ma|o|oppure|altrimenti|poi|and|but|or|otherwise|then|ou|oder)$/u;
+  const ALTERNATIVA = /^(?:o|oppure|altrimenti|or|otherwise|ou|oder)$/u;
+  // Le parole che possono chiudere la frase dopo il valore senza essere il discorso che continua: «use … instead».
+  const IN_CODA = /^(?:invece|instead|please|grazie|thanks|pure|allora|adesso|ora|now|per|favore|plz|ok)$/u;
+  // Gli annunci che il guardiano non conta perché da soli presentano altro: «now it's …», «le nouveau est …».
+  const ANNUNCI_QUI = /^(?:it['’]?s|its|c['’]est|est|es|ist)$/u;
+  // Quello che dopo «prova», «adesso», «the new one is» è il resto del discorso: «prova con calma», «adesso entro»,
+  // «ora rinnovala», «try again», «is ready», «prova domani», «usa numeri», «now working», «adesso dimmi».
+  const SEGUITO_DEL_DISCORSO = /^(?:meglio|peggio|calma|basta|dopo|subito|pure|così|cosi|tardi|presto|pront[ao]|fatt[ao]|entr[aoi]|entrate|esc[oie]|arriv[aoi]|torn[aoi]|funzion[aoi]|aspetta|attendi|riavvia|grazie|later|soon|ready|done|works?|fine|thanks|please|domani|dopodomani|stasera|stanotte|stamattina|oggi|tomorrow|tonight|today|again|harder|better|numeri|simboli|lettere|caratteri|maiuscol[ae]|minuscol[ae]|numbers|symbols|letters|characters|strano|assurdo|normale|(?:di|da|fa|sta|va)mmi|\p{L}{3,}[aei](?:mi|ci)|\p{L}{3,}ing|\p{L}{3,}[aei]rl[aoie]|(?:rinnov|cambi|scriv|mett|prov|us|inserisc|ripet|digit|controll|salv|cancell)[aie](?:l[aoie]|mel[ao]|tel[ao]))$/u;
+  let avverbio = null;
+  const VIRGOLETTE_QUI = new RegExp(FRA_VIRGOLETTE.source, 'uy');
+  // Un elenco: anche l'alternativa dopo il valore («prova gattonero oppure micio77») è un valore.
+  function dopoIlRinvio(resto, { soloCifre, spiega, prima }) {
+    const r = RINVIO.exec(resto);
+    if (!r) return [];
+    const G = global.SN_GUARDIANO_STATICO;
+    if (!cambioDavanti && G) cambioDavanti = new RegExp(`(?<!\\p{L})(?:${G.CAMBI}|${G.PARTICIPI}|${G.PASSATI})(?!\\p{L})`, 'iu');
+    if (r.groups.annuncio && !(/^[,;]/.test(r[0]) && (r.groups.raccordo || (cambioDavanti && cambioDavanti.test(prima))))) return [];
+    if (!avverbio && G) avverbio = new RegExp(`^(?:${G.AVVERBIO}|${G.AVVERBI}|${G.MODALI})$`, 'u');
+    const seguito = fineFrase(resto.slice(r[0].length).replace(/^\s+/, ''));
+    const parole = seguito.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
+    const pulita = (w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    // I due punti poco più avanti presentano il valore anche dopo un giro di parole: «la nuova te la scrivo qui: …».
+    // Non dopo un annuncio, e non se prima ci sono cifre: «la nuova è Gatto!Nero77: ricordatela» presenta già il valore.
+    let duePunti = parole.slice(0, 6).findIndex((w) => /:$/.test(w) && !/:\/\//.test(w));
+    // E solo se le parole prima la riprendono («te la …», «la nuova …», «it»): «è semplice: chiama» parla d'altro.
+    const davanti = parole.slice(0, duePunti + 1);
+    const ripresa = /(?:\bla|nuov[ao]|prossim[ao]|new(?:\s+one)?|next(?:\s+one)?|nouve(?:lle|au)|nuev[ao]|neue[sr]?)\s*$/iu.test(r[0])
+      || davanti.some((w) => /^(?:la|lo|l['’]\p{L}*|it|te|ve|me)$/iu.test(pulita(w)));
+    if (duePunti > -1 && (!ripresa || davanti.some((w) => /\d/.test(w) || (G && G.ANNUNCI.includes(pulita(w))) || ANNUNCI_QUI.test(pulita(w))))) duePunti = -1;
+    let annunciato = false;
+    let da = 0;
+    const out = [];
+    for (let k = 0; k < parole.length; k++) {
+      const w = parole[k];
+      da = seguito.indexOf(w, da);
+      const t = pulita(w);
+      if (/^[:=]+$/.test(w) || (G && G.ANNUNCI.includes(t)) || ANNUNCI_QUI.test(t)) { annunciato = true; continue; }
+      if (k <= duePunti) { annunciato = k === duePunti; continue; }
+      if (avverbio && avverbio.test(t)) continue;
+      // Fra virgolette il valore è tutto quello che chiudono, anche con gli spazi: «prova «Mela! Verde77»».
+      VIRGOLETTE_QUI.lastIndex = da;
+      const fra = VIRGOLETTE_QUI.exec(seguito);
+      if (fra) return fra[3].length >= 4 && (!soloCifre || /^\d+$/.test(fra[3])) ? [...out, { valore: fra[3], regola: 'password', rinvio: true }] : out;
+      const cifre = /\d/.test(t);
+      let preso = null;
+      // Un codice solo se è un numero: «il codice sconto è scaduto, prova BENVENUTO10» resta.
+      if (cifre) {
+        if (soloAlnum(t).length >= 4 && (!soloCifre || /^\d+$/.test(t))) preso = { valore: t, regola: 'codice', rinvio: true };
+      } else {
+        // Dopo un punto comincia un altro discorso: lì la parola qualunque vuole l'annuncio («La nuova è …»).
+        const resto = parole.slice(k + 1).map(pulita);
+        const chiude = /^[,;]/.test(r[0]) && (!resto.length || CONGIUNZIONE.test(resto[0]) || resto.every((x) => IN_CODA.test(x)));
+        if (!(soloCifre || t.length < MIN_TOKEN || RIEMPITIVI.has(t) || SEGUITO_DEL_DISCORSO.test(t) || (spiega && spiega(parole, k))
+          || !(annunciato || chiude))) preso = { valore: t, regola: 'password', rinvio: true };
+      }
+      if (!preso) return out;
+      out.push(preso);
+      if (!ALTERNATIVA.test(pulita(parole[k + 1] || ''))) return out;
+      k++;
+    }
+    return out;
+  }
   // `spiega(parole, k)`: la parola k della frase spiega la password («va cambiata ogni 90 giorni») e, di sole lettere, non
   // è il valore. Chi toglie il testo (correttoreRiservati.js) la passa; chi lo confronta con un URL no.
   function segretiDetti(testo, { spiega = null } = {}) {
     const out = [];
     const prendi = (re, soloCifre) => {
       for (const m of testo.matchAll(re)) {
-        const coda = fineFrase(testo.slice(m.index + m[0].length, m.index + m[0].length + 200));
+        const da = m.index + m[0].length;
+        const coda = fineFrase(testo.slice(da, da + 200));
         const parole = coda.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
         for (const [k, w] of parole.entries()) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
@@ -430,6 +513,9 @@
           const spiegata = !cifre && !!spiega && !!spiega(parole, k);
           if (cifre ? soloAlnum(t).length < 4 : (soloCifre || spiegata || t.length < MIN_TOKEN || RIEMPITIVI.has(t))) continue;
           out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
+        }
+        if (coda.length < 200) {
+          out.push(...dopoIlRinvio(testo.slice(da + coda.length, da + coda.length + 200), { soloCifre, spiega, prima: testo.slice(Math.max(0, m.index - 60), da + coda.length) }));
         }
       }
     };

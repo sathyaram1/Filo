@@ -449,10 +449,14 @@ function formeLibere(testo) {
     for (const v of X.segretiDetti(`password ${coda}`)) {
       const s = valoreDi(v);
       const fra = coda.slice(0, Math.max(0, coda.indexOf(s)));
-      if (forma(s).length || PRESENTATA.test(fra) || (pw && ACCANTO.test(fra) && !PONTE.test(s))) out.push(v);
+      if (v.rinvio || forma(s).length || PRESENTATA.test(fra) || (pw && ACCANTO.test(fra) && !PONTE.test(s))) out.push(v);
     }
   }
   conNome(LIBERE.virgola, (m) => nomePw(m[1]) || SOLO_CORTE.test(m[1]), (m) => out.push(...forma(m[2])));
+  // La password nella frase dopo, che la rimanda senza nominarla (urlExfil.js, segretiDetti): qui quella con la forma di
+  // una password, un numero («prova 4821», come «il pin è 4821») o fra virgolette con gli spazi; di sole lettere la prende
+  // il correttore dalla sua lettura, che sa quali parole spiegano.
+  for (const v of X.segretiDetti(l)) if (v.rinvio) out.push(...(/\s/.test(v.valore) || /^\d+$/.test(v.valore) ? [v] : forma(v.valore)));
   return out;
 }
 
