@@ -301,7 +301,7 @@ test('col tasto del Profilo nel «+» o in vista c’è la foto dell’account, 
   await expect.poll(() => avatar(fuori(page, 'profilo')).evaluate((i) => i.naturalWidth)).toBe(1);
   // Rimesso in vista, il tasto ridisegnato ha la sua foto.
   await fuori(page, 'profilo').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rimetti in vista' }).click();
+  await menuDi(page).scegli('Rimetti in vista');
   await expect(tasto(page, 'profilo')).toBeVisible();
   await expect(page.locator('.dash-altro-griglia.vista .dash-altro-app[data-id="profilo"] img.account-avatar')).toHaveAttribute('src', foto);
   // Un altro ridisegno (il «+» richiuso) non la perde.
