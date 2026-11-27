@@ -461,10 +461,10 @@
     // Non dopo un annuncio, e non se prima ci sono cifre: «la nuova è Gatto!Nero77: ricordatela» presenta già il valore.
     let duePunti = parole.slice(0, 6).findIndex((w) => /:$/.test(w) && !/:\/\//.test(w));
     // E solo se le parole prima la riprendono («te la …», «la nuova …», «it»): «è semplice: chiama» parla d'altro.
-    const prima = parole.slice(0, duePunti + 1);
+    const davanti = parole.slice(0, duePunti + 1);
     const ripresa = /(?:\bla|nuov[ao]|prossim[ao]|new(?:\s+one)?|next(?:\s+one)?|nouve(?:lle|au)|nuev[ao]|neue[sr]?)\s*$/iu.test(r[0])
-      || prima.some((w) => /^(?:la|lo|l['’]\p{L}*|it|te|ve|me)$/iu.test(pulita(w)));
-    if (duePunti > -1 && (!ripresa || prima.some((w) => /\d/.test(w) || (G && G.ANNUNCI.includes(pulita(w))) || ANNUNCI_QUI.test(pulita(w))))) duePunti = -1;
+      || davanti.some((w) => /^(?:la|lo|l['’]\p{L}*|it|te|ve|me)$/iu.test(pulita(w)));
+    if (duePunti > -1 && (!ripresa || davanti.some((w) => /\d/.test(w) || (G && G.ANNUNCI.includes(pulita(w))) || ANNUNCI_QUI.test(pulita(w))))) duePunti = -1;
     let annunciato = false;
     let da = 0;
     const out = [];
