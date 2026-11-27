@@ -1219,7 +1219,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         if (!res.nonCompare && !res.senzaModulo) push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
         PageRead.annotaAzione(provenienza, rendered);
         const tipoUscita = String(a.type || '').toUpperCase();
-        if (tipoUscita === 'NAVIGA' || tipoUscita === 'LEGGI_PAGINA') {
+        if (tipoUscita === 'NAVIGA' || tipoUscita === 'LEGGI_PAGINA' || tipoUscita === 'TRASCRIVI_MEDIA') {
           const dove = globalThis.SN_ACTION_LEVELS.indirizzoDi(a);
           if (res.nonCompare) lasciati.set(dove, a);
           else if (res.executed) lasciati.clear();
