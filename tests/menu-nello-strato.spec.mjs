@@ -113,8 +113,8 @@ test.describe('il menu nello strato', () => {
     expect(qui).toBeGreaterThan(0);
     expect(qui).toBeLessThan('prima dopo'.length);
     const menu = menuDi(page);
-    await expect(menu.locator('.sn-menu-paste-main')).toContainText('Incolla');
-    await menu.locator('.sn-menu-paste-main').click();
+    await expect(menu.locator('.sn-menu-griglia [data-sn-verbo="paste"]')).toContainText('Incolla');
+    await menu.locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
     await chiusoLoStrato(app);
     await expect(page.locator('#campo')).toHaveValue(`${'prima dopo'.slice(0, qui)}IN MEZZO ${'prima dopo'.slice(qui)}`);
     await fuocoNelCampo(page, '#campo');
@@ -130,7 +130,7 @@ test.describe('il menu nello strato', () => {
     });
     await page.mouse.click(p.x, p.y, { button: 'right' });
     await apertoNelloStrato(app, page);
-    await menu.locator('.sn-menu-paste-main').click();
+    await menu.locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
     await chiusoLoStrato(app);
     await expect(page.locator('#ricco')).toHaveText('uno IN MEZZO tre');
     await fuocoNelCampo(page, '#ricco');
@@ -144,7 +144,7 @@ test.describe('il menu nello strato', () => {
     const banca = await apriPagina(openTab, testServer, '<!doctype html><title>Banca</title><input id="c">');
     await banca.locator('#c').click({ button: 'right' });
     await apertoNelloStrato(app, banca);
-    await menuDi(banca).locator('.sn-menu-paste-main').click();
+    await menuDi(banca).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
     await expect(banca.locator('#c')).toHaveValue('codice-banca-1054');
     await appunti(app, 'altro-appunto');
 
@@ -218,7 +218,7 @@ test.describe('il menu nello strato', () => {
       <input id="campo" style="position:absolute;left:20px;top:20px;width:300px"><script>
       window.__premuti = 0;
       const premi = () => {
-        for (const b of document.querySelectorAll('.sn-menu-paste-main, .sn-menu button, button')) {
+        for (const b of document.querySelectorAll('.sn-menu-griglia [data-sn-verbo="paste"], .sn-menu button, button')) {
           for (const n of b.querySelectorAll('*')) if (!n.children.length && n.textContent.trim()) n.textContent = 'Traduci la pagina';
           b.click();
           window.__premuti++;
@@ -238,12 +238,12 @@ test.describe('il menu nello strato', () => {
     await apertoNelloStrato(app, page);
     const menu = menuDi(page);
     // Lo strato dice quello che fa: la pagina non ne cambia le parole.
-    await expect(menu.locator('.sn-menu-paste-main')).toContainText('Incolla');
+    await expect(menu.locator('.sn-menu-griglia [data-sn-verbo="paste"]')).toContainText('Incolla');
     await pausa(1500);
     expect(await page.locator('#campo').inputValue(), 'la pagina ha incollato gli appunti da sé').toBe('');
     expect((await statoDelloStrato(app)).aperto, 'la pagina non chiude il menu').toBe(true);
     // Con la voce vera, premuta dall'utente, gli appunti arrivano: c'era davvero qualcosa da rubare.
-    await menu.locator('.sn-menu-paste-main').click();
+    await menu.locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
     await expect(page.locator('#campo')).toHaveValue('password-1054');
   });
 
@@ -590,7 +590,7 @@ test.describe('il menu nello strato', () => {
     expect(await pop.evaluate(() => document.documentElement.innerText)).not.toContain('Incolla');
     let menu = null;
     await expect.poll(async () => Boolean(menu = await menuDelloStratoAperto(app)), { timeout: 5000 }).toBe(true);
-    await menu.locator('.sn-menu-paste-main').click();
+    await menu.locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
     await expect(pop.locator('#pw')).toHaveValue('segreto-1054');
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoStrato && w._filoStrato.stato().aperto))).toBe(false);
   });
