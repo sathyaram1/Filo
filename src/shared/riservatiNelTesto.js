@@ -237,7 +237,8 @@ function chiede(riga) {
 // Chi scrive il campo si firma così nelle conversazioni copiate; le pagine di chat non mettono nomi, e un altro nome
 // può essere chiunque del gruppo.
 const CHI_SCRIVE = new Set(['io', 'tu', 'me', 'you', 'i']);
-const pulito = (v) => String(v || '').replace(/[.,;:!?)\]»”"']+$/u, '');
+// Anche le virgolette davanti: «pass «Mela!Verde77»» ha il valore fra loro (#2678.7).
+const pulito = (v) => String(v || '').replace(/^[«“„‘"'(\[]+/u, '').replace(/[.,;:!?)\]»”"'’]+$/u, '');
 // La riga porta già il dato: in testa («Gatto2024 (con la G maiuscola)», «certo, Gatto2024») o dopo una parola che lo
 // presenta («è gattonero tutto minuscolo», «eccola: gattonero»). Il nome di chi parla non presenta. Una domanda non porta,
 // ma solo nel suo inciso: «è gattonero?» no, «Gatto2024. Tu a che ora arrivi?» e «sì: Gatto2024 ma…, ok?» sì.
@@ -377,10 +378,9 @@ const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
 // Dopo un'etichetta corta una parola qualunque è il resto della frase («la pass giornaliera», «il pw del documento»):
 // conta se ha la forma di una password, o se la presenta un annuncio o i due punti; dopo «pw» anche se viene subito.
 // Come dopo «password»: anche con un avverbio («la pass ora è …») o un verbo di cambio («pw diventa …») in mezzo.
-const AVVERBI = '(?:ora|adesso|invece|ancora|attualmente|now|still)';
-const CAMBIA = '(?:diventa|diventerà|resta|rimane|sarà|will\\s+be)(?!\\p{L})';
-const PRESENTATA = new RegExp(`^\\s*(?:(?:del(?:la)?|dell['’]|di)\\s+[\\p{L}\\p{N}-]+\\s*)?(?:${AVVERBI}\\s+)?(?:[:=]|${ANNUNCIO}|${CAMBIA})\\s*$`, 'u');
-const PONTE = new RegExp(`^(?:${AVVERBI}|${CAMBIA}|${ANNUNCIO})$`, 'u');
+// L'annuncio largo, i modali e gli avverbi stanno nel guardiano, con l'elenco degli annunci.
+const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:[:=]|(?<!\\p{L})${guardiano().ANNUNCIO_LARGO}(?!\\p{L}))\\s*$`, 'u');
+const PONTE = new RegExp(`^(?:${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO})$`, 'u');
 const ACCANTO = /^\s*$/u;
 
 function formeLibere(testo) {
