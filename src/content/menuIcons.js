@@ -278,7 +278,7 @@
     const { contesto, azioni } = aperta;
     const regPagina = registro();
     const regFinestra = registroFinestra();
-    const { fila: ids, altro } = Disp.filaDi(disposizione(), contesto);
+    const { fila: ids, altro } = aperta.soloScritte ? { fila: [], altro: [] } : Disp.filaDi(disposizione(), contesto);
     const voci = (lista) => lista.map((id) => voce(id, azioni, regPagina, regFinestra)).filter(Boolean);
     const inFila = voci(ids);
     const inAltro = voci(altro);
