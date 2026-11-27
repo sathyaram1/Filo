@@ -714,7 +714,7 @@
         } else if (cambio && PONTE_DEL_CAMBIO.test(parola)) {
           presentato = true;
         } else if (DETERMINANTE.test(parola) && !PREPOSIZIONE.test(prec) && toks[k + 1] && /^\p{L}{2,}/u.test(toks[k + 1][0])
-          && !NEUTRA.test(toks[k + 1][0].replace(/[.,;:!?)»”"']+$/, '')) && !UN_NOME_DEL_VALORE.test(toks[k + 1][0])) {
+          && !NEUTRA.test(toks[k + 1][0].replace(/[.,;:!?)»”"']+$/, '')) && !UN_ALTRO_SEGRETO.test(toks[k + 1][0])) {
           break;
         } else if (!NEUTRA.test(parola) && !PREPOSIZIONE.test(parola)) {
           // «è giusto», «è scritta sul foglio»: dopo l'annuncio una parola che lo descrive, e il valore non c'è.
