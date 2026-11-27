@@ -204,7 +204,8 @@
     for (const it of Array.isArray(items) ? items : []) {
       if (!it || typeof it !== 'object' || MISURATE.has(it)) continue;
       MISURATE.add(it);
-      for (const k of ['items', 'subItems']) if (Array.isArray(it[k])) misuraLeAzioni(it[k]);
+      for (const k of ['items', 'subItems', 'varianti']) if (Array.isArray(it[k])) misuraLeAzioni(it[k]);
+      if (it.altro && Array.isArray(it.altro.items)) misuraLeAzioni(it.altro.items);
       if (typeof it.azione !== 'string' || !it.azione) continue;
       for (const campo of ['onClick', 'onPickHistory']) {
         const fa = it[campo];
