@@ -583,8 +583,17 @@
     for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
     for (const m of s.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) out.push({ valore: m[1], regola: 'codice' });
     for (const m of s.matchAll(PIN_CON_COMPLEMENTO)) out.push({ valore: m[1], regola: 'codice' });
+    for (const x of pavimentoTrova(s)) out.push({ valore: x.valore, regola: REGOLA_DEL_PAVIMENTO[x.regola] || x.regola });
     out.push(...codiciInElenco(s, out.valori));
     return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
+  }
+  // Ciò che non arriva a un modello non esce nemmeno da un'azione (#1403.89): il codice del mio telefono, del cancello,
+  // il CVV. Il pavimento li legge da sé, e qui si chiede a lui invece di copiarne le forme.
+  const REGOLA_DEL_PAVIMENTO = Object.freeze({ cvv: 'carta', token: 'chiave' });
+  function pavimentoTrova(s) {
+    if (!global.SN_PAVIMENTO && typeof require === 'function') { try { require('./pavimento.js'); } catch (_) { /* resta senza */ } }
+    const P = global.SN_PAVIMENTO;
+    return P && typeof P.trova === 'function' ? P.trova(s) : [];
   }
 
   // Un PIN, un codice o un CVV trovato vale per i numeri della stessa forma che lo seguono nella stessa frase: «i pin
