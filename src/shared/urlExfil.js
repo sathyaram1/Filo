@@ -368,12 +368,13 @@
   const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
   const LETTERA = NON_LATINI.LETTERA;
   // «parola» è anche l'italiano: il rumeno conta con chi la possiede, col wifi o dopo chi la chiede («care e parola»).
-  // «palabra clave» è la parola chiave.
+  // «palabra clave» è la parola chiave. I controlli all'indietro dopo la parola: messi prima, a ogni posto di una fila
+  // di spazi rileggerebbero tutta la fila, e una pagina con migliaia di spazi fermava Filo per secondi (#2673.10).
   const PAROLE_PASSWORD = [
-    'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', '(?<!palabras?\\s+)claves?',
+    'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', 'clave(?<!palabras?\\s+clave)s?',
     'senhas?', 'palavras?-passe', 'wachtwoord(?:en)?', 'has[łl](?:o|a|em|u)', 'parol(?:ă|a\\s+de|ei)',
     'parola\\s+(?:mea|ta|noastr[ăa]|voastr[ăa]|wi-?fi|wlan|router|re[țţt]elei|contului)',
-    '(?<=(?<![A-Za-z\\u00C0-\\u024F])(?:care\\s+(?:e|este|era)|d[ăa]-mi|trimite-mi|spune-mi|zi-mi|[șşs]tii|ai)\\s+)parola',
+    'parola(?<=(?<![A-Za-z\\u00C0-\\u024F])(?:care\\s+(?:e|este|era)|d[ăa]-mi|trimite-mi|spune-mi|zi-mi|[șşs]tii|ai)\\s+parola)',
     'parool(?:i|e)?', 'l[öo]senord(?:et|en)?', 'passord(?:et|ene)?', 'adgangskode(?:n|r|rne)?', 'kodeord(?:et)?',
     'salasan(?:a|an|aa|asi|ani)', 'jelsz(?:[óo]t?|av(?:a|ad|am|ak|at)?)', 'hesl(?:o|a|em|u|e)', 'gesl(?:o|a|om|u)',
     '[şs][iİı]\\u0307?fre(?:si|yi|n|niz|nizi|ler|m|mi|min|miz|ni|nin)?', 'lozink(?:a|e|u|om|i)', 'slapta[žz]od(?:is|į|žio|i)',
