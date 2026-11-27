@@ -190,7 +190,7 @@ test('un video di sfondo non ruba il menu al testo selezionato sopra di lui', as
   // Vince il contesto "testo selezionato": la spiegazione inline c'è…
   await expect(menu.locator('.sn-menu-inline')).toBeVisible();
   // …e le azioni del video non compaiono.
-  await expect(menu.getByText('Velocità', { exact: false })).toHaveCount(0);
+  await expect(menu.voce('Velocità')).toHaveCount(0);
 });
 
 test('"Salva video come…" scarica davvero il file, anche da un altro dominio', async ({ app, openTab, testServer }) => {
