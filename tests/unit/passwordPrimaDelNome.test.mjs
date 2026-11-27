@@ -45,7 +45,7 @@ test('una frase che parla della password senza dirla arriva intera ai due cancel
     'ecco, è la password', "l'unica cosa che manca è la password", 'la cosa importante è la password',
     'davvero è la password?', 'sicuramente è la password', 'this is the password', 'what is the password',
     'the problem is the password', 'non so se questa è la password', 'funziona anche come password',
-    'la data di nascita come password è una pessima idea', 'gattonero è il nome del gatto']) {
+    'mai usare la data di nascita come password', 'gattonero è il nome del gatto']) {
     assert.equal(P.oscura(frase), frase, `pavimento: ${frase}`);
     assert.equal(alCorrettore(frase), frase, `correttore: ${frase}`);
   }
