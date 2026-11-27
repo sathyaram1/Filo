@@ -1206,7 +1206,7 @@
     return out;
   }
 
-  function regole(s) {
+  function regole(s, giro) {
     const out = [];
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
