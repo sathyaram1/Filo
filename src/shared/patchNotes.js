@@ -15,6 +15,7 @@
         { testo: 'Un PIN o una password con una parola prima del valore, come «il pin è ancora 4821» o «the pin is still 4821», non arriva più a nessun modello, e un\'azione di Filo non li manda a un sito senza la tua conferma.', segnalazione: 2678 },
         { testo: 'Una password o un codice scritti in un indirizzo coi caratteri codificati, come «%20» al posto degli spazi, non arrivano più a nessun modello, come quando li scrivi in chiaro.', segnalazione: 1403 },
         { testo: 'Il CVV della carta non arriva a nessun modello nemmeno con un errore di battitura nel suo nome, come «Le crytogramme est 123», o chiamato «código de verificación», «Kreditkartenprüfnummer» o «codi de seguretat».', segnalazione: 2681 },
+        { testo: 'Un PIN scritto come «il pin del telefono é 4821», «il pin della carta è ancora 4821» o «der PIN meines Handys ist 4821» non esce più verso un sito senza la tua conferma, come già succedeva con «è».', segnalazione: 1403 },
       ],
     },
     {
