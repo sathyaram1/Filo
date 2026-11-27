@@ -78,7 +78,7 @@ async function tastoDestroApre(page, atteso) {
 
 async function scegliMenuDelSito(page, dove = '#area') {
   await page.locator(dove).click({ button: 'right', position: { x: 60, y: 50 } });
-  const voce = menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: 'Menu di Sito di prova' });
+  const voce = menuDi(page).icona('siteMenu').and(menuDi(page).voce('Menu di Sito di prova'));
   await expect(voce).toBeVisible();
   await voce.click();
 }
