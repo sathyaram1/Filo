@@ -236,7 +236,7 @@ function principale() {
     specDelRamo = blocchiDelDiff(diff).file.size ? [...blocchiDelDiff(diff).file.keys()].filter((f) => /^tests\/[^/]+\.spec\.mjs$/.test(f)) : [];
   }
   const { cambi, nuovi, nota } = cambiDelDiff({ diff, primaDi, file: opt.file, commitMappa: mappa.commit });
-  const { prove, senzaProve } = proveDelCambio(mappa, cambi);
+  const { prove, senzaProve } = proveDelCambio(mappa, cambi, { sorgente: sorgenteDellaMappa(mappa.commit) });
   if (opt.json) { console.log(JSON.stringify({ fonte, commit: mappa.commit, prove, senzaProve, nuovi, specDelRamo, nota }, null, 2)); return; }
   console.log(testoScelta({ prove, senzaProve, nuovi, mappa, fonte, nota, specDelRamo }));
 }
