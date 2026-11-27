@@ -1472,7 +1472,6 @@
       });
     };
 
-    conMenuDelSito(items, sito);
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
 
     if (wantCorrection) {
