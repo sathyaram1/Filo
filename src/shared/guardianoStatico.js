@@ -558,7 +558,8 @@
   // Il PIN anche con un complemento prima del verbo («il pin del telefono è 4821», «the pin for my phone is 4821»): il
   // primo verbo chiude, così «se il pin è giusto la pagina è 2048» non conta (#2678.3). Il verbo è ogni parola di ANNUNCI
   // anche nelle forme larghe, come per il pavimento verso i modelli («il pin del telefono é 4821», «è ancora», #1403.83);
-  // l'infinito e «ecco» non chiudono: «the pin to be used is 4821», «the pin here is 4821».
+  // l'infinito e «ecco» non chiudono: «the pin to be used is 4821», «the pin here is 4821». Il verbo regge anche i due
+  // punti o l'uguale dopo di sé («il pin è: 4821», «è = 4821», #1403.83 giro 1).
   // Le lunghezze di un PIN (o codice) e di un CVV, da qui sole: le leggono le regole che trovano il primo valore, qui e
   // nel pavimento, e quella dei numeri accanto in elenco; una misura allargata in un posto solo lascerebbe uscire il secondo.
   const MISURE_CIFRE = Object.freeze({ codice: Object.freeze([4, 8]), cvv: Object.freeze([3, 4]) });
@@ -567,7 +568,7 @@
   const ARTICOLO = '(?:(?:il|lo|la|el|le|die|der|das|the)\\s{1,8})?';
   const PIN_CHIUDE = `(?!(?:be|essere|here|ecco)(?![\\p{L}\\p{N}]))${ANNUNCIO}`;
   const PIN_CON_COMPLEMENTO = new RegExp(`\\bpin\\b(?:\\s{1,8}(?!${PIN_CHIUDE})[^\\s\\d:=.,;!?|"'«“]{1,24}){1,5}?`
-    + `\\s{0,8}(?:[:=]|(?<![\\p{L}\\p{N}])(?:${ANNUNCIO_LARGO})(?=\\s))\\s{0,8}${ARTICOLO}["'«“]?(${cifre('codice')})(?!\\d)`, 'giu');
+    + `\\s{0,8}(?:[:=]|(?<![\\p{L}\\p{N}])(?:${ANNUNCIO_LARGO})(?=[\\s:=])(?:\\s{0,8}[:=])?)\\s{0,8}${ARTICOLO}["'«“]?(${cifre('codice')})(?!\\d)`, 'giu');
   const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
     + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI})`
     + `\\s{0,8}(?:["'«“]|[${APRE_VALORE}]\\s{0,8})?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
