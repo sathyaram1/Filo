@@ -195,6 +195,32 @@ test('il menu proprio di una pagina di Filo (il titolo dell\'Editor) è a icone,
   await editor.screenshot({ path: resolve(SHOTS, 'menu-a-icone-editor.png') });
 });
 
+test.describe('col menu nello strato sopra la scheda', () => {
+  test.use({ stratoDelMenu: true });
+
+  test('griglia, riga del nome, contorno sulla pagina e menu dell\'icona come nella pagina', async ({ app, openTab, testServer }) => {
+    const img = testServer.asset(PNG, 'image/png');
+    const page = await testServer.openReady(openTab, SITO(img));
+    await page.locator('#copertina').click({ button: 'right' });
+    const menu = menuDi(page);
+    await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
+    expect(menu.superficie.url()).toMatch(/^filo:\/\/menu\//);
+    const s = await statoMenu(menu);
+    expect(s.testo).toEqual([]);
+    const copia = menu.locator('.sn-menu-griglia [data-sn-verbo="copy"]');
+    await copia.hover();
+    await expect(menu.locator('.sn-menu-nome')).toHaveText('Copia · l\'immagine · C');
+    // Il contorno sta nello strato, sopra l'immagine della pagina.
+    const foto = await page.locator('#copertina').boundingBox();
+    const contorno = await menu.locator('.sn-menu-bersaglio').first().boundingBox();
+    expect(Math.abs(contorno.x + 2 - foto.x)).toBeLessThan(4);
+    expect(Math.abs(contorno.y + 2 - foto.y)).toBeLessThan(4);
+    expect(await variantiDi(page, menu, 'copy')).toEqual(['Copia URL immagine', 'Copia URL']);
+    await menu.locator('.sn-menu-sub .sn-menu-item', { hasText: 'Copia URL' }).last().click();
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://esempio.it/altra');
+  });
+});
+
 test('«copia» copia la selezione quando c\'è, l\'elemento quando non c\'è', async ({ app, openTab, testServer }) => {
   const img = testServer.asset(PNG, 'image/png');
   const page = await testServer.openReady(openTab, SITO(img));
