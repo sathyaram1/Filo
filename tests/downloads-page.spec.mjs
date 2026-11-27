@@ -66,14 +66,14 @@ test('la pagina Scaricamenti elenca un download recente con le sue azioni', asyn
     // 3) Tasto destro → menu contestuale con TUTTE le azioni (copia percorso,
     //    ri-scarica), coerente con la centralità del tasto destro in Filo.
     await item.click({ button: 'right' });
-    const menu = dl.locator('.dl-ctxmenu');
-    await expect(menu).toBeVisible();
-    await expect(menu.locator('.sn-select-option', { hasText: 'Copia percorso' })).toBeVisible();
-    await expect(menu.locator('.sn-select-option', { hasText: 'Ri-scarica' })).toBeVisible();
-    await expect(menu.locator('.sn-select-option', { hasText: 'Rimuovi dalla lista' })).toBeVisible();
+    const menu = menuDi(dl);
+    await expect(menu.principale).toBeVisible();
+    await expect(menu.voce('Copia percorso')).toBeVisible();
+    await expect(menu.voce('Ri-scarica')).toBeVisible();
+    await expect(menu.voce('Rimuovi dalla lista')).toBeVisible();
     // Chiudi il menu (clic fuori) per non interferire col passo dopo.
     await dl.locator('h1').click();
-    await expect(menu).toHaveCount(0);
+    await expect(menu.pannelli).toHaveCount(0);
 
     // 4) "Rimuovi" fa sparire la voce DAVVERO (invariante UX: ciò che è in lista
     //    si può togliere), e comparire lo stato vuoto.
