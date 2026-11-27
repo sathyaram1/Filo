@@ -187,7 +187,7 @@ test('trascino i Mazzi sopra l’Editor e si scambiano; tolti finiscono in «alt
 
     // Tolgo i Mazzi dal tasto destro: diventano un'icona in «altro».
     await page.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
-    await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+    await menuDi(page).scegli('Togli dalla home');
     await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
     const icona = page.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]');
     await fuoriVista(page);
@@ -443,7 +443,7 @@ test('una carta di sinistra che non si trova: Filo riceve tutte le carte con la 
   test.setTimeout(60_000);
   const page = await home(app);
   await page.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await menuDi(page).scegli('Togli dalla home');
   await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
   await app.evaluate(async () => {
     const M = globalThis.SN_FILO_MEMORY;
@@ -564,7 +564,7 @@ test('la carta dei Crediti tolta va in «altro» e si rimette da sola: la destra
   test.setTimeout(60_000);
   const page = await home(app);
   await page.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await menuDi(page).scegli('Togli dalla home');
   await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
   const disposta = await ordineDestra(page);
 
@@ -601,7 +601,7 @@ test('uno scaricamento tolto dalla home torna chiesto a parole, e la disposizion
     const carta = page.locator('#accade .dash-carta[data-tipo="download"]', { hasText: 'bolletta-luce.bin' });
     await expect(carta.locator('.dash-carta-stato')).toHaveText(/^scaricato/, { timeout: 15_000 });
     await page.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
-    await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+    await menuDi(page).scegli('Togli dalla home');
     await carta.hover();
     await carta.locator('.dash-carta-togli').click();
     await expect(carta).toHaveCount(0);
