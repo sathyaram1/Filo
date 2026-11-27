@@ -836,6 +836,7 @@ module.exports = {
   buildMessages,
   handleAIRequest,
   handleStream,
+  controllaTrascrizione,
   extractJson,
   lessonsBufferText,
   memoriaPerModello,
