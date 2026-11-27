@@ -1116,8 +1116,10 @@
           }
           notaRipiego(bubble.text, m.keyFallback);
           notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
-          setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
+          setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}${durata ? ` • ${durata}` : ''}`);
         });
+        // Le domande sulla trascrizione vanno a un modello che risponde, non di nuovo a quello che trascrive.
+        if (trascrizione) popup.action = ACTIONS.EXPLAIN_DEEP;
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
         // non i marker, così l'LLM non si confonde nei turni successivi. Fermata prima del testo (#1302): la nota, perché
         // un turno del modello vuoto alcuni host lo rifiutano al «Continua». Col blocco riaperto, o il «Continua» dopo
