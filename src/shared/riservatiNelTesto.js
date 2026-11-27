@@ -85,19 +85,21 @@ const FINE_FRASE = new RegExp(`[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'gu');
 // leggono come spazi, con gli stessi indici. Solo i segni a confine di parola e sulla stessa riga (#2673.5).
 const ENFASI = /(?<![^\s|>(\[«"'“‘-])(\*{1,3}|_{1,3})(?=[^\s*_])((?:(?!\1)[^\n]){1,120}?)(?<=[^\s*_])\1(?![\p{L}\p{N}*_])/gu;
 // Lo stesso per i tag di un pezzo di pagina incollato («<b>Password:</b> …», «<strong>PIN:</strong> 4821», #2673.12):
-// il tag si legge come spazi, quello che va a capo come a capo, la cella come «|». Gli attributi restano testo (un
-// token in un href si vede ancora); un tag di testo fra due lettere («Ab<i>9x», «a<b && c>d») resta com'è.
+// il tag si legge come spazi, l'apertura di una riga come a capo (la chiusura no: le righe di una tabella restano
+// attaccate), la cella come «|». Gli attributi restano testo (un token in un href si vede ancora); un tag di testo fra
+// due lettere («Ab<i>9x», «a<b && c>d») resta com'è.
 const TAG_TESTO = 'b|strong|i|em|u|s|strike|del|ins|mark|small|big|sub|sup|span|font|code|kbd|samp|tt|var|a|abbr|cite|q'
   + '|label|time|data|bdi|bdo|wbr|nobr';
-const TAG_A_CAPO = 'br|hr|p|div|li|ul|ol|dl|dt|dd|tr|table|thead|tbody|tfoot|caption|h[1-6]|pre|blockquote|section'
-  + '|article|header|footer|main|aside|nav|figure|figcaption|address|details|summary|form|fieldset|legend';
-const TAG_HTML = new RegExp(`<(/?)(${TAG_TESTO}|${TAG_A_CAPO}|td|th)(?=[\\s/>])((?:[^<>"']|"[^"<>]*"|'[^'<>]*')*)>`, 'giu');
+const TAG_A_CAPO = 'br|hr|p|div|li|dt|dd|tr|table|caption|h[1-6]|pre|blockquote|section|article|header|footer|main'
+  + '|aside|nav|figure|figcaption|address|details|summary|form|fieldset|legend';
+const TAG_HTML = new RegExp(`<(/?)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|dl|thead|tbody|tfoot|td|th)(?=[\\s/>])`
+  + '((?:[^<>"\']|"[^"<>]*"|\'[^\'<>]*\')*)>', 'giu');
 const DI_TESTO = new RegExp(`^(?:${TAG_TESTO})$`, 'i');
 const A_CAPO = new RegExp(`^(?:${TAG_A_CAPO})$`, 'i');
 const SPAZIO_HTML = /&(?:nbsp|#160|#x0*a0);/gi;
 const senzaTag = (s) => s.replace(TAG_HTML, (tag, chiude, nome, attributi, k, tutto) => {
   if (DI_TESTO.test(nome) && /[\p{L}\p{N}]/u.test(tutto[k - 1] || '') && /[\p{L}\p{N}]/u.test(tutto[k + tag.length] || '')) return tag;
-  const segno = A_CAPO.test(nome) ? '\n' : (!chiude && /^t[dh]$/i.test(nome) ? '|' : ' ');
+  const segno = chiude ? ' ' : A_CAPO.test(nome) ? '\n' : /^t[dh]$/i.test(nome) ? '|' : ' ';
   const testa = segno + ' '.repeat(1 + chiude.length + nome.length - 1);
   return testa + attributi.replace(/\/$/, ' ') + ' ';
 }).replace(SPAZIO_HTML, (e) => ' '.repeat(e.length));
