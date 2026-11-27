@@ -3157,7 +3157,7 @@
   }
 
   // Il tasto destro a icone (#2555): grandezza delle icone in px e colonne della griglia, dentro i limiti.
-  const MENU_ICONE_LIMITI = Object.freeze({ icona: Object.freeze([14, 32]), colonne: Object.freeze([3, 10]) });
+  const MENU_ICONE_LIMITI = Object.freeze({ icona: Object.freeze([14, 32]), colonne: Object.freeze([3, 12]) });
   function opzioniMenuIcone(v) {
     const o = v && typeof v === 'object' ? v : {};
     const d = DEFAULT_SETTINGS.menuIcone;
