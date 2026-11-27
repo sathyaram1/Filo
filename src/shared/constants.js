@@ -3551,6 +3551,8 @@
     AVVISO_CREDITI_LIMITI,
     opzioniBarraLaterale,
     opzioniPannelloDestro,
+    MENU_ICONE_LIMITI,
+    opzioniMenuIcone,
     AVVISO_SCHERMO_PIENO_LIMITI,
     opzioniAvvisoSchermoPieno,
     RICERCA_FILO_LIMITI,
