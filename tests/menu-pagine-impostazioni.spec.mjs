@@ -241,8 +241,9 @@ test('Preferenze: se la voce cliccata viene ridisegnata mentre Filo si prepara, 
   // un'altra voce, ed è di quella che il menu deve parlare.
   await etichetta.evaluate((el) => el.replaceWith(document.getElementById('autoArchiveEnabled').closest('label')));
   await apriImpostazioni(app);
-  expect(await etichette(page)).toContain('Chiedi a Filo');
-  await menuDi(page).scegli('Chiedi a Filo');
+  expect(await etichette(page)).toContain('Spiega cosa fa');
+  expect(await variantiDiChiedi(page)).toContain('Chiedi a Filo');
+  await menuDi(page).sottomenu.locator('.sn-menu-item', { hasText: 'Chiedi a Filo' }).click();
   const campo = page.locator('.sn-sidebar-input textarea');
   await expect(campo).toBeVisible({ timeout: 8_000 });
   await expect(campo).toHaveValue(/^Sull'impostazione «.*riordino.*»: $/i);
