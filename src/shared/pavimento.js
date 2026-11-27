@@ -1095,7 +1095,10 @@
     const copia = aCapo(vero);
     const piano = copia ? copia.piano : vero;
     // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
-    const s = virgoletteStrette(R ? R.senzaEnfasi(piano) : piano);
+    // Un avverbio fra il verbo e il valore («il pin è ancora 4821») si legge come spazi, come l'enfasi (guardianoStatico.js).
+    if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
+    const G = global.SN_GUARDIANO_STATICO;
+    const s = G.avverbiComeSpazi(virgoletteStrette(R ? R.senzaEnfasi(piano) : piano));
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return [];
     const out = regole(s);
     // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
