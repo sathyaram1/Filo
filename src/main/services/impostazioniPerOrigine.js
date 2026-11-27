@@ -18,7 +18,7 @@ const CAMPI_WEB = Object.freeze({
   // I siti dove il tasto destro apre il loro menu (#975): come i siti esclusi, arriva solo la voce del frame che chiede.
   menuDelSito: Object.freeze({ siti: true }),
   // Il tasto destro a icone (#2555): grandezza e colonne, due numeri dell'utente.
-  menuIcone: Object.freeze({ icona: true, colonne: true }),
+  menuIcone: true,
   // L'Aiuto spento (#841) toglie la sua voce dal tasto destro anche sui siti.
   featureFlags: Object.freeze({ spellcheck: true, spellcheckContext: true, help: true }),
   // Il correttore (#1446): la parte del modello, le ripetizioni e i tempi dei due controlli; la correzione automatica e
