@@ -1792,7 +1792,7 @@ test('#997 il giro di aggiornamento non porta via l\'esito del controllo già le
   await page.evaluate(() => window.__mgTest.pollNow());
   // Il giro è arrivato (il titolo nuovo è nell'elenco), e l'esito è rimasto.
   await page.locator('[data-fs-id="audit"]').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option').first().click();
+  await primaDelMenu(page).click();
   await expect(page.locator('#mgFsDrillList')).toContainText('titolo cambiato');
   await expect(tile(page, 'audit')).toHaveText('1');
 });
