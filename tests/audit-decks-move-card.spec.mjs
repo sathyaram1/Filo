@@ -67,8 +67,8 @@ test('spostare una carta in un mazzo che la contiene già non perde le copie', a
 
   // Flusso utente: tasto destro sulla riga → Sposta in un altro mazzo → Mazzo B.
   await page.locator('.dk-row', { hasText: 'Island' }).click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Sposta in un altro mazzo' }).click();
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Mazzo B' }).click();
+  await menuDi(page).scegli('Sposta in un altro mazzo');
+  await menuDi(page).scegli('Mazzo B');
 
   // La riga esce dal mazzo di origine (il "move" è avvenuto).
   await expect(page.locator('.dk-row', { hasText: 'Island' })).toHaveCount(0);
