@@ -316,7 +316,6 @@ const ORDINE = { funzione: 0, larga: 1, file: 2 };
 
 const DICHIARAZIONE = /^(\s*)(?:export\s+)?(?:const|let|var|class|(?:async\s+)?function\s*\*?)\s*([A-Za-z_$][\w$]*|\{[^}]*\}|\[[^\]]*\])/;
 const CHIUSURA = /^\s*[\]})]/;
-const TETTO_NOMI = 500;
 
 /**
  * Le righe che leggono i nomi dichiarati fuori dalle funzioni sulle righe `righe`: una costante, una tabella o
