@@ -225,6 +225,7 @@ function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo riquadri] dictationSegmenter.js', e); }
   try { require(path.join(SHARED_DIR, 'ascolto.js')); } catch (e) { console.error('[Filo riquadri] ascolto.js', e); }
   try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo riquadri] voceChat.js', e); }
+  try { require(path.join(SHARED_DIR, 'trascriviMedia.js')); } catch (e) { console.error('[Filo riquadri] trascriviMedia.js', e); }
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo riquadri] tts.js', e); }
   try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo riquadri] editBox.js', e); }
   try { require(path.join(SHARED_DIR, 'trascrizioneRighe.js')); } catch (e) { console.error('[Filo riquadri] trascrizioneRighe.js', e); }
