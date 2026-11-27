@@ -2315,7 +2315,7 @@
     if (riquadro[0]) a.cookie = { label: riquadro[0].label, onClick: riquadro[0].onClick };
     a.feedback = { label: 'Invia feedback', onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()) };
     const spegni = buildSpegniFiloItem();
-    if (spegni) a.filoOff = { label: spegni.label, onClick: spegni.onClick, misura: spegni.azione };
+    if (spegni) a.filoOff = { label: spegni.label, onClick: spegni.onClick, azione: spegni.azione };
     if (voceAttacco) a.redteam = { label: 'Invia attacco (Red-team)', onClick: () => openSurface('redteam', () => self.SN_REDTEAM_ATTACK_UI?.open()) };
     return a;
   }
