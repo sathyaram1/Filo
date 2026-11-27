@@ -298,14 +298,13 @@
       const ic = pulisciIcona(String(d.svg || ''));
       const icon = /^<svg[\s>]/.test(ic) ? ic : ic.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
       Menu.trascinaDaFuori({ fase: String(d.fase || ''), id: String(d.icona || ''), x: Number(d.x) || 0, y: Number(d.y) || 0, icon });
-    } else if (d.cosa === 'griglia-apri' || d.cosa === 'collegamento-apri') {
+    } else if (d.cosa === 'collegamento-apri') {
       m.inVolo.clear();
       const el = m.ancore.get(String(d.ancora || ''));
       // Arrivata tardi, con un altro pannello già aperto dall'utente: vale quello.
       if (!el || !el.isConnected) return;
       const opts = D.ricostruisci(d.opts || {}, { funzione: chiamata });
-      if (d.cosa === 'collegamento-apri') Menu.openLinkSubmenu(el, { valore: String(opts.valore || ''), onApplica: opts.onApplica });
-      else if (!Menu.isSubMenuOpen()) Menu.openIconGridSubmenu(el, costruisci(d.items, []), opts);
+      Menu.openLinkSubmenu(el, { valore: String(opts.valore || ''), onApplica: opts.onApplica });
     }
   });
 
