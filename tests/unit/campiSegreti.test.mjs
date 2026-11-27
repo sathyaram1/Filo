@@ -97,6 +97,18 @@ test('la chiave del wifi e le forme della parola nelle altre lingue: il campo è
   }
 });
 
+test('un campo col nome del CVV in un’altra lingua è segreto, come nel testo (#1403.61)', () => {
+  const P = require('../../src/shared/pavimento.js');
+  const s = creaIsolata();
+  for (const etichetta of ['Code de sécurité', 'Cryptogramme visuel', 'Sicherheitscode', 'Kartenprüfnummer',
+    'Código de seguridad', 'Código de segurança', 'Beveiligingscode', 'Kod bezpieczeństwa']) {
+    assert.equal(s.campoSegreto(campo({ 'aria-label': etichetta }, '123')), true, `campo «${etichetta}»`);
+    assert.ok(!P.oscura(`${etichetta}: 123`).includes('123'), `testo «${etichetta}:»`);
+  }
+  for (const etichetta of ['Code postal', 'Código postal', 'Sicherheitshinweise', 'Kod pocztowy'])
+    assert.equal(s.campoSegreto(campo({ 'aria-label': etichetta }, '20121')), false, etichetta);
+});
+
 test('ogni strada che crea i campi segreti riceve le etichette del pavimento', () => {
   const src = (p) => readFileSync(new URL(`../../src/${p}`, import.meta.url), 'utf8');
   for (const p of ['content/extractContext.js', 'content/testoDeiCampi.js', 'main/services/campiNeiRiquadri.js', 'main/services/fotoDellaPagina.js']) {

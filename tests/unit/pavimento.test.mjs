@@ -60,6 +60,24 @@ test('#2681.2: il CVV con l\'articolo dopo il verbo, col trattino, al futuro e c
     assert.equal(P.oscura(riga), riga);
 });
 
+test('il CVV chiamato col suo nome nelle lingue delle etichette si toglie come «Codice di sicurezza: 123» (#1403.61)', () => {
+  for (const riga of ['Code de sécurité : 123', 'Cryptogramme : 123', 'Sicherheitscode: 123', 'Kartenprüfnummer: 123',
+    'Código de seguridad: 123', 'Código de segurança: 123', 'Beveiligingscode: 123', 'Kod bezpieczeństwa: 123',
+    'Codice di sicurezza: 123', 'Security code: 123', 'Code de securite: 123', 'Codigo de seguranca: 123',
+    'Kod bezpieczenstwa: 123', 'Kartenpruefnummer: 123', 'Cryptogramme visuel 123', 'Code de sécurité 123',
+    'Code de sécurité de la carte : 123', 'Código de seguridad de la tarjeta 123', 'Código de segurança do cartão: 123',
+    'Sicherheitscode der Karte: 123', 'Kod bezpieczeństwa karty: 123', 'Veiligheidscode van de kaart: 123',
+    'Le code de sécurité est 123', 'El código de seguridad es 1234', 'Der Sicherheitscode lautet 123',
+    'Code de sécurité (au dos) : 123', 'Sicherheitscode | 123']) {
+    const fuori = P.oscura(riga);
+    assert.ok(!/\b12(34|3)\b/.test(fuori), riga);
+    assert.ok(fuori.includes(S), riga);
+  }
+  for (const riga of ['Le code de sécurité est au dos de la carte', 'El código de seguridad tiene 3 cifras',
+    'Der Sicherheitscode steht auf der Rückseite', 'Code de la sécurité sociale, article 123'])
+    assert.equal(P.oscura(riga), riga);
+});
+
 test('un codice usa e getta e una chiave col suo prefisso non escono', () => {
   const t = P.oscura('Il tuo codice OTP è 482913. Chiave: sk-abcdefghijklmnop1234567890');
   assert.ok(!t.includes('482913'));

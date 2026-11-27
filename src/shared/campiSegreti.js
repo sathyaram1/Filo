@@ -236,7 +236,7 @@
   function etichette() {
     if (!global.SN_PAVIMENTO && typeof require === 'function') { try { require('./pavimento.js'); } catch (_) {} }
     const P = global.SN_PAVIMENTO || {};
-    return [P.ETICHETTE, P.CVV_ALTRE_LINGUE].filter(Boolean).join('|');
+    return [P.ETICHETTE, P.NOMI_CVV, P.CVV_ALTRE_LINGUE].filter(Boolean).join('|');
   }
 
   // Il testo a schermo che ripete il valore di un campo segreto (#810.16), come l'anteprima della carta che si compone
