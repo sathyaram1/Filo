@@ -1,4 +1,4 @@
-// I tetti di SPEC-CONTESTO § Le costanti per chi scrive Filo: 8.000 token per la parte fissa della chat e 8.450 per gli
+// I tetti di SPEC-CONTESTO § Le costanti per chi scrive Filo: 8.000 token per la parte fissa della chat e 8.550 per gli
 // strumenti, perché il prompt non ricresca in silenzio (+11.000 token fra il 25/09 e il 07/10).
 // La stima è quella della chat (SN_FILO_CONTESTO.stimaToken), tarata qui sotto sul contatore di Anthropic (#2473).
 
