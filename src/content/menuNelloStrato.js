@@ -18,10 +18,8 @@
   const locale = {
     open: Menu.open,
     close: Menu.close,
-    openIconGridSubmenu: Menu.openIconGridSubmenu,
     openLinkSubmenu: Menu.openLinkSubmenu,
     refreshIconRow: Menu.refreshIconRow,
-    refreshIconGrid: Menu.refreshIconGrid,
     isSubMenuOpen: Menu.isSubMenuOpen,
     isOpen: Menu.isOpen,
     testoNascosto: Menu.testoNascosto,
