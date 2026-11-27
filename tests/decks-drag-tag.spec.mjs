@@ -159,7 +159,7 @@ test('vista per tipo, trascinare forza il gruppo (parità con "Sposta in gruppo"
 
   // Passa alla vista per tipo: gruppi Artefatti / Terre / Creature.
   await page.click('#groupBy');
-  await menuDi(page).scegli('per tipo');
+  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'per tipo' }).click();
   await expect(page.locator('#groupBy')).toContainText('per tipo');
   await expect(page.locator('.dk-group[data-group="Artefatti"] .dk-row', { hasText: 'Sol Ring' })).toHaveCount(1);
 
