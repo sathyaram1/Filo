@@ -387,16 +387,15 @@ async function provaIconeDelMenu(page) {
   await page.locator('#bersaglio').click({ button: 'right' });
   const m = menuDi(page);
   await expect(m.locator('.sn-menu').first()).toBeVisible();
-  const icona = m.locator('.sn-menu-row-btn[aria-label="Traduci"]');
-  const atteso = await icona.getAttribute('data-tip');
-  expect(atteso).toMatch(/^Traduci/);
+  const icona = m.locator('.sn-menu-griglia .sn-menu-row-btn[aria-label="Traduci"]');
+  expect(await icona.getAttribute('data-tip')).toBeNull();
   // Il menu cresce e si riposa quando arrivano le sue sezioni: a quel punto sotto il puntatore c'è un'altra icona (Copia,
-  // in GitHub), e il fumetto giustamente dice la sua. Si ripassa sull'icona finché il menu non è fermo.
+  // in GitHub), e la riga del nome giustamente dice la sua. Si ripassa sull'icona finché il menu non è fermo.
   await expect(async () => {
     await icona.hover({ force: true });
-    await expect(fumetto(m.superficie)).toBeVisible({ timeout: 1500 });
-    await expect(fumetto(m.superficie)).toHaveText(atteso, { timeout: 1500 });
+    await expect(m.nome).toHaveText(/^Traduci · /, { timeout: 1500 });
   }).toPass({ timeout: 10_000 });
+  await expect(fumetto(m.superficie)).toBeHidden();
   expect(await m.valuta(() => document.querySelectorAll('.sn-tooltip').length), 'il menu non disegna più un\'etichetta sua').toBe(0);
   await m.superficie.keyboard.press('Escape');
 }
