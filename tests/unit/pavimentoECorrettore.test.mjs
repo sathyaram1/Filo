@@ -199,7 +199,25 @@ test('sotto l\'etichetta un valore in una voce d\'elenco, una citazione o un blo
     assert.equal(alCorrettore(testo), testo, 'correttore');
   }
   // Mille voci vuote non diventano una fila di spazi: le etichette la rileggerebbero all'indietro (6 s invece di 70 ms).
-  const t0 = Date.now();
-  P.oscura(`x\n${'\n- '.repeat(4000)}`);
-  assert.ok(Date.now() - t0 < 2000, `${Date.now() - t0} ms`);
+  const c = costoInUnita(() => P.oscura(`x\n${'\n- '.repeat(4000)}`), { tetto: TETTO_VOCI_VUOTE });
+  assert.ok(c.entro, c.come);
+});
+
+// Le forme più rare dello stesso valore: il blocco di codice citato, più righe vuote, una cella vuota o una barra
+// protetta in tabella. Il pavimento le copre come il correttore.
+test('il blocco di codice citato, le righe vuote e le celle vuote non lasciano passare il valore sotto l\'etichetta', () => {
+  for (const [testo, atteso] of [
+    ['Password:\n> ```\n> Nyckel!2024\n> ```', `Password:\n> \`\`\`\n> ${S}\n> \`\`\``],
+    ['> Password:\n> ```\n> Nyckel!2024\n> ```', `> Password:\n> \`\`\`\n> ${S}\n> \`\`\``],
+    ['Password:\n\n\n\n- Nyckel!2024', `Password:\n\n\n\n- ${S}`],
+    ['Password:\n\n\n```\nNyckel!2024\n```', `Password:\n\n\n\`\`\`\n${S}\n\`\`\``],
+    ['| Password: | | Nyckel!2024 |', `| Password: | | ${S} |`],
+    ['| Password: | Nyckel\\|2024 |', `| Password: | ${S} |`],
+  ]) {
+    assert.equal(P.oscura(testo), atteso, 'pavimento');
+    assert.doesNotMatch(alCorrettore(testo), /Nyckel|2024/, 'correttore');
+  }
+  for (const testo of ['Password:\n> ```\n> npm install\n> ```', '| Password: | | obbligatoria |', '| Password: | | |']) {
+    assert.equal(P.oscura(testo), testo);
+  }
 });
