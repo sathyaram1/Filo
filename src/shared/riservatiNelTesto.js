@@ -284,7 +284,7 @@ function incisiComeSpazi(s) {
     cambiato = true;
     return tutto.slice(0, tutto.length - inciso.length) + ' '.repeat(inciso.length);
   });
-  return cambiato ? out : null;
+  return cambiato ? verbiDopoIlNome(out) : null;
 }
 
 // Le letture del testo col nome e il verbo corretti e con l'inciso come spazi, per chi cerca la password dopo il nome
