@@ -58,16 +58,18 @@ function segui(app, prova, dir, { accumula: accumulaIn, comeIndirizzi }) {
   app.once('close', scrivi);
 }
 
-/**
- * `regola`: src/main/copertura.js, che dice quando una funzione conta come eseguita per il main e per le pagine. La
- * passa chi accende perché gli strumenti fissati non portano src/main (tests/unit/toolsPin.test.mjs).
- */
-export function accendiCopertura(regola) {
+// Senza la regola passata, quella del repo della config: gli strumenti fissati non portano src/main
+// (tests/unit/toolsPin.test.mjs), e la config letta da Playwright non regge import.meta.
+function regolaDelRepo() {
+  let radice = process.cwd();
+  try { radice = dirname(test.info().config.configFile); } catch (_) {}
+  return createRequire(join(radice, 'package.json'))('./src/main/copertura.js');
+}
+
+/** `regola`: src/main/copertura.js, che dice quando una funzione conta come eseguita, per il main e per le pagine. */
+export function accendiCopertura(regola = null) {
   const dir = process.env.FILO_COPERTURA;
   if (!dir) return;
-  if (typeof regola?.accumula !== 'function' || typeof regola?.comeIndirizzi !== 'function') {
-    throw new Error('accendiCopertura vuole la regola del main: accendiCopertura(require(\'./src/main/copertura.js\'))');
-  }
   const proto = Object.getPrototypeOf(_electron);
   if (proto.__filoCopertura) return;
   proto.__filoCopertura = true;
