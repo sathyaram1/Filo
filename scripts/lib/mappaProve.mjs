@@ -336,24 +336,25 @@ export function righeDeiNomi(testo, righe, dentro) {
       if (!l || !l.trim()) continue;
       const rin = rientro(l);
       if (rin > base || (i === r - 1 && rin === base && CHIUSURA.test(l))) continue;
-      if (rin < base) return [];
+      if (rin < base) return { nomi: [] };
       const m = l.match(DICHIARAZIONE);
-      return m ? m[2].match(/[A-Za-z_$][\w$]*/g) || [] : [];
+      return { nomi: m ? m[2].match(/[A-Za-z_$][\w$]*/g) || [] : [], dove: i + 1 };
     }
-    return [];
+    return { nomi: [] };
   };
   const visti = new Set();
   const out = new Set();
   const coda = (righe || []).filter((r) => !dentro(r));
   while (coda.length) {
     const r = coda.pop();
-    for (const nome of nomiDi(r)) {
+    const { nomi, dove } = nomiDi(r);
+    for (const nome of nomi) {
       if (visti.has(nome)) continue;
       visti.add(nome);
       const re = new RegExp(`(?<![\\w$.])${nome.replace(/\$/g, '\\$')}(?![\\w$])`);
       linee.forEach((l, i) => {
         const riga = i + 1;
-        if (riga === r || out.has(riga) || !re.test(l)) return;
+        if (riga === r || riga === dove || out.has(riga) || !re.test(l)) return;
         out.add(riga);
         if (!dentro(riga)) coda.push(riga);
       });
