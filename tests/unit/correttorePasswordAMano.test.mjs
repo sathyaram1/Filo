@@ -201,9 +201,10 @@ test('#1649: le porte nuove non prendono nomi di prodotto, utenti, ticket e codi
 
 // Un testo lungo senza punti, con la parola ripetuta, cercava la fine della frase da capo a ogni menzione: 200 mila
 // caratteri erano 17 secondi a ogni richiesta del correttore, e i refusi contati come menzioni li moltiplicavano.
-// Oggi costa qualche decina di unità, la versione quadratica più di mille.
+// Oggi costa circa 300 unità su Linux e sopra 400 sul Windows del cancello (i refusi letti come il nome, #2678.21), la
+// versione quadratica circa tremila: il tetto sta fra le due.
 test('un testo lunghissimo che ripete la parola password senza punti si legge in fretta', () => {
-  const c = costoInUnita(() => R.oscura('pasword passowrd password '.repeat(12000)), { tetto: 400 });
+  const c = costoInUnita(() => R.oscura('pasword passowrd password '.repeat(12000)), { tetto: 1000 });
   assert.ok(c.entro, c.come);
 });
 

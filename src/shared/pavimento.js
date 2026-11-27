@@ -915,6 +915,13 @@
   // Dopo la sola domanda («Ti ricordi la password? «…»») conta la forma della password, come senza verbo.
   const VIRGOLETTATO_DOMANDA = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*\\?+${FRA_VIRGOLETTE}`, 'gid');
   const RISPOSTA_NUDA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
+  // «e» senza accento è anche la congiunzione: vale «è» solo subito dopo il nome e di cosa è, e col valore che ha la
+  // forma di una password («la password e Mela!Verde77», non «la password e il nome utente», #2678.21). Un verbo al
+  // plurale dopo il valore dice che era la congiunzione («la password e Office365 sono collegati»).
+  const E_SENZA_ACCENTO = `${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]+e`;
+  const PLURALE_DOPO = '(?![ \\t]+(?:(?:non|not)[ \\t]+)?(?:sono|erano|saranno|siano|vanno|stanno|hanno|funzionano|restano|rimangono|coincidono|li|le|ne|are|were|have|do|don[\'’]t)(?![A-Za-zÀ-ÿ]))';
+  const VIRGOLETTATO_E = new RegExp(`${E_SENZA_ACCENTO}${FRA_VIRGOLETTE}${PLURALE_DOPO}`, 'gid');
+  const E_NUDA = new RegExp(`${E_SENZA_ACCENTO}[ \\t]+([^\\s|\\[]{6,64})(?![^\\s|\\[])${PLURALE_DOPO}`, 'gi');
   // Dopo una password fra virgolette, nella stessa frase, la seconda che le si lega con un annuncio o una preposizione
   // («da «…» a «…»», «era «…», l'ho cambiata in «…»», «la vecchia era «…» e la nuova è «…»»). Un altro campo nominato
   // in mezzo («e il nome utente è «…»») non è la password.
@@ -945,7 +952,7 @@
       return true;
     };
     const fini = [];
-    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE, VIRGOLETTATO_MESSA, VIRGOLETTATO_RISPOSTA, VIRGOLETTATO_DOMANDA]) {
+    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE, VIRGOLETTATO_MESSA, VIRGOLETTATO_RISPOSTA, VIRGOLETTATO_DOMANDA, VIRGOLETTATO_E]) {
       for (const m of s.matchAll(re)) {
         const separato = (re === VIRGOLETTATO_DOPO && !UNA_FRECCIA.test(m.groups.sep || '')) || re === VIRGOLETTATO_MESSA || re === VIRGOLETTATO_RISPOSTA;
         if (prendi(m, separato)) fini.push(m.index + m[0].length);
@@ -962,7 +969,7 @@
         fine = m.index + m[0].length;
       }
     }
-    for (const m of s.matchAll(RISPOSTA_NUDA)) {
+    for (const m of [...s.matchAll(RISPOSTA_NUDA), ...s.matchAll(E_NUDA)]) {
       const v = formaVicina(m[1]);
       if (v) out.push({ valore: v, regola: 'password' });
     }
@@ -1406,11 +1413,14 @@
     // Un avverbio fra il verbo e il valore («il pin è ancora 4821») si legge come spazi, come l'enfasi (guardianoStatico.js).
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
-    const viste = (R ? R.vistePerLeRegole(piano) : [piano]).map((v) => G.avverbiComeSpazi(virgoletteStrette(v)));
+    // Un refuso del nome («pasword») o del verbo («diventta») si legge giusto, alla stessa lunghezza, e un inciso fra nome
+    // e verbo come spazi in una lettura in più (riservatiNelTesto.js).
+    const viste = (R ? R.vistePerLeRegole(piano).map((v) => R.verbiDopoIlNome(R.refusiComeNome(v))) : [piano])
+      .map((v) => G.avverbiComeSpazi(virgoletteStrette(v)));
     if (!viste[0].trim() || /^data:image\//i.test(viste[0].slice(0, 16))) return [];
     const out = [];
     for (const s of viste) {
-      for (const lettura of [s, celleComeRighe(s)]) {
+      for (const lettura of [s, celleComeRighe(s), R ? R.incisiComeSpazi(s) : null]) {
         if (lettura === null) continue;
         const qui = regole(lettura, giro);
         // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
