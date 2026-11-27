@@ -720,6 +720,15 @@
     return { partial: { correttore: { [campo]: volte } }, label: etichetta(cifre(volte)) };
   }
 
+  // Il tasto destro a icone (#2555): un numero dentro i limiti, o il rifiuto col numero.
+  function numeroMenuIcone(v, campo, etichetta) {
+    const n = Math.round(parseItalianNumber(String(v == null ? '' : v).trim().replace(/[^0-9.,-]/g, '')));
+    if (!Number.isFinite(n)) return null;
+    const [min, max] = global.SN_CONST.MENU_ICONE_LIMITI[campo];
+    if (n < min || n > max) return { rifiuto: `${cifre(n)} è fuori dai limiti: da ${cifre(min)} a ${cifre(max)}` };
+    return { partial: { menuIcone: { [campo]: n } }, label: etichetta(cifre(n)) };
+  }
+
   // Il pannello di destra delle app (#1433) ha gli stessi tempi della barra, e la stessa lettura.
   function msPannello(v, campo, etichetta) {
     const r = msBarra(v, campo, etichetta);
