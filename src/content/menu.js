@@ -1448,6 +1448,12 @@
 
   // Il menu dell'icona (#2555): le varianti dello stesso verbo su un altro oggetto, come testo. Non ha un livello sotto.
   function apriVarianti(b, it) {
+    if (it.cronologia && typeof it.cronologia === 'object') {
+      const c = it.cronologia;
+      openSubmenu(b, Array.isArray(c.history) ? c.history : [], { onPick: c.onPick, onRemove: c.onRemove, onClear: c.onClear });
+      if (activeMenu) { activeMenu.subOwner = b; activeMenu.subLocked = true; }
+      return true;
+    }
     const voci = (Array.isArray(it.varianti) ? it.varianti : []).filter((x) => x && typeof x.onClick === 'function');
     if (!voci.length) return false;
     openGenericSubmenu(b, voci.map((x) => ({
