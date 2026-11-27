@@ -217,7 +217,7 @@ test('negli Scaricamenti: «Dai un nome sensato», la voce segue il file, e «Ri
     const voce = dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'scan_00231.pdf' }) });
     await expect(voce).toBeVisible({ timeout: 10000 });
     await voce.click({ button: 'right' });
-    await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(dl).scegli('Dai un nome sensato');
     await expect(dl.locator('.sn-rinomina-campo')).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
     await dl.locator('.sn-rinomina-ok').click();
     await expect(dl.locator('.sn-rinomina-esito-testo')).toHaveText(`Rinominato: ${NOME_NUOVO}`);
@@ -666,7 +666,7 @@ test('col nome automatico acceso, il nome dato a mano mentre Filo legge ancora i
     const dl = await openTab('filo://downloads/downloads.html');
     const voce = dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'scan_00555.pdf' }) });
     await voce.click({ button: 'right' });
-    await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(dl).scegli('Dai un nome sensato');
     const campo = dl.locator('.sn-rinomina-campo');
     await campo.fill('Luce marzo scelto da me');
     await campo.press('Enter');
