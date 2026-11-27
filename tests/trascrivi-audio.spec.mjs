@@ -182,7 +182,7 @@ test('in chat: «trascrivi <indirizzo>» risponde col parlato; un indirizzo che 
   const esiti = await app.evaluate(() => globalThis.__esiti);
   expect(esiti.join('\n')).toMatch(/0:40/);
 
-  const pagina = testServer.html('<!doctype html><html><body><p>Solo testo, nessun audio.</p></body></html>').replace(/\/(\d+)$/, '/$1');
+  const pagina = testServer.html('<!doctype html><html><body><p>Solo testo, nessun audio.</p></body></html>');
   await chiedi(page, `trascrivi ${pagina}`);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'non è un audio o un video' })).toBeVisible({ timeout: 30_000 });
 });
