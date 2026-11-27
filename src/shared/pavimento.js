@@ -778,12 +778,12 @@
   // modifica 2 mesi fa»): «ci vediamo ogni giorno», «may the force be with you», «ci vediamo tra due giorni» e «il mio
   // cane ha tre anni» sono frasi-password (#2678.14).
   const NUMERO = /\d|^(?:due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|quindici|venti|trenta|two|three|four|five|six|seven|eight|nine|ten|twelve|sixteen|twenty|thirty)$/i;
-  const APRE_MISURA = /^(?:almeno|circa|minimo|min|massimo|max|oltre|più|entro|ogni|per|valida|valido|validità|durata|lunghezza|scadenza|ultim[ao]|modifica|cambio|aggiornamento|at|least|most|about|around|every|within|for|over|up|to|last|valid)$/i;
+  const APRE_MISURA = /^(?:almeno|circa|minimo|min|massimo|max|oltre|più|entro|ogni|per|valida|valido|validità|durata|lunghezza|scadenza|ultim[ao]|modifica|cambio|aggiornamento|cambiat[ao]|modificat[ao]|aggiornat[ao]|at|least|most|about|around|every|within|for|over|up|to|last|valid|changed|updated|modified|on)$/i;
   const FRA_NUMERI = /^(?:o|or|più|more|a|to|e|and|-|–|fino)$/i;
   const misuraODate = (parole) => {
     const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
-    let i = ARTICOLO.test(p[0]) ? 1 : 0;
-    while (i < p.length && APRE_MISURA.test(p[i])) i++;
+    let i = 0;
+    while (i < p.length && (APRE_MISURA.test(p[i]) || ARTICOLO.test(p[i]))) i++;
     if (TEMPO.test(p[i] || '') && NUMERO.test(p[i + 1] || '')) return true;
     if (!NUMERO.test(p[i] || '')) return false;
     while (i < p.length && (NUMERO.test(p[i]) || FRA_NUMERI.test(p[i]))) i++;
