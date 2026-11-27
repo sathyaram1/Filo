@@ -1255,7 +1255,7 @@
       const piene = celle.filter((c) => c.trim());
       const nome = celle[0].trim();
       // La password nuda ha già la regola della sua cella, che sa quando la cella dopo la spiega.
-      if (celle.length === 2 && piene.length === 2 && !PAROLA_CHIAVE.test(nome)
+      if (/^[ \t]*\|/.test(r) && celle.length === 2 && piene.length === 2 && !PAROLA_CHIAVE.test(nome)
         && ((/^[A-Za-z_][\w.-]{0,60}$/.test(nome) && tipoDiNome(nome)) || ETICHETTA_SEGRETO_SOLA.test(nome))) {
         const k = r.indexOf('|', r.indexOf('|') + 1);
         r = `${r.slice(0, k)}:${r.slice(k + 1)}`;
