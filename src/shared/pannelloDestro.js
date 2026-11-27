@@ -409,8 +409,9 @@
 
     function fermaUscita() { if (timerUscita) { clearTimeout(timerUscita); timerUscita = null; } }
     // La striscia è sua: aperto con un clic, il pannello scivola sotto il puntatore fermo, che resta sopra di lei.
+    // Anche il menu a icone aperto dai suoi strumenti (#2555): sceglierci una voce non chiude il pannello.
     const suoi = (t) => !!(t && t.nodeType === 1 && (t === striscia || pannello.contains(t) || (menuEl && menuEl.contains(t))
-      || (opts.appartiene && opts.appartiene(t))));
+      || (menuIcone && !!t.closest && !!t.closest('.sn-menu')) || (opts.appartiene && opts.appartiene(t))));
     // L'unica regola per l'uscita del puntatore: non chiude chi ci sta lavorando (dentro, un trascinamento, un menu, la
     // tastiera in un suo campo); il tasto, la chat e il lucchetto lo tengono finché si clicca fuori.
     const scriveQui = () => siScrive(document.activeElement) && suoi(document.activeElement);
