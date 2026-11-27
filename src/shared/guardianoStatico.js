@@ -541,7 +541,14 @@
   // «conferma» o lascia fare a mano; nel registro dei letti fermerebbe per un mese ogni uscita con quel valore.
   // Il PIN anche con un complemento prima del verbo («il pin del telefono è 4821», «the pin for my phone is 4821»): il
   // primo verbo chiude, così «se il pin è giusto la pagina è 2048» non conta (#2678.3).
-  const PIN_CON_COMPLEMENTO = /\bpin\b(?:\s{1,8}(?!(?:è|e'|is|era|was)(?=\s))[^\s\d:=.,;!?|"'«“]{1,24}){1,5}?\s{0,8}(?:[:=]|(?:è|e'|is|era|was)(?=\s))\s{0,8}["'«“]?(\d{4,8})(?!\d)/gi;
+  // Le lunghezze di un PIN (o codice) e di un CVV, da qui sole: le leggono le regole che trovano il primo valore, qui e
+  // nel pavimento, e quella dei numeri accanto in elenco; una misura allargata in un posto solo lascerebbe uscire il secondo.
+  const MISURE_CIFRE = Object.freeze({ codice: Object.freeze([4, 8]), cvv: Object.freeze([3, 4]) });
+  const cifre = (regola) => `\\d{${MISURE_CIFRE[regola][0]},${MISURE_CIFRE[regola][1]}}`;
+  // Dopo il verbo anche l'articolo, come per il CVV: «il pin è il 4829».
+  const ARTICOLO = '(?:(?:il|lo|la|el|le|die|der|das|the)\\s{1,8})?';
+  const PIN_CON_COMPLEMENTO = new RegExp(`\\bpin\\b(?:\\s{1,8}(?!(?:è|e'|is|era|was)(?=\\s))[^\\s\\d:=.,;!?|"'«“]{1,24}){1,5}?\\s{0,8}`
+    + `(?:[:=]|(?:è|e'|is|era|was)(?=\\s))\\s{0,8}${ARTICOLO}["'«“]?(${cifre('codice')})(?!\\d)`, 'gi');
   const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
     + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI})`
     + `\\s{0,8}(?:["'«“]|[${APRE_VALORE}]\\s{0,8})?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
