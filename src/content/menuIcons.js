@@ -250,9 +250,9 @@
     const tutte = [...inFila, ...inAltro];
     const restano = [];
     for (const s of scritte) {
-      const stessa = s.azione && tutte.find((v) => v.azione === s.azione);
+      const stessa = s.verbo && tutte.find((v) => v.verbo === s.verbo);
       if (!stessa) { restano.push(s); continue; }
-      stessa.varianti = [...(stessa.varianti || []), { label: s.label, onClick: s.onClick, bersaglio: s.bersaglio }, ...(s.varianti || [])];
+      stessa.varianti = [...(stessa.varianti || []), { label: s.label, onClick: s.onClick, bersaglio: s.bersaglio, ...(s.azione ? { azione: s.azione } : {}) }, ...(s.varianti || [])];
     }
     return restano;
   }
