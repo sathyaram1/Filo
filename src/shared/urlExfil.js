@@ -357,6 +357,7 @@
   // Senza spazi fra le parole (cinese, giapponese, thai) il valore finisce dove ricomincia la frase.
   const FRA_PAROLE = new RegExp(`[\\s${NON_LATINI.FINE_VALORE}]+`);
   // I nomi del PIN senza «codice» («numero segreto», «Geheimzahl») li tiene il pavimento, che urlExfil precede nel loader.
+  // Il PUK sblocca la SIM come il PIN: chi lo chiede in chat chiede un codice (#2692.5).
   let presentaCodice = null;
   const PRESENTA_CODICE = () => {
     if (presentaCodice) return presentaCodice;
