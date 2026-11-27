@@ -713,7 +713,7 @@
       }
     }
     // Il compito «Gestisci la domanda» (§3.5) la tiene prima che arrivi a te: si dice cosa sta succedendo e com'è finita.
-    else if (d.stato === 'in_smistamento') testo = 'La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre.';
+    else if (d.stato === 'in_smistamento') testo = 'La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre. Se rispondi adesso, vale la tua risposta.';
     else if (e && e.smistata === 'guasto') testo = 'Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.';
     // Chiusa sulla domanda viva che chiedeva la stessa scelta (#1928): si risponde una volta, là.
     else if (e && e.smistata === 'doppione') {
