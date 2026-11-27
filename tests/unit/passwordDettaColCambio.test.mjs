@@ -86,6 +86,8 @@ test('la password nuova con altri ponti, nella stessa frase o dopo la domanda, n
     "j'ai changé le mot de passe en «Mela! Verde77»",
     'he cambiado la contraseña a «Mela! Verde77»',
     'ich habe das Passwort in «Mela! Verde77» geändert',
+    'ho cambiato la password del conto «Lavoro» in «Mela! Verde77»',
+    "Password? Sì, era «Gatto1» ma l'ho cambiata in «Mela! Verde77»",
   ]) {
     for (const [chi, o] of [['pavimento', P.oscura(t)], ['correttore', C.oscura(t)]]) {
       assert.ok(o.includes(S) && !/Mela|Verde77|Gatto1/.test(o), `${chi}: ${t} → ${o}`);
