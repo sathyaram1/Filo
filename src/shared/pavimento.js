@@ -550,7 +550,7 @@
   const finoAllaFrase = (v) => v.replace(APRE_VALORE, '').split(FINE_VALORE)[0];
   // Cinese, giapponese e coreano non separano le parole: lì il verbo sta attaccato al nome (ATTACCATO, #1403.6).
   // Le scritture per intervalli, senza \p: col flag u insieme a i ogni passo delle regex delle etichette costa decine di
-  // volte di più, e un testo lungo che ripete «비밀번호는» fermava il processo per secondi (#1403.6).
+  // volte di più, e un testo lungo che ripete «암호는» fermava il processo per secondi (#1403.6).
   const CJK = '\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uF900-\\uFAFF\\u1100-\\u11FF\\u3130-\\u318F\\uAC00-\\uD7AF';
   // I nomi sono le etichette non latine di campiSegreti.js che cominciano con una lettera di queste scritture.
   const NOMI_CJK = `(?=[${CJK}])(?:${NON_LATINI.ETICHETTE_NON_LATINE})`;
