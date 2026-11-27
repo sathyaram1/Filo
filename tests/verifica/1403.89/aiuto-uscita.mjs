@@ -21,7 +21,7 @@ export function segretoCercando(testo) {
 export function righeNovita(num) {
   const out = [];
   for (const blocco of globalThis.SN_PATCH_NOTES.NOTES) {
-    for (const r of blocco.notes || blocco.righe || []) {
+    for (const r of [...(blocco.fixes || []), ...(blocco.features || []), ...(blocco.notes || [])]) {
       const s = r && r.segnalazione;
       if (s === num || (Array.isArray(s) && s.includes(num))) out.push(r.testo);
     }
