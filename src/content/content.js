@@ -2321,7 +2321,7 @@
     }
     // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
     const riquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
-    if (riquadro[0]) a.cookie = { label: riquadro[0].label, onClick: riquadro[0].onClick, acceso: !!riquadro[0].acceso };
+    if (riquadro[0]) a.cookie = { label: riquadro[0].label, onClick: riquadro[0].onClick };
     a.feedback = { label: 'Invia feedback', onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()) };
     const spegni = buildSpegniFiloItem();
     if (spegni) a.filoOff = { label: spegni.label, onClick: spegni.onClick, misura: spegni.azione };
