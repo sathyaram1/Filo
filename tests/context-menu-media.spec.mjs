@@ -131,7 +131,7 @@ test('ripetizione e controlli si attivano davvero, e la voce racconta lo stato',
   const page = await testServer.openReady(openTab, pageHtml('/nonexistent.mp4'));
 
   let menu = await openMenuOn(page, '#v');
-  await menu.locator('button', { hasText: 'Ripeti in continuo' }).first().click();
+  await menu.scegli('Ripeti in continuo');
   await expect.poll(() => page.evaluate(() => document.getElementById('v').loop)).toBe(true);
 
   // Invariante UX: se si può attivare, si deve poter disattivare — la voce ora
