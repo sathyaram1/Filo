@@ -1223,6 +1223,37 @@ test('un testo lunghissimo senza spazi dopo l\'etichetta non ferma il pavimento'
   assert.equal(P.oscura(`password: ${valore}`), `password: ${S}`);
 });
 
+// #2673.14 — sotto l'etichetta il valore partiva col punto d'elenco o la citazione davanti, con «=», fra virgolette con
+// gli spazi, o con un a capo di Unicode; sulla stessa riga erano già coperti.
+const OGNI_A_CAPO = ['\n', '\r\n', '\r', ...[0x2028, 0x2029, 0x85, 0x0c].map((c) => String.fromCharCode(c))];
+test('il valore sotto l\'etichetta col segno d\'elenco o di citazione davanti, o con «=», resta fuori con ogni a capo', () => {
+  const forme = [
+    ['**Password:**', 'Nyckel!2024'], ['Password:', '- Nyckel!2024'], ['Password:', '* Nyckel!2024'], ['Password:', '+ Nyckel!2024'],
+    ['Password:', '• Nyckel!2024'], ['Password:', '1. Nyckel!2024'], ['Password:', '> Nyckel!2024'], ['> Password:', '> Nyckel!2024'],
+    ['> **Password:**', '> > Nyckel!2024'], ['- Password:', '  - Nyckel!2024'], ['Password =', 'Nyckel!2024'],
+    ['Password:', '"Nyckel 2024 casa"'], ['Password:', '«Nyckel 2024 casa»'], ['Password:', '- "Nyckel 2024 casa"'],
+    ['Password:', 'Nyckel 2024 casa'], ['Password:', '- Nyckel 2024 casa'],
+  ];
+  for (const a of OGNI_A_CAPO) {
+    for (const [etichetta, riga] of forme) {
+      const t = `${etichetta}${a}${riga}`;
+      const fuori = P.oscura(t);
+      assert.ok(!/Nyckel|2024|casa/.test(fuori), JSON.stringify(t));
+      assert.equal(fuori, `${etichetta}${a}${riga.replace(/Nyckel[^"»]*/, S)}`, JSON.stringify(t));
+    }
+    assert.equal(P.oscura(`Password:${a}${a}"Nyckel 2024 casa"`), `Password:${a}${a}"${S}"`);
+  }
+});
+
+test('un elenco o una citazione qualunque sotto un\'etichetta o senza restano come sono', () => {
+  for (const t of [
+    'Requisiti della password:\n- almeno 8 caratteri\n- una maiuscola', 'Password del wifi:\n- chiedi al bancone',
+    'Password:\n"la trovi sul modem"', 'Cambia la password\n"Gestisci account"', '> Ciao Luca,\n> ci vediamo domani alle 8.\n> Marco',
+    'Lista della spesa:\n- latte\n- pane\n* uova\n1. burro', '1. Apri le impostazioni\n2. Tocca Password\n3. Scegli "Nuova password"',
+    'password =\n  input("scrivi")', 'x = 3\ny = 4', 'Password:\nUtente: mario', 'Password:\nMostra password', 'Password:\nAlmeno otto caratteri',
+  ]) for (const a of OGNI_A_CAPO) assert.equal(P.oscura(t.replaceAll('\n', a)), t.replaceAll('\n', a), JSON.stringify(t));
+});
+
 test('l\'etichetta araba con «e», «con» o «per» attaccati non lascia la password al modello', () => {
   for (const t of ['اسم المستخدم: ahmed وكلمة المرور: Gatto2024!', 'بكلمة المرور: Gatto2024!', 'ولكلمة المرور هي Gatto2024!']) {
     assert.ok(!P.oscura(t).includes('Gatto2024'), t);

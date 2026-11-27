@@ -621,7 +621,7 @@
   // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra.
   const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*(${FRECCIA}|[:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
   const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:(?:[ \\t]+|${VIRGOLA_CEST})${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
-  const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
+  const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=]?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
   const QUALIFICA = '(?:[ \\t]+(?:provvisori[ao]|temporane[ao]|iniziale|nuova|attuale|new|temporary|initial|current))?';
@@ -793,7 +793,7 @@
     const k = Math.max(0, resto.length - 200);
     return resto.slice(0, k) + resto.slice(k).replace(NOTA_IN_FONDO, '');
   };
-  const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*$`, 'i');
+  const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：=]?[ \\t]*$`, 'i');
   const TESTA_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}`, 'i');
   function alPostoDelValore(s, out) {
     const righe = s.split('\n');
@@ -825,8 +825,10 @@
   // 2019»): la password con gli spazi, quante che siano le parole (#2678.5). Toglierla toglie solo quella frase, mai una
   // parola sola altrove. Una frase che comincia come una spiegazione («disponibile alla reception», «sul retro del
   // modem», «vedi email»), anche dopo un articolo («la stessa di prima»), o che misura la password («min. 8 caratteri»)
-  // dice dove trovarla o come sceglierla, e resta. Il tetto in caratteri tiene fuori un paragrafo intero.
-  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*([^\\n|\\t]{3,160}?)[ \\t]*(?=\\n|$)`, 'gi');
+  // dice dove trovarla o come sceglierla, e resta. Il tetto in caratteri tiene fuori un paragrafo intero. Così sulla riga
+  // sotto l'etichetta sola, se non è un altro campo né un bottone (#2673.14).
+  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*(\\n(?:[ \\t]*\\n)?[ \\t]*)?([^\\n|\\t]{3,160}?)[ \\t]*(?=\\n|$)`, 'gi');
+  const CAMPO_IN_TESTA = /^[^\s:：]{1,30}[:：](?:\s|$)/;
   const INIZIO_SPIEGAZIONE = /^(?:a|al|allo|alla|ai|agli|alle|da|dal|dallo|dalla|dai|dagli|dalle|in|nel|nello|nella|nei|negli|nelle|su|sul|sullo|sulla|sui|sugli|sulle|presso|tra|fra|con|senza|dentro|sotto|sopra|dietro|at|on|from|under|behind|inside|with|see|ask|check|contact|available|provided|sent|printed|same|vedi|vedere|guarda|chiedere|richiedi|richiedila|contatta|rivolgiti|disponibile|disponibili|fornita|fornito|inviata|inviato|stampata|scritta|indicata|riportata|deve|devono|può|must|should|can|minimo|min|massimo|max|stessa|stesso|quella|quello|uguale|identica|come|vuota|nessuna|nessuno|scegli|sceglila|usa|use|cambiata|cambiato|modificata|modificato|aggiornata|aggiornato|scaduta|scaduto|scade|scadrà|changed|updated|expired|expires|не|нет|должен|должна|должно|см|смотрите|спросите|минимум|максимум|от|из|на|в|у|при|без|πρέπει|δείτε)$/i;
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
@@ -859,7 +861,8 @@
   function fraseDopo(s, out) {
     for (const m of s.matchAll(FRASE_DOPO)) {
       // Le virgolette intorno alla frase («Password: «casa mia al mare»») non sono della password (#1403.27).
-      const tutta = senzaNota(` ${m[1]}`).trim();
+      if (m[1] && (CAMPO_IN_TESTA.test(m[2]) || SOLO_BOTTONI.test(m[2]) || NOMINA_ETICHETTA.test(m[2]))) continue;
+      const tutta = senzaNota(` ${m[2]}`).trim();
       const q = tutta.match(SOLO_FRA_VIRGOLETTE);
       const v = q ? q[3] : tutta;
       const parole = v.split(/\s+/);
@@ -1265,6 +1268,8 @@
   // Senza due punti né verbo le parole fra virgolette sono spesso una voce («password «Gestisci account»», #2678).
   const PRIMA_DELLE_VIRGOLETTE_NUDA = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}(?:[ \\t]*${FRECCIA})?[ \\t]*$`, 'i');
   const PRIMA_DELLE_VIRGOLETTE_CORTA = new RegExp(`${ETICHETTA_CORTA}[ \\t]*[:=]?[ \\t]*$`, 'i');
+  // Ogni a capo: quello di Windows, il solo \r, quelli di Unicode e il salto di pagina (aCapo).
+  const RIGHE = /\r\n?|[\n\v\f\x85\u{2028}\u{2029}]/u;
   function interiFraVirgolette(vero, valori) {
     const s = testo(vero);
     const nudo = (v) => String(v).replace(TESTA_VIRGOLETTE, '').replace(CODA_VIRGOLETTE, '').toLowerCase();
@@ -1277,7 +1282,10 @@
       const v = m[3];
       const parole = v.split(/\s+/);
       if (parole.length < 2 || parole.length > PAROLE_FRA_VIRGOLETTE || NOMINA_ETICHETTA.test(v) || NOMINA_CORTA.test(v)) continue;
-      const prima = s.slice(Math.max(0, m.index - 120), m.index).split('\n').pop();
+      const righe = s.slice(Math.max(0, m.index - 240), m.index).split(RIGHE);
+      let prima = righe.pop();
+      // Da solo sulla riga sotto l'etichetta, anche dopo una riga vuota, vale come accanto (#2673.14).
+      if (!prima.trim() && righe.length) prima = righe.pop().trim() || (righe.length ? righe.pop() : '');
       const alPostoDelValore = !spiegazione(parole)
         && (PRIMA_DELLE_VIRGOLETTE.test(prima) || (PRIMA_DELLE_VIRGOLETTE_NUDA.test(prima) && FORMA_FORTE(v))
           || (PRIMA_DELLE_VIRGOLETTE_CORTA.test(prima) && /[^\p{L}\s'’]/u.test(v)));
@@ -1287,10 +1295,12 @@
   }
 
   // Gli a capo di Windows e quelli col solo \r (un file di testo allegato) valgono il nostro (#2673.6): le regole leggono
-  // una copia col solo \n, e `posto` riporta ogni suo carattere nel testo vero, dove torna il valore di più righe.
+  // una copia col solo \n, e `posto` riporta ogni suo carattere nel testo vero, dove torna il valore di più righe. Così
+  // gli a capo di Unicode e i salti di pagina, che contano un carattere per uno (#2673.14).
+  const OGNI_A_CAPO = new RegExp(RIGHE.source, 'gu');
   function aCapo(vero) {
-    if (!vero.includes('\r')) return null;
-    const piano = vero.replace(/\r\n?/g, '\n');
+    const piano = vero.replace(OGNI_A_CAPO, '\n');
+    if (piano === vero) return null;
     const posto = new Int32Array(piano.length + 1);
     for (let i = 0, k = 0; i < vero.length; i++) {
       if (vero[i] === '\r' && vero[i + 1] === '\n') continue;
