@@ -225,6 +225,10 @@
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => aPezzi('🌐', pezziLetturaPagina(a), { title: indirizzoLetto(a) }),
+    TRASCRIVI_MEDIA: (a) => {
+      const o = a._output || {};
+      return { icon: '🎧', text: o.durata ? `Trascritto un audio di ${o.durata}` : 'Trascritto un audio' };
+    },
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
     ELIMINA_FILE: (a) => aPezzi('🗑', pezziEliminati(a._output)),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
