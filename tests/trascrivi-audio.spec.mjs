@@ -158,7 +158,7 @@ async function chatFinta(app) {
       globalThis.__esiti.push(...esiti);
       const tutto = esiti.join('\n');
       const testo = /PEZZO-\d/.test(tutto) ? `Ecco la trascrizione: ${(tutto.match(/PEZZO-\d/g) || []).join(' ')}`
-        : /non è un audio o un video/.test(tutto) ? 'Quell\'indirizzo non è un audio o un video.' : `NIENTE ${tutto.slice(0, 600)}`;
+        : /non è un audio o un video/.test(tutto) ? 'Quell\'indirizzo non è un audio o un video.' : 'NIENTE';
       try { onDelta && onDelta(testo); } catch (_) {}
       return { ...base, text: testo, toolCalls: [], finishReason: 'stop' };
     };
