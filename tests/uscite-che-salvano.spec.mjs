@@ -3,6 +3,7 @@
 // La regola pura sta in tests/unit/caselleAlSicuro.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const OPZIONI = 'filo://options/options.html';
 const ALTRO = 'filo://options/altro.html';
