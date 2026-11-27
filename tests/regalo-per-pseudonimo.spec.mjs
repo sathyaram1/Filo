@@ -170,9 +170,10 @@ test('la pagina Crediti mostra il proprio pseudonimo solo con un portafoglio, e 
 
   await app.evaluate(({ clipboard }) => clipboard.writeText(''));
   await page.click('#pseudonym', { button: 'right' });
-  const menu = page.locator('.sn-wallet-me-menu');
+  // A icone (#2555): la spiegazione è la riga di testo sotto la griglia.
+  const menu = menuDi(page).principale;
   await expect(menu).toBeVisible();
-  await expect(menu).toContainText('regalo di crediti');
+  await expect(menu.locator('.sn-menu-inline')).toContainText('regalo di crediti');
   await menu.getByRole('menuitem', { name: 'Copia lo pseudonimo' }).click();
   await expect(menu).toHaveCount(0);
   await expect.poll(() => leggiAppunti(app)).toBe(MIO);
