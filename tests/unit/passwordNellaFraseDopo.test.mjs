@@ -94,7 +94,7 @@ test('un testo lungo che ripete il nome e il rimando costa quanto la sua lunghez
     alCorrettore(t);
   }, { giri: 3 });
   const corto = costo(500);
-  const lungo = costo(2000, corto.unita * 8);
+  const lungo = costo(2000);
   // Quattro volte il testo: circa quattro volte il costo; il quadrato sarebbe sedici.
   assert.ok(lungo.unita < corto.unita * 10, `${corto.come} | ${lungo.come}`);
 });
