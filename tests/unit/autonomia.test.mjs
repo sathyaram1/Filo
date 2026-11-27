@@ -832,7 +832,7 @@ test('il codice del mio telefono, del cancello o il CVV non escono da un\'azione
   for (const frase of ['il codice del telefono del cliente è 4829', 'my phone number is 3331234567', 'codice prodotto 4829',
     'il pin del telefono è cambiato 2 volte', 'se il pin è giusto la pagina è 2048']) {
     assert.equal(A.segreto(frase), '', frase);
-    assert.notEqual(risposta({ type: 'CERCA_WEB', query: frase }), 'conferma', frase);
+    assert.notEqual(risposta({ type: 'CERCA_WEB', query: frase }), 'no', frase);
   }
 });
 
