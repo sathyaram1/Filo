@@ -155,7 +155,7 @@ async function chatFinta(app) {
       const ultimaDomanda = messages.map((m) => m.role).lastIndexOf('user');
       const esiti = messages.slice(ultimaDomanda + 1).filter((m) => m.role === 'tool').map((m) => String(m.content || ''));
       if (!esiti.length) {
-        const url = (/http:\/\/127\.0\.0\.1:\d+\/\w+/.exec(String(messages[ultimaDomanda]?.content || '')) || [''])[0];
+        const url = (/https?:\/\/(?:127\.0\.0\.1:\d+\/\w+|www\.youtube\.com\/watch\?v=\w+)/.exec(String(messages[ultimaDomanda]?.content || '')) || [''])[0];
         return { ...base, text: '', toolCalls: [{ id: `t${ultimaDomanda}`, name: 'web', arguments: JSON.stringify({ azione: 'trascrivi', url }) }], finishReason: 'tool_calls' };
       }
       globalThis.__esiti.push(...esiti);
