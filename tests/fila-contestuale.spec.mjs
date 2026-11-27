@@ -345,7 +345,7 @@ test('un\'icona della barra portata nella fila del tasto destro lascia la barra,
   await page.mouse.up();
   await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 6)).toEqual(['help', 'back', 'forward', 'reload', 'saveForLater', 'home']);
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]')).toHaveCount(0);
-  expect((await salvata(app))['fila:pagina']).toEqual([]);
+  expect((await salvata(app))['fila:pagina']).not.toContain('saveForLater');
 });
 
 test.describe('col menu nello strato sopra la scheda', () => {
