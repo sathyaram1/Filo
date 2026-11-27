@@ -25,6 +25,15 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { oggiFa } from './helpers/istanti.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+
+// Il testo di tutte le voci del menu a icone (#2555): le icone e le varianti nei loro menu.
+async function testoDelMenu(page) {
+  await expect(menuDi(page).principale).toBeVisible();
+  return (await menuDi(page).vociScritte()).join('\n');
+}
+// La prima voce del menu proprio della pagina: la prima icona scritta dalla pagina.
+const primaDelMenu = (page) => menuDi(page).locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow):not([data-sn-icon-id])').first();
 
 const URL = 'filo://manage/manage.html';
 const GIORNO = 24 * 60 * 60 * 1000;
