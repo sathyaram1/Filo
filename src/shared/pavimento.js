@@ -693,7 +693,7 @@
   // frase. Dopo la nota la riga può continuare solo dopo un segno o dopo un'emoji: in «casa (mia) al mare» è la password.
   const EMOJI = '(?:[\\p{Extended_Pictographic}\\p{Regional_Indicator}][\\p{Emoji_Modifier}\\u{FE0F}\\u{20E3}]*(?:\\u{200D}\\p{Extended_Pictographic}[\\p{Emoji_Modifier}\\u{FE0F}]*)*|[0-9#*]\\u{FE0F}?\\u{20E3}|[:;=]-?[)(DPp]|<3)';
   const NOTA = `(?:[ \\t]*(?:\\([^()\\n]{0,80}\\)|\\[[^\\[\\]\\n]{0,80}\\])|[ \\t]+${EMOJI}+)`;
-  const NOTA_IN_FONDO = new RegExp(`(?<![ \\t])(?:${NOTA}*[ \\t]+${EMOJI}+(?:[ \\t][^\\n]*)?|${NOTA}+)(?:[ \\t]*[.!?;,…]+(?:[ \\t][^\\n]*)?)?[ \\t]*$`, 'u');
+  const NOTA_IN_FONDO = new RegExp(`(?<![ \\t])(?:${NOTA}*[ \\t]+${EMOJI}+(?:[ \\t][^\\n]*)?|${NOTA}+)(?:[ \\t]*[.!?;,…–—-]+(?:[ \\t][^\\n]*)?)?[ \\t]*$`, 'u');
   // Solo la coda: su una riga lunga piena di emoji o parentesi la ricerca da ogni punto diventerebbe quadratica.
   const senzaNota = (resto) => {
     const k = Math.max(0, resto.length - 200);
