@@ -75,7 +75,7 @@
     run: v('Esegui', 'run', 'g', 'eseguire', ['esegui']),
     reload: v('Rileggi', 'reload', 'l', 'rileggere', ['rileggi', 'ricarica', 'rigenera', 'aggiorna']),
     keep: v('Tieni', 'pin', 'p', 'tenere', ['tieni', 'tienila', 'imposta come', 'metti']),
-    add: v('Aggiungi', 'plus', 'w', 'aggiungere', ['aggiungi', 'collega']),
+    add: v('Aggiungi', 'plus', 'w', 'aggiungere', ['aggiungi']),
     close: v('Chiudi', 'close', 'c', 'chiudere', ['chiudi', 'salta']),
     folder: v('Cartella', 'folder', 'f', 'aprire la cartella', ['mostra nella cartella', 'apri cartella', 'apri la cartella']),
     settings: v('Regola', 'options', 'j', 'regolare', ['regola', 'impostazioni', 'impostazione']),
