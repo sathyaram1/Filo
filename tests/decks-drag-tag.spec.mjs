@@ -15,6 +15,7 @@
 // comparsa/assenza del popup: falliscono se la feature non fa la cosa giusta.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CARDS = {
   'c-solring': {
