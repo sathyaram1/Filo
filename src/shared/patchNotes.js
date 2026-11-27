@@ -27,6 +27,7 @@
         { testo: 'Una password, un PIN o un CVV in un pezzo di pagina incollato col suo HTML, come «<b>Password:</b> …» o una tabella copiata da un sito, non arrivano più a nessun modello, come già negli appunti in Markdown.', segnalazione: 2673 },
         { testo: 'Un PIN o un codice di sblocco con lettere o simboli, come «Il pin è 48A9», «il codice del mio Samsung è Mela77» o «M3l@77!», non arriva più a nessun modello, come già succedeva a quelli di sole cifre, anche dato in risposta o in un elenco.', segnalazione: 1403 },
         { testo: 'Una password, un PIN o un CVV scritti dopo un\'etichetta in grassetto o fra tag HTML, come «<b>Password:</b> …», non arrivano più a nessun modello, nemmeno al correttore.', segnalazione: 2695 },
+        { testo: 'Una password scritta prima del suo nome, come «gattonero è la password» o «usa Gatto2024 come password», non arriva più ai modelli del correttore, come quando la scrivi dopo il nome. Con un numero, un simbolo o fra virgolette non arriva più a nessun modello.', segnalazione: 2695 },
       ],
     },
     {
