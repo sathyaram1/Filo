@@ -148,6 +148,8 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
   la sua fila ha Apri in nuova tab, e il «+» Copia URL, azioni del suo contesto
   che compaiono solo dove il collegamento c'è (giro 2).
 - **Tante icone vanno a capo**, mai fuori dal bordo del menu.
+- **La fila è il menu intero** (#2555): ogni azione del tasto destro è un'icona della fila o del suo «+», che si apre
+  nello stesso menu; l'elenco e le sue regole stanno in [Il tasto destro è a icone](il-tasto-destro-e-a-icone.md).
 - **Un'azione vive in un posto solo, e voci e fila la prendono da lì** (#1434.2): `azioniDellImmagine`,
   `azioniDelLink`, `azioniDellaSelezione` (`content.js`), `azioniDelMedia` (`actions.js`), coi nomi che dicono lo
   stato. Due copie avevano già diviso la stessa azione sullo stesso elemento. Taglia fa come il sistema: appunti, poi
