@@ -109,7 +109,6 @@
   const SEPARA_ALTRE = `(?:\\s*[:=#]|\\s+(?:${VERBO}|to)(?![\\p{L}]))?\\s*$`;
   // Il possessivo vale l'articolo («Le code de mon colis», «Kod mojej paczki»). «Le code banque», senza complemento,
   // passa dall'elenco degli identificativi: lì la parola dopo «code» può essere un aggettivo («Le code généré est …»).
-  const POSSESSIVO_POLACCO = 'moj\\p{L}*|mój|twoj\\p{L}*|twój|swoj\\p{L}*|swój|nasz\\p{L}*|wasz\\p{L}*';
   const POSSESSIVO_ALTRE = '(?:mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leurs?|mis|mi|tus?|sus?|nuestr[oa]s?|vuestr[oa]s?'
     + `|meus?|minhas?|teus?|tuas?|seus?|suas?|noss[oa]s?|${POSSESSIVO_POLACCO})`;
   const ETICHETTA_ALTRE = new RegExp(`(?:\\b[Cc]ode\\s+(?:(?:de|du|des|van)\\s+(?:(?:la|les|le|de|het)\\s+|l['’]\\s*|${POSSESSIVO_ALTRE}\\s+)?|d['’]\\s*)`
