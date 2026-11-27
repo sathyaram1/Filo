@@ -139,11 +139,11 @@ test('tasto destro sul rombo azzurro: «💻 Lavoro server», e la pratica passa
   const page = await openTab(MANAGE);
   await apri(page, [fb({ clientId: 'routine:worker', senderProof: 'server' })]);
   await page.locator('.mg-item').click({ button: 'right' });
-  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: '💻 Lavoro server' });
-  await expect(voce).toBeVisible();
-  await expect(voce).toHaveAttribute('title', /Diventa un lavoro server/);
-  await voce.click();
-  await expect(page.locator('.mg-ctxmenu')).toHaveCount(0);
+  // A icone (#2555): la voce è un'icona col suo nome; la spiegazione del tasto non ha più un fumetto nel menu.
+  const menu = menuDi(page);
+  await expect(menu.voce('💻 Lavoro server')).toHaveCount(1);
+  await menu.scegli('💻 Lavoro server');
+  await expect(menu.pannelli).toHaveCount(0);
   await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
   const updates = await page.evaluate(() => window.__updates);
   expect(scrittura(updates[0])).toEqual({ status: 'todo', reviewDecision: 'accepted', localOnly: true, localApproval: true });
