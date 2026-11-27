@@ -431,7 +431,16 @@
   const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
   // Il «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
   const VERBO_PASSWORD = `(?:${VERBO}|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)`;
-  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+${VERBO_PASSWORD}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
+  // Fra il nome e il valore, spazi compresi: l'annuncio, il verbo di cambio («diventa», «è rimasta»), «in», «a», «to»
+  // dopo un participio di cambio nella frase («ho cambiato la password in …»), l'annuncio dopo la domanda («ti ricordi
+  // la password? Era …»). Gli elenchi sono del guardiano (CAMBI, #1403.67).
+  const CAMBI = global.SN_GUARDIANO_STATICO.CAMBI;
+  const LETTERA_LATINA = 'A-Za-zÀ-ÿ';
+  const unaDi = (xs) => `(?<![${LETTERA_LATINA}])(?:${xs.map((w) => w.replace(/ /g, '[ \\t]+')).join('|')})(?![${LETTERA_LATINA}])`;
+  const DIVENTA = `(?:(?:${VERBO}|ha|has)[ \\t]+)?${unaDi(CAMBI.diventa)}`;
+  const VERSO_IL_NUOVO = `(?<=${unaDi(CAMBI.participi)}[^\\n.!?:;,]{0,80})${unaDi(CAMBI.verso)}`;
+  const AL_VALORE = `(?:[ \\t]+(?:${DIVENTA}|${VERSO_IL_NUOVO}|${VERBO_PASSWORD})|[ \\t]*\\?[ \\t]+${VERBO}(?![${LETTERA_LATINA}]))`;
+  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}${AL_VALORE}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*:?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
