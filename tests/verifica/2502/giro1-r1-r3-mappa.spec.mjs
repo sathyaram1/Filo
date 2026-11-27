@@ -13,8 +13,9 @@ import { accendiCopertura } from '../../../scripts/lib/copertura-prove.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const QUESTA = 'tests/verifica/2502/giro1-r1-r3-mappa.spec.mjs';
-const REG = cartellaTemporanea('filo-v2502-reg-');
-process.env.FILO_COPERTURA = REG;
+// Il modulo si valuta più di una volta nel lavoratore: la cartella resta quella della prima, come la registrazione.
+if (!process.env.FILO_COPERTURA) process.env.FILO_COPERTURA = cartellaTemporanea('filo-v2502-reg-');
+const REG = process.env.FILO_COPERTURA;
 accendiCopertura();
 
 let mappa = '';
