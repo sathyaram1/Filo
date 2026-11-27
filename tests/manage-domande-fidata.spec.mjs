@@ -2,6 +2,7 @@
 // fidata»; l'owner la segna, e la toglie, da qui o dal tasto destro. Una fidata dalla nascita non ha né l'uno né l'altro.
 import { test, expect } from './fixtures/electron.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const tab = (page, t) => page.locator(`.mg-tab[data-tab="${t}"]`);
 const riga = (page, id) => page.locator(`#mgDomandeLista .mg-domanda[data-id="${id}"]`);
