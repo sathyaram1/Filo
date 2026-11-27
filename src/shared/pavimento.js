@@ -122,7 +122,8 @@
   const NOME_PIN = new RegExp(`\\b${NOMI_DEL_PIN}\\b`, 'i');
   // L'elenco degli apparecchi il cui codice li sblocca è uno solo (#1403.44): la frase col possessivo, l'etichetta senza
   // e il nome attaccato a «code» («Handycode», «Gerätecode») lo leggono da qui.
-  const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
+  // Coi refusi più comuni del telefono («telefno», «telfono»), perché il codice si scrive di fretta.
+  const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|tel[ef]{1,2}f?o?n[oi]|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
     + '|t[ée]l|celus?|cell|compus?|gsms?|smartphones?'
     + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
     + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
