@@ -176,13 +176,16 @@ test('nuovo compito: si rifiuta prima di mandare, si crea con le scelte, compare
 test('tasto destro: le stesse azioni della riga, più nuovo compito e rilettura; Esc chiude il modulo', async ({ openTab }) => {
   const page = await apri(openTab);
   await righe(page, 'inAttesa').nth(1).click({ button: 'right' });
-  const voci = page.locator('.mg-ctxmenu .sn-select-option');
-  await expect(voci).toHaveText(['Mostra le chiamate', 'Annulla il compito', 'Copia il nome', 'Nuovo compito', 'Rileggi dal server']);
+  // A icone (#2555): le stesse voci (ogni icona seguita dalle varianti del suo verbo), la prima in cima.
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  await expect(menu.primaVoce).toHaveAttribute('aria-label', 'Mostra le chiamate');
+  expect((await menu.vociScritte()).sort()).toEqual(['Mostra le chiamate', 'Annulla il compito', 'Copia il nome', 'Nuovo compito', 'Rileggi dal server'].sort());
   const prima = await page.evaluate(() => window.__cp.letture);
-  await voci.filter({ hasText: 'Rileggi dal server' }).click();
+  await menu.scegli('Rileggi dal server');
   await expect.poll(() => page.evaluate(() => window.__cp.letture)).toBe(prima + 1);
   await righe(page, 'inAttesa').first().click({ button: 'right' });
-  await expect(voci.first()).toHaveText('Apri il feedback');
+  await expect(menu.primaVoce).toHaveAttribute('aria-label', 'Apri il feedback');
   await page.keyboard.press('Escape');
   await page.locator('#mgCpNuovoApri').click();
   await page.locator('#mgCpTitolo').press('Escape');
