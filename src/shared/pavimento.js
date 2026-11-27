@@ -793,7 +793,7 @@
     const k = Math.max(0, resto.length - 200);
     return resto.slice(0, k) + resto.slice(k).replace(NOTA_IN_FONDO, '');
   };
-  const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*$`, 'i');
+  const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：=]?[ \\t]*$`, 'i');
   const TESTA_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}`, 'i');
   function alPostoDelValore(s, out) {
     const righe = s.split('\n');
