@@ -254,7 +254,7 @@ test('una pagina appena aperta non apre da sola il menu e non legge appunti né 
 
   // Il tasto destro dell'utente apre il menu, e la cronologia mostra a lui le due voci.
   await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
+  await menuDi(page).incolla.click({ button: 'right' });
   await expect.poll(() => testiCronologia(app, page)).toEqual(expect.arrayContaining([SEGRETO, IBAN]));
 });
 
@@ -307,7 +307,7 @@ test('la cronologia aperta dall\'utente non si fa leggere dal sito con la ricerc
 
   // L'utente apre lui la cronologia per incollare.
   await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
+  await menuDi(page).incolla.click({ button: 'right' });
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
 
   // Il sito prova a ricostruire il testo interrogando window.find lettera per lettera: non ci riesce
@@ -362,7 +362,7 @@ test('la cronologia aperta dall\'utente non dice al sito quali caratteri contien
   expect(await page.evaluate(() => window.caratteriVisti())).toBe('');
 
   await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
+  await menuDi(page).incolla.click({ button: 'right' });
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
   await page.waitForTimeout(800);
 
