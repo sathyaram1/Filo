@@ -1021,7 +1021,7 @@
     editor: 'file(leggi_editor)', 'translate-page': 'scheda(traduci)', 'explain-image': SOLO_A_MANO,
     'copy-download-image': SOLO_A_MANO, 'search-image': 'scheda(lens)', 'video-audio-controls': 'scheda(pausa_audio)',
     'video-pip': SOLO_A_MANO, 'copy-download-video': SOLO_A_MANO, 'download-progress': SOLO_A_MANO, screenshot: SOLO_A_MANO,
-    ocr: SOLO_A_MANO, 'color-picker': SOLO_A_MANO, 'qr-code': SOLO_A_MANO, 'explain-link': SOLO_A_MANO, 'save-link': SOLO_A_MANO,
+    ocr: SOLO_A_MANO, 'transcribe-media': 'web(trascrivi)', 'color-picker': SOLO_A_MANO, 'qr-code': SOLO_A_MANO, 'explain-link': SOLO_A_MANO, 'save-link': SOLO_A_MANO,
     'share-copy-link': SOLO_A_MANO, 'paste-clipboard': SOLO_A_MANO, 'copy-cut': SOLO_A_MANO, 'save-for-later': 'scheda(salva)',
     'open-for-later': 'scheda(salvate)', archive: 'scheda(chiuse)', 'chat-archive': 'filo(cerca)',
     'visited-pages': 'filo(cancella_pagine)', 'filo-accaduti': 'filo(espandi)', 'chat-archive-recall': 'filo(cerca)',
