@@ -12,6 +12,7 @@
 // raggruppano secondo il loro criterio). Se il bug c'è, l'assert è rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CARDS = {
   'c-solring': {
