@@ -270,6 +270,16 @@ test('un\'etichetta in un pezzo di pagina HTML copre il valore intero, e i tag r
   }
 });
 
+test('un testo di 120.000 caratteri pieno di tag aperti e mai chiusi si controlla in fretta', () => {
+  for (const pezzo of ['&lt;b ', '<b &', '&lt;b title=&quot;x ', '<span title="x&']) {
+    const s = `${pezzo.repeat(Math.ceil(120000 / pezzo.length))}<b>Password:</b> Nyckel!2024`;
+    let fuori = '';
+    const c = costoInUnita(() => { fuori = P.oscura(s); }, { tetto: 60 });
+    assert.ok(c.entro, `${pezzo}: ${c.come}`);
+    assert.ok(!fuori.includes('Nyckel!2024'), pezzo);
+  }
+});
+
 // #2673.6 — in un file di testo di Windows «Password:» a capo e il valore arrivavano ai modelli.
 test('con gli a capo di Windows o col solo \\r il testo si copre come con l\'a capo semplice, e gli a capo restano', () => {
   assert.equal(P.oscura('Password:\r\nNyckel!2024'), `Password:\r\n${S}`);
