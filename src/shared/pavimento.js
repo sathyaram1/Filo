@@ -389,6 +389,17 @@
   const CHIUDE_ETICHETTA = new RegExp(`(?:[:=#]|(?:^|\\s)(?:${VERBO}|will\\s+be)(?:\\s+(?:il|el|le|o|the))?|\\bn\\.|\\bnr\\.?|\\bno\\.)\\s*$`, 'i');
   // Il polacco «to» dopo un nome polacco («kod», «tajny numer»), o dopo il PIN in una frase polacca (SEGNO_POLACCO).
   const CHIUDE_KOD = /\sto\s*$/i;
+  // Il primo verbo chiude il nome del codice, anche quello di cambio: in «il pin è giusto e la pagina diventa 2048» o «il
+  // pin non funziona e il prezzo diventa 4821» il numero è d'altro, salvo che il nuovo soggetto sia una cosa che si apre (#2714).
+  const UN_VERBO_PRIMA = new RegExp(`(?<![\\p{L}\\p{N}])${VERBO}(?![\\p{L}\\p{N}])`, 'iu');
+  const UN_ALTRO_SOGGETTO = /(?:,|\s(?:e|ed|ma|and|but))\s+(?:il|lo|la|l['’]|i|gli|le|un[oa]?|the|an?|my|your|his|her|its)\s*[\p{L}-]+\s*$/iu;
+  const chiusoPrima = (fra) => {
+    const fine = new RegExp(`${CHIUDE_VERO}\\s*$`, 'iu').exec(fra);
+    if (!fine || /\d/.test(fra)) return false;
+    const testa = fra.slice(0, fine.index);
+    if (DOPO_CHE_SI_APRE.test(testa)) return false;
+    return UN_VERBO_PRIMA.test(testa) || UN_ALTRO_SOGGETTO.test(testa);
+  };
   const NOME_POLACCO = /^(?:kod|tajn)/i;
   const FRASE_POLACCA = new RegExp(SEGNO_POLACCO, 'i');
   const nomePolacco = (nome, prima) => NOME_POLACCO.test(nome) || (/^pin$/i.test(nome) && FRASE_POLACCA.test(prima));
