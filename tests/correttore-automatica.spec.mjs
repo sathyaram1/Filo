@@ -302,9 +302,10 @@ test('una correzione scelta tre volte dal tasto destro diventa automatica e comp
     await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
     const b = await riquadroDelSegno(segno);
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
-    const prima = menuDi(page).primaVoce;
+    // La correzione in cima ai testi, subito sotto la griglia delle icone (#2555).
+    const prima = menuDi(page).primaCorrezione;
     await expect(prima).toHaveText(/proprio/, { timeout: 5000 });
-    await prima.click();
+    await prima.locator('.sn-menu-correction-main').click();
     await expect.poll(() => valore(page)).toBe('è proprio bello ');
   }
   await expect.poll(() => magazzino(app, 'sn_autocorrect')).toEqual({ propio: 'proprio' });
