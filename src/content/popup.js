@@ -1228,6 +1228,7 @@
   // comunque, ma solo come storia da cui ripartono le domande successive
   // finché non torna quella vera. #724
   function payloadDaComporreNelMain(action, payload) {
+    if (action === ACTIONS.TRANSCRIBE_AUDIO) return { mediaId: String(payload?.mediaId || '') };
     if (action !== ACTIONS.EXPLAIN && action !== ACTIONS.EXPLAIN_DEEP) return null;
     const sel = payload?.selection || '';
     return { selection: sel, sentence: payload?.sentence || sel };
