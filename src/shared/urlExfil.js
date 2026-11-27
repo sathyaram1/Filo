@@ -424,7 +424,7 @@
   const RINVIO = new RegExp('^(?:[.,;!?]+|\\n)[^\\S\\n]*' + RACCORDO + '(?:'
     + "(?:(?:la|il|quella|quello|una|un)\\s+)?(?:nuov[ao]|giust[ao]|corrett[ao]|ver[ao]|vecchi[ao]|attuale|prossim[ao]|definitiv[ao])"
     + '|(?:ri)?prova(?:\\s+con)?|usa|metti|inserisci|scrivi|digita|adesso|ora|invece|da\\s+(?:oggi|adesso|ora)'
-    + '|(?:ri)?(?:mett|impost|cambi)(?:ila|ilo|ala|alo)(?:\\s+(?:a|in|con|su))?|(?:te|ve|ti|vi|me|ce)\\s+la|eccola|ecco'
+    + '|(?:ri)?(?:mett|impost|cambi)(?:ila|ilo|ala|alo)(?:\\s+(?:a|in|con|su))?|(?:te|ve|ti|vi|me|ce)\\s+la|eccola'
     + "|(?:the\\s+)?(?:new|right|correct|real|old|current|next)(?:\\s+one)?|try(?:\\s+with)?|use|enter|type|now|instead"
     + "|it['’]?s\\s+now|it\\s+is\\s+now|from\\s+now\\s+on|(?:set|change)\\s+it\\s+to|here\\s+it\\s+is|here['’]?s"
     + "|(?:la\\s+|le\\s+)?nouve(?:lle|au)|essaie|essayez|maintenant|(?:la\\s+|el\\s+)?nuev[ao]"
