@@ -557,7 +557,7 @@ test('Editor, tasto destro sul titolo senza invito: «Rigenera titolo» e «Rige
 
   for (const [voce, cosa] of [['Rigenera titolo', 'il titolo'], ['Rigenera riassunto', 'il riassunto']]) {
     await editor.locator('#docTitle').click({ button: 'right' });
-    await editor.locator('.ed-title-ctxmenu .sn-select-option', { hasText: voce }).click();
+    await menuDi(editor).scegli(voce);
     const avviso = editor.locator('.ed-toast', { hasText: `Non sono riuscito a generare ${cosa}` });
     await expect(avviso).toBeVisible({ timeout: 15_000 });
     await expect(avviso).toContainText('invito');
