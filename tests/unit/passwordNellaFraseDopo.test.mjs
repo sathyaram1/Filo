@@ -76,6 +76,12 @@ test('la frase dopo che parla d\'altro arriva intera, a tutti e due i cancelli',
   }
 });
 
+test('un indirizzo che porta la password detta così non esce', () => {
+  const X = globalThis.SN_URL_EXFIL;
+  assert.ok(X.taintScritto('https://esempio.it/?q=gattonero', 'la password scade, la nuova è gattonero'));
+  assert.equal(X.taintScritto('https://esempio.it/?q=funziona', 'Ho cambiato la password ieri, adesso funziona'), null);
+});
+
 test('un testo lungo che ripete il nome e il rimando si legge in fretta', () => {
   const lungo = 'la password è sbagliata, prova '.repeat(5000);
   const t0 = Date.now();
