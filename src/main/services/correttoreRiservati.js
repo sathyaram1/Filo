@@ -94,7 +94,10 @@ function riservatiIn(testo) {
   const out = [];
   const l = testo.toLowerCase();
   try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
-  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l, { spiega })); } catch (_) {}
+  // Anche col nome o il verbo scritti con un refuso e con un inciso fra i due, come nel pavimento (#2678.21).
+  for (const t of [l, ...RT().lettureDelNome(testo).map((x) => x.toLowerCase())]) {
+    try { if (X && X.segretiDetti) out.push(...X.segretiDetti(t, { spiega })); } catch (_) {}
+  }
   // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   const valori = [...RT().lunghi(out), ...RT().trova(testo)];
