@@ -42,7 +42,7 @@ test('creare, rinominare, duplicare ed eliminare un mazzo dalla libreria', async
 
   // Duplica dal menu contestuale (tasto destro sulla card).
   await card.click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Duplica' }).click();
+  await menuDi(page).scegli('Duplica');
   await expect(page.locator('[data-deck-id]')).toHaveCount(2);
   await expect(page.locator('[data-deck-id]', { hasText: 'Izzet Spellslinger (copia)' })).toHaveCount(1);
 
