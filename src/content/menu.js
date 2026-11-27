@@ -1295,40 +1295,6 @@
     attachSubmenuHover(sub);
   }
 
-  // ── La fila in cima al menu e la griglia del suo «Altro…» (#1434) ───────────────────────────────────────────────
-  // La griglia è ancorata al «+» della fila: NON chiude il menu padre, e regge il trascinamento fra griglia e fila.
-  function openIconGridSubmenu(anchorEl, items, opts = {}) {
-    if (!activeMenu) return;
-    if (activeMenu.subRoot) {
-      staccaSub();
-      return;
-    }
-    contaGesto('altro_del_menu', { aperto: true });
-    const cols = opts.cols || 4;
-    const sub = document.createElement('div');
-    sub.className = 'sn-menu sn-menu-sub sn-menu-icon-grid';
-    global.SN_FILO_UI?.mark(sub);
-    global.SN_FILO_UI?.soloGestiVeri(sub);
-    sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    if (opts.dropTarget) sub.dataset.snDropTarget = opts.dropTarget;
-    keepPageFocus(sub);
-
-    populateGrid(sub, items, { dropTarget: opts.dropTarget, cols });
-    if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
-
-    monta(sub);
-    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
-    activeMenu.cleanups.push(cleanupZoom);
-    activeMenu.subRoot = sub;
-    activeMenu.subAnchor = anchorEl;
-    activeMenu.subMode = 'anchor';
-
-    placeSub(sub, anchorEl, 'anchor');
-    sorveglia(sub);
-    // Senza, il timer di uscita dal «+» chiude la griglia appena il puntatore ci entra.
-    attachSubmenuHover(sub);
-  }
-
   // L'indirizzo di un collegamento sul testo selezionato: un campo ancorato all'icona, Invio lo mette. Il menu resta
   // aperto finché si scrive; `onApplica(indirizzo)` parte a menu chiuso, col fuoco rimesso dove si scriveva.
   function openLinkSubmenu(anchorEl, { valore = '', onApplica } = {}) {
