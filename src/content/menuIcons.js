@@ -298,7 +298,7 @@
   // disabled?, acceso?, valore?, iconaImg? } }, quelle che l'elemento sotto il mouse permette; `icona` e `nome` dicono lo
   // stato (Riproduci o Pausa), `acceso` uno stato acceso (Grassetto, l'audio), `valore` un'azione col valore come icona.
   // `opzioni`: { bersagli: { <oggetto>: [rect] }, oggetti: { <oggetto>: frase }, scritte: [voci delle pagine di Filo],
-  // aspetto: { icona, colonne }, oggetto: la frase della riga del nome a riposo }.
+  // aspetto: { icona, colonne }, oggetto: la frase della riga del nome a riposo, rifai: () => azioni }.
   function fila(contesto, azioni = {}, opzioni = {}) {
     if (!Object.prototype.hasOwnProperty.call(Disp.CONTESTI, contesto)) { aperta = null; return null; }
     const o = opzioni && typeof opzioni === 'object' ? opzioni : {};
