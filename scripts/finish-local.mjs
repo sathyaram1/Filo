@@ -491,11 +491,12 @@ export function specDellaScelta({ changed, base, root = ROOT, mappa = null }) {
   const soloCommenti = cambiatiSoloNeiCommenti(changed, { base, root });
   const veri = changed.filter((f) => !soloCommenti.includes(f));
   const perUso = specCheUsano(veri, leggiSorgenti(root));
-  // Coi file che la mappa della suite conosce sceglie lei, dalle righe cambiate (#2502); gli altri (nuovi, test,
-  // script) restano alla scelta per area e nome.
-  const dallaMappa = mappa ? sceltaDallaMappa({ mappa, file: veri.filter((f) => mappa.file[f]), base, root }) : null;
-  const perArea = veri.filter((f) => !(dallaMappa && mappa.file[f]));
-  const esatte = dallaMappa ? veri.flatMap((f) => (mappa.file[f] ? PROVE_DI_CHI_DECIDE.get(f) || [] : [])).map((p) => `tests/${p}`) : [];
+  // Coi file di cui la mappa della suite conosce le funzioni sceglie lei, dalle righe cambiate (#2502); gli altri
+  // (nuovi, test, script, fogli di stile e HTML, che la mappa sa solo chi carica) restano alla scelta per area e nome.
+  const sceglieLaMappa = (f) => Boolean(mappa?.file[f]?.funzioni?.length);
+  const dallaMappa = mappa ? sceltaDallaMappa({ mappa, file: veri.filter(sceglieLaMappa), base, root }) : null;
+  const perArea = veri.filter((f) => !(dallaMappa && sceglieLaMappa(f)));
+  const esatte = dallaMappa ? veri.flatMap((f) => (sceglieLaMappa(f) ? PROVE_DI_CHI_DECIDE.get(f) || [] : [])).map((p) => `tests/${p}`) : [];
   const specs = [...new Set([...specsForChangedFiles(perArea, [...tracked]), ...esatte, ...(dallaMappa?.specs || []), ...perUso.specs])].filter((s) => tracked.has(`${s}.spec.mjs`));
   return { specs, soloCommenti, troppoLarghi: perUso.troppoLarghi, mappa: dallaMappa };
 }
