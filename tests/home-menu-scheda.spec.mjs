@@ -26,7 +26,14 @@ async function semina(home, { pagine, categorie = [], categorizza = false, tema 
 }
 
 const salvate = (home) => home.evaluate(async () => (await chrome.storage.local.get('savedPages')).savedPages || []);
+// Il menu della scheda è a icone (#2555): le voci, ogni icona seguita dalle varianti del suo verbo. L'elenco delle
+// categorie di «Sposta in…» resta un elenco scritto.
+async function vociScheda(home) {
+  await expect(menuDi(home).principale).toBeVisible();
+  return menuDi(home).vociScritte();
+}
 const vociMenu = (home) => home.locator('.home-ctxmenu .sn-select-option').allTextContents();
+const iconaFocalizzata = (home) => home.evaluate(() => document.activeElement?.getAttribute('aria-label') || '');
 const scheda = (home, id) => home.locator(`#grid .sn-card[data-page-id="${id}"]`);
 // Un avviso chiuso resta nel documento il tempo della dissolvenza.
 const annullaVivo = (home) => home.locator('.home-annulla:not([data-sn-closing]) .home-annulla-btn');
