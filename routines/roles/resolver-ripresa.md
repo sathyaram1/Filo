@@ -34,7 +34,7 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
   sposta. Il lavoro è tuo lo stesso: finché c'è la ripresa nessuno lo verifica,
   e la consegna in revisione qui sotto il server la accetta come sempre.
 
-Se la `domanda` comincia con «Ripresa fermata prima del biglietto», è la nota
+Se la `domanda` è la nota «Ripresa fermata prima del biglietto: …», è quella
 con cui il server aveva fermato la ripresa su un ramo vecchio, non la domanda
 dell'owner: se sei qui, l'hanno sbloccata, e si riprende così, sul ramo com'è.
 Rifare da capo o archiviare non sono strade tue. La domanda vera, se ce n'era
