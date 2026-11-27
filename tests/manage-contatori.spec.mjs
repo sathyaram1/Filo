@@ -167,8 +167,11 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     await page.keyboard.press('Enter');
     await expect(andamento).toHaveCount(1);
     await nuova.click({ button: 'right' });
-    await expect(page.locator('.mg-ctxmenu .sn-select-option')).toHaveText(['Nascondi l’andamento', 'Copia la riga', 'Copia la tabella', 'Rileggi']);
-    await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Copia la riga' }).click();
+    // A icone (#2555): le stesse voci, ogni icona seguita dalle varianti del suo verbo.
+    const menu = menuDi(page);
+    await expect(menu.principale).toBeVisible();
+    expect(await menu.vociScritte()).toEqual(['Nascondi l’andamento', 'Copia la riga', 'Copia la tabella', 'Rileggi']);
+    await menu.scegli('Copia la riga');
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toMatch(/^Apri una nuova scheda\t15\tfino a 0,5 s: 15, fino a 1 s: meno di 5/);
     // Una riga sotto soglia non si apre: niente andamento, né dal clic né dal menu.
     await altre.click();
