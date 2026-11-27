@@ -570,7 +570,7 @@
   // Le parole in mezzo hanno un tetto e non passano un punto; un a capo vale solo con la congiunzione o il trattino d'elenco.
   const CONGIUNZIONE = '(?:e|ed|o|oppure|ma|mentre|and|or|but|while|und|oder|aber|et|ou|mais|y|pero|i|oraz|lub|albo|en|of)';
   const SEPARA = `(?:[ \\t]*[,;/&][ \\t]*|[ \\t]+[-–—][ \\t]+|[ \\t]*\\n[ \\t]*(?:[-–—•*][ \\t]+|(?=${CONGIUNZIONE}[ \\t]))`
-    + `|[ \\t]+(?=${CONGIUNZIONE}[ \\t]))`;
+    + `|[ \\t]+${CONGIUNZIONE}[ \\t]*\\n[ \\t]*|[ \\t]+(?=${CONGIUNZIONE}[ \\t]))`;
   const PAROLE_IN_MEZZO = "(?:[\\p{L}'’]{1,24}(?:[ \\t]*[:=][ \\t]*|[ \\t]+)){0,6}";
   const CIFRE_ACCANTO = `\\d{${Math.min(...Object.values(MISURE_CIFRE).map((x) => x[0]))},${Math.max(...Object.values(MISURE_CIFRE).map((x) => x[1]))}}`;
   const ACCANTO_IN_ELENCO = new RegExp(`["'»”)*_]{0,4}${SEPARA}${PAROLE_IN_MEZZO}["'«“(*_]{0,4}(${CIFRE_ACCANTO})(?![\\d\\p{L}]|[.,/:-]\\d)`, 'uy');
