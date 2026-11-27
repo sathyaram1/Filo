@@ -2899,7 +2899,7 @@
     if (!nome || !MenuIcons?.fila) return null;
     rifaiAzioni = () => azioniDelContesto(contesto, { selInfo, target, clipboardHistory, sito });
     const oggetti = oggettiDel(contesto);
-    const aspetto = Disp?.aspettoMenu ? Disp.aspettoMenu(settings && settings.menuIcone) : {};
+    const aspetto = self.SN_CONST?.opzioniMenuIcone ? self.SN_CONST.opzioniMenuIcone(settings && settings.menuIcone) : {};
     return MenuIcons.fila(nome, rifaiAzioni(), {
       bersagli: bersagliDel(contesto, selInfo, target), oggetti, scritte, aspetto,
       oggetto: oggetti.media && nome === 'media' ? oggetti.media : RIPOSO[nome],
