@@ -78,6 +78,9 @@ export function menuDi(scheda) {
     scegli,
     /** Tasto destro sull'icona (nome o locator) e clic sulla variante col testo dato. */
     variante,
+    /** I nomi delle icone del menu principale, in ordine, anche quelle dietro il «+» (per `expect.poll`). */
+    nomi: () => locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))),
     /** Un'icona della griglia per il suo verbo dell'elenco unico (`copy`, `save`…). */
     icona: (verbo) => locator(`.sn-menu-griglia [data-sn-verbo="${verbo}"]`),
     /** L'icona Incolla: il tasto destro su di lei apre la cronologia degli appunti. */
