@@ -221,7 +221,8 @@ test('il blocco di codice citato, le righe vuote e le celle vuote non lasciano p
     assert.equal(P.oscura(testo), atteso, 'pavimento');
     assert.doesNotMatch(alCorrettore(testo), /Nyckel|2024/, 'correttore');
   }
-  for (const testo of ['Password:\n> ```\n> npm install\n> ```', '| Password: | | obbligatoria |', '| Password: | | |']) {
+  // Il testo che resta è uno che anche fuori dal blocco non è un valore: più parole sotto l'etichetta ora si coprono (#2714).
+  for (const testo of ['Password:\n> ```\n> vedi sotto\n> ```','| Password: | | obbligatoria |', '| Password: | | |']) {
     assert.equal(P.oscura(testo), testo);
   }
 });
