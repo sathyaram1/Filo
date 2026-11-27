@@ -645,7 +645,7 @@ test('#496 — dall\'elenco si arriva alla segnalazione vera', async ({ openTab 
   await page.evaluate((f) => window.__mgTest.setFsData({ feedbacks: [f], workerLog: [] }), uno);
   await page.locator('[data-fs-range="30g"]').click();
   await page.locator('[data-fs-id="ricevuti"]').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Mostra' }).click();
+  await menuDi(page).scegli('Mostra');
   await page.locator('#mgFsDrillList .mg-fs-drill-row').first().click();
   // La segnalazione è aperta nella colonna di sinistra, nella sua sezione.
   await expect(page.locator('#mgDetail')).toBeVisible();
