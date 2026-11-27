@@ -475,10 +475,15 @@
     if (categories.length) voci.push({ label: I18n.t('home_menu_move'), run: () => apriMenuSposta(x, y, page) });
     voci.push({ label: I18n.t('home_remove'), run: (o) => rimuovi(page, o) });
     // A icone come il tasto destro di Filo (#2555); «Sposta» apre poi l'elenco dei gruppi, che sono dati e restano testo.
+    // Una voce scelta coi tasti (Invio, il tasto singolo) porta il fuoco dove continua la tastiera, come prima.
     const I = window.SN_MENU_ICONS;
-    if (I && I.apriVoci && I.apriVoci({ x, y, voci: voci.map((v) => ({ label: v.label, onClick: () => v.run() })) })) return;
+    if (I && I.apriVoci && I.apriVoci({
+      x, y, voci: voci.map((v) => ({ label: v.label, onClick: () => v.run({ daTastiera: Date.now() - ultimoTasto < 500 }) })),
+    })) return;
     openMenuAt(x, y, voci);
   }
+  let ultimoTasto = 0;
+  document.addEventListener('keydown', (e) => { if (e.isTrusted) ultimoTasto = Date.now(); }, true);
 
   // Il secondo livello si apre nello stesso punto, come «Sposta in gruppo…» dei Mazzi.
   function apriMenuSposta(x, y, page) {
