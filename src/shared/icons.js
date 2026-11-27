@@ -731,6 +731,79 @@
     `<circle cx="12" cy="12" r="8.5"/>` +
     `<path d="M6 6l12 12"/>`;
 
+  // --- Il tasto destro a icone (#2555): i verbi che prima erano solo scritti.
+  const eye =
+    `<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/>` +
+    `<circle cx="12" cy="12" r="2.8"/>`;
+  const redo =
+    `<path d="M20 10H9a5 5 0 0 0 0 10h4"/>` +
+    `<path d="M16 6l4 4-4 4"/>`;
+  const duplicate =
+    `<rect x="8" y="8" width="12" height="12" rx="2"/>` +
+    `<path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>` +
+    `<path d="M14 11v6"/>` +
+    `<path d="M11 14h6"/>`;
+  const move =
+    `<path d="M12 3v18"/>` +
+    `<path d="M3 12h18"/>` +
+    `<path d="M9 6l3-3 3 3"/>` +
+    `<path d="M9 18l3 3 3-3"/>` +
+    `<path d="M6 9l-3 3 3 3"/>` +
+    `<path d="M18 9l3 3-3 3"/>`;
+  const exportIcon =
+    `<path d="M12 15V3.5"/>` +
+    `<path d="M8 7.5l4-4 4 4"/>` +
+    `<path d="M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/>`;
+  const rename =
+    `<rect x="3" y="7" width="18" height="10" rx="2"/>` +
+    `<path d="M7 10v4"/>` +
+    `<path d="M15 5h-2.5"/>` +
+    `<path d="M15 19h-2.5"/>` +
+    `<path d="M13.75 5v14"/>`;
+  const quote =
+    `<path d="M5 17c2.5 0 4-1.6 4-4.5V8H5v4.5h3"/>` +
+    `<path d="M14 17c2.5 0 4-1.6 4-4.5V8h-4v4.5h3"/>`;
+  const stop =
+    `<rect x="6" y="6" width="12" height="12" rx="2"/>`;
+  const sliders =
+    `<path d="M4 7h9"/>` +
+    `<path d="M17 7h3"/>` +
+    `<circle cx="15" cy="7" r="2"/>` +
+    `<path d="M4 17h3"/>` +
+    `<path d="M11 17h9"/>` +
+    `<circle cx="9" cy="17" r="2"/>`;
+  const power =
+    `<path d="M12 3.5v8"/>` +
+    `<path d="M7 6.5a7.5 7.5 0 1 0 10 0"/>`;
+  const remove =
+    `<circle cx="12" cy="12" r="8.5"/>` +
+    `<path d="M8 12h8"/>`;
+  const putBack =
+    `<path d="M9 14l-5-5 5-5"/>` +
+    `<path d="M4 9h10a6 6 0 0 1 0 12h-3"/>` +
+    `<path d="M14 15h.01"/>`;
+  const cookie =
+    `<path d="M20.5 12.5A8.5 8.5 0 1 1 11.5 3.5a3 3 0 0 0 4 3.5 3 3 0 0 0 5 5.5z"/>` +
+    `<path d="M8.5 10h.01"/>` +
+    `<path d="M10 15h.01"/>` +
+    `<path d="M15 15.5h.01"/>`;
+  const gift =
+    `<rect x="4" y="9" width="16" height="11" rx="1.5"/>` +
+    `<path d="M3 9h18"/>` +
+    `<path d="M12 9v11"/>` +
+    `<path d="M12 9c-1.5-3.5-5.5-4-5.5-1.5S10 9 12 9c2 0 5.5 0 5.5-1.5S13.5 5.5 12 9"/>`;
+  const run =
+    `<path d="M4 5h16v14H4z"/>` +
+    `<path d="M8 10l2.5 2L8 14"/>` +
+    `<path d="M12.5 14.5H16"/>`;
+  const expand =
+    `<path d="M6 9l6 6 6-6"/>`;
+  const collapse =
+    `<path d="M6 15l6-6 6 6"/>`;
+  const target =
+    `<circle cx="12" cy="12" r="8.5"/>` +
+    `<circle cx="12" cy="12" r="3"/>`;
+
   // Ogni icona è una FUNZIONE (size) => stringa SVG: i consumer chiedono taglie diverse
   // (16 per la riga, 20 per la griglia) senza rifare il wrapper a mano.
   const ICONS = {
