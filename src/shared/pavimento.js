@@ -688,6 +688,11 @@
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
+  // In fondo alla riga una nota fra parentesi o un'emoji (anche una faccina scritta) non è del valore: «Password: casa
+  // mia al mare (tutto minuscolo)», «Password: tramonto 😊» (#2678.13). Una sola regola per la parola e per la frase.
+  const EMOJI = '(?:[\\p{Extended_Pictographic}\\p{Regional_Indicator}][\\p{Emoji_Modifier}\\u{FE0F}\\u{20E3}]*(?:\\u{200D}\\p{Extended_Pictographic}[\\p{Emoji_Modifier}\\u{FE0F}]*)*|[:;=]-?[)(DPp]|<3)';
+  const NOTA_IN_FONDO = new RegExp(`(?:[ \\t]+(?:\\([^()\\n]{0,80}\\)|${EMOJI}+))+[ \\t]*$`, 'u');
+  const senzaNota = (resto) => resto.replace(NOTA_IN_FONDO, '');
   const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*$`, 'i');
   const TESTA_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}`, 'i');
   function alPostoDelValore(s, out) {
