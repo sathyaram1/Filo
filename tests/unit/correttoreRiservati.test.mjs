@@ -40,6 +40,15 @@ test('un\'etichetta in grassetto o corsivo Markdown coi due punti dentro non fa 
   assert.equal(p.dopo, '\n__Utente:__ mario');
 });
 
+// #2673.12 — lo stesso con l'etichetta in HTML, da un pezzo di pagina incollato.
+test('un\'etichetta in grassetto HTML non fa partire il valore, nemmeno a pezzi', () => {
+  for (const [t, segreto] of [['<b>Password:</b> Nyckel!2024', 'Nyckel!2024'], ['<strong>PIN:</strong> 4821', '4821'],
+    ['<p><strong>Wi-Fi password:</strong></p><p>Nyckel!2024</p>', 'Nyckel!2024']]) assert.ok(!R.oscura(t).includes(segreto), t);
+  const p = R.richiestaSenzaRiservati({ prima: '<b>Password:</b> ', nuovo: 'Nyckel!2024', dopo: '<br><b>Utente:</b> mario' });
+  assert.ok(!JSON.stringify(p).includes('Nyckel!2024'), JSON.stringify(p));
+  assert.equal(p.dopo, '<br><b>Utente:</b> mario');
+});
+
 // La parola che presenta il dato e il dato possono partire in pezzi diversi, o la parola restare fuori dai pezzi: si
 // cerca nel campo intero, e il campo non parte.
 test('una password scritta dopo una pausa e una carta a metà fra due pezzi non partono', () => {
