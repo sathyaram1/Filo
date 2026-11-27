@@ -239,6 +239,7 @@
         id: '', verbo: d ? verbo : '', icon: d ? I(a.icona && global.SN_ICONS[a.icona] ? a.icona : d.icona) : I('list'),
         nome, oggetto: d ? a.oggettoScritto : '', tasto: d ? d.tasto : '', label: a.label, onClick: a.onClick,
         disabled: !!a.disabled, bersaglio: a.bersaglio || null, draggable: false, ...misura(a),
+        ...(a.nota ? { nota: String(a.nota) } : {}),
         ...(altre.length ? { varianti: altre.map((x) => ({ label: x.label, onClick: x.onClick, bersaglio: x.bersaglio || null, disabled: !!x.disabled, ...misura(x) })) } : {}),
       };
     });
