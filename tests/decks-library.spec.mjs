@@ -237,7 +237,7 @@ test('le voci del menu della scheda si accendono al passaggio del mouse', async 
   await seedLibrary(app, page);
 
   await scheda(page, 'Fulmini').click({ button: 'right' });
-  const voce = page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Rinomina…' });
+  const voce = menuDi(page).voce('Rinomina…');
   const fondo = () => voce.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(await voce.evaluate((el) => getComputedStyle(el).transitionProperty)).toContain('background-color');
   await page.mouse.move(0, 0);
