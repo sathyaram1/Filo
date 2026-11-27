@@ -2791,6 +2791,7 @@
       if (detta && typeof detta.onClick === 'function') {
         azioni.dictate = {
           label: detta.disabled ? I18n.t('menu_dictate_not_supported') : detta.label, onClick: detta.onClick, disabled: !!detta.disabled,
+          nota: detta.shortcut || '',
           varianti: (detta.subItems || []).filter((x) => x && typeof x.onClick === 'function').map((x) => ({ label: x.label, onClick: x.onClick })),
         };
       }
