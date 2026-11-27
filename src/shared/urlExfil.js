@@ -432,15 +432,13 @@
     const r = RINVIO.exec(resto);
     if (!r) return null;
     const G = global.SN_GUARDIANO_STATICO;
+    if (!avverbio && G) avverbio = new RegExp(`^${G.AVVERBIO}$`, 'u');
     const parole = fineFrase(resto.slice(r[0].length).replace(/^\s+/, '')).split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
     let annunciato = false;
     for (const [k, w] of parole.entries()) {
       const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
-      if (/^[:=]+$/.test(w) || (G && (G.ANNUNCI.includes(t) || new RegExp(`^${G.AVVERBIO}$`, 'u').test(t)))) {
-        annunciato = annunciato || !/^(?:ora|adesso|now)$/u.test(t);
-        continue;
-      }
-      if (w.endsWith(':')) annunciato = true;
+      if (/^[:=]+$/.test(w) || (G && G.ANNUNCI.includes(t))) { annunciato = true; continue; }
+      if (avverbio && avverbio.test(t)) continue;
       const cifre = /\d/.test(t);
       if (cifre) return soloAlnum(t).length >= 4 ? { valore: t, regola: 'codice', rinvio: true } : null;
       const chiude = k === parole.length - 1 || CONGIUNZIONE.test(parole[k + 1]);
