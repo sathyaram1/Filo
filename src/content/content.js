@@ -2349,7 +2349,13 @@
         if (Array.isArray(voci)) out.push(...voci.filter((v) => v && v.label && typeof v.onClick === 'function'));
       } catch (_) {}
     }
-    return out;
+    // Il menu a icone contorna l'elemento su cui la voce agisce (#2555): quello che la voce nomina, o il cliccato.
+    return out.map((v) => {
+      if (v.bersaglio) return v;
+      const el = v.elemento && v.elemento.getBoundingClientRect ? v.elemento : null;
+      const r = el ? el.getBoundingClientRect() : null;
+      return r && r.width > 0 ? { ...v, elemento: undefined, bersaglio: [{ x: r.left, y: r.top, w: r.width, h: r.height }] } : { ...v, elemento: undefined };
+    });
   }
 
   // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
