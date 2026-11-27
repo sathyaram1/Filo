@@ -53,7 +53,6 @@ export function unisciRegistrazioni(registrazioni, root) {
       if (!set) file.set(rel, (set = new Set()));
       for (const [da, a] of intervalli || []) set.add(`${da}:${a}`);
     };
-    for (const [rel, iv] of Object.entries(reg?.file || {})) if (String(rel).startsWith('src/')) metti(rel, iv);
     for (const [u, iv] of Object.entries(reg?.indirizzi || {})) {
       const rel = percorsoDaIndirizzo(u, root);
       if (rel) metti(rel, iv);
