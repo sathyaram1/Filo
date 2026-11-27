@@ -189,8 +189,7 @@ test('scelto tre volte, Filo propone una volta il menu del sito; accettato, il t
   await page.keyboard.up('Shift');
   expect(await primaVoce(page)).toBe('Menu di Sito di prova');
   expect(await page.evaluate(() => window.aperture)).toBe(prima);
-  await menuDi(page).locator('.sn-menu .sn-menu-split-arrow').first().hover();
-  await menuDi(page).locator('.sn-menu-sub .sn-menu-item', { hasText: 'Col tasto destro apri il menu di Filo' }).click();
+  await menuDi(page).variante(menuDi(page).icona('siteMenu'), 'Col tasto destro apri il menu di Filo');
   await expect.poll(() => sitiScelti(app)).toEqual([]);
   await tastoDestroApre(page, menuDi(page).locator('.sn-menu'));
   expect(await page.evaluate(() => window.aperture)).toBe(prima);
