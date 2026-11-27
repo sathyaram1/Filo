@@ -1,6 +1,7 @@
 // #2229: un «da fare» dell'owner sta nella lista delle Domande col suo segno, il contatore lo conta a parte, e «Fatto»
 // manda la scelta che riprende il lavoro collegato. Il main è finto: la parte del server la provano le sue prove.
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const ora = Date.now();
