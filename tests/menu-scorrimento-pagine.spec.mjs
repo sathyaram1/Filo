@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
 import { home } from './helpers/chatFinta.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Scorre il contenitore che porta `bersaglio` (o la finestra, con `finestra`), allungato da uno spazio in fondo: va
 // fuori dall'elenco che la pagina ridisegna.
