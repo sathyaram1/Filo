@@ -60,20 +60,8 @@ test('la bozza del campo diventa un documento nuovo, il campo si svuota e l\'Aiu
   await expect.poll(() => h.evaluate(() => !document.querySelector('.dash-velo-editor'))).toBe(true);
   const prima = await documenti(ed);
   await h.fill('#input', 'Seconda lettera\n\nCon due paragrafi');
-  h.on('console', (m) => console.log('PAGINA', m.text()));
-  await h.evaluate(() => {
-    const E = window.SN_DASH_EDITOR_CAMPO; const o = E.apri;
-    E.apri = () => { console.log('apri chiamato'); const r = o(); console.log('apri ->', r); return r; };
-    document.addEventListener('click', (e) => console.log('click su', e.target.className), true);
-  });
-  await h.locator('#tieni .dash-carta[data-tipo="editor"]').click({ position: { x: 150, y: 20 } });
-  await h.waitForTimeout(3000);
-  console.log('DEBUG', await h.evaluate(() => ({ v: document.getElementById('input').value, s: window.SN_DASH_EDITOR_CAMPO._stato() })),
-    await ed.evaluate(() => ({ u: location.href, p: [...document.querySelectorAll('#doc p')].map((x) => x.textContent) })),
-    await app.evaluate(({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
-      return { inArrivo: win._filoTabs._inArrivo, tabs: win._filoTabs.tabs.map((t) => [t.id, t.url, t.view.webContents.getURL(), t.view.webContents.isLoading()]) };
-    }));
+  // Il clic sulla carta, non sul suo bottone: la stessa strada.
+  await h.locator('#tieni .dash-carta[data-tipo="editor"] .dash-carta-tit').click();
   await expect.poll(() => davanti(app), { timeout: 10_000 }).toMatch(/^filo:\/\/editor\//);
   const ed2 = await finestraCon(app, (u) => u.startsWith('filo://editor/'));
   await expect(ed2.locator('#doc p')).toHaveText(['Seconda lettera', '', 'Con due paragrafi']);
