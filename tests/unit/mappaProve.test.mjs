@@ -200,3 +200,59 @@ test('finish:check: coi file che la mappa conosce sceglie lei dalle righe cambia
     assert.match(testoDellaMappa({ letta: { errore: 'gh non c\'è' }, daMappa: null }), /non disponibile \(gh non c'è\): scelgo gli spec per area/);
   } finally { togliCartella(dir); }
 });
+
+// Un modulo condiviso: costanti nel corpo dell'IIFE, lette da funzioni, una attraverso l'altra.
+const MODULO = [
+  '(function (global) {', // 1
+  "  const VERBO = 'è';", // 2
+  '  const CVV = new RegExp(`cvv ${VERBO}`);', // 3
+  '  const LISTA = [', // 4
+  "    'a',", // 5
+  '  ];', // 6
+  '  function trova(t) {', // 7
+  '    return CVV.test(t);', // 8
+  '  }', // 9
+  '  function elenca(obj) {', // 10
+  '    return LISTA.length + obj.VERBO;', // 11
+  '  }', // 12
+  '  global.X = { trova, elenca };', // 13
+  '})(globalThis);', // 14
+].join('\n');
+const dentroDelModulo = (r) => (r >= 7 && r <= 9) || (r >= 10 && r <= 12);
+
+test('una riga fuori dalle funzioni vale per le righe che usano i nomi che dichiara, seguendo le costanti (#2502 giro 1)', () => {
+  assert.deepEqual(righeDeiNomi(MODULO, [2], dentroDelModulo), [3, 8], 'VERBO entra in CVV, e CVV lo legge trova(); obj.VERBO è un altro nome');
+  assert.deepEqual(righeDeiNomi(MODULO, [5], dentroDelModulo), [11], 'un elemento della tabella vale per la tabella');
+  assert.deepEqual(righeDeiNomi(MODULO, [6], dentroDelModulo), [11], 'anche la riga che la chiude');
+  assert.deepEqual(righeDeiNomi(MODULO, [8], dentroDelModulo), [], 'dentro una funzione eseguita decide già la funzione');
+  const cjs = "const FILE = 'x.json';\nfunction leggi() {\n  return FILE;\n}\nmodule.exports = { leggi };\n";
+  assert.deepEqual(righeDeiNomi(cjs, [1], (r) => r >= 2 && r <= 4), [3]);
+});
+
+test('con il sorgente, una costante cambiata nomina fra le specifiche chi esegue le funzioni che la leggono', () => {
+  const m = {
+    prove: [{ spec: 'tests/a.spec.mjs', ms: 1 }, { spec: 'tests/b.spec.mjs', ms: 1 }],
+    insiemi: [[0, 1], [0], [1]],
+    file: { 'src/shared/x.js': { carico: 0, funzioni: [[1, 14, 0], [7, 9, 1], [10, 12, 2]] } },
+  };
+  const cambio = new Map([['src/shared/x.js', [2]]]);
+  assert.deepEqual(proveDelCambio(m, cambio).prove.map((p) => [p.spec, p.livello]), [['tests/a.spec.mjs', 'file'], ['tests/b.spec.mjs', 'file']]);
+  assert.deepEqual(proveDelCambio(m, cambio, { sorgente: () => MODULO }).prove.map((p) => [p.spec, p.livello]), [['tests/a.spec.mjs', 'funzione'], ['tests/b.spec.mjs', 'file']]);
+});
+
+test('un file servito senza funzioni (un foglio di stile) lo carica chi l\'ha chiesto', () => {
+  const css = 'src/pages/dashboard/dashboard.css';
+  const regs = unisciRegistrazioni([{ prova: 'tests/c.spec.mjs', processo: 'main', indirizzi: { 'filo://newtab/dashboard.css': [] } }], ROOT);
+  const m = costruisciMappa({ registrazioni: regs, sorgente: (rel) => (rel === css ? 'a {}\n' : null), root: ROOT });
+  assert.deepEqual(m.file[css].funzioni, []);
+  assert.deepEqual(m.insiemi[m.file[css].carico], [0]);
+  const { prove, senzaProve } = proveDelCambio(m, new Map([[css, [1]]]));
+  assert.deepEqual(prove.map((p) => [p.spec, p.livello]), [['tests/c.spec.mjs', 'file']]);
+  assert.deepEqual(senzaProve, []);
+});
+
+test('la durata prevista di finish:check usa i tempi della mappa, gli stessi dello strumento', () => {
+  assert.match(stimaDurataControlli(2, { ms: [120_000, 180_000] }).testo, /da 9 a 13 minuti \(unit più 2 spec, 2 coi tempi misurati dalla suite\)/);
+  assert.match(stimaDurataControlli(2, { ms: [120_000, 0] }).testo, /1 coi tempi misurati dalla suite, gli altri a circa mezzo minuto/);
+  assert.equal(stimaDurataControlli(3).testo, stimaDurataControlli(3, { ms: [0, 0, 0] }).testo);
+});
