@@ -121,7 +121,6 @@ const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repea
 // di codice: «Password:» e sotto «- Nyckel!2024» o «```» è la riga sotto l'etichetta (#2673.10). Un segno senza niente
 // dopo resta: le etichette rileggono all'indietro le file lunghe di spazi, e mille voci vuote le farebbero lente. Il
 // blocco di codice dentro una citazione o una voce («> ```») è una riga di segni sola, come senza.
-// Il punto «•» vale come il trattino (#2673.14).
 const SEGNO_BLOCCO = '(?:>[ \\t]*|(?:[-*+•]|\\d{1,9}[.)])[ \\t]+(?:\\[[ xX]\\][ \\t]+)?|#{1,6}[ \\t]+)';
 const BLOCCO = new RegExp(`^([ \\t]*)(${SEGNO_BLOCCO}*(?:\`{3,}|~{3,})[^\`\\n]*$|${SEGNO_BLOCCO}+(?=\\S))`, 'gmu');
 const spazi = (s) => ' '.repeat(s.length);
