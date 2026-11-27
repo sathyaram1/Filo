@@ -683,7 +683,9 @@
       for (let giri = 0; giri < 8; giri++) {
         SEGUITO.lastIndex = fine;
         const m = SEGUITO.exec(s);
-        if (!m || (m.groups.gap && ALTRO_CAMPO.test(m.groups.gap)) || !prendi(m, true)) break;
+        // Una preposizione da sola lega solo attaccata («da «…» a «…»»): «a «Netflix» e a «Spotify»» sono due siti.
+        const gap = m && (m.groups.gap || '').trim();
+        if (!m || (gap && (m.groups.prep || ALTRO_CAMPO.test(gap))) || !prendi(m, true)) break;
         fine = m.index + m[0].length;
       }
     }
