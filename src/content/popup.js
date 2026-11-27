@@ -1106,8 +1106,8 @@
           if (vuota) bubble.text.textContent = '';
           const daMostrare = conRecinto(popup.action === ACTIONS.EXPLAIN
             ? spiegazioneDaMostrare(resolved) : resolved);
-          if (popup.action === ACTIONS.EXPLAIN && !daMostrare) {
-            bubble.text.textContent = I18n.t('popup_no_explanation');
+          if ((popup.action === ACTIONS.EXPLAIN || trascrizione) && !String(daMostrare || '').trim()) {
+            bubble.text.textContent = I18n.t(trascrizione ? 'popup_transcribe_empty' : 'popup_no_explanation');
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
