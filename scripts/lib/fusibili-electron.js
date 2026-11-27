@@ -161,6 +161,6 @@ function motoreSenzaPrivilegi({ radice, cache = null, piattaforma = process.plat
 }
 
 module.exports = {
-  SENTINELLA, PRIVILEGI_FILE, fileDelFilo, privilegiFile, spegniPrivilegiFile, eseguibileDelPacchetto, afterPack,
+  SENTINELLA, PRIVILEGI_FILE, appDelMac, fileDelFilo, privilegiFile, spegniPrivilegiFile, eseguibileDelPacchetto, afterPack,
   cartellaDelleCopie, motoreSenzaPrivilegi,
 };
