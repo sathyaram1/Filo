@@ -103,9 +103,10 @@ test('dal tasto destro sulla scheda fa la stessa cosa del tasto, e apre la prati
   const fb = pratica();
   await apri(page, [fb]);
   await page.locator(`.mg-item[data-id="${fb._id}"]`).click({ button: 'right' });
-  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Segna fidato' });
-  await expect(voce).toHaveAttribute('title', /i giudici non servono più/);
-  await voce.click();
+  // A icone (#2555): la voce è un'icona col suo nome; il fumetto che la spiegava nel menu non c'è più.
+  const menu = menuDi(page);
+  await expect(menu.voce('Segna fidato')).toHaveCount(1);
+  await menu.scegli('Segna fidato');
   await expect(page.locator('#mgDetail')).toBeVisible();
   await expect(page.locator('#mgManageMsg')).toContainText('è fidato');
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: fb._id }]);
