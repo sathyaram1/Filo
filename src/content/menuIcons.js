@@ -359,6 +359,8 @@
 
   global.SN_MENU_ICONS = {
     init, fila, runIconAction, statoPerBarra, layoutCambiato, dallaBarra, aggiorna: ridisegna,
+    // Chi apre il menu dice come rifare le sue azioni quando lo stato dell'elemento cambia a menu aperto.
+    rifacitore: (fn) => { rifacitore = typeof fn === 'function' ? fn : null; },
     prepara: chiediFinestra,
     redrawIconRows: ridisegnaFinestra,
   };
