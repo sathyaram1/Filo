@@ -34,6 +34,7 @@
     aiutoPasso: () => aiutoPasso(),
     aiutoStato: () => Sidebar?.stato?.(),
     aiutoAcceso: () => aiutoAcceso(),
+    aspetto: () => aspettoDelMenu(),
   });
   TTS.init({
     getSettings: () => settings,
