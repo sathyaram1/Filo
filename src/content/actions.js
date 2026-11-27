@@ -2577,6 +2577,8 @@
 
   global.SN_ACTIONS = {
     init,
+    mediaDelLettore,
+    trascriviMedia,
     copyToClipboard,
     copySelection,
     testoCopiato,
