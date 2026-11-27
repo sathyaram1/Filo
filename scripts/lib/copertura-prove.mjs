@@ -48,11 +48,9 @@ function segui(app, prova, dir) {
     if (scritto) return;
     scritto = true;
     clearInterval(timer);
-    const indirizzi = {};
-    for (const [u, set] of viste) indirizzi[u] = [...set].map((x) => x.split(':').map(Number));
     try {
       mkdirSync(dir, { recursive: true });
-      writeFileSync(nome, JSON.stringify({ prova, processo: 'pagine', indirizzi }));
+      writeFileSync(nome, JSON.stringify({ prova, processo: 'pagine', indirizzi: comeIndirizzi(viste) }));
     } catch (_) {}
   };
   const chiudi = app.close.bind(app);
