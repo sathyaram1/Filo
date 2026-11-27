@@ -503,3 +503,11 @@ test('il rifiuto delle immagini si riconosce; quello per la finestra o per i cre
   assert.equal(FC.rifiutaImmagini({ status: 402, message: 'Insufficient credits for image input' }), false);
   assert.equal(FC.rifiutaImmagini({ status: 404, message: 'No endpoints found for moonshotai/kimi' }), false);
 });
+
+test('#974.1 la riga di una conversazione di un\'altra app riaperta nella home resta davanti oltre i tre giorni', () => {
+  const riga = { chat: 'editor-vecchia', role: 'user', riga: true, text: '(conversazione nell\'Editor su «tesi»: si rilegge con filo(cerca) e id "editor-vecchia")', ts: fa(24 * 10), actions: [] };
+  const filo = [riga, ...filoDiProva()];
+  const testi = (f) => f.messaggi.map((x) => JSON.stringify(x.content)).join('\n');
+  assert.doesNotMatch(testi(FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'oggi-b' })), /editor-vecchia/, 'senza riaprirla resta fuori');
+  assert.match(testi(FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'oggi-b', inVista: 'editor-vecchia' })), /editor-vecchia/);
+});
