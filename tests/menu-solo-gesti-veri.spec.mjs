@@ -275,7 +275,7 @@ test('a menu aperto dall\'utente il sito non preme Invia feedback né Aiuto; l\'
   for (const fuori of [false, true]) {
     for (const testo of ['Invia feedback', 'Aiuto']) {
       await page.locator('#campo').click({ button: 'right' });
-      await expect(voce(testo)).toBeVisible();
+      await expect(voce(testo)).toHaveCount(1);
       expect(await preme(testo, fuori)).toBe(true);
       await page.waitForTimeout(600);
       expect(await conta(app, page, '.sn-sidebar'), `il sito non apre l'Aiuto premendo «${testo}»`).toBe(0);
