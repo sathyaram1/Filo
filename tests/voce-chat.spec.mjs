@@ -338,10 +338,11 @@ test('home: «Detta» dal tasto destro nella casella della chat è lo stesso mic
   const page = await home(app);
   const mic = page.locator('.dash-input-wrap .sn-voce-btn');
   await page.locator('#input').click({ button: 'right' });
-  const detta = menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: 'Detta' });
+  const detta = menuDi(page).icona('dictate');
   await expect(detta).toBeVisible();
-  const tasto = await page.evaluate(() => window.SN_TASTI.etichetta(window.SN_VOCE_CHAT.TASTO));
-  await expect(detta.locator('.sn-menu-shortcut')).toHaveText(tasto);
+  // L'icona ha il suo tasto singolo, detto nella riga del nome (#2555): la scorciatoia globale non c'è più nel menu.
+  await detta.hover();
+  await expect(menuDi(page).nome).toHaveText(/^Detta · .+ · [A-Z0-9]$/);
   await detta.click();
   await parla(page, mic);
   await expect(page.locator('.sn-dictate-pill')).toHaveCount(0);
