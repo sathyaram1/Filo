@@ -2,6 +2,7 @@
 // la domanda nella sezione Domande, e il dettaglio rimanda lì invece di offrire una seconda casella di risposta.
 // I blocchi di sicurezza restano nei Ricevuti anche con un domandaId; il worker che segna un attacco è L3.
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const base = { clientId: 'tester@example.com', createdAt: '2026-10-01T08:00:00Z', images: [], subSeq: 0, text: 'x' };
