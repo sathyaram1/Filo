@@ -1212,7 +1212,10 @@
     codiceDelMioApparecchio(s, out);
     codiciDiRecupero(s, out);
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
-    for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
+    for (const m of s.matchAll(INDIRIZZO)) {
+      segretiNellIndirizzo(m[0], out);
+      codificatiNellIndirizzo(m[0], m.index, out, giro);
+    }
     scritteAMano(s, out);
     if (G && typeof G.codiciInElenco === 'function') out.push(...G.codiciInElenco(s, out));
     out.push(...interiFraVirgolette(s, out));
