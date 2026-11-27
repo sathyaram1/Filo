@@ -704,6 +704,20 @@ test('#2678.14: un numero e una parola di tempo dentro la frase-password non la 
   }
 });
 
+test('#2678.14: la frase-password che apre col tempo si toglie; la riga che dice lo stato della password resta, con e senza virgolette', () => {
+  for (const [frase, pezzo] of [['tre anni al mare con mia madre', 'mia madre'], ['due giorni a Parigi con Luca', 'Luca'],
+    ['dieci anni di matrimonio felice', 'felice'], ['da tre anni vivo a Milano', 'Milano'], ['tra due giorni parto per Roma', 'Roma'],
+    ['sette giorni in barca', 'barca'], ['three days in Paris', 'Paris']]) {
+    for (const riga of [`Password: ${frase}`, `Password: «${frase}»`]) assert.ok(!P.oscura(riga).includes(pezzo), riga);
+  }
+  for (const stato of ['bloccata per 30 minuti', 'reimpostata 2 ore fa', 'la devo cambiare tra due giorni', 'me la chiede ogni 3 giorni',
+    'te la dico tra due giorni', 'cambiala ogni tre mesi', 'sempre la solita da 5 anni', 'minimum 8 characters',
+    'between 8 and 64 characters', 'lunga almeno 8 caratteri', 'creata 2 mesi fa', 'created 3 months ago', 'reset 2 days ago',
+    'impostata il 3 marzo 2024', 'tra 8 e 16 caratteri', 'da 8 a 16 caratteri', 'scade tra 30 giorni', 'expires in 90 days']) {
+    for (const riga of [`Password: ${stato}`, `Password: «${stato}»`]) assert.equal(P.oscura(riga), riga, riga);
+  }
+});
+
 test('una chiave o una password per nome, in un file di configurazione o sulla pagina di un servizio, non esce', () => {
   const segreti = {
     'PGPASSWORD=Girasole2024': 'Girasole2024',
