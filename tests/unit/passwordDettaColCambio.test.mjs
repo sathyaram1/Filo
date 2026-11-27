@@ -136,6 +136,6 @@ test('senza un cambio né un annuncio dopo la domanda, le parole dopo la passwor
 test('le parole di cambio stanno solo nel guardiano', () => {
   for (const f of [join('src', 'shared', 'pavimento.js'), join('src', 'shared', 'riservatiNelTesto.js'), join('src', 'main', 'services', 'correttoreRiservati.js')]) {
     const src = readFileSync(join(ROOT, f), 'utf8').replace(/^\s*\/\/.*$/gm, '');
-    assert.ok(!/diventat|rimast|became|sostituit|aggiornat|updated/.test(src), `${f}: le parole stanno in guardianoStatico.js (CAMBI)`);
+    assert.ok(!/diventat|rimast|became|sostituit|rimpiazzat|replaced/.test(src), `${f}: le parole stanno in guardianoStatico.js (CAMBI)`);
   }
 });
