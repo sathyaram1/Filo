@@ -77,6 +77,8 @@ export function menuDi(scheda) {
     principale: locator('.sn-menu:not(.sn-menu-sub)'),
     /** La prima voce del pannello principale: la prima icona della griglia, che sta sempre in cima (#1434, #2555). */
     primaVoce: locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:visible').first(),
+    /** La prima proposta del correttore: il primo testo del menu, subito sotto la griglia delle icone (#2555). */
+    primaCorrezione: locator('.sn-menu:not(.sn-menu-sub) > .sn-menu-griglia + .sn-menu-correction'),
     /** Le voci: le icone della griglia (il nome sta nell'icona, nascosto alla vista) e le voci scritte dei sottomenu. */
     voci: locator('.sn-menu-item, .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)'),
     voce,
