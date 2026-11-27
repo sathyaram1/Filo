@@ -124,13 +124,13 @@ test('su un\'immagine la fila ha le sue azioni, e il «+» le altre; sul testo d
   const r = await page.locator('#testo').boundingBox();
   await page.mouse.click(r.x + 30, r.y + r.height / 2, { button: 'right' });
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
-  expect(await iconeDellaFila(menu)).toEqual(['testo:copy', 'testo:translate', 'testo:search']);
+  expect(await iconeDellaFila(menu)).toEqual(['testo:copy', 'testo:translate', 'testo:search', 'testo:readAloud', 'testo:help']);
   await page.keyboard.press('Escape');
 
-  // Niente sotto il mouse: la fila della pagina è vuota di partenza, e non si vede.
+  // Niente sotto il mouse: nessuna azione della pagina intera di partenza, solo l'Aiuto che sta in ogni menu (#2555).
   await page.locator('#vuoto').click({ button: 'right' });
   await expect(menu.principale).toBeVisible();
-  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeHidden();
+  expect(await iconeDellaFila(menu)).toEqual(['pagina:help']);
 });
 
 // Seleziona `parola` nel foglio dell'Editor e apre il tasto destro sopra di lei.
