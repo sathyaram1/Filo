@@ -20,6 +20,15 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
   c'era prima non poteva toccare il server e ti ha passato il lavoro: la sua
   nota, in `domanda`, dice cosa serve lì, e tu hai le istruzioni del lavoro
   server.
+  `processo` vuol dire che il manutentore ha risposto a una domanda di
+  processo: la sua nota sta in `domanda`, e la applichi tu.
+  `rossi_del_ramo` (ruolo `cancello` o `verifier`) vuol dire che il cancello
+  rifiuta il ramo per unit rossi che il ramo porta sulla fusione con main, e
+  un riallineamento non li cambia: i `rilievi` li nominano, e li fai tornare
+  verdi tu, anche se vuol dire cambiare la logica o togliere un'asserzione
+  che prova un difetto di `main`. Se la `domanda` è una nota del manutentore,
+  segui quella. Prima di consegnare, `npm run test:unit` sul ramo fuso con
+  `origin/main` (in una cartella a parte, senza toccare il ramo) li dà verdi.
 
 <!-- includi: _ripresa-bocciatura.md -->
 
