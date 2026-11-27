@@ -406,7 +406,7 @@ test('il riquadro fa scegliere partita, mulligan e pescate extra, e il numero ca
 
   // Se inizia l'altro si pesca, come a più giocatori.
   await page.click('#probGame');
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizia l\'altro' }).click();
+  await menuDi(page).scegli('Partita a due, inizia l\'altro');
   expect(Math.abs((await settledPct(page)) - multi)).toBeLessThan(0.5);
 
   // Mulligan: compare la colonna «per tenere», già con 2 terre, e la probabilità sale.
