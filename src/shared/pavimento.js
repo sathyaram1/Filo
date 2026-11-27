@@ -750,7 +750,7 @@
   function fraseDopo(s, out) {
     for (const m of s.matchAll(FRASE_DOPO)) {
       // Le virgolette intorno alla frase («Password: «casa mia al mare»») non sono della password (#1403.27).
-      const tutta = m[1].trim();
+      const tutta = senzaNota(` ${m[1]}`).trim();
       const q = tutta.match(SOLO_FRA_VIRGOLETTE);
       const v = q ? q[3] : tutta;
       const parole = v.split(/\s+/);
