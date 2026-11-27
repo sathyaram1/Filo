@@ -17,7 +17,7 @@ function wav(secondi) {
   return Buffer.concat([h, data]);
 }
 
-test('crediti finiti a metà: il riquadro dice l\'errore e smette di dire «Trascrivo: n di m»', async ({ app, openTab, testServer }) => {
+test('r2 crediti finiti: il riquadro dice l\'errore e smette di dire «Trascrivo: n di m»', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.setSettings({
