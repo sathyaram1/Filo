@@ -11,6 +11,7 @@
     {
       version: '0.2.308', date: '2026-11-27',
       fixes: [
+        { testo: 'Il codice del cancello, della porta o della cassaforte scritto come «è sempre 4829», «is now 4829» o «e 4829» senza accento non arriva più a nessun modello, come già quello del telefono. Lo stesso per il PIN: «il pin è sempre 4829».', segnalazione: 1403 },
         { testo: 'Se in una chat qualcuno ti chiede il PUK della SIM e tu lo scrivi nella risposta, il correttore non lo manda ai suoi modelli, come già succedeva per il PIN e la password.', segnalazione: 2692 },
       ],
     },
