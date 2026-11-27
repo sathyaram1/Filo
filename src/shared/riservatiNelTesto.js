@@ -208,6 +208,15 @@ function refusoDiPassword(w) {
   return NOVITA().distanza(w, 'password', 2) <= 2;
 }
 
+// Il refuso letto come il nome, a parità di lunghezza: il pavimento ritrova i posti nel testo vero (#2678.21).
+function refusiComeNome(s) {
+  return s.replace(/(?<![\p{L}\p{N}])p\p{L}{5,9}(?![\p{L}\p{N}])/giu, (w) => {
+    if (!refusoDiPassword(w.toLowerCase())) return w;
+    const nome = w.length >= 8 ? 'password' : 'passwd';
+    return nome + ' '.repeat(w.length - nome.length);
+  });
+}
+
 // I nomi della password: quelli che il filtro riconosce già (urlExfil), «pw», «pass» e i refusi di «password».
 let soloNomePassword = null;
 function nomeDiPassword(w) {
