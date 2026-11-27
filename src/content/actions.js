@@ -2483,9 +2483,7 @@
     imageSearchUrlFor,
     indirizzoDellImmagine,
     // video / audio
-    buildMediaItems,
     azioniDelMedia,
-    buildMediaSpeedItem,
     downloadMedia,
     copyMediaUrl,
     mediaSrc,
