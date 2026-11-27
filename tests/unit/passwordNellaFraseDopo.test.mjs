@@ -46,7 +46,8 @@ test('gli altri modi di rimandarla: fra virgolette, dopo il punto con l\'annunci
   assert.equal(alCorrettore('il pin è sbagliato, prova 4821'), `il pin è sbagliato, prova ${S}`);
   assert.equal(alCorrettore('il codice sconto è scaduto, prova BENVENUTO10'), 'il codice sconto è scaduto, prova BENVENUTO10');
   for (const frase of ['La password è scaduta. La nuova è gattonero.', 'la password scade; la nuova è gattonero',
-    'the password expired, the new one is gattonero', 'la password è sbagliata, prova con gattonero',
+    'the password expired, the new one is gattonero', 'the password expired, the new one should be gattonero',
+    'la password è sbagliata, prova con gattonero',
     'la password è scaduta, quella nuova sarà gattonero', 'la password è scaduta, la nuova: gattonero',
     'la password è sbagliata, prova gattonero e dimmi', 'la password è sbagliata, prova «gattonero»',
     'Marco: la password è sbagliata, prova gattonero', 'la password non è gattobianco, invece gattonero',
