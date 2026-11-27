@@ -172,6 +172,8 @@ test.describe('il menu nello strato', () => {
     await apertoNelloStrato(app, page);
     const menu = menuDi(page);
     await menu.incolla.click({ button: 'right' });
+    // Il pannello nasce vuoto e si riempie quando arriva l'elenco: si aspetta la voce, poi che sia cliccabile.
+    await expect.poll(async () => ((await statoCronologia(app, page))?.voci || []).map((v) => v.testo)).toContain('codice-banca-1054');
     const stato = await cronologiaPronta(app, page);
     expect(stato.voci.map((v) => v.testo)).toContain('codice-banca-1054');
     await pausa(500);
