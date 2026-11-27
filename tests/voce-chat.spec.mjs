@@ -340,9 +340,10 @@ test('home: «Detta» dal tasto destro nella casella della chat è lo stesso mic
   await page.locator('#input').click({ button: 'right' });
   const detta = menuDi(page).icona('dictate');
   await expect(detta).toBeVisible();
-  // L'icona ha il suo tasto singolo, detto nella riga del nome (#2555): la scorciatoia globale non c'è più nel menu.
+  // L'icona ha il suo tasto singolo nella riga del nome (#2555), e sotto la scorciatoia del microfono della chat.
   await detta.hover();
-  await expect(menuDi(page).nome).toHaveText(/^Detta · .+ · [A-Z0-9]$/);
+  await expect(menuDi(page).nome).toHaveText(/^Detta · .+ · [A-Z0-9]/);
+  await expect(menuDi(page).locator('.sn-menu-nome-nota')).toHaveText(/Ctrl|Cmd|⌘/);
   await detta.click();
   await parla(page, mic);
   await expect(page.locator('.sn-dictate-pill')).toHaveCount(0);
