@@ -969,7 +969,7 @@
         fine = m.index + m[0].length;
       }
     }
-    for (const m of s.matchAll(RISPOSTA_NUDA)) {
+    for (const m of [...s.matchAll(RISPOSTA_NUDA), ...s.matchAll(E_NUDA)]) {
       const v = formaVicina(m[1]);
       if (v) out.push({ valore: v, regola: 'password' });
     }
