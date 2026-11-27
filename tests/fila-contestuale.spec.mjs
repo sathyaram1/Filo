@@ -487,7 +487,8 @@ test('con tante icone portate nella stessa fila, vanno a capo dentro il menu', a
       .map((e) => e.dataset.snIconId || e.getAttribute('aria-label'));
   });
   expect(fuori, 'icone disegnate fuori dal menu').toEqual([]);
-  expect(await iconeDellaFila(menu)).toHaveLength(13);
+  // Le cinque di partenza del testo (Aiuto compreso, #2555) più le dieci portate.
+  expect(await iconeDellaFila(menu)).toHaveLength(15);
 });
 
 test('Chiedi a Filo su un\'immagine scritta nella pagina (data:) la allega con un nome da immagine', async ({ app, openTab, testServer }) => {
