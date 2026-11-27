@@ -497,12 +497,8 @@
       bubblesEl.scrollTop = bubblesEl.scrollHeight;
     }
     body.dataset.state = 'home';
-    // Ridisegnata da altri (l'accoglienza che finisce) la vista cambia, la casella no: dentro può esserci un seguito
-    // tornato lì perché il turno ha chiuso l'accoglienza (#1296), o quello che l'utente scriveva intanto.
-    if (!ricarica) {
-      inputEl.value = '';
-      autoGrowInput();
-    }
+    // La casella non si tocca mai: chiudere o tornare non butta la bozza (#1204.6), e un comando scritto lì (/home,
+    // /clear) lo toglie chi lo esegue. Dopo l'accoglienza dentro può esserci un seguito tornato lì (#1296).
     inputEl.focus();
   }
 
