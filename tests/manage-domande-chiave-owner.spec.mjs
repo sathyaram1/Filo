@@ -2,6 +2,7 @@
 // il suo segno, distinto da quella data qui: in riga, nel dettaglio e nel turno della conversazione; e si riapre.
 import { test, expect } from './fixtures/electron.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const tab = (page, t) => page.locator(`.mg-tab[data-tab="${t}"]`);
 const riga = (page, id) => page.locator(`#mgDomandeLista .mg-domanda[data-id="${id}"]`);
