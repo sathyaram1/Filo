@@ -13,6 +13,7 @@ import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './hel
 import { cartellaDellaProva, BOLLETTA_MARZO } from './helpers/documentiFinti.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { quadratoPronto } from './helpers/copione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const RICHIESTA = 'Mi serve la bolletta della luce di marzo. Dov\'è?';
 
