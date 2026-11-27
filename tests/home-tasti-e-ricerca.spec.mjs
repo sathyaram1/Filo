@@ -84,17 +84,20 @@ test('tasto destro su un tasto: sposta, metti nel «+», rimetti in vista; e a p
   test.setTimeout(60_000);
   const page = await casa(app);
   await tasto(page, 'cronologia').click({ button: 'right' });
-  const voci = page.locator('.dash-menu .dash-menu-voce');
-  await expect(voci).toHaveText(['Apri Memorie', 'Sposta prima', 'Sposta dopo', 'Metti nel «+»', 'Assegna una lettera']);
-  await voci.filter({ hasText: 'Sposta prima' }).click();
+  // A icone (#2555): le stesse voci, ogni icona seguita dalle varianti del suo verbo.
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  expect(await menu.vociScritte()).toEqual(['Apri Memorie', 'Sposta prima', 'Sposta dopo', 'Metti nel «+»', 'Assegna una lettera']);
+  await menu.scegli('Sposta prima');
   await expect.poll(() => inVista(page)).toEqual(['cerca', 'perDopo', 'cronologia', 'scaricamenti', 'bacheca', 'impostazioni']);
   await tasto(page, 'cronologia').click({ button: 'right' });
-  await voci.filter({ hasText: 'Metti nel «+»' }).click();
+  await menu.scegli('Metti nel «+»');
   await expect.poll(() => inVista(page)).not.toContain('cronologia');
   await apriPiu(page);
   await fuori(page, 'cronologia').click({ button: 'right' });
-  await expect(voci).toHaveText(['Apri Memorie', 'Rimetti in vista', 'Assegna una lettera']);
-  await voci.filter({ hasText: 'Rimetti in vista' }).click();
+  await expect(menu.principale).toBeVisible();
+  expect(await menu.vociScritte()).toEqual(['Apri Memorie', 'Rimetti in vista', 'Assegna una lettera']);
+  await menu.scegli('Rimetti in vista');
   await expect.poll(() => inVista(page)).toContain('cronologia');
 
   // A parole, con l'azione della chat: il tasto delle impostazioni va nel «+», le carte non si toccano.
