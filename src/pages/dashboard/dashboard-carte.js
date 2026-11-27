@@ -550,8 +550,8 @@
     return {
       stato: e ? (file.length ? plurale(file.length, 'documento', 'documenti') : 'nessun documento') : '…',
       voci,
-      principale: { etichetta: file.length ? 'Apri l’Editor' : 'Scrivi', fai: () => apri(URL_EDITOR) },
-      apri: () => apri(URL_EDITOR),
+      principale: { etichetta: file.length ? 'Apri l’Editor' : 'Scrivi', fai: apriEditor },
+      apri: apriEditor,
       filo: file.length
         ? `Nell’Editor hai ${plurale(file.length, 'documento', 'documenti')}${titoli ? `; gli ultimi: ${titoli}` : ''}.`
         : 'L’Editor è vuoto: quando vuoi, scriviamo qualcosa insieme.',
