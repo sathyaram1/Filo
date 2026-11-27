@@ -4,6 +4,7 @@
 
 import { _electron, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, relative, resolve, dirname } from 'node:path';
 
 const OGNI_MS = 1000;
