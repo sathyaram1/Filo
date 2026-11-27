@@ -351,7 +351,7 @@
   loadIconLayout();
 
   global.SN_MENU_ICONS = {
-    init, fila, runIconAction, statoPerBarra, layoutCambiato, dallaBarra,
+    init, fila, runIconAction, statoPerBarra, layoutCambiato, dallaBarra, aggiorna: ridisegna,
     prepara: chiediFinestra,
     redrawIconRows: ridisegnaFinestra,
   };
