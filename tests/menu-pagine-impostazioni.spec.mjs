@@ -11,6 +11,11 @@ const etichette = async (page) => {
   await expect(menuDi(page).principale).toBeVisible({ timeout: 8_000 });
   return menuDi(page).voci.evaluateAll((vs) => vs.map((v) => v.textContent.trim()));
 };
+const variantiDiChiedi = async (page) => {
+  await menuDi(page).icona('ask').click({ button: 'right' });
+  await expect(menuDi(page).sottomenu).toBeVisible();
+  return menuDi(page).sottomenu.locator('.sn-menu-item').allTextContents();
+};
 // Qui si prova la voce, a impostazioni lette: il clic dato prima, che si rigioca, ha le sue prove più sotto (#2444).
 const pronta = (page) => page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 10_000 });
 
