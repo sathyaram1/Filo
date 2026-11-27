@@ -19,6 +19,8 @@
   /* Il filo dell'attesa: quanto dura il cappio che si stringe, quanto l'avvolgimento, quanto si vede la trama. */
   --dash-filo-nodo: 450ms;
   --dash-filo-gomitolo: 850ms;
+  /* Il campo che diventa l'Editor (#2389), token editor.campo.durata. */
+  --dash-editor-campo: 450ms;
   --dash-trama-opacity: 0.5;
   /* La barra dei siti (#1803): fondo delle sue voci e misura delle icone, token barraSiti.*. */
   --dash-barra-fondo: #f7f2e8;
