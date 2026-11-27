@@ -177,6 +177,9 @@
   }
   function apriMenu(x, y, items) {
     chiudiMenu();
+    // A icone come il tasto destro di Filo (#2555); il riquadro qui sotto dove il menu di Filo non c'è.
+    const I = window.SN_MENU_ICONS;
+    if (I && I.apriVoci && I.apriVoci({ x, y, voci: items.map((it) => ({ label: it.label, onClick: () => it.run() })) })) return;
     scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop bd-mia-menu';
