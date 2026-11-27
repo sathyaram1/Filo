@@ -83,8 +83,12 @@ function spiega(parole, k) {
 }
 
 function riservati(grezzo) {
-  // L'enfasi del Markdown fra etichetta e valore («__Password:__ …») si legge come spazi, come nel pavimento.
-  const testo = RT().senzaEnfasi(grezzo);
+  // L'enfasi del Markdown e i tag HTML fra etichetta e valore («__Password:__ …») si leggono come spazi, e un commento
+  // HTML in due letture, come nel pavimento.
+  return RT().vistePerLeRegole(grezzo).flatMap(riservatiIn);
+}
+
+function riservatiIn(testo) {
   const G = globalThis.SN_GUARDIANO_STATICO;
   const X = globalThis.SN_URL_EXFIL;
   const out = [];

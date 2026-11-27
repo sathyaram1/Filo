@@ -243,6 +243,66 @@ test('un\'etichetta in grassetto o corsivo Markdown coi due punti dentro copre i
   }
 });
 
+// #2673.12 — l'etichetta scritta in HTML («<b>Password:</b> …») spezzava il valore o lo lasciava passare.
+test('un\'etichetta in un pezzo di pagina HTML copre il valore intero, e i tag restano', () => {
+  for (const [t, atteso] of [
+    ['<b>Password:</b> Nyckel!2024', `<b>Password:</b> ${S}`],
+    ['<strong>PIN:</strong> 4821', `<strong>PIN:</strong> ${S}`],
+    ['<B>Password</B>: Nyckel!2024', `<B>Password</B>: ${S}`],
+    ['<em>Password:</em> gattonero', `<em>Password:</em> ${S}`],
+    ['<p><strong>Password:</strong> Nyckel!2024</p>', `<p><strong>Password:</strong> ${S}</p>`],
+    ['<span class="lbl">Password:</span> <span>Nyckel!2024</span>', `<span class="lbl">Password:</span> <span>${S}</span>`],
+    ['<b>Password:</b><br>Nyckel!2024', `<b>Password:</b><br>${S}`],
+    ['<p>Password:</p><p>Nyckel!2024</p>', `<p>Password:</p><p>${S}</p>`],
+    ['<li><b>CVV:</b> 123</li>', `<li><b>CVV:</b> ${S}</li>`],
+    ['<b>Codice di verifica:</b> 482193', `<b>Codice di verifica:</b> ${S}`],
+    ['Password:&nbsp;Nyckel!2024', `Password:&nbsp;${S}`],
+    ['&lt;b&gt;Password:&lt;/b&gt; Nyckel!2024', `&lt;b&gt;Password:&lt;/b&gt; ${S}`],
+    ['<ul><li><b>Utente:</b> mario</li><li><b>Password:</b> Faro#Blu55</li></ul>',
+      `<ul><li><b>Utente:</b> mario</li><li><b>Password:</b> ${S}</li></ul>`],
+    ['<table><thead><tr><th>Utente</th><th>Password</th></tr></thead><tbody><tr><td>mario</td><td>Nyckel!2024</td></tr></tbody></table>',
+      `<table><thead><tr><th>Utente</th><th>Password</th></tr></thead><tbody><tr><td>mario</td><td>${S}</td></tr></tbody></table>`],
+  ]) assert.equal(P.oscura(t), atteso, t);
+  // Un token in un attributo si vede ancora: il tag si legge come spazi, i suoi attributi no.
+  assert.ok(!P.oscura('<a href="https://x.example/?token=ghp_abcdefghijklmnopqrstuvwxyz0123456789">link</a>').includes('ghp_abcdef'));
+  for (const t of ['<b>Nota:</b> la password va cambiata ogni 90 giorni', 'if (a<b && c>d) return a', '<p>Ciao</p><p>come stai</p>']) {
+    assert.equal(P.oscura(t), t);
+  }
+});
+
+// #2673.12 giro 1 — le celle su righe diverse (il sorgente rientrato), il due punti come entità, un commento o un tag di
+// chiusura con lo spazio fra etichetta e valore; e un tag stretto dentro la password non la spezza.
+test('una tabella rientrata, le entità, i commenti e un tag dentro la password non lasciano uscire il valore', () => {
+  for (const [t, atteso] of [
+    ['<td>Password</td>\n<td>Nyckel!2024</td>', `<td>Password</td>\n<td>${S}</td>`],
+    ['<th>PIN</th>\n<td>4821</td>', `<th>PIN</th>\n<td>${S}</td>`],
+    ['<tr>\n    <td>PIN:</td>\n    <td>4821</td>\n  </tr>', `<tr>\n    <td>PIN:</td>\n    <td>${S}</td>\n  </tr>`],
+    ['<b>Password</b>&#58; Nyckel!2024', `<b>Password</b>&#58; ${S}`],
+    ['<b>Password&colon;</b> Nyckel!2024', `<b>Password&colon;</b> ${S}`],
+    ['<b >Password:</ b> Nyckel!2024', `<b >Password:</ b> ${S}`],
+    ['<!-- password: Nyckel!2024 -->', `<!-- password: ${S} -->`],
+    ['Password: Pa$$<br>word99', `Password: ${S}`],
+    ['Password: x7<p>Kq9!z', `Password: ${S}`],
+    ['Rete: Casa<br>Password: Nyckel!2024', `Rete: Casa<br>Password: ${S}`],
+  ]) assert.equal(P.oscura(t), atteso, t);
+  assert.ok(!P.oscura('<b>Password:</b> <!-- x --> Nyckel!2024').includes('Nyckel!2024'));
+  const tabella = '<table>\n  <tr>\n    <td>Rete</td>\n    <td>Casa</td>\n  </tr>\n  <tr>\n    <td>Password</td>\n    <td>Nyckel!2024</td>\n  </tr>\n</table>';
+  assert.equal(P.oscura(tabella), tabella.replace('Nyckel!2024', S));
+  const colonne = '<table>\n  <thead>\n    <tr>\n      <th>Rete</th>\n      <th>Password</th>\n    </tr>\n  </thead>\n'
+    + '  <tbody>\n    <tr>\n      <td>Casa</td>\n      <td>Nyckel!2024</td>\n    </tr>\n  </tbody>\n</table>';
+  assert.equal(P.oscura(colonne), colonne.replace('Nyckel!2024', S));
+});
+
+test('un testo di 120.000 caratteri pieno di tag aperti e mai chiusi si controlla in fretta', () => {
+  for (const pezzo of ['&lt;b ', '<b &', '&lt;b title=&quot;x ', '<span title="x&', '<!-- ', '<!-- <td>', '\n<td\n']) {
+    const s = `${pezzo.repeat(Math.ceil(120000 / pezzo.length))}<b>Password:</b> Nyckel!2024`;
+    let fuori = '';
+    const c = costoInUnita(() => { fuori = P.oscura(s); }, { tetto: 60 });
+    assert.ok(c.entro, `${pezzo}: ${c.come}`);
+    assert.ok(!fuori.includes('Nyckel!2024'), pezzo);
+  }
+});
+
 // #2673.6 — in un file di testo di Windows «Password:» a capo e il valore arrivavano ai modelli.
 test('con gli a capo di Windows o col solo \\r il testo si copre come con l\'a capo semplice, e gli a capo restano', () => {
   assert.equal(P.oscura('Password:\r\nNyckel!2024'), `Password:\r\n${S}`);

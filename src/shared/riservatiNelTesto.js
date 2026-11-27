@@ -84,9 +84,50 @@ const FINE_FRASE = new RegExp(`[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'gu');
 // L'enfasi del Markdown («**Password:** …», «__PIN:__ …», «- **Wi-Fi password:**») è forma, non testo: le regole la
 // leggono come spazi, con gli stessi indici. Solo i segni a confine di parola e sulla stessa riga (#2673.5).
 const ENFASI = /(?<![^\s|>(\[«"'“‘-])(\*{1,3}|_{1,3})(?=[^\s*_])((?:(?!\1)[^\n]){1,120}?)(?<=[^\s*_])\1(?![\p{L}\p{N}*_])/gu;
+// Lo stesso per i tag di un pezzo di pagina incollato («<b>Password:</b> …», «<strong>PIN:</strong> 4821», #2673.12):
+// il tag si legge come spazi, l'apertura di una riga come a capo (la chiusura no: le righe di una tabella restano
+// attaccate), la cella come «|», e l'a capo che porta a un tag della tabella è rientro del sorgente, non una riga. Gli attributi
+// restano testo (un token in un href si vede ancora); un tag stretto fra due segni di un valore («Ab<i>9x», «Pa$$<br>w»)
+// resta com'è: spezzarlo farebbe uscire metà password.
+const TAG_TESTO = 'b|strong|i|em|u|s|strike|del|ins|mark|small|big|sub|sup|span|font|code|kbd|samp|tt|var|a|abbr|cite|q'
+  + '|label|time|data|bdi|bdo|wbr|nobr';
+const TAG_A_CAPO = 'br|hr|p|div|li|dt|dd|tr|table|caption|h[1-6]|pre|blockquote|section|article|header|footer|main'
+  + '|aside|nav|figure|figcaption|address|details|summary|form|fieldset|legend';
+// Anche scritti come entità («&lt;b&gt;Password:&lt;/b&gt;», il sorgente mostrato in una pagina). Il tag non scavalca
+// l'inizio di un altro: un testo lungo resta lineare.
+const E = '&(?!gt;|lt;)';
+const TAG_HTML = new RegExp(`(<|&lt;)(/\\s*|)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|dl|thead|tbody|tfoot|td|th)(?=[\\s/>]|&gt;)`
+  + `((?:[^<>"'&]|${E}|"(?:[^"<>&]|${E})*"|'(?:[^'<>&]|${E})*')*)(>|&gt;)`, 'giu');
+const A_CAPO = new RegExp(`^(?:${TAG_A_CAPO})$`, 'i');
+const SPAZIO_HTML = /&(?:nbsp|#160|#x0*a0);/gi;
+const DUE_PUNTI_HTML = /&(?:colon|#0*58|#x0*3a);/gi;
+const VERSO_CELLA = /(?<![ \t\r\n])[ \t]*[\r\n][ \t\r\n]*(?=(?:<|&lt;)\/?\s*(?:t[dhr]|thead|tbody|tfoot)(?:[\s/>]|&gt;))/gi;
+// Un segno che sta dentro un valore: non uno spazio, un tag, un due punti, una cella o un'entità.
+const DEL_VALORE = /[^\s<>:：|&]/u;
+// I commenti si leggono in due modi: coi soli segni come spazi (una password scritta dentro si vede) e interi come
+// spazi (non separano più l'etichetta dal suo valore). Le regole girano su tutte e due le letture (vistePerLeRegole).
+const COMMENTO = /(<|&lt;)!--((?:(?!(?:<|&lt;)!--)[\s\S])*?)--(>|&gt;)/g;
+const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repeat(apre.length + 3) + dentro + ' '.repeat(fine.length + 2))
+  .replace(VERSO_CELLA, (w) => w.replace(/[\r\n]/g, ' '))
+  .replace(TAG_HTML, (tag, apre, chiude, nome, attributi, fine, k, tutto) => {
+    if (DEL_VALORE.test(tutto[k - 1] || '') && DEL_VALORE.test(tutto[k + tag.length] || '')) return tag;
+    const segno = chiude ? ' ' : A_CAPO.test(nome) ? '\n' : /^t[dh]$/i.test(nome) ? '|' : ' ';
+    const testa = segno + ' '.repeat(apre.length + chiude.length + nome.length - 1);
+    return testa + attributi.replace(/\/$/, ' ') + ' '.repeat(fine.length);
+  })
+  .replace(SPAZIO_HTML, (e) => ' '.repeat(e.length))
+  .replace(DUE_PUNTI_HTML, (e) => ':' + ' '.repeat(e.length - 1));
 const senzaEnfasi = (t) => {
-  const s = String(t == null ? '' : t);
+  let s = String(t == null ? '' : t);
+  if (s.includes('<') || s.includes('&')) s = senzaTag(s);
   return /[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s;
+};
+const vistePerLeRegole = (t) => {
+  const s = String(t == null ? '' : t);
+  const una = senzaEnfasi(s);
+  if (!s.includes('!--')) return [una];
+  const senza = senzaEnfasi(s.replace(COMMENTO, (c) => c.replace(/[^\n]/g, ' ')));
+  return senza === una ? [una] : [una, senza];
 };
 // Il testo come lo leggono le regole: senza enfasi, minuscolo, i due punti a tutta larghezza come i nostri, e il punto e
 // virgola di una riga in greco come punto di domanda (in greco è quello). Stessa lunghezza: le posizioni restano.
@@ -484,6 +525,6 @@ function trova(testo, { sotto = false } = {}) {
   return lunghi(out);
 }
 
-global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, SEPARA_CIFRE, cifreAttaccate, senzaEnfasi, minuscolo, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi, parlaInChat, chiede, PRESENTA_DATO };
+global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, SEPARA_CIFRE, cifreAttaccate, senzaEnfasi, vistePerLeRegole, minuscolo, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi, parlaInChat, chiede, PRESENTA_DATO };
 if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
