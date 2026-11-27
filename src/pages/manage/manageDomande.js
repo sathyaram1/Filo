@@ -888,7 +888,7 @@
       allegati.collega(ta, d.id);
       box.appendChild(ta);
       // D-186: l'azione parte solo dal pulsante di un'opzione, le parole le legge un agente.
-      if (d.stato === 'aperta' && (d.opzioni || []).length) {
+      if (daRispondere(d) && (d.opzioni || []).length) {
         box.appendChild(el('p', 'mg-dq-parole', 'Le parole non riprendono il lavoro: per riprenderlo scegli un’opzione'));
       }
       box.appendChild(allegati.riga(d.id, { disabilitata: occupata }));
