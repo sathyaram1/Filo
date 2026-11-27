@@ -54,8 +54,8 @@ La priorità non è più una coda: dice quanto una cosa conta oggi.
 
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
-| **3** | urgentissimo, a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito e per cui accetta un riallineamento | owner, giudici, manutentore (può crearne, **non toglierne**) | parte subito, sempre in parallelo, fuori da ogni ordine |
-| **2** | importante: da mettere presto nell'ordine | manutentore (e owner) | nell'ordine parte come le altre; senza un ordine pronto la coda per urgenza la dà anche a basse chiuse |
+| **3** | urgentissimo, a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento, né la lacuna di copertura di un filtro già presente: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito e per cui accetta un riallineamento | owner, giudici, manutentore (può crearne, **non toglierne**) | parte subito, sempre in parallelo, fuori da ogni ordine |
+| **2** | importante: da mettere presto nell'ordine | manutentore (e owner); il giudice solo per la lacuna di copertura di un filtro con dati privati diretti ai modelli (#2700) | nell'ordine parte come le altre; senza un ordine pronto la coda per urgenza la dà anche a basse chiuse |
 | **1** | da fare | manutentore, owner, giudici | parte quando il manutentore la mette nell'ordine |
 | **0** | da fare idealmente, rimandato a lungo termine: difetti minori per cui lo sforzo oggi non vale (un difetto grafico fra scroll e zoom, un errore raro senza danni permanenti) | manutentore (e owner) | non entra nell'ordine; ne esistono infiniti, e oggi conta più un'analisi per velocizzare Filo che correggerli |
 
@@ -350,7 +350,8 @@ si può perdere senza danno e interessa sapere.
 - #1155 (monitoraggio, taccuino, sveglie): assorbito qui.
 - Tetti per priorità, fermo globale dopo un guasto, riserva su A: tolti.
 - Scala delle priorità: `patterns/` e la scala del 03/09 si riscrivono con il
-  § 2; i giudici assegnano 3 o lasciano 1 (la 2 è del manutentore).
+  § 2; i giudici assegnano 3 o lasciano 1 (la 2 è del manutentore, salvo la
+  lacuna di copertura di un filtro con dati diretti ai modelli, #2700).
 
 ## 11. Da costruire
 
