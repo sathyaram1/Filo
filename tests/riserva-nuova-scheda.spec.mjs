@@ -180,7 +180,7 @@ test('una carta tolta e il tema cambiati prima del Ctrl+T si vedono nella scheda
   await expect(riserva.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(1);
 
   await home.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
-  await home.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await menuDi(home).scegli('Togli dalla home');
   await expect(home.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
 
   const temaPrima = await riserva.evaluate(() => document.documentElement.dataset.snTheme);
