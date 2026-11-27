@@ -125,9 +125,11 @@ test('un clic qualunque sulla pagina non apre la cronologia: serve il menu, aper
       for (let i = 0; i < 60; i++) { const el = document.querySelector(sel); if (el) return el; await new Promise((ok) => setTimeout(ok, 50)); }
       return null;
     };
-    const freccia = await aspetta('.sn-menu-paste-arrow');
-    if (!freccia) return '(nessun menu)';
-    freccia.click();
+    // La cronologia è il menu dell'icona Incolla, che si apre col suo tasto destro (#2555).
+    const incolla = await aspetta('.sn-menu-griglia [data-sn-verbo="paste"]');
+    if (!incolla) return '(nessun menu)';
+    const ri = incolla.getBoundingClientRect();
+    incolla.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: ri.left + 4, clientY: ri.top + 4, button: 2 }));
     const sub = await aspetta('.sn-menu-history-sub, .sn-menu-sub');
     return sub ? sub.textContent : '(nessun sottomenu)';
   });
