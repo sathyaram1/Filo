@@ -39,7 +39,7 @@ test('un commento incollato col menu di Filo si pubblica: il sito lo conta come 
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
 
   await casella(page).click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
+  await menuDi(page).incolla.click();
   await expect(casella(page)).toHaveValue(testo);
   await page.screenshot({ path: 'tests/.shots/testo-di-filo-incollato.png' });
 
@@ -55,7 +55,7 @@ test('incollato dopo quello che si è scritto, il sito ha il testo intero', asyn
   await casella(page).click();
   await page.keyboard.type('Fable è un modello per automazione, ');
   await casella(page).click({ button: 'right', position: { x: 500, y: 130 } });
-  await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
+  await menuDi(page).incolla.click();
   await expect(casella(page)).toHaveValue('Fable è un modello per automazione, non per coding.');
 
   await page.locator('#invia').click();
@@ -70,7 +70,7 @@ test('un testo di migliaia di righe si incolla subito e il sito lo ha intero', a
 
   await casella(page).click({ button: 'right' });
   const partito = Date.now();
-  await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
+  await menuDi(page).incolla.click();
   await expect.poll(() => casella(page).inputValue(), { timeout: 5000 }).toBe(testo);
   expect(Date.now() - partito, 'l\'incolla lungo non ferma la pagina').toBeLessThan(5000);
 
