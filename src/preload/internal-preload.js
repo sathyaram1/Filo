@@ -175,6 +175,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'dictationSegmenter.js'), 'SN_DICTATION_SEGMENTER');
   safe(path.join(SHARED, 'ascolto.js'), 'SN_ASCOLTO'); // microfono e trascrizione: Detta e le chat
   safe(path.join(SHARED, 'voceChat.js'), 'SN_VOCE_CHAT'); // tasto microfono delle chat, a cui «Detta» passa la mano
+  safe(path.join(SHARED, 'trascriviMedia.js'), 'SN_TRASCRIVI_MEDIA'); // #1660 — i tetti di «Trascrivi» su un audio
   // Solo nei test: modelli di prova (vedi loader.js).
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));
