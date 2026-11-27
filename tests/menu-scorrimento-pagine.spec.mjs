@@ -132,7 +132,7 @@ test('Editor: il menu del titolo', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#docSwitch');
   await scorriEApri(page, page.locator('#docSwitch'));
-  await restaPoiSiChiude(page, page.locator('.ed-title-ctxmenu'));
+  await restaPoiSiChiude(page, menuDi(page).principale);
 });
 
 test('Editor: la tendina dei font resta anche quando si scorre il suo elenco', async ({ openTab }) => {
