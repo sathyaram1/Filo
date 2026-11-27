@@ -257,14 +257,7 @@
 
   Menu.open = (o) => { if (o) Menu.misuraLeAzioni(o.items); return acceso() ? apri(o) : locale.open(o); };
   Menu.close = () => (acceso() ? chiudi() : locale.close());
-  // La fila in cima e i suoi pannelli (#1434): le voci restano qui, lo strato li disegna.
-  Menu.openIconGridSubmenu = (ancora, items, opts) => {
-    if (!acceso()) return locale.openIconGridSubmenu(ancora, items, opts);
-    const m = corrente;
-    if (!m || !(ancora instanceof Ancora)) return;
-    const op = opDi(m);
-    aggiorna(m, 'griglia-apri', { ancora: ancora.segno, items: D.descrivi(items || [], op), opts: D.descrivi(opts || {}, op) });
-  };
+  // La griglia in cima e il campo del collegamento (#1434, #2555): le voci restano qui, lo strato li disegna.
   Menu.openLinkSubmenu = (ancora, opts) => {
     if (!acceso()) return locale.openLinkSubmenu(ancora, opts);
     const m = corrente;
