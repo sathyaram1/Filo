@@ -5,12 +5,13 @@
 import { defineConfig } from '@playwright/test';
 import { usaSchermoDelLavoratore } from './scripts/lib/schermo-virtuale.mjs';
 import { accendiCopertura } from './scripts/lib/copertura-prove.mjs';
+import regolaCopertura from './src/main/copertura.js';
 
 // Con `--workers` > 1 nel contenitore ogni lavoratore apre Electron sullo schermo virtuale suo (#2133).
 usaSchermoDelLavoratore();
 
 // La suite in GitHub registra quali file di src/ fa eseguire ogni prova (#2502): scripts/lib/copertura-prove.mjs.
-accendiCopertura();
+accendiCopertura(regolaCopertura);
 
 // Finestre invisibili per TUTTA la suite (vedi src/main/test-window-mode.js).
 // Sta qui e non nella fixture perché una cinquantina di spec lancia Electron per
