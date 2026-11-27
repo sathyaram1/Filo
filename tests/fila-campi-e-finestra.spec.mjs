@@ -261,14 +261,14 @@ test.describe('col menu nello strato sopra la scheda', () => {
     await expect(barra.locator('#nav')).toHaveClass(/mira/);
     await m.mouse.up();
     await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 6)).toEqual(['help', 'back', 'forward', 'reload', 'saveForLater', 'home']);
-    await expect.poll(async () => (await salvata(app))['fila:pagina']).toEqual([]);
+    await expect.poll(async () => (await salvata(app))['fila:pagina']).not.toContain('saveForLater');
     await comandaBarra(app, 'chiudi');
 
-    // Dalla barra alla fila: la fila vuota della pagina si apre per accoglierla.
+    // Dalla barra alla fila: la fila della pagina, con solo l'Aiuto di ogni menu (#2555), la accoglie.
     await page.keyboard.press('Escape');
     await page.locator('#vuoto').click({ button: 'right' });
     await expect(menu.principale).toBeVisible();
-    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeHidden();
+    expect(await iconeDellaFila(menu)).toEqual(['pagina:help']);
     await comandaBarra(app, 'clic');
     await pannelloFermo(barra);
     const src = await barra.locator('#nav .ico[data-id="saveForLater"]').boundingBox();
