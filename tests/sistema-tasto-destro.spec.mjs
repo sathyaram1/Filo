@@ -302,12 +302,15 @@ test('una pastiglia delle Impostazioni rapide ha il suo menu: accenderla e la su
   await expect(pastiglia).toBeVisible({ timeout: 8_000 });
   const acceso = (await pastiglia.getAttribute('aria-pressed')) === 'true';
   await pastiglia.click({ button: 'right' });
-  const menu = page.locator('.dash-menu');
-  await expect(menu.locator('.dash-menu-voce')).toHaveText([`${acceso ? 'Spegni' : 'Accendi'}: anteprima schede`, 'Apri la voce in Preferenze']);
-  await menu.locator('.dash-menu-voce').first().click();
+  // A icone (#2555): le stesse voci, ogni icona seguita dalle varianti del suo verbo.
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  const prima = `${acceso ? 'Spegni' : 'Accendi'}: anteprima schede`;
+  expect(await menu.vociScritte()).toEqual([prima, 'Apri la voce in Preferenze']);
+  await menu.scegli(prima);
   await expect(pastiglia).toHaveAttribute('aria-pressed', acceso ? 'false' : 'true');
   await pastiglia.click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Apri la voce in Preferenze' }).click();
+  await menu.scegli('Apri la voce in Preferenze');
   await expect.poll(async () => (await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.url)))
     .some((u) => u === 'filo://preferences/preferences.html#tabPreviewEnabled')).toBe(true);
 });
