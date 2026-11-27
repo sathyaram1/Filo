@@ -592,7 +592,7 @@ test('il testo incollato o dettato con Filo che finisce con «perchè» e un pun
   const incolla = async (sel, testo) => {
     await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), testo);
     await page.locator(sel).click({ button: 'right' });
-    await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
+    await menuDi(page).incolla.click();
   };
   const detta = async (sel, testo) => {
     await page.locator(sel).click({ button: 'right' });
