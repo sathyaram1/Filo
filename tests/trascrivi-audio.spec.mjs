@@ -161,7 +161,8 @@ async function chatFinta(app) {
       globalThis.__esiti.push(...esiti);
       const tutto = esiti.join('\n');
       const testo = /PEZZO-\d/.test(tutto) ? `Ecco la trascrizione: ${(tutto.match(/PEZZO-\d/g) || []).join(' ')}`
-        : /non è un audio o un video/.test(tutto) ? 'Quell\'indirizzo non è un audio o un video.' : 'NIENTE';
+        : /non è un audio o un video/.test(tutto) ? 'Quell\'indirizzo non è un audio o un video.'
+          : /a segmenti o protetto[\s\S]*web\(leggi\)|a segmenti o protetto[\s\S]*LEGGI_PAGINA/.test(tutto) ? 'Quel video è in streaming: posso leggere la trascrizione della pagina.' : 'NIENTE';
       try { onDelta && onDelta(testo); } catch (_) {}
       return { ...base, text: testo, toolCalls: [], finishReason: 'stop' };
     };
