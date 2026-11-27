@@ -2639,66 +2639,37 @@
       // oppure a occuparne la superficie. Un video di sfondo che si ritrova per
       // caso un link sopra non deve intrufolarsi nel menu di quel link.
       const mediaInLink = belongsTo(mediaUnder, linkEl, layers) ? mediaUnder : null;
-      if (mediaInLink) {
-        di('media', { media: mediaInLink, link: linkEl });
-        for (const it of Actions.buildMediaItems(mediaInLink, linkEl)) items.push(it);
-        items.push({ type: 'separator' });
-      }
+      if (mediaInLink) di('media', { media: mediaInLink, link: linkEl });
       // Stessa storia con la copertina ferma: le schede la coprono con un velo che regge il
       // titolo, e il clic arriva lì invece che sull'<img> (#444).
       const imgInLink = (!mediaInLink && belongsTo(imgUnder, linkEl, layers)) ? imgUnder : null;
-      if (imgInLink) {
-        di('immagine', { img: imgInLink, link: linkEl });
-        for (const it of buildImageActionItems(imgInLink)) items.push(it);
-        items.push({ type: 'separator' });
-      }
-      for (const it of buildLinkActionItems(linkEl)) items.push(it);
-      items.push({ type: 'separator' });
-      // Il riquadro parla dell'elemento primario: se abbiamo adottato la copertina il primario
+      if (imgInLink) di('immagine', { img: imgInLink, link: linkEl });
+      // La spiegazione parla dell'elemento primario: se abbiamo adottato la copertina il primario
       // è lei, o la stessa scheda cambiava argomento a seconda del pixel cliccato (#444).
-      items.push(imgInLink
-        ? Actions.buildInlineExplainImage(imgInLink, linkEl)
-        : Actions.buildInlineExplainLink(linkEl));
+      spiega(imgInLink ? Actions.buildInlineExplainImage(imgInLink, linkEl) : Actions.buildInlineExplainLink(linkEl));
       return items;
     }
 
     if (editable) {
       di('cursore');
-      items.push(Actions.buildPasteItem(clipboardHistory));
-      items.push(TTS.buildDictateItem(target));
-      if (valutaQui) items.push({ type: 'separator' }, buildValutaItem(valutaQui));
       return items;
     }
 
-    // Nessun altro contesto, ma sotto al punto cliccato c'è un filmato coperto
-    // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
+    // Nessun altro contesto, ma sotto al punto cliccato c'è un filmato coperto dall'overlay del player: sono comunque
+    // le sue azioni che l'utente cerca. Due cose prese entrambe da sotto devono stare insieme anche fra loro (#444).
     if (mediaUnder) {
-      // Due cose prese entrambe da sotto devono stare insieme anche fra loro, o il menu
-      // unirebbe due schede diverse (#444).
       const linkDelMedia = belongsTo(mediaUnder, linkUnder, layers) ? linkUnder : null;
       di('media', { media: mediaUnder, link: linkDelMedia });
-      for (const it of Actions.buildMediaItems(mediaUnder, linkDelMedia)) items.push(it);
-      if (linkDelMedia) {
-        items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkUnder)) items.push(it);
-        items.push({ type: 'separator' });
-        items.push(Actions.buildInlineExplainLink(linkUnder));
-      }
+      if (linkDelMedia) spiega(Actions.buildInlineExplainLink(linkUnder));
       return items;
     }
 
     // Stessa scheda con l'anteprima ferma: senza questo ramo lo stesso pixel dava menu
     // completo mentre il filmatino suonava e menu vuoto un istante dopo (#444).
     if (imgUnder) {
-      di('immagine', { img: imgUnder });
-      for (const it of buildImageActionItems(imgUnder)) items.push(it);
       const linkOfCover = belongsTo(imgUnder, linkUnder, layers) ? linkUnder : null;
-      if (linkOfCover) {
-        items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkOfCover)) items.push(it);
-      }
-      items.push({ type: 'separator' });
-      items.push(Actions.buildInlineExplainImage(imgUnder, linkOfCover));
+      di('immagine', { img: imgUnder, link: linkOfCover });
+      spiega(Actions.buildInlineExplainImage(imgUnder, linkOfCover));
       return items;
     }
 
@@ -2706,9 +2677,7 @@
     // (#444). Barre fisse, modali e manti li ha già scartati `linkUnder`.
     if (linkUnder) {
       di('link', { link: linkUnder });
-      for (const it of buildLinkActionItems(linkUnder)) items.push(it);
-      items.push({ type: 'separator' });
-      items.push(Actions.buildInlineExplainLink(linkUnder));
+      spiega(Actions.buildInlineExplainLink(linkUnder));
       return items;
     }
 
