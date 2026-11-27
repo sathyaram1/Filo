@@ -434,6 +434,8 @@
     if (!m || m.index < prima.length) return false;
     return solo ? m.index === prima.length : SOLO_COMPLEMENTO.test(fra.slice(0, m.index - prima.length));
   }
+  // `fra` finisce con un verbo come «diventa»: presenta il valore del nome solo se cambioFra lo dice (#2714).
+  const finisceColCambio = (fra) => DIVENTA_IN_CODA.test(fra);
   // Le etichette fuori dall'alfabeto latino, e i verbi attaccati del cinese, giapponese, coreano e thai, sono quelli dei
   // campi segreti (#1403.8); i verbi che sono una parola stanno in ANNUNCI qui sopra.
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
