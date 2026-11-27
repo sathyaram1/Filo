@@ -323,6 +323,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
         return p == null ? currentPercent() : p;
       },
       azzera: () => { eseguiZoom({ verso: 'reset' }); },
+      // I valori dell'icona della dimensione nel tasto destro a icone (#2555).
+      imposta: (p) => { eseguiZoom({ percentuale: p }); },
     };
   } catch (_) {}
 
