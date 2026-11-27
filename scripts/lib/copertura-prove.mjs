@@ -22,17 +22,8 @@ function provaInCorsa() {
 function segui(app, prova, dir) {
   const viste = new Map();
   const sessioni = new Set();
-  const accumula = (res) => {
-    for (const s of res?.result || []) {
-      if (!s.url) continue;
-      let set = viste.get(s.url);
-      if (!set) viste.set(s.url, (set = new Set()));
-      for (const f of s.functions || []) {
-        const r = f.ranges && f.ranges[0];
-        if (r && r.count > 0) set.add(`${r.startOffset}:${r.endOffset}`);
-      }
-    }
-  };
+  const { accumula: accumulaIn, comeIndirizzi } = regola();
+  const accumula = (res) => accumulaIn(viste, res);
   const prendi = () => Promise.all([...sessioni].map((s) => s.send('Profiler.takePreciseCoverage').then(accumula, () => sessioni.delete(s))));
   const aggancia = async (page) => {
     try {
