@@ -236,7 +236,7 @@ test('fotogrammi dell\'apertura: nessun fotogramma bianco fra la home e l\'edito
   await h.locator('#tieni .dash-carta[data-tipo="editor"] .dash-carta-az.principale').click();
   await finito;
   const file = readdirSync(cartella).filter((f) => f.endsWith('.png')).sort();
-  expect(file.length).toBeGreaterThan(20);
+  expect(file.length, `ffmpeg: ${errore} area ${JSON.stringify(area)}`).toBeGreaterThan(20);
   // Un fotogramma «bianco» ha più di un terzo dell'area pagina in bianco pieno: lo sfondo di Filo non lo è mai.
   const bianchi = await app.evaluate(async ({ nativeImage }, percorsi) => {
     const out = [];
