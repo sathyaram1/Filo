@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.308', date: '2026-11-27',
+      fixes: [
+        { testo: 'Se in una chat qualcuno ti chiede il PUK della SIM e tu lo scrivi nella risposta, il correttore non lo manda ai suoi modelli, come già succedeva per il PIN e la password.', segnalazione: 2692 },
+      ],
+    },
+    {
       version: '0.2.307', date: '2026-11-26',
       fixes: [
         { testo: 'Il PIN o il CVV scritti in polacco col verbo «to», come «Mój PIN to 4829» o «Mój tajny numer to 4829», non arrivano più ai modelli, come già succedeva coi due punti.', segnalazione: 1403 },

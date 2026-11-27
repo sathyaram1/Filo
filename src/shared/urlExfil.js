@@ -357,12 +357,13 @@
   // Senza spazi fra le parole (cinese, giapponese, thai) il valore finisce dove ricomincia la frase.
   const FRA_PAROLE = new RegExp(`[\\s${NON_LATINI.FINE_VALORE}]+`);
   // I nomi del PIN senza «codice» («numero segreto», «Geheimzahl») li tiene il pavimento, che urlExfil precede nel loader.
+  // Il PUK sblocca la SIM come il PIN: chi lo chiede in chat chiede un codice (#2692.5).
   let presentaCodice = null;
   const PRESENTA_CODICE = () => {
     if (presentaCodice) return presentaCodice;
     if (!global.SN_PAVIMENTO && typeof require === 'function') require('./pavimento.js');
     const pin = global.SN_PAVIMENTO ? `${global.SN_PAVIMENTO.NOMI_DEL_PIN}|` : '';
-    const re = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${pin}pin|codice|code|c[oó]digo|combinazione|otp)(?![\\p{L}\\p{N}_])`, 'giu');
+    const re = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${pin}pin|puk|codice|code|c[oó]digo|combinazione|otp)(?![\\p{L}\\p{N}_])`, 'giu');
     if (pin) presentaCodice = re;
     return re;
   };

@@ -120,6 +120,15 @@ function oscura(testo, valori = null) {
   return v;
 }
 
+// Il campo è il messaggio sotto il testo sopra: i codici il pavimento li legge lì, come il cancello dei modelli nella
+// conversazione intera, così la risposta a «mi dici il puk?» non parte nemmeno con la domanda fuori dal campo (#2692.5).
+// La password no: la risposta sotto chi la chiede la legge richiestaAperta, che sa quando il legame è finito (#1723).
+function codiciSottoLaDomanda(sopra, campo) {
+  try {
+    return PAV().trova(/\n\s*$/.test(sopra) ? sopra + campo : `${sopra}\n${campo}`).filter((x) => x.regola === 'codice').map((x) => String(x.valore));
+  } catch (_) { return []; }
+}
+
 // I pezzi contigui del campo (prima, nuovo, dopo), oscurati sul campo intero: la parola che presenta una password, o
 // metà di un numero di carta, può stare in un pezzo diverso dal valore, o fuori dai pezzi. `campo` e `campoDa` (dove
 // comincia il primo pezzo) li manda la pagina; se non tornano coi pezzi vale il loro testo unito.
@@ -137,6 +146,7 @@ function pezziOscurati(pezzi, campo, campoDa, sopra = '') {
   const valori = [...new Set([
     ...[base, ...pezzi].flatMap(valoriDi),
     ...(s ? valoriDi(s) : []),
+    ...(s ? codiciSottoLaDomanda(s, base) : []),
     ...(aperta ? R.lunghi(R.valoriRisposta(R.minuscolo(base.slice(0, R.RISPOSTA_MAX)),aperta.tipo, aperta.chiesta, aperta.data)) : []),
   ])].sort((x, y) => y.length - x.length);
   const coperti = [];
