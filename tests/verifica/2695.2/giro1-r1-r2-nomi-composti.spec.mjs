@@ -26,6 +26,7 @@ test('r2 un\'impostazione che descrive la password arriva intera al modello, com
     'password_encryption = scram-sha-256', 'password_storage: database', 'password_backend: ldap', 'password_scheme: SSHA',
     'password_digest: sha256', 'password_store: keychain', 'password_provider: ldap', 'password_sync: yes',
     'password_autocomplete: off', 'password_reuse_time: 365', 'password_forgotten: Hai dimenticato la password?',
+    'password_encoding: sha256', 'password_strategy: bcrypt', 'pwd_rate: 0.9',
   ]) {
     expect(P.oscura(riga), riga).toBe(riga);
   }
