@@ -16,10 +16,9 @@ function provaInCorsa() {
   } catch (_) { return ''; }
 }
 
-function segui(app, prova, dir) {
+function segui(app, prova, dir, { accumula: accumulaIn, comeIndirizzi }) {
   const viste = new Map();
   const sessioni = new Set();
-  const { accumula: accumulaIn, comeIndirizzi } = regola();
   const accumula = (res) => accumulaIn(viste, res);
   const prendi = () => Promise.all([...sessioni].map((s) => s.send('Profiler.takePreciseCoverage').then(accumula, () => sessioni.delete(s))));
   const aggancia = async (page) => {
