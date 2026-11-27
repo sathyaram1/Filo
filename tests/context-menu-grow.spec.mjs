@@ -75,7 +75,8 @@ async function attendiRientro(page) {
 // sposta la risposta arriva qualche fotogramma dopo, e un clic che la anticipa non parte. Una persona non è così svelta.
 async function attendiUltimaVoceCliccabile(app, page) {
   await expect.poll(() => nelMondoDelMenu(app, page, () => {
-    const voci = document.querySelectorAll('.sn-menu:not(.sn-menu-sub) .sn-menu-item');
+    const voci = [...document.querySelectorAll('.sn-menu:not(.sn-menu-sub) .sn-menu-item:not(.sn-menu-row-overflow)')]
+      .filter((v) => v.getClientRects().length);
     const ultima = voci[voci.length - 1];
     return !!ultima && globalThis.SN_VISTO?._test.pronta(ultima) !== false;
   }), { timeout: 5000, message: 'l\'ultima voce non diventa mai cliccabile' }).toBe(true);
