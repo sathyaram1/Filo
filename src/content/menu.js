@@ -256,6 +256,7 @@
 
   function close() {
     try { dismissTooltip(); } catch (_) {}
+    nascondiBersaglio();
     lettura.via();
     clearSubCloseTimer();
     if (activeMenu) {
