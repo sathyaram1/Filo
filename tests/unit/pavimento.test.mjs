@@ -742,6 +742,25 @@ test('una parola dell\'aprire nella frase non copre un identificativo; il codice
   }
 });
 
+// #1403.93: il codice di quello che si apre, e il PIN, con le parole in più del parlato, come quello del telefono.
+test('il codice di un cancello o di una porta detto con un avverbio, un verbo composto o col refuso non esce', () => {
+  for (const [t, s] of [['Il codice del cancello è sempre 4829', '4829'], ['The gate code is now 4829', '4829'],
+    ['Il codice del cancello e 4829', '4829'], ['Il codice del portone è ancora 4829', '4829'], ['The door code is still 4829', '4829'],
+    ['Il codice del cancello è sempre stato 4829', '4829'], ['The gate code has been 4829', '4829'], ['Il codice del cancello, 4829', '4829'],
+    ['Il codice del cancello nuovo e 4829', '4829'], ['Il codice per aprire il cancello e 4829', '4829'], ['Il codice di ritiro è sempre 640385', '640385'],
+    ['Il codice del wifi è ancora 48291736', '48291736'], ['Il codice del cancello è sempre 1990', '1990'], ['The gate code is now 1990', '1990'],
+    ['Le code du portail est toujours 4829', '4829'], ['El código de la puerta es siempre 4829', '4829'], ['Il pin è sempre 4829', '4829'],
+    ['The pin is now 4829', '4829'], ['Il codice OTP è sempre 482913', '482913']]) {
+    assert.ok(!P.oscura(t).includes(s), t);
+  }
+  // La «e» e la virgola dopo altre parole sono congiunzioni; un identificativo resta tale anche con l'avverbio.
+  for (const t of ['Il codice del cancello non funziona e 4829 volte ho provato', 'Il codice del cancello lo sai, e 4829 è il numero della stanza',
+    'Send the gate code to 4829 people', 'Il codice cliente è sempre 4829', 'Il codice prodotto è sempre 4829', 'Il codice del corso e 4829',
+    'Il codice postale del cancello è sempre 20121', 'Codice del cancello installato nel 2019']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+});
+
 // Il codice ha un posto, come la password: un altro numero della frase che dice «code» non è il codice, e non sparisce
 // dalla pagina.
 test('un numero nella frase del codice che non sta al posto del codice resta, in tutta la pagina e nelle ricerche', () => {
