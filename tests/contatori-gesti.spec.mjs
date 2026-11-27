@@ -150,9 +150,9 @@ test('le carte della home: l’uso per colonna e gesto, le mosse scritte dal mai
   const editor = home.locator('#tieni .dash-carta[data-chiave="editor"]');
   await expect(editor).toBeVisible({ timeout: 10_000 });
   await editor.click({ button: 'right' });
-  await expect(home.locator('.dash-menu')).toBeVisible();
+  await expect(menuDi(home).principale).toBeVisible();
   await expect.poll(() => conto(app, 'carta_home', 'editor', 'destra|tasto_destro'), { timeout: 8_000 }).toBe(1);
-  await home.locator('.dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await menuDi(home).scegli('Togli dalla home');
   await expect(editor).toHaveCount(0);
   await expect.poll(() => conto(app, 'carta_home', 'editor', 'togli'), { timeout: 8_000 }).toBe(1);
 
