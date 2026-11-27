@@ -294,8 +294,8 @@ test('un dato di adesso passa dalla ricerca: mentre cerca respirano i puntini, p
   expect(estrazione).toContain('Google ha un p/e di soli xx, davvero basso.');
 
   const menu = await tastoDestroSu(page, valore(page, '27'));
-  const prima = menu.primaVoce;
-  await expect(prima).toHaveClass(/sn-menu-correction/);
+  // In cima ai testi, subito sotto la griglia delle icone (#2555).
+  const prima = menu.primaCorrezione;
   await expect(prima).toHaveText(/27/);
   await expect(menu.locator('.sn-menu-segno')).toContainText('Rapporto prezzo/utili di Alphabet');
   await expect(menu.locator('.sn-menu-segno')).toContainText('Fonte: borsa.example, 20 ottobre 2026');
