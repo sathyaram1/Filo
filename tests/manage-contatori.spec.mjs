@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { GESTIONE, apriScheda, ricaricaSu } from './helpers/gestione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 
