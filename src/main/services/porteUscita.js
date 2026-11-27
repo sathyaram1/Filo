@@ -366,10 +366,10 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
   const daPagina = daPaginaNonDiFilo(sender);
-  const indirizzo = (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
+  const indirizzo = (tipo === 'NAVIGA' || comeLettura(tipo)) ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
   const delComando = tipo === 'ESEGUI_COMANDO' ? Exfil.indirizziDelComando(action) : [];
   let memoria = '';
-  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'IMMAGINI_WEB' || tipo === 'LEGGI_PAGINA' || delComando.length) {
+  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'IMMAGINI_WEB' || comeLettura(tipo) || delComando.length) {
     const riservato = [indirizzo, ...delComando].filter(Boolean).map((u) => PageRead.materialeRiservato(u));
     memoria = [await navExfilCorpus(), ...riservato].filter(Boolean).join('\n');
   }
