@@ -560,10 +560,12 @@
   // Il codice di ciò che si apre (il mio telefono, il cancello), la password detta col suo complemento («la password del
   // mio pc è …») e il CVV non escono da un'azione (#1403.89): le forme sono del pavimento, e qui si chiedono a lui. Gli
   // altri suoi codici no: «se il pin è giusto la pagina è 2048» lì si toglie, qui fermerebbe l'azione.
+  // La password solo dopo il verbo o il separatore: in «The password war2023 is not valid» il pavimento toglie, qui no.
   // Il CVV vale la carta: scritto dall'utente esce come il numero accanto.
   const DAL_PAVIMENTO = {
     codice: (x) => (x.apre ? 'codice' : ''),
-    password: (x) => (passwordInUscita(x.valore) ? 'password' : ''),
+    password: (x, s) => (passwordInUscita(x.valore)
+      && new RegExp(`(?:[:=：]|${ANNUNCIO})\\s*["'«“„]?${escRe(String(x.valore))}`, 'iu').test(s) ? 'password' : ''),
     cvv: () => 'carta',
   };
   function codiciDelPavimento(s) {
