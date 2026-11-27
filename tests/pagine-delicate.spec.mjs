@@ -590,8 +590,8 @@ test('uno screenshot della banca incollato col menu su un altro sito non va al m
     // Sotto le immagini già incollate: il tasto destro su un'immagine apre il suo menu, senza Incolla.
     await chat.locator('#ce').click({ button: 'right', position: { x: 300, y: 170 } });
     // Lo strato del menu nasce al primo tasto destro: si cerca di nuovo finché c'è.
-    await expect.poll(() => menuDi(chat).locator('.sn-menu-paste-main').count(), { timeout: 10_000 }).toBeGreaterThan(0);
-    await menuDi(chat).locator('.sn-menu-paste-main').click();
+    await expect.poll(() => menuDi(chat).incolla.count(), { timeout: 10_000 }).toBeGreaterThan(0);
+    await menuDi(chat).incolla.click();
   };
   await incolla(banca.dataUrl);
   await expect(chat.locator('#ce img')).toHaveCount(1, { timeout: 10_000 });
