@@ -142,6 +142,7 @@
     LIMIT_REACHED: 'opzioni',
     // Errori la cui cura è un altro modello: la frase dice DOVE_ALTRO_MODELLO, il tasto porta lì.
     NO_TOOL_HOST: 'opzioni',
+    NO_TRANSCRIBE_HOST: 'opzioni',
     MODEL_UNAVAILABLE: 'opzioni',
     DATA_POLICY: 'opzioni',
     NO_PROVIDER_ALLOWED: 'opzioni',
