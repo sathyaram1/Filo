@@ -378,7 +378,7 @@ const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
 // conta se ha la forma di una password, o se la presenta un annuncio o i due punti; dopo «pw» anche se viene subito.
 // Come dopo «password»: anche con un avverbio («la pass ora è …») o un verbo di cambio («pw diventa …») in mezzo.
 const AVVERBI = '(?:ora|adesso|invece|ancora|attualmente|now|still)';
-const CAMBIA = '(?:diventa|diventerà|resta|rimane|sarà|will\\s+be)(?!\\p{L})';
+const CAMBIA = `(?:${guardiano().CAMBI.diventa.map((w) => esc(w).replace(/ /g, '\\s+')).join('|')})(?!\\p{L})`;
 const PRESENTATA = new RegExp(`^\\s*(?:(?:del(?:la)?|dell['’]|di)\\s+[\\p{L}\\p{N}-]+\\s*)?(?:${AVVERBI}\\s+)?(?:[:=]|${ANNUNCIO}|${CAMBIA})\\s*$`, 'u');
 const PONTE = new RegExp(`^(?:${AVVERBI}|${CAMBIA}|${ANNUNCIO})$`, 'u');
 const ACCANTO = /^\s*$/u;
