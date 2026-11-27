@@ -1122,7 +1122,7 @@ test('#496 «Restringi la finestra a questo periodo» su una colonna-anno tiene 
   await expect(page.locator('#mgFsTrendHint')).toContainText('Una colonna per anno');
 
   await page.locator(`.mg-fs-trend-col[data-fs-punto="${anno}"]`).click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Restringi' }).click();
+  await menuDi(page).scegli('Restringi');
   await expect(tile(page, 'ricevuti'), 'restringendo a un anno le sue segnalazioni spariscono').toHaveText('2');
 });
 
