@@ -488,7 +488,7 @@ test('risposto altrove, la domanda nel pannello si ritira', async ({ app, shell,
     // 3) Voce tolta dall'elenco col tasto destro, senza rispondere.
     await expect(rigaDl('tre.exe')).toBeVisible({ timeout: 15000 });
     await rigaDl('tre.exe').click({ button: 'right' });
-    await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Rimuovi dalla lista' }).click();
+    await menuDi(dl).scegli('Rimuovi dalla lista');
     await expect.poll(() => voce(shell, 'tre.exe'), { timeout: 10000 }).toBeNull();
     await expect(domanda(shell, 'tre.exe')).toHaveCount(0, { timeout: 10000 });
   } finally {
