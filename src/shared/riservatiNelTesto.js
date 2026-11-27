@@ -98,7 +98,6 @@ const TAG_A_CAPO = 'br|hr|p|div|li|dt|dd|tr|table|caption|h[1-6]|pre|blockquote|
 const E = '&(?!gt;|lt;)';
 const TAG_HTML = new RegExp(`(<|&lt;)(/\\s*|)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|dl|thead|tbody|tfoot|td|th)(?=[\\s/>]|&gt;)`
   + `((?:[^<>"'&]|${E}|"(?:[^"<>&]|${E})*"|'(?:[^'<>&]|${E})*')*)(>|&gt;)`, 'giu');
-const DI_TESTO = new RegExp(`^(?:${TAG_TESTO})$`, 'i');
 const A_CAPO = new RegExp(`^(?:${TAG_A_CAPO})$`, 'i');
 const SPAZIO_HTML = /&(?:nbsp|#160|#x0*a0);/gi;
 const DUE_PUNTI_HTML = /&(?:colon|#0*58|#x0*3a);/gi;
