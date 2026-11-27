@@ -56,8 +56,8 @@ function davanti(id) {
   const a = chiudi(id);
   if (!a) return;
   const tabs = a.tabs;
-  if (a.testo != null) manda(a.homeWc, { type: globalThis.SN_MSG.MSG.EDITOR_BOZZA_RESA, id, testo: a.testo });
   try { tabs.fineArrivo(a.tabId); } catch (_) {}
+  if (a.testo != null) { manda(a.homeWc, { type: globalThis.SN_MSG.MSG.EDITOR_BOZZA_RESA, id, testo: a.testo }); return; }
   const editor = tabs.tabs.find((t) => t.id === a.tabId);
   if (!editor) return;
   if (tabs.activeId === a.homeTabId) tabs.activate(a.tabId);
