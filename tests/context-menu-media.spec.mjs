@@ -57,10 +57,11 @@ function pageHtml(videoSrc) {
   </body></html>`;
 }
 
+// Il menu aperto sull'elemento: le icone si cercano per nome (aria-label), le rare dietro il «+» (#2555).
 async function openMenuOn(page, selector) {
   await page.locator(selector).click({ button: 'right', position: { x: 20, y: 20 } });
-  const menu = menuDi(page).locator('.sn-menu');
-  await expect(menu).toBeVisible();
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
   return menu;
 }
 
@@ -68,12 +69,13 @@ test('tasto destro su un video: il menu offre le azioni del video', async ({ ope
   const page = await testServer.openReady(openTab, pageHtml('/nonexistent.mp4'));
 
   const menu = await openMenuOn(page, '#v');
+  await menu.piu.click();
   await page.screenshot({ path: 'tests/.shots/context-menu-media.png' }).catch(() => {});
 
   // Prima del fix la zona contestuale su un video era VUOTA: solo Aiuto, Invia
   // feedback e Invia attacco.
   for (const label of ['Riproduci', 'Disattiva audio', 'Velocità', 'Ripeti in continuo', 'Mostra i controlli', 'Copia URL video', 'Salva video come']) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await expect(menu.voce(label).first(), label).toBeVisible();
   }
 });
 
