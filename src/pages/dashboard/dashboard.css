@@ -2580,8 +2580,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 360px;
-  overflow-y: auto;
+  /* Senza un'altezza sua: lo scambio aperto scorre col filo, mai un riquadro che scorre dentro l'altro (#974.1). */
 }
 .dash-riga-app-msg {
   max-width: 92%;
