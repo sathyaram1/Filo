@@ -2,6 +2,7 @@
 // qui, in riga, nel dettaglio e nella conversazione; vale come tua e si riapre, con quello che la riapertura non disfa.
 import { test, expect } from './fixtures/electron.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const tab = (page, t) => page.locator(`.mg-tab[data-tab="${t}"]`);
 const riga = (page, id) => page.locator(`#mgDomandeLista .mg-domanda[data-id="${id}"]`);
