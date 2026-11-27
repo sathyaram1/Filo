@@ -2285,7 +2285,8 @@
     const a = {};
     if (aiutoAcceso()) {
       a.help = {
-        label: I18n.t('menu_help'), tastiFilo: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
+        // La scorciatoia di sempre, a menu chiuso, sotto il nome: il menu la insegna.
+        label: I18n.t('menu_help'), nota: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
         onClick: () => { Popup.conta({ misura: 'strada', id: 'help', via: 'tasto_destro_altro' }); openSurface('help', () => openHelpSidebar()); },
       };
     }
