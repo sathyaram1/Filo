@@ -1115,9 +1115,7 @@
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
     out.push(...interiFraVirgolette(s, out));
-    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano)))
-      .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
-      .filter((x) => String(x.valore).length >= 3);
+    return out;
   }
 
   // Le password scritte a mano (la risposta sotto chi la chiede, «Utente / Password: mario / …», dopo il nome della rete):
