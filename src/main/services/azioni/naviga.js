@@ -459,6 +459,7 @@ module.exports = {
   CERCA_IMMAGINE: azioneCercaImmagine,
   APRI_SALVATA: azioneApriSalvata,
   LEGGI_PAGINA: azioneLeggiPagina,
+  TRASCRIVI_MEDIA: azioneTrascriviMedia,
   PULISCI_TAB: azionePulisciTab,
   TIENI_APERTA: azioneTieniAperta,
   NON_TENERE_APERTA: azioneNonTenereAperta,
