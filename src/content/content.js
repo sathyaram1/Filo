@@ -2791,7 +2791,7 @@
       if (contesto.valutaQui) { const v = buildValutaItem(contesto.valutaQui); azioni.valuta = { label: v.label, onClick: v.onClick }; }
       const campoDiFilo = SpellCheck?.findSupportedEditable?.(target) || null;
       if (campoDiFilo) {
-        const tutti = voceCorreggiTutti(campoDiFilo, 1);
+        const tutti = voceCorreggiTutti(campoDiFilo, contesto.minimoCorreggi || 1);
         if (tutti) azioni.correggiTutti = { label: tutti.label, onClick: tutti.onClick };
         const controlla = voceControlla(campoDiFilo);
         if (controlla) azioni.controlla = { label: controlla.label, onClick: controlla.onClick };
