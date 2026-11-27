@@ -135,7 +135,7 @@ test('#2695.1: nella riga di una tabella ogni etichetta, non solo la password, t
     ['| login_password: | Nyckel!2024 |', 'Nyckel!2024'], ['| login_password | Nyckel!2024 |', 'Nyckel!2024'],
     ['| db_password | hunter2x |', 'hunter2x'], ['| Chiave API: | abcd1234efgh5678 |', 'abcd1234efgh5678'],
     ['| api_key | abcd1234efgh5678 |', 'abcd1234efgh5678'],
-    ['| Campo | Valore |\n|---|---|\n| Carta: | Visa |\n| CVV: | 482 |', '482'],
+    ['| Campo | Valore |\n|---|---|\n| Carta: | Visa |\n| CVV: | 482 |', '482'], ['CVV: | 123', '123'],
   ]) {
     assert.equal(P.oscura(riga), riga.replace(v, S), `pavimento: ${riga}`);
     assert.equal(alCorrettore(riga), riga.replace(v, S), `correttore: ${riga}`);
