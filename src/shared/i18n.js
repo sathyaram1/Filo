@@ -72,7 +72,6 @@
     menu_media_mute: 'Disattiva audio',
     menu_media_unmute: 'Riattiva audio',
     menu_media_speed: 'Velocità',
-    menu_media_speed_pick: 'Scegli la velocità',
     menu_media_speed_normal: 'normale',
     menu_media_loop: 'Ripeti in continuo',
     menu_media_loop_off: 'Non ripetere',
