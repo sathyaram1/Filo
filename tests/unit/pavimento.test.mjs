@@ -1198,6 +1198,7 @@ test('la password annunciata da un verbo non esce in nessuna lingua, e il resto 
     ['паролем является Ключ!Зима2024', 'Ключ!Зима2024', 'паролем является '],
     ['密码是：Mima2024!', 'Mima2024!', '密码是：'],
     ['パスワードは、Pass2024!です', 'Pass2024!', 'です'],
+    ['パスワードは：Pass2024!です', 'Pass2024!', 'パスワードは：'],
   ]) {
     const t = P.oscura(riga);
     assert.ok(!t.includes(v), riga);
