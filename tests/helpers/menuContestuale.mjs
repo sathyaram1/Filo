@@ -38,10 +38,18 @@ export function menuDi(scheda) {
     /** Ogni pannello del menu aperto, principale e sottomenu. */
     pannelli: locator('.sn-menu'),
     principale: locator('.sn-menu:not(.sn-menu-sub)'),
-    /** La prima voce del pannello principale: sotto la fila contestuale, che sta sempre in cima (#1434). */
-    primaVoce: locator('.sn-menu:not(.sn-menu-sub) > :not(.sn-menu-row):not(.sn-menu-sep):visible').first(),
-    voci: locator('.sn-menu-item'),
-    voce: (testo) => locator('.sn-menu-item', { hasText: testo }),
+    /** La prima voce del pannello principale: la prima icona della griglia, che sta sempre in cima (#1434, #2555). */
+    primaVoce: locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:visible').first(),
+    /** Le voci: le icone della griglia (il nome sta nell'icona, nascosto alla vista) e le voci scritte dei sottomenu. */
+    voci: locator('.sn-menu-item, .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)'),
+    voce: (testo) => locator('.sn-menu-item, .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)', { hasText: testo }),
+    /** Un'icona della griglia per il suo verbo dell'elenco unico (`copy`, `save`…). */
+    icona: (verbo) => locator(`.sn-menu-griglia [data-sn-verbo="${verbo}"]`),
+    /** L'icona Incolla: il tasto destro su di lei apre la cronologia degli appunti. */
+    incolla: locator('.sn-menu-griglia [data-sn-verbo="paste"]'),
+    /** Il «+» che apre le azioni rare nello stesso menu. */
+    piu: locator('.sn-menu-griglia .sn-menu-row-overflow'),
+    nome: locator('.sn-menu-nome'),
     sottomenu: locator('.sn-menu-sub'),
   };
 }
