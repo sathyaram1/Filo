@@ -349,10 +349,14 @@
   const SP = '[^\\S\\n]+';
   const AUSILIARI = "è|e'|e’|é|era|sarà|sarebbe|fosse|sia|ha|aveva|avrà|has|had|have|was|is|will";
   const PARTICIPI = 'stat[ao]|diventat[ao]|divenut[ao]|rimast[ao]|restat[ao]|been|become';
-  const PASSATI = 'diventò|divenne|rimase|restò|became|become|remained|stayed';
+  const PASSATI_EN = 'became|become|remained|stayed';
+  const PASSATI = `diventò|divenne|rimase|restò|${PASSATI_EN}`;
   // Un elenco solo dei verbi di cambio, anche per il correttore (#1403.67): «sostituita con», «changé en», «cambiada a».
-  const CAMBI = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|sostituit[ao]|rimpiazzat[ao]|settat[ao]|passat[ao]|messa|messo'
-    + '|changed|set|updated|reset|replaced|chang[ée]e?|modifi[ée]e?|cambiad[ao]|modificad[ao]|actualizad[ao]|mudad[ao]';
+  // Italiano e inglese a parte perché la preposizione del valore nuovo è diversa («in»/«a», «to»): VERBI_CAMBIO.
+  const CAMBI_IT = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|sostituit[ao]|rimpiazzat[ao]|settat[ao]'
+    + '|passat[ao]|messa|messo|cambia|cambiano|passa|passano';
+  const CAMBI_EN = 'changed|set|updated|reset|replaced';
+  const CAMBI = `${CAMBI_IT}|${CAMBI_EN}|chang[ée]e?|modifi[ée]e?|cambiad[ao]|modificad[ao]|actualizad[ao]|mudad[ao]`;
   // Dopo chi l'ha cambiata la preposizione porta al valore nuovo, anche «da … a …» e «con …»; in tedesco il verbo
   // viene dopo il valore («das Passwort in «…» geändert»).
   const VERSO = 'in|a|to|into|con|with|da|from|en|à|por';
