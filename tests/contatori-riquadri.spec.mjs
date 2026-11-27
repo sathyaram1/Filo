@@ -198,7 +198,7 @@ test('nell’Editor il titolo automatico riscritto a mano conta quando, e l’Ai
   await expect.poll(() => voceOra(app, 'editor_titolo', 'automatico'), { timeout: 10_000 }).toEqual({ applicato: 1 });
 
   await page.click('#docSwitch', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  await menuDi(page).scegli('Rinomina');
   const campo = page.locator('.ed-doc-title-input');
   await campo.fill('Appunti di Mario');
   await campo.press('Enter');
