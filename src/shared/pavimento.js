@@ -1248,7 +1248,8 @@
     if (!s.includes('|')) return null;
     let cambiato = false;
     const righe = s.split('\n').map((riga) => {
-      if (riga.length > 2000 || !/^[ \t]*\|/.test(riga)) return riga;
+      // Anche la tabella senza la barra in testa («CVV: | 123»), come per la password.
+      if (riga.length > 2000 || !/^[ \t]*\||^[^|]{1,80}[:：=][ \t]*\|/.test(riga)) return riga;
       let r = riga.replace(/(?<=[:：=][ \t]*)\|(?=[ \t]*[^|\s])/g, ' ');
       const celle = r.trim().replace(/^\||\|$/g, '').split('|');
       const piene = celle.filter((c) => c.trim());
