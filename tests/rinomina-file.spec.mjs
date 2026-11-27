@@ -127,9 +127,8 @@ test('tasto destro su un file trovato in chat → «Dai un nome sensato»: nome 
     await expect(chip.locator('.dash-file-btn-nome')).toHaveText('scan_00231.pdf', { timeout: 15000 });
 
     await chip.click({ button: 'right' });
-    const voce = page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' });
-    await expect(voce).toBeVisible();
-    await voce.click();
+    await expect(menuDi(page).voce('Dai un nome sensato')).toHaveCount(1);
+    await menuDi(page).scegli('Dai un nome sensato');
 
     const riquadro = page.locator('.sn-rinomina');
     const campo = riquadro.locator('.sn-rinomina-campo');
