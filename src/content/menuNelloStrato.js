@@ -270,7 +270,12 @@
   };
   Menu.refreshIconRow = (items, o) => {
     if (!acceso()) return locale.refreshIconRow(items, o);
-    if (corrente) aggiorna(corrente, 'riga', { items: D.descrivi(items || [], opDi(corrente)), vuota: !!(o && o.vuota) });
+    if (corrente) {
+      aggiorna(corrente, 'riga', {
+        items: D.descrivi(perLoStrato(items), opDi(corrente)), vuota: !!(o && o.vuota),
+        altro: D.descrivi(perLoStrato(o && o.altro), opDi(corrente)),
+      });
+    }
   };
   Menu.refreshIconGrid = (items) => {
     if (!acceso()) return locale.refreshIconGrid(items);
