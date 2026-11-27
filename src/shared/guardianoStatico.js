@@ -406,9 +406,10 @@
   const intera = (xs) => `(?<!${FUORI_LATINO})(?:${xs.map((w) => w.replace(/ /g, '[ \\t]+')).join('|')})(?!${FUORI_LATINO})`;
   const AUSILIARE_CAMBIO = `(?:${intera(['è', "e'", 'e’', 'é', 'era', 'sarà', 'ha', 'aveva', 'is', 'was', 'has', 'have', 'had'])}[ \\t]+)?`
     + `(?:${intera(['stata', 'stato', 'been'])}[ \\t]+)?`;
-  const PARTICIPIO_IT = intera(VERBI_CAMBIO.participi);
-  const PARTICIPIO_EN = intera(VERBI_CAMBIO.participiInglesi);
-  const PARTICIPIO_CAMBIO = intera([...VERBI_CAMBIO.participi, ...VERBI_CAMBIO.participiInglesi]);
+  const interaRe = (re) => `(?<!${FUORI_LATINO})(?:${re})(?!${FUORI_LATINO})`;
+  const PARTICIPIO_IT = interaRe(CAMBI_IT);
+  const PARTICIPIO_EN = interaRe(CAMBI_EN);
+  const PARTICIPIO_CAMBIO = interaRe(`${CAMBI_IT}|${CAMBI_EN}`);
   const PASSO = `(?:${PARTICIPIO_IT}[ \\t]+${intera(VERBI_CAMBIO.verso)}|${PARTICIPIO_EN}[ \\t]+${intera(VERBI_CAMBIO.versoInglese)})`;
   const CLITICO = `l['’][ \\t]*${intera(['ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno'])}[ \\t]+`;
   const PRESENTE = intera(['è', "e'", 'e’', 'é', 'is']);
