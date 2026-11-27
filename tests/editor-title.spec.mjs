@@ -299,7 +299,7 @@ test('un documento nuovo non prende titolo o riassunto dal testo di quello apert
   // Lo stesso per il riassunto chiesto a mano: a metà si apre un documento nuovo, vuoto.
   await page.evaluate(() => { window.__trattieni = true; });
   await page.click('#docSwitch', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Rigenera riassunto', { exact: true }).click();
+  await menuDi(page).scegli('Rigenera riassunto');
   await expect.poll(() => page.evaluate(() => window.__inAttesa.length)).toBe(1);
   await page.click('#docSwitch');
   await page.click('#docNew');
