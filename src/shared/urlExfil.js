@@ -447,9 +447,8 @@
       if (/^[:=]+$/.test(w) || (G && G.ANNUNCI.includes(t))) { annunciato = true; continue; }
       if (avverbio && avverbio.test(t)) continue;
       // Fra virgolette il valore è tutto quello che chiudono, anche con gli spazi: «prova «Mela! Verde77»».
-      const q = new RegExp(FRA_VIRGOLETTE.source, 'uy');
-      q.lastIndex = da;
-      const fra = q.exec(seguito);
+      VIRGOLETTE_QUI.lastIndex = da;
+      const fra = VIRGOLETTE_QUI.exec(seguito);
       if (fra) return fra[3].length >= 4 ? { valore: fra[3], regola: 'password', rinvio: true } : null;
       const cifre = /\d/.test(t);
       if (cifre) return soloAlnum(t).length >= 4 ? { valore: t, regola: 'codice', rinvio: true } : null;
