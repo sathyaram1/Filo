@@ -164,9 +164,13 @@ test('il tasto destro sul titolo espone "Rigenera riassunto" e rigenerarlo aggio
   await stubAI(page, 'Riassunto rigenerato a mano.');
 
   await page.click('#docSwitch', { button: 'right' });
-  const menu = page.locator('.ed-title-ctxmenu');
-  await expect(menu).toBeVisible();
-  await expect(menu.getByText('Rigenera riassunto', { exact: true })).toHaveCount(1);
+  // A icone (#2555): «Rigenera riassunto» è la variante dell'icona «Rigenera titolo», nel suo menu.
+  const menu = menuDi(page);
+  const rigenera = menu.icona('reload');
+  await expect(rigenera).toHaveAttribute('aria-label', 'Rigenera titolo');
+  await rigenera.click({ button: 'right' });
+  await expect(menu.sottomenu.locator('.sn-menu-item', { hasText: 'Rigenera riassunto' })).toHaveCount(1);
+  await page.keyboard.press('Escape');
 
   // Scrive un po' di testo, poi rigenera il riassunto dal menu (nessuna soglia).
   await page.evaluate(() => {
