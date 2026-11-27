@@ -14,11 +14,18 @@ const ACCESO = 0x31;
 const SPENTO = 0x30;
 const BLOCCO = 4 * 1024 * 1024;
 
+// L'app del Mac che contiene l'eseguibile (o l'app stessa), null fuori dal Mac: il file da spegnere e quello da
+// rifirmare escono da qui, perché un conto diverso firmerebbe il posto sbagliato.
+function appDelMac(eseguibile) {
+  const p = String(eseguibile || '');
+  if (p.endsWith('.app')) return p;
+  return /\.app[\\/]Contents[\\/]MacOS[\\/]/.test(p) ? p.split(/[\\/]Contents[\\/]MacOS[\\/]/)[0] : null;
+}
+
 // Il file che porta il filo: su Mac il framework dentro l'app, altrove l'eseguibile.
 function fileDelFilo(eseguibile) {
-  const p = String(eseguibile || '');
-  const app = p.endsWith('.app') ? p : (/\.app[\\/]Contents[\\/]MacOS[\\/]/.test(p) ? p.split(/[\\/]Contents[\\/]MacOS[\\/]/)[0] : null);
-  return app ? path.join(app, 'Contents', 'Frameworks', 'Electron Framework.framework', 'Electron Framework') : p;
+  const app = appDelMac(eseguibile);
+  return app ? path.join(app, 'Contents', 'Frameworks', 'Electron Framework.framework', 'Electron Framework') : String(eseguibile || '');
 }
 
 // Le posizioni del byte del fusibile, una per filo (due in un binario universale del Mac).
