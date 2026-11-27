@@ -568,6 +568,8 @@ function ripiegoDaDire(kf) {
 // Il main side è in src/main/ipc.js, qui esponiamo handleStream.
 
 async function handleStream({ action, payload, origin, onDelta, onMeta, onReset, signal }) {
+  // «Trascrivi» su un audio (#1660): il riquadro della risposta riceve la trascrizione a pezzi, non una chat.
+  if (action === ACTIONS.TRANSCRIBE_AUDIO) return require('./trascriviMedia').inStreaming({ payload, origin, signal, onDelta, onMeta });
   const settings = await getEffectiveSettings();
   const model = modelForAction(settings, action);
   let messages = await buildMessages(action, payload);
