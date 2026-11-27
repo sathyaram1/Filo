@@ -522,7 +522,9 @@ window.addEventListener('load', () => {
   expect({ a: e.a, b: e.b, regole: e.regole }, 'i pixel delle foto e le regole dello stile non si leggono').toEqual({ a: 'SecurityError', b: 'SecurityError', regole: 'SecurityError' });
   expect(e.nota, 'un file di testo non gira come script').toBe('NO');
   expect(e.errori.length, 'lo script di chiavi è girato e ha dato errore').toBeGreaterThan(0);
-  expect(e.errori.join(' | '), 'l\'errore dello script arriva senza testo').not.toMatch(/chiave-/);
+  // Un errore eseguito nomina solo la prima parola della chiave: si chiede il messaggio muto di un browser, intero.
+  expect(e.errori.map((m) => m.trim()), 'l\'errore dello script arriva senza testo').toEqual(e.errori.map(() => 'Script error.'));
+  expect(e.errori.join(' | ')).not.toMatch(/chiave|TOKEN/);
 });
 
 // Come in un browser: script modulo e risorse marcate crossorigin chiedono un permesso che un file non dà. La novità
