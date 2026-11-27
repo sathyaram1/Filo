@@ -638,8 +638,9 @@
   // perché «Account -> Password -> Cambia» è un percorso di menu (#2678.7).
   const FRECCIA = '(?:-{1,2}>|=>|[⇒➔➜])';
   const UNA_FRECCIA = new RegExp(`^(?:${FRECCIA}|[-–—→])$`);
-  // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra.
-  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*(${FRECCIA}|[:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
+  // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra;
+  // le celle vuote in mezzo si saltano, e una barra protetta («\|») è della password (#2673.10).
+  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*(${FRECCIA}|[:：=][ \\t]*\\|(?:[ \\t]*\\|)*|[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*((?:\\\\\\||[^\\n|\\t])*)`, 'gid');
   // Il verbo di cambio vale quanto «è» («la password diventa …», «ho cambiato la password in …», #2714).
   const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:(?:[ \\t]+|${VIRGOLA_CEST})${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*|${CAMBIO}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=]?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
