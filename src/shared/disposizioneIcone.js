@@ -280,6 +280,7 @@
   function nome(id) {
     const d = descrizione(id);
     if (!d) return String(id || '');
+    if (d.nome) return d.nome;
     const I = global.SN_I18N;
     const t = I && typeof I.t === 'function' ? I.t(d.etichetta) : '';
     return t && t !== d.etichetta ? t : id;
