@@ -6,14 +6,15 @@ import { menuDi, statoCronologia } from './menuContestuale.mjs';
 
 export { statoCronologia };
 
-// Tasto destro vero sul campo, poi la freccetta di Incolla: ritorna lo stato del pannello aperto.
+// Tasto destro vero sul campo, poi il tasto destro sull'icona Incolla, il cui menu è la cronologia (#2555): ritorna lo
+// stato del pannello aperto.
 export async function apriCronologia(app, page, campo) {
   await page.locator(campo).click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.pannelli.first()).toBeVisible();
-  const freccia = menu.locator('.sn-menu-paste-arrow');
-  await expect(freccia).toBeVisible();
-  await freccia.click();
+  const incolla = menu.incolla;
+  await expect(incolla).toBeVisible();
+  await incolla.click({ button: 'right' });
   return cronologiaPronta(app, page);
 }
 
