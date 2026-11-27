@@ -540,6 +540,7 @@ function formeLibere(testo) {
   // una password, un numero («prova 4821», come «il pin è 4821») o fra virgolette con gli spazi; di sole lettere la prende
   // il correttore dalla sua lettura, che sa quali parole spiegano.
   for (const v of X.segretiDetti(l)) if (v.rinvio) out.push(...(/\s/.test(v.valore) || /^\d+$/.test(v.valore) ? [v] : forma(v.valore)));
+  out.push(...primaDelNome(l));
   return out;
 }
 
