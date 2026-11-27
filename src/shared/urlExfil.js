@@ -463,8 +463,7 @@
       da = seguito.indexOf(w, da);
       const t = pulita(w);
       if (/^[:=]+$/.test(w) || (G && G.ANNUNCI.includes(t)) || ANNUNCI_QUI.test(t)) { annunciato = true; continue; }
-      if (k < duePunti) continue;
-      if (k === duePunti) { annunciato = true; if (!t || /^[:=]+$/.test(t)) continue; }
+      if (k <= duePunti) { annunciato = k === duePunti; continue; }
       if (avverbio && avverbio.test(t)) continue;
       // Fra virgolette il valore è tutto quello che chiudono, anche con gli spazi: «prova «Mela! Verde77»».
       VIRGOLETTE_QUI.lastIndex = da;
