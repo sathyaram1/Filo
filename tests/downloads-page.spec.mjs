@@ -9,6 +9,7 @@
 // l'URL non esisterebbe → rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 import { createServer } from 'node:http';
 import { existsSync, readdirSync } from 'node:fs';
 
