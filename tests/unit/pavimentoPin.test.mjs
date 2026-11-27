@@ -193,3 +193,117 @@ test('accanto al PIN un numero che non ha la sua forma resta', () => {
     ['il cvv è 123 e 4567890 il conto', `il cvv è ${S} e 4567890 il conto`],
   ]) assert.equal(P.oscura(frase), atteso, frase);
 });
+
+// #1403.91 — un codice di sblocco con le lettere arrivava intero al modello.
+test('il PIN o il codice di sblocco con le lettere diventa il segnaposto, anche minuscolo e corto', () => {
+  for (const [frase, atteso] of [
+    ['Il codice di sblocco è 48A9', `Il codice di sblocco è ${S}`],
+    ['Il pin è 48A9', `Il pin è ${S}`],
+    ['Il codice di sblocco è Mela77', `Il codice di sblocco è ${S}`],
+    ['Il codice del mio telefono è Mela77', `Il codice del mio telefono è ${S}`],
+    ['Il pin del telefono è «48a9»', `Il pin del telefono è «${S}»`],
+    ['My unlock code is 48a9', `My unlock code is ${S}`],
+    ['Unlock code: Mela77', `Unlock code: ${S}`],
+    ['El código de desbloqueo es Mela77', `El código de desbloqueo es ${S}`],
+    ['Der Entsperrcode ist Mela77', `Der Entsperrcode ist ${S}`],
+    ['Il codice di accesso è ab12cd', `Il codice di accesso è ${S}`],
+    ['Mela77 è il codice del mio telefono', `${S} è il codice del mio telefono`],
+    ['Per sbloccare il mio telefono uso Mela77', `Per sbloccare il mio telefono uso ${S}`],
+    ['Il codice del mio telefono è 4821, quello del pc è Pc2024x', `Il codice del mio telefono è ${S}, quello del pc è ${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+});
+
+test('una parola con le cifre che non è il codice che sblocca resta', () => {
+  for (const frase of ['Il codice prodotto è AB12', 'Il codice è 48A9', 'Il codice cliente è AB12CD', 'Il codice sconto è SALDI20',
+    'Accedi e inserisci il codice prodotto Ab12', 'Il codice di sblocco è nel file config2.txt', 'Codice di accesso: config2.txt',
+    'Il codice del mio telefono è semplice', 'Il pin è stato cambiato ieri']) assert.equal(P.oscura(frase), frase, frase);
+  assert.equal(P.oscura('Codice di sblocco iPhone15: 4821'), `Codice di sblocco iPhone15: ${S}`);
+  assert.equal(P.oscura('Il codice di sblocco del mio iPhone13 è 4821'), `Il codice di sblocco del mio iPhone13 è ${S}`);
+});
+
+// #1403.91 giro 1: dove il codice di sole cifre sparisce, sparisce anche quello con le lettere.
+test('il codice con le lettere sparisce col telefono chiamato per marca e col blocco schermo, come quello di cifre', () => {
+  for (const cornice of ['Il codice del mio Samsung è X', 'Il codice del mio Galaxy è X', 'Il codice del mio Huawei è X',
+    'Il codice del mio Xiaomi è X', 'Il codice del mio Pixel è X', 'Il codice del mio Android è X', 'Il codice del mio Motorola è X',
+    'Il codice di blocco schermo è X', 'Il codice del blocco schermo è X', 'Il codice della schermata di blocco è X',
+    'my Samsung code is X', 'Per sbloccare il mio Samsung uso X']) {
+    for (const codice of ['4821', '48A9', 'Mela77']) {
+      const frase = cornice.replace(/X$/, codice);
+      assert.equal(P.oscura(frase), cornice.replace(/X$/, S), frase);
+    }
+  }
+  for (const frase of ['Il codice di errore del mio Samsung è E404', 'Il codice del modello del mio Samsung è SM-G991B',
+    'Il codice prodotto del mio Huawei è AB12CD', 'il codice del pixel è FF00AA', 'Il codice colore del pixel è A1B2C3',
+    'Il codice del blocco try è x1y2']) assert.equal(P.oscura(frase), frase, frase);
+});
+
+test('il codice di sblocco coi simboli di una password sparisce intero', () => {
+  for (const codice of ['M3l@77!', 'Mela77!', 'mela-77', 'Mela_77', '48A9#']) {
+    for (const cornice of ['Il codice di sblocco è X', 'Il pin del telefono è X', 'Il codice del mio telefono è X']) {
+      assert.equal(P.oscura(cornice.replace('X', codice)), cornice.replace('X', S), cornice.replace('X', codice));
+    }
+  }
+  for (const [frase, atteso] of [
+    ['Il codice di sblocco è Mela77.', `Il codice di sblocco è ${S}.`],
+    ['Il codice di sblocco è Mela77?', `Il codice di sblocco è ${S}?`],
+    ['pin=48A9', `pin=${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+  for (const frase of ['Inserisci il codice di sblocco: mario77@gmail.com', 'Il codice di sblocco è nel file config2.txt']) {
+    assert.equal(P.oscura(frase), frase, frase);
+  }
+});
+
+test('il codice con le lettere dato in risposta nella riga sotto sparisce, come quello di cifre', () => {
+  for (const [frase, atteso] of [
+    ['Qual è il codice di sblocco del tuo telefono?\nMela77', `Qual è il codice di sblocco del tuo telefono?\n${S}`],
+    ['Qual è il pin del tuo telefono?\nLuc: 48A9', `Qual è il pin del tuo telefono?\nLuc: ${S}`],
+    ['Qual è il codice di sblocco del tuo telefono?\nTe lo dico dopo\nMela77', `Qual è il codice di sblocco del tuo telefono?\nTe lo dico dopo\n${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+});
+
+test('in un elenco di codici di sblocco sparisce anche quello con le lettere', () => {
+  for (const [frase, atteso] of [
+    ['Il codice di sblocco è Mela77 e Pera88', `Il codice di sblocco è ${S} e ${S}`],
+    ['I pin sono 4829 e 48A9', `I pin sono ${S} e ${S}`],
+    ['Il codice di sblocco è Mela77, Pera88 o 4821', `Il codice di sblocco è ${S}, ${S} o ${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+  assert.equal(P.oscura('Il codice di sblocco è Mela77 e poi apri Wifi5'), `Il codice di sblocco è ${S} e poi apri Wifi5`);
+});
+
+// #1403.91 giro 2: le marche sono un elenco solo, il modello col numero è del telefono, le congiunzioni sono quelle del
+// guardiano, e le sigle che non aprono niente restano.
+test('il codice con le lettere sparisce con ogni marca, col modello e con l\'abbreviazione, come quello di cifre', () => {
+  for (const cornice of ['Il codice del mio Galaxy S23 è X', 'Il codice del mio Samsung A52 è X', 'Il codice del mio Redmi Note 12 è X',
+    'Il codice del mio Moto G è X', 'Il codice del mio Honor è X', 'Il codice del mio Sony è X', 'Il codice del mio LG è X',
+    'Il codice del mio Vivo è X', 'Il codice del mio Alcatel è X', 'Il codice del mio Galaxy Tab è X', 'Il codice del mio Surface è X',
+    'Il codice del mio iMac è X', 'Il codice del mio Dell è X', 'Il codice del mio Windows è X', 'Codice sblocco tel. X', 'PIN cell. X']) {
+    for (const codice of ['4821', 'Mela77', 'M3l@77!']) {
+      const frase = cornice.replace(/X$/, codice);
+      assert.equal(P.oscura(frase), cornice.replace(/X$/, S), frase);
+    }
+  }
+  assert.equal(P.oscura('La mia moto è rossa, il pin è 4821'), `La mia moto è rossa, il pin è ${S}`);
+});
+
+test('in un elenco il codice con le lettere sparisce con le congiunzioni di quello di cifre', () => {
+  for (const [frase, atteso] of [
+    ['I pin sono 4829 oppure 48A9', `I pin sono ${S} oppure ${S}`],
+    ['I pin sono 4829 ma anche 48A9', `I pin sono ${S} ma anche ${S}`],
+    ['Il pin è 4829 i 48A9', `Il pin è ${S} i ${S}`],
+    ['Il pin è 4829 - Mela77', `Il pin è ${S} - ${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+  assert.equal(P.oscura('Il pin è Mela77 e domani vado a Roma2024'), `Il pin è ${S} e domani vado a Roma2024`);
+});
+
+test('il pin di una scheda e la sigla di un modello restano, se la frase non parla di sblocco', () => {
+  for (const frase of ['Il pin del relè è PB13, perché non scatta?', 'Il pin di reset è RST1', 'The pin is PA10',
+    'Il pin del display è SDA1', 'Il pin del led è GPIO13', 'Il codice del mio Samsung è SM-A525F, quale cover compro?',
+    'Il codice del mio portatile è i7-1255U']) assert.equal(P.oscura(frase), frase, frase);
+  assert.equal(P.oscura('Il codice di sblocco è PB13'), `Il codice di sblocco è ${S}`);
+});
+
+test('la forma del codice con le lettere resta lineare su una riga lunga di simboli', () => {
+  const riga = `Il codice di sblocco è ${'a!'.repeat(30000)}`;
+  const c = costoInUnita(() => P.oscura(riga), { tetto: 60 });
+  assert.ok(c.entro, c.come);
+});
