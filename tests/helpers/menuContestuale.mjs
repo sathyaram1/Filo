@@ -35,6 +35,13 @@ export function menuDi(scheda) {
   const piu = locator('.sn-menu-griglia .sn-menu-row-overflow');
   // Il gesto dell'utente: un'azione rara sta dietro il «+», e prima di cliccarla si apre il «+» (#2555).
   // Un nome che non è un'icona è una variante: sta nel menu di un'icona dello stesso verbo, e la si cerca lì.
+  // Il menu di un'icona si chiude con la freccia a sinistra (Esc chiuderebbe tutto): sennò copre le icone accanto.
+  async function chiudiSub() {
+    const prima = locator('.sn-menu-sub .sn-menu-item').first();
+    if (!(await prima.isVisible().catch(() => false))) return;
+    await prima.press('ArrowLeft');
+    await locator('.sn-menu-sub').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
+  }
   // Apre uno dopo l'altro i menu delle icone che hanno varianti, finché uno ha `testo`: la voce, col suo menu aperto.
   async function fraLeVarianti(testo) {
     const conVarianti = locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia [data-sn-varianti="1"]:not([data-sn-verbo="paste"])');
@@ -43,6 +50,7 @@ export function menuDi(scheda) {
       await locator('.sn-menu-sub').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
       const sub = locator('.sn-menu-sub .sn-menu-item', { hasText: testo }).first();
       if (await sub.isVisible().catch(() => false)) return sub;
+      await chiudiSub();
     }
     return null;
   }
