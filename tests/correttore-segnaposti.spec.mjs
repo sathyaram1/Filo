@@ -606,7 +606,7 @@ test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice,
   await page.waitForTimeout(4500);
   expect(await globale(app, '__ragionate'), 'mentre si scrive non parte niente').toEqual([]);
   await page.locator('#ta').click({ button: 'right' });
-  await menuDi(page).voce('Controlla').click();
+  await menuDi(page).scegli('Controlla');
   await expect.poll(async () => (await globale(app, '__ragionate')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 5000 });
   await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 5000 });
