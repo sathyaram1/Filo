@@ -122,7 +122,8 @@
   const NOME_PIN = new RegExp(`\\b${NOMI_DEL_PIN}\\b`, 'i');
   // L'elenco degli apparecchi il cui codice li sblocca è uno solo (#1403.44): la frase col possessivo, l'etichetta senza
   // e il nome attaccato a «code» («Handycode», «Gerätecode») lo leggono da qui.
-  const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
+  // Coi refusi più comuni del telefono («telefno», «telfono»), perché il codice si scrive di fretta.
+  const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|tel[ef]{1,2}f?o?n[oi]|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
     + '|t[ée]l|celus?|cell|compus?|gsms?|smartphones?'
     + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
     + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
@@ -198,7 +199,7 @@
     + '|(?:mein|dein|sein|ihr|unser|eur)\\p{L}*|mijn|jouw|je|uw|zijn|haar|onze?)';
   const APPARECCHIO_SOLO = new RegExp(`^${APPARECCHIO}$`, 'iu');
   // Anche attaccato all'apparecchio, come si scrive in tedesco e olandese: «Handycode», «telefooncode», «Entsperrcode».
-  const NOME_SBLOCCO = '(?:(?:entsperr|sperr|zugangs|toegangs|ontgrendel)?(?:codic[ei]|codes?)|c[óo]digos?|kod(?:u|em|y)?|pin|passcode)';
+  const NOME_SBLOCCO = '(?:(?:entsperr|sperr|zugangs|toegangs|ontgrendel)?(?:codic[ei]|codes?)|c[óo]digos?|kod(?:u|em|y)?|pin|puk|passcode)';
   const LEGAME_SBLOCCO = '(?:di|del|della|dello|dei|degli|delle|per|of|for|on|to|in|the|de|du|des|do|da|dos|das|para|pour|sur|en|von|vom|f[üu]r|zu|zum'
     + '|auf|der|van|voor|op|het|od|dla|na|w|la|le|les|il|lo|el|los|las|o|a|os|as|al|alla|sul|sulla|nel|nella|au|à|om|te)';
   // La parola che dice a cosa serve il codice, fra il nome e l'apparecchio: le parole che già tengono segreto un codice
@@ -231,9 +232,10 @@
   const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])(?:${CHIUDE_VERO})?\\s*$`, 'iu');
   const SOLO_DOPO_IL_NOME = new RegExp(`^(?:${CHIUDE_VERO})?\\s*$`, 'iu');
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
-  // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung», «13»): elencate, perché dopo
+  // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung», «13», «mio»): elencate, perché dopo
   // «phone» può venire «number»; e solo col verbo dopo: «codice del mio telefono nuovo serie 71034» è un altro dato.
-  const DOPO_APPARECCHIO = '(?:\\s+(?:(?:di|de|da|du|del|of|for|para|pour|f[üu]r)\\s+)?(?:nuov\\p{L}*|vecchi\\p{L}*|aziendal\\p{L}*|personal\\p{L}*'
+  const DOPO_APPARECCHIO = '(?:\\s+(?:(?:di|de|da|du|del|of|for|para|pour|f[üu]r)\\s+)?(?:mi[oaei]|tu[oaei]|su[oaei]|nostr[oaei]|vostr[oaei]'
+    + '|nuov\\p{L}*|vecchi\\p{L}*|aziendal\\p{L}*|personal\\p{L}*'
     + '|privat\\p{L}*|fisso|portatile|principale|attuale|lavoro|ufficio|casa|nuev\\p{L}*|viej\\p{L}*|trabajo|nouve(?:au|l|lle)|vieux|ancien\\p{L}*'
     + '|travail|bureau|perso|pro|professionnel\\p{L}*|new|old|work|office|home|current|main|neu\\p{L}*|alt\\p{L}*|arbeit|dienst\\p{L}*|nieuw\\p{L}*'
     + '|oud\\p{L}*|werk|novo|nova|antigo|velho|móvil|movil|portable|cellulare|celular|samsung|galaxy|iphone|pixel|xiaomi|redmi|huawei|honor'
@@ -257,18 +259,36 @@
     + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
   const NUCLEO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${NUCLEO}`, 'iu');
   // Lo sblocco detto col verbo, senza «codice»: «Per sbloccare il mio telefono uso 6118», «I unlock my phone with 6215».
+  // Anche col nome dello sblocco al posto del codice: «Lo sblocco del mio telefono è 4829».
+  const COL_NUMERO = '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)\\s*[:=]?';
   const SBLOCCO_COL_NUMERO = new RegExp(`(?<![\\p{L}])${SBLOCCA}\\s+(?:${LEGAME_SBLOCCO}\\s+)*(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}`
-    + '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)'
-    + `\\s*[:=]?\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
+    + `(?:${COL_NUMERO}|${CHIUDE_VERO})\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
+  // L'apparecchio prima del verbo: «Il mio telefono si sblocca con 4829», «My phone unlocks with 6215».
+  const APPARECCHIO_SI_SBLOCCA = new RegExp(`(?<![\\p{L}])(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}(?:\\s+(?:si|se|sich|zich|się))?\\s+${SBLOCCA}`
+    + `${COL_NUMERO}\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
+  // Le cifre staccate dopo l'etichetta del proprio apparecchio («Il codice del mio telefono è 48 29»): da quattro a otto.
+  // Si parte dalle cifre e si guarda l'etichetta prima, come per il codice intero: un testo lungo resta lineare.
+  const CIFRE_STACCATE = /(?<![\d\p{L}])\d{1,4}(?:[ .-]\d{1,4}){1,7}(?![\d\p{L}])/gu;
   // Le regole lunghe partono solo dove c'è un apparecchio: su una riga di 120.000 caratteri senza, costerebbero secondi.
   const UN_APPARECCHIO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${APPARECCHIO}`, 'iu');
   function codiceDelMioApparecchio(s, out) {
     if (!UN_APPARECCHIO_NEL_TESTO.test(s)) return;
     for (const m of s.matchAll(QUELLO_DEL_MIO)) {
-      if (NUCLEO_NEL_TESTO.test(s.slice(Math.max(0, m.index - 200), m.index))) out.push({ valore: m[1], regola: 'codice' });
+      if (NUCLEO_NEL_TESTO.test(s.slice(Math.max(0, m.index - 200), m.index))) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
     }
-    for (const m of s.matchAll(SBLOCCO_COL_NUMERO)) out.push({ valore: m[1], regola: 'codice' });
+    for (const re of [SBLOCCO_COL_NUMERO, APPARECCHIO_SI_SBLOCCA]) {
+      for (const m of s.matchAll(re)) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
+    }
+    for (const m of s.matchAll(CIFRE_STACCATE)) {
+      const n = m[0].replace(/\D/g, '').length;
+      if (n < 4 || n > 8) continue;
+      const prima = s.slice(Math.max(0, m.index - 160), m.index).replace(/["«“]\s*$/, '');
+      if (delMioApparecchio(prima) || etichettaSbloccabile(prima)) out.push(conCheApre({ valore: m[0], regola: 'codice' }, true));
+    }
   }
+  // `apre`: il codice di qualcosa che apre (il mio telefono, il cancello, la carta). Il controllo delle uscite prende
+  // questi, la password e il CVV (guardianoStatico.js, segretiInUscita); il resto lo legge con le sue forme.
+  const conCheApre = (x, apre) => (apre ? Object.assign(x, { apre: true }) : x);
   // «The serial code of my phone»: un nome comune davanti a «code» ne fa un identificativo, come nell'etichetta inglese.
   const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
   const DAVANTI_AL_NOME = /^(?:il|lo|la|le|el|un|the|and|gli|una|une|uno|los|las|der|die|das|den|dem|des|het|een|ein\w*|unlock|lock|screen|access|pin|puk|sim|what|what['’]?s|here|ecco|anche|also|plus)$/i;
@@ -454,7 +474,7 @@
               // Un pezzo di un numero più lungo («+39 333 1234567», «Chiama 02 4829 1736») è un telefono, non il codice;
               // così le cifre finali di un numero coperto o annunciate come tali («al ***4567», «che termina con 4567»).
               if (/(?:\+|\d)[ .]?$/.test(prima) || FINE_DI_UN_NUMERO.test(prima)) continue;
-              out.push({ valore: v, regola: 'codice' });
+              out.push(conCheApre({ valore: v, regola: 'codice' }, (chiave.apre && !chiave.pin) || (!nome && perAprire)));
             }
           }
         }

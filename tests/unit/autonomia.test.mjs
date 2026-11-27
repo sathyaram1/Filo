@@ -810,6 +810,63 @@ test('segreti: controlli deterministici, che non gridano al lupo', () => {
   assert.deepEqual(A.segretoDettaglio('La mia password è Gatto!2024 e non entra.', { richiesta: 'la mia password è Gatto!2024' }).valori, ['Gatto!2024']);
 });
 
+// #1403.89 — il codice di ciò che si apre, che il pavimento toglie ai modelli, non esce nemmeno da un'azione: non
+// scritto dall'utente è un no, scritto da lui vuole la parola.
+test('il codice del mio telefono o del cancello non esce da un\'azione senza la parola', () => {
+  for (const frase of ['Il codice del mio telefono è 4829', '4829 è il codice del mio telefono', 'my phone code is 4829',
+    'Le code de mon téléphone est 4829', 'Per sbloccare il mio telefono uso 4829', 'Il codice del cancello è 4829',
+    'Il codice del mio telefono è 1111. Quello del pc è 4829']) {
+    for (const action of [{ type: 'CERCA_WEB', query: frase }, { type: 'NAVIGA', url: `https://modulo.example/invia?t=${encodeURIComponent(frase)}` }]) {
+      const ing = AL.ingressi(action, {});
+      assert.equal(ing.costo, A.COSTO_MAX, `${action.type}: ${frase}`);
+      assert.equal(ing.chiesta, false, `${action.type}: ${frase}`);
+      assert.equal(risposta(action), 'no', `${action.type}: ${frase}`);
+      assert.equal(risposta(action, { richiesta: `scrivi: ${frase}` }), 'conferma', `${action.type}: ${frase}`);
+    }
+  }
+  assert.equal(A.segreto('Il codice del mio telefono è 4829'), 'codice');
+  // Scritto dall'utente nel compito esce con la parola, come una sua password.
+  assert.deepEqual(A.segretoDettaglio('Il codice del mio telefono è 4829', { richiesta: 'scrivi che il codice del mio telefono è 4829' }),
+    { tipo: 'codice', scritto: true, valori: ['4829'] });
+  for (const frase of ['il codice del telefono del cliente è 4829', 'my phone number is 3331234567', 'codice prodotto 4829',
+    'il pin del telefono è cambiato 2 volte', 'se il pin è giusto la pagina è 2048']) {
+    assert.equal(A.segreto(frase), '', frase);
+    assert.notEqual(risposta({ type: 'CERCA_WEB', query: frase }), 'no', frase);
+  }
+});
+
+// #1403.89 giro 1 — la password col complemento e il CVV, che il pavimento toglie ai modelli, e il codice del telefono
+// detto senza nominarlo, col possessivo dopo, con un refuso o a cifre staccate: nessuno esce da un'azione senza chiedere.
+test('ciò che il pavimento toglie ai modelli come password, CVV o codice del telefono non esce da un\'azione', () => {
+  const P = require(join(ROOT, 'src', 'shared', 'pavimento.js'));
+  const attesi = {
+    password: ['La password del mio telefono è 4829', 'La password di sblocco del mio telefono è 4829',
+      'The password for my phone is 4829', 'La password del mio computer è Ciao2024', 'La password della mia mail è Ciao2024',
+      'La password del wifi è Casa2024!'],
+    banca: ['Il CVV della mia carta è 123', 'Il codice di sicurezza della carta è 123'],
+    codice: ['Il codice del telefono mio è 4829', 'Lo sblocco del mio telefono è 4829', 'Il mio telefono si sblocca con 4829',
+      'My phone unlocks with 4829', 'Il PUK del mio telefono è 12345678', 'Il codice del mio telefno è 4829',
+      'Il codice del mio telefono è 48 29', 'Il codice del telefono è 4 8 2 9', 'Per aprire il cancello digita 3958'],
+  };
+  for (const [tipo, frasi] of Object.entries(attesi)) {
+    for (const frase of frasi) {
+      assert.equal(A.segreto(frase), tipo, frase);
+      assert.equal(risposta({ type: 'CERCA_WEB', query: frase }), 'no', frase);
+      assert.equal(risposta({ type: 'NAVIGA', url: `https://modulo.example/invia?t=${encodeURIComponent(frase)}` }), 'no', frase);
+      assert.notDeepEqual(P.trova(frase), [], `ai modelli: ${frase}`);
+    }
+  }
+  // Il CVV scritto dall'utente esce come il numero della carta accanto; la sua password vuole la parola.
+  assert.equal(A.segretoDettaglio('Il CVV della mia carta è 123', { richiesta: 'il cvv è 123' }).tipo, '');
+  assert.equal(risposta({ type: 'CERCA_WEB', query: 'La password del mio pc è Ciao2024' }, { richiesta: 'scrivi: la password del mio pc è Ciao2024' }), 'conferma');
+  for (const frase of ['come cambiare la password del wifi', 'la password del mio computer non funziona più', 'il CVV ha 3 cifre',
+    'dove trovo il CVV della carta', 'sblocca il mio telefono senza codice', 'il mio telefono si sblocca da solo',
+    'il numero del mio telefono è 333 123 4567', 'Il mio telefono ha 12 30 foto', 'orari treni 12 30 milano',
+    'ftp://anonymous:guest@x.it/', 'se il pin è giusto la pagina è 2048']) {
+    assert.equal(A.segreto(frase), '', frase);
+  }
+});
+
 // ── nessuna superficie decide da sé ──────────────────────────────────────────
 
 function sorgenti(dir) {

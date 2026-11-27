@@ -583,8 +583,33 @@
     for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
     for (const m of s.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) out.push({ valore: m[1], regola: 'codice' });
     for (const m of s.matchAll(PIN_CON_COMPLEMENTO)) out.push({ valore: m[1], regola: 'codice' });
+    for (const x of codiciDelPavimento(s)) out.push(x);
     out.push(...codiciInElenco(s, out.valori));
     return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
+  }
+  // Il codice di ciò che si apre (il mio telefono, il cancello), la password detta col suo complemento («la password del
+  // mio pc è …») e il CVV non escono da un'azione (#1403.89): le forme sono del pavimento, e qui si chiedono a lui. Gli
+  // altri suoi codici no: «se il pin è giusto la pagina è 2048» lì si toglie, qui fermerebbe l'azione.
+  // La password solo dopo il verbo o il separatore: in «The password war2023 is not valid» il pavimento toglie, qui no.
+  // Il CVV vale la carta: scritto dall'utente esce come il numero accanto.
+  const DAL_PAVIMENTO = {
+    codice: (x) => (x.apre ? 'codice' : ''),
+    password: (x, s) => (passwordInUscita(x.valore)
+      && new RegExp(`(?:[:=：]|${ANNUNCIO})\\s*["'«“„]?${escRe(String(x.valore))}`, 'iu').test(s) ? 'password' : ''),
+    cvv: () => 'carta',
+  };
+  function codiciDelPavimento(s) {
+    if (!global.SN_PAVIMENTO && typeof require === 'function') { try { require('./pavimento.js'); } catch (_) { /* resta senza */ } }
+    const P = global.SN_PAVIMENTO;
+    if (!P || typeof P.trova !== 'function') return [];
+    const out = [];
+    // Il valore di un parametro si legge come una riga sua: «?t=La password del mio pc è …» è la frase, non un campo.
+    const righe = s.replace(/[?&#][\w.%[\]-]{0,64}=/g, '\n');
+    for (const x of P.trova(righe)) {
+      const regola = DAL_PAVIMENTO[x.regola] ? DAL_PAVIMENTO[x.regola](x, righe) : '';
+      if (regola) out.push({ valore: String(x.valore), regola });
+    }
+    return out;
   }
 
   // Un PIN, un codice o un CVV trovato vale per i numeri della stessa forma che lo seguono nella stessa frase: «i pin

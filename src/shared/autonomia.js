@@ -263,7 +263,8 @@
     const valori = [];
     for (const s of trovati(testo)) {
       const v = soloAlnum(s.valore);
-      const suo = v.length >= 4 && chiesto.includes(v);
+      // Il CVV ha tre cifre: lì vale solo come parola intera di ciò che ha scritto l'utente.
+      const suo = v.length >= 4 ? chiesto.includes(v) : v.length === 3 && new RegExp(`(?<![A-Za-z0-9])${v}(?![A-Za-z0-9])`, 'i').test(richiesta);
       if (s.tipo === 'banca' && suo) continue;
       if (!suo) return { tipo: s.tipo, scritto: false, valori: [] };
       if (!tipo) tipo = s.tipo;
