@@ -456,7 +456,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Oltre il listino anche dopo la compattazione, gli esiti dei turni passati escono e restano fuori per il turno.
   let senzaEsitiVecchi = false;
   const componiFilo = (tetti) => ContestoFilo.componi({
-    chatId, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
+    chatId, inVista, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
     immagini: fotoNelTratto && !modelliSenzaFoto.has(modelloChat), senzaEsiti: senzaEsitiVecchi,
   });
   try {
