@@ -55,7 +55,8 @@ test('Taglia nella fila toglie la parola come il sistema: Ctrl+Z la rimette, e v
   await page.evaluate(() => document.getElementById('testo').setSelectionRange(0, 3));
   await page.locator('#testo').click({ button: 'right', position: { x: 8, y: 8 } });
   await expect(fila).toBeVisible();
-  expect(await iconeDellaFila(menu)).toEqual(['campo:cut', 'campo:copy', 'campo:paste']);
+  // La fila di partenza di una casella (#2555, disposizioneIcone.js).
+  expect(await iconeDellaFila(menu)).toEqual(['campo:cut', 'campo:copy', 'campo:paste', 'campo:dictate', 'campo:edit', 'campo:help']);
   await fila.locator('[data-sn-icon-id="campo:cut"]').click();
   await expect.poll(() => appunti(app)).toBe('una');
   await expect.poll(() => page.locator('#testo').inputValue()).toBe(' parola qui');
