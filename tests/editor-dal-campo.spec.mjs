@@ -229,6 +229,8 @@ test('fotogrammi dell\'apertura: nessun fotogramma bianco fra la home e l\'edito
   const hh = area.h - (area.h % 2);
   const rec = spawn('ffmpeg', ['-loglevel', 'error', '-f', 'x11grab', '-framerate', '30', '-video_size', `${w}x${hh}`,
     '-i', `${process.env.DISPLAY}+${area.x},${area.y}`, '-t', '2.2', join(cartella, 'f%03d.png')]);
+  let errore = '';
+  rec.stderr.on('data', (b) => { errore += b; });
   const finito = new Promise((ok) => rec.on('exit', ok));
   await new Promise((r) => setTimeout(r, 300));
   await h.locator('#tieni .dash-carta[data-tipo="editor"] .dash-carta-az.principale').click();
