@@ -200,7 +200,7 @@
     + '|(?:mein|dein|sein|ihr|unser|eur)\\p{L}*|mijn|jouw|je|uw|zijn|haar|onze?)';
   const APPARECCHIO_SOLO = new RegExp(`^${APPARECCHIO}$`, 'iu');
   // Anche attaccato all'apparecchio, come si scrive in tedesco e olandese: «Handycode», «telefooncode», «Entsperrcode».
-  const NOME_SBLOCCO = '(?:(?:entsperr|sperr|zugangs|toegangs|ontgrendel)?(?:codic[ei]|codes?)|c[óo]digos?|kod(?:u|em|y)?|pin|passcode)';
+  const NOME_SBLOCCO = '(?:(?:entsperr|sperr|zugangs|toegangs|ontgrendel)?(?:codic[ei]|codes?)|c[óo]digos?|kod(?:u|em|y)?|pin|puk|passcode)';
   const LEGAME_SBLOCCO = '(?:di|del|della|dello|dei|degli|delle|per|of|for|on|to|in|the|de|du|des|do|da|dos|das|para|pour|sur|en|von|vom|f[üu]r|zu|zum'
     + '|auf|der|van|voor|op|het|od|dla|na|w|la|le|les|il|lo|el|los|las|o|a|os|as|al|alla|sul|sulla|nel|nella|au|à|om|te)';
   // La parola che dice a cosa serve il codice, fra il nome e l'apparecchio: le parole che già tengono segreto un codice
