@@ -623,7 +623,7 @@ test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice,
   await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1 });
   // Ignorato, il valore trovato col clic è un rifiuto di quella ricerca.
   const sulValore = await tastoDestroSu(page, valore(page, '27'));
-  await sulValore.voce('Ignora').click();
+  await sulValore.scegli('Ignora');
   await expect(valore(page, '27')).toHaveCount(0, { timeout: 5000 });
   await expect.poll(() => voceOggi(app, 'correttore_segnaposto', 'su_richiesta'), { timeout: 5000 }).toEqual({ cercato: 1, trovato: 1, rifiutato: 1 });
 });
