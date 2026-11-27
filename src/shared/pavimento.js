@@ -650,20 +650,39 @@
     return DESCRIVE.test(p[i]) || misuraODate(p);
   };
   function fraVirgolette(s, out) {
-    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE]) {
-      for (const m of s.matchAll(re)) {
-        const k = m.groups.d !== undefined ? 'd' : 's';
-        const v = m.groups[k].trim();
-        if (!v || v.startsWith('[') || v.includes(SEGNAPOSTO)) continue;
-        const parole = v.split(/\s+/);
-        const separato = re === VIRGOLETTATO_DOPO && !UNA_FRECCIA.test(m.groups.sep || '');
-        if (parole.length > 1) {
-          if (separato ? !descrive(parole) : FORMA_FORTE(v)) out.push({ valore: v, regola: 'password' });
-          continue;
-        }
-        const p = valorePassword(v);
-        if (p && (separato || FORMA_FORTE(p))) out.push(alPosto(p, m.indices.groups[k][0], m.groups[k]));
+    const prendi = (m, separato) => {
+      const k = m.groups.d !== undefined ? 'd' : 's';
+      const v = m.groups[k].trim();
+      if (!v || v.startsWith('[') || v.includes(SEGNAPOSTO)) return false;
+      const parole = v.split(/\s+/);
+      if (parole.length > 1) {
+        if (!(separato ? !descrive(parole) : FORMA_FORTE(v))) return false;
+        out.push({ valore: v, regola: 'password' });
+        return true;
       }
+      const p = valorePassword(v);
+      if (!p || !(separato || FORMA_FORTE(p))) return false;
+      out.push(alPosto(p, m.indices.groups[k][0], m.groups[k]));
+      return true;
+    };
+    const fini = [];
+    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE, VIRGOLETTATO_PONTE, VIRGOLETTATO_DOMANDA]) {
+      for (const m of s.matchAll(re)) {
+        const separato = (re === VIRGOLETTATO_DOPO && !UNA_FRECCIA.test(m.groups.sep || '')) || re === VIRGOLETTATO_PONTE;
+        if (prendi(m, separato)) fini.push(m.index + m[0].length);
+      }
+    }
+    for (let fine of fini) {
+      for (let giri = 0; giri < 8; giri++) {
+        SEGUITO.lastIndex = fine;
+        const m = SEGUITO.exec(s);
+        if (!m || (m.groups.gap && ALTRO_CAMPO.test(m.groups.gap)) || !prendi(m, true)) break;
+        fine = m.index + m[0].length;
+      }
+    }
+    for (const m of s.matchAll(RISPOSTA_NUDA)) {
+      const v = formaVicina(m[1]);
+      if (v) out.push({ valore: v, regola: 'password' });
     }
   }
 
