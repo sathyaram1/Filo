@@ -253,12 +253,14 @@ test('hover e tasto destro su ogni carta; la stessa mossa si chiede a Filo a par
     await carta.hover();
     await expect(carta.locator('.dash-carta-mani')).toHaveCSS('opacity', '1');
     await carta.click({ button: 'right', position: { x: 30, y: 12 } });
-    const menu = page.locator('.dash-menu');
-    await expect(menu).toBeVisible();
-    await expect(menu.locator('.dash-menu-voce', { hasText: 'Apri nel filo' })).toHaveCount(1);
-    await expect(menu.locator('.dash-menu-voce').last()).toHaveText(/^(Togli|Chiudi)/);
+    // A icone (#2555): le azioni della carta, in ordine, sono le voci scritte dalla pagina.
+    const menu = menuDi(page);
+    await expect(menu.principale).toBeVisible();
+    const azioni = await menu.scritte();
+    expect(azioni.filter((n) => n === 'Apri nel filo')).toHaveLength(1);
+    expect(azioni.at(-1)).toMatch(/^(Togli|Chiudi)/);
     await page.keyboard.press('Escape');
-    await expect(menu).toHaveCount(0);
+    await expect(menu.pannelli).toHaveCount(0);
   }
 
   await modelloFinto(app, [
