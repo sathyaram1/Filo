@@ -31,9 +31,12 @@ non può sapere quali siano i più importanti fra tutti.
   forma della frase in più) non è mai 3: 2 se il dato privato arriva ai
   modelli, se no 1; il buco (il filtro non parte su un cammino, o la forma
   che sfugge la sceglie un attaccante e l'attacco riesce oggi) resta 3
-  (#2700: quaranta 3 di una famiglia avevano riempito le urgenze). Vale
-  anche per i rilievi esterni nati dalle verifiche, che nascono senza
-  priorità e prendono quella del giudice. Una
+  (#2700: quaranta 3 di una famiglia avevano riempito le urgenze). Decide chi
+  sceglie la forma, non «provato oggi»: il dato dell'utente scritto in un modo
+  che il filtro non conosce resta lacuna anche quando succede (#2700.1). Un
+  feedback nato da una routine (residuo, rilievo esterno, segnalazione di un
+  worker, pacchetto) esce dal giudice al più a 2, scritto nel codice: la 3 la
+  dà l'owner a mano, o il giudice a una segnalazione di un utente (#2710). Una
   priorità scritta dal manutentore non la riscrive a un rientro in coda.
 - **Niente tetti per priorità.** Le 3 partono sempre; il resto fino al
   parallelismo N del manutentore, sotto il freno d'emergenza dell'owner (il
