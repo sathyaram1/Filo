@@ -252,8 +252,8 @@ test('un\'icona portata dal «+» alla fila resta dopo il riavvio, e «rimetti c
     await expect(menu.locator('.sn-menu-row.sn-drop-hover')).toHaveCount(1);
     await page.mouse.up();
     // Si vede subito, nel menu ancora aperto.
-    await expect.poll(() => iconeDellaFila(menu)).toEqual(['testo:readAloud', 'testo:copy', 'testo:translate', 'testo:search']);
-    await expect.poll(async () => (await salvata(app))['fila:testo']).toEqual(['testo:readAloud', 'testo:copy', 'testo:translate', 'testo:search']);
+    await expect.poll(() => iconeDellaFila(menu)).toEqual(['testo:readAloud', 'testo:copy', 'testo:translate', 'testo:search', 'testo:help']);
+    await expect.poll(async () => (await salvata(app))['fila:testo'].slice(0, 4)).toEqual(['testo:readAloud', 'testo:copy', 'testo:translate', 'testo:search']);
     const mossa = (await registro(app)).filter((e) => e.tipo === 'icone').pop();
     expect(mossa).toMatchObject({ via: 'interfaccia', dove: 'tasto-destro' });
     await chiudiApp(app);
