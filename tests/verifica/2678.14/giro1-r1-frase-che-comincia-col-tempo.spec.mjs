@@ -27,5 +27,8 @@ test('r1 la riga che dice lo stato della password resta leggibile', () => {
     'Password: la devo cambiare tra due giorni',
     'Password: me la chiede ogni 3 giorni',
     'Password: te la dico tra due giorni',
+    'Password: minimum 8 characters',
+    'Password: creata 2 mesi fa',
+    'Password: reset 2 days ago',
   ]) expect(P.oscura(riga), riga).toBe(riga);
 });
