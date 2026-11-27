@@ -238,6 +238,11 @@ function verbiDopoIlNome(s) {
   const cambi = [];
   const metti = (t, nuovo) => cambi.push([t.i, nuovo + ' '.repeat(t.w.length - nuovo.length)]);
   for (const m of s.matchAll(NOME_IN_TESTO)) {
+    // Chi l'ha cambiata la nomina dopo il verbo («ho cmbiato la password in …»).
+    const prima = s.slice(Math.max(0, m.index - 30), m.index).split('\n').pop();
+    for (const x of [...prima.matchAll(/\S+/g)].slice(-3)) {
+      if (vicino(x[0].toLowerCase(), CAMBI_DEL_VALORE)) metti({ i: m.index - prima.length + x.index, w: x[0] }, 'messo');
+    }
     const da = m.index + m[0].length;
     const riga = s.slice(da, da + 80).split('\n')[0];
     const parole = [...riga.matchAll(/\S+/g)].slice(0, 6).map((x) => ({ i: da + x.index, w: x[0], l: x[0].toLowerCase() }));
