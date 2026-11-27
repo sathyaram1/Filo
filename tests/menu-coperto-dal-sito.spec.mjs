@@ -229,7 +229,7 @@ test('i pezzi di Filo sopra il menu non contano come velo: la conferma annullata
 
   // Svuota → Annulla: la conferma sta sopra la scheda (#592.6), e chi torna subito su una voce incolla.
   await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-paste-arrow').click();
+  await menuDi(page).incolla.click({ button: 'right' });
   const stato = await cronologiaPronta(app, page);
   await page.mouse.click(stato.svuota.x, stato.svuota.y);
   const sopra = await confermaSopraPagina(app);
