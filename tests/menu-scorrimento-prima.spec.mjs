@@ -53,12 +53,13 @@ test('il menu di Rinomina appena aperto su una pagina scorsa resta, e si chiude 
     ok();
   })), VOCE);
   await fotogrammi(page);
-  const voce = page.locator('.sn-rinomina-menu .sn-select-option', { hasText: VOCE });
-  await expect(voce).toBeVisible();
+  // A icone come il tasto destro (#2555): il menu di Rinomina è il menu di Filo.
+  const menu = menuDi(page);
+  await expect(menu.voce(VOCE).first()).toBeVisible();
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
 
   await page.evaluate(() => window.scrollBy({ top: 200, behavior: 'instant' }));
-  await expect(page.locator('.sn-rinomina-menu')).toHaveCount(0);
+  await expect(menu.principale).toHaveCount(0);
 });
 
 test.describe('nello strato', () => {
