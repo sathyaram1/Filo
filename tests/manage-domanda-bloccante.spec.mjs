@@ -114,7 +114,7 @@ test('tasto destro e dettaglio fanno la stessa cosa del segno', async ({ openTab
   await apri(page);
   await page.evaluate(() => window.__mgTest.setTab('waiting'));
   await riga(page, 'Bordo delle schede').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Rispondi alla domanda D-21' }).click();
+  await menuDi(page).scegli('Rispondi alla domanda D-21');
   await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-21"]')).toBeVisible();
   await page.locator('.mg-sezione[data-sezione="feedback"]').click();
   await page.evaluate(() => window.__mgTest.setTab('waiting'));
