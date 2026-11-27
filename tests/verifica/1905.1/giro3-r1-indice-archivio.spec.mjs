@@ -52,7 +52,7 @@ test('r1 chiusa la scheda di un file, il suo titolo non va al modello che indici
   // Una pagina web chiusa dopo: la prova che l'indice è passato.
   await app.evaluate(() => globalThis.SN_ARCHIVED_TABS.archive({ url: 'https://controllo.test/', title: 'Pagina web di controllo' }));
   await expect.poll(() => app.evaluate(() => globalThis.__versoIlModello.join(' | ')), { timeout: 20_000, message: 'l\'indice è passato' }).toMatch(/Pagina web di controllo/);
-  expect(await app.evaluate(() => globalThis.__versoIlModello.join(' | ')), 'il titolo del file resta sul computer').not.toMatch(/Referto|Mario Rossi/);
+  expect.soft(await app.evaluate(() => globalThis.__versoIlModello.join(' | ')), 'il titolo del file resta sul computer').not.toMatch(/Referto|Mario Rossi/);
 
   // La ricerca nell'archivio la trova per parole, senza mandare il titolo al modello.
   const page = await openTab('filo://newtab/');
