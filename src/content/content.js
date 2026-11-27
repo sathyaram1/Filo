@@ -2798,7 +2798,7 @@
         if (annulla) azioni.annullaCorrezione = { label: annulla.label, onClick: annulla.onClick };
       }
       if (nome !== 'cursore' && !contesto.segreto) {
-        daSel('search', 'search', { label: I18n.t('menu_search_text'), misura: 'search-web' });
+        daSel('search', 'search', { label: I18n.t('menu_search_text'), azione: 'search-web' });
         const leggi = TTS.buildReadAloudItem(testo);
         if (leggi) suOggetto(azioni, 'readAloud', 'selezione', { label: leggi.label, onClick: leggi.onClick, misura: leggi.azione });
         suOggetto(azioni, 'edit', 'selezione', { label: I18n.t('menu_edit_selection'), onClick: () => EditBox.openEditBox(selInfo.selection) });
@@ -2822,7 +2822,7 @@
     } else if (nome === 'testo') {
       daSel('copy', 'copy', { label: I18n.t('menu_copy'), azione: 'copy-cut' });
       if (!contesto.segreto) {
-        daSel('search', 'search', { label: I18n.t('menu_search_text'), misura: 'search-web' });
+        daSel('search', 'search', { label: I18n.t('menu_search_text'), azione: 'search-web' });
         suOggetto(azioni, 'translate', 'selezione', { label: I18n.t('fila_translate'), onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) });
         const leggi = TTS.buildReadAloudItem(testo);
         if (leggi) suOggetto(azioni, 'readAloud', 'selezione', { label: leggi.label, onClick: leggi.onClick, misura: leggi.azione });
