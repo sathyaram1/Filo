@@ -151,9 +151,10 @@ test('da tastiera: Maiusc+F10 e il tasto Menu aprono il menu, le frecce scelgono
   await home.keyboard.press('Shift+F10');
   await expect(menuDi(home).principale).toBeVisible();
   expect(await menuDi(home).scritte()).toEqual(['Apri', 'Copia link', 'Rimuovi']);
-  // Le frecce scelgono fra le icone (#2555): da destra a sinistra si torna alla prima.
+  // Le frecce scelgono fra le icone (#2555), Inizio torna alla prima.
   await home.keyboard.press('ArrowRight');
-  await home.keyboard.press('ArrowLeft');
+  await expect.poll(() => iconaFocalizzata(home)).toMatch(/^(Apri|Copia link|Rimuovi)$/);
+  await home.keyboard.press('Home');
   await expect.poll(() => iconaFocalizzata(home)).toBe('Apri');
   await home.screenshot({ path: 'tests/.shots/home-menu-scheda-scuro.png' }).catch(() => {});
   await home.keyboard.press('Escape');
