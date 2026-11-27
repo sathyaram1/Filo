@@ -452,7 +452,8 @@
       const fra = VIRGOLETTE_QUI.exec(seguito);
       if (fra) return fra[3].length >= 4 ? { valore: fra[3], regola: 'password', rinvio: true } : null;
       const cifre = /\d/.test(t);
-      if (cifre) return soloAlnum(t).length >= 4 ? { valore: t, regola: 'codice', rinvio: true } : null;
+      // Un codice solo se è un numero: «il codice sconto è scaduto, prova BENVENUTO10» resta.
+      if (cifre) return soloAlnum(t).length >= 4 && (!soloCifre || /^\d+$/.test(t)) ? { valore: t, regola: 'codice', rinvio: true } : null;
       // Dopo un punto comincia un altro discorso: lì la parola qualunque vuole l'annuncio («La nuova è …»).
       const chiude = /^[,;]/.test(r[0]) && (k === parole.length - 1 || CONGIUNZIONE.test(parole[k + 1]));
       if (soloCifre || t.length < MIN_TOKEN || RIEMPITIVI.has(t) || SEGUITO_DEL_DISCORSO.test(t) || (spiega && spiega(parole, k))
