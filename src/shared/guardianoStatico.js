@@ -621,9 +621,9 @@
   // La password detta dopo il nome con un verbo di cambio o dopo la domanda la riconosce la regola delle uscite (#2714).
   function segretiNelTesto(testoLetto) {
     const s = testo(testoLetto);
-    const out = raccogli(s, raccolta(), FORMA_LETTA);
+    const out = raccolta();
     for (const v of valoriDopoIlNome(s)) if (v.regola === 'password') out.push(v);
-    return out;
+    return raccogli(s, out, FORMA_LETTA);
   }
 
   // Quello che un'azione porterebbe fuori (autonomia.js): le stesse forme di segretiNelTesto, anche percent-codificate, più
