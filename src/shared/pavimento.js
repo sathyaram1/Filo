@@ -16,13 +16,18 @@
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
-  // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo dopo «kod».
+  // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo in una frase polacca (SEGNO_POLACCO).
   // Dopo il verbo anche l'articolo («Il CVV è il 123», «Die Prüfnummer ist die 123»), e come per la password il trattino
   // o la freccia fra spazi («CVV — 123», #2681.2).
-  const VERBO_CVV = `(?:${VERBO}|(?<=\\bkod\\b[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
-  const TRATTINO = '[-–—→](?=[ \\t])';
   // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности».
   const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F';
+  // Le parole che fanno polacca la frase, per il suo «to» dopo un nome che non è solo polacco come PIN e CVV («Mój PIN
+  // to 4829», #1403.80): in inglese «send the PIN to …» è una destinazione. Senza \p{L}, perché vale anche senza flag u.
+  const POSSESSIVO_POLACCO = `(?:moj[${LETTERE}]*|mój|twoj[${LETTERE}]*|twój|swoj[${LETTERE}]*|swój|nasz[${LETTERE}]*|wasz[${LETTERE}]*)`;
+  const SEGNO_POLACCO = `(?<![${LETTERE}])(?:${POSSESSIVO_POLACCO}|kod[${LETTERE}]*|numer[${LETTERE}]*|now(?:y|a|e|ego|ej|ym|ą)`
+    + `|(?:tymczasow|jednorazow|tajn|poufn|prywatn|osobist|bankow)[${LETTERE}]*|kart(?:a|y|ę|ą|zie))(?![${LETTERE}])`;
+  const VERBO_CVV = `(?:${VERBO}|(?<=${SEGNO_POLACCO}[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
+  const TRATTINO = '[-–—→](?=[ \\t])';
   // CVV_ALTRE_LINGUE (#2681.1) è la parte che va anche ai campi dei moduli (da etichette() di campiSegreti.js) e agli
   // indizi di pagamento (copia autonoma in safebrowseHints.js, uguale per tests/unit/cvvAltreLingue.test.mjs): coi
   // separatori dei nomi di campo («codigo_de_seguridad»).
@@ -105,7 +110,7 @@
   // Il possessivo vale l'articolo («Le code de mon colis», «Kod mojej paczki»). «Le code banque», senza complemento,
   // passa dall'elenco degli identificativi: lì la parola dopo «code» può essere un aggettivo («Le code généré est …»).
   const POSSESSIVO_ALTRE = '(?:mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leurs?|mis|mi|tus?|sus?|nuestr[oa]s?|vuestr[oa]s?'
-    + '|meus?|minhas?|teus?|tuas?|seus?|suas?|noss[oa]s?|moj\\p{L}*|mój|twoj\\p{L}*|twój|swoj\\p{L}*|swój|nasz\\p{L}*|wasz\\p{L}*)';
+    + `|meus?|minhas?|teus?|tuas?|seus?|suas?|noss[oa]s?|${POSSESSIVO_POLACCO})`;
   const ETICHETTA_ALTRE = new RegExp(`(?:\\b[Cc]ode\\s+(?:(?:de|du|des|van)\\s+(?:(?:la|les|le|de|het)\\s+|l['’]\\s*|${POSSESSIVO_ALTRE}\\s+)?|d['’]\\s*)`
     + `|\\b(?:[Cc][óo]digo|[Kk]od)\\s+(?:(?:de|del|do|da|dos|das)\\s+(?:(?:la|las|los|el|o|a|os|as)\\s+)?)?(?:${POSSESSIVO_ALTRE}\\s+)?)`
     + `([\\p{Ll}][\\p{Ll}-]{2,})${SEPARA_ALTRE}`, 'u');
@@ -291,8 +296,11 @@
   const NOMI_CODICE = new RegExp(NOMI_DEL_CODICE, 'gi');
   // L'articolo dopo il verbo («El código es el 482913») non cambia il posto del numero.
   const CHIUDE_ETICHETTA = new RegExp(`(?:[:=#]|(?:^|\\s)(?:${VERBO}|will\\s+be)(?:\\s+(?:il|el|le|o|the))?|\\bn\\.|\\bnr\\.?|\\bno\\.)\\s*$`, 'i');
-  // Il polacco «to» solo dopo «kod»: in inglese «code to …» è una destinazione.
+  // Il polacco «to» dopo un nome polacco («kod», «tajny numer»), o dopo il PIN in una frase polacca (SEGNO_POLACCO).
   const CHIUDE_KOD = /\sto\s*$/i;
+  const NOME_POLACCO = /^(?:kod|tajn)/i;
+  const FRASE_POLACCA = new RegExp(SEGNO_POLACCO, 'i');
+  const nomePolacco = (nome, prima) => NOME_POLACCO.test(nome) || (/^pin$/i.test(nome) && FRASE_POLACCA.test(prima));
   const PRIMA_DEL_NOME = new RegExp(`^\\s*(?:[:=-]\\s*)?(?:${VERBO}|=)\\s+(?:[\\p{L}'’-]+\\s+){0,4}?${NOMI_DEL_CODICE}`, 'iu');
   // Prima del numero si guarda solo la coda: il nome conta a 60 caratteri al più, e rileggere da capo la riga a ogni
   // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
@@ -320,7 +328,7 @@
     if (!/\d/.test(fra) && (delMioApparecchio(prima.slice(-160)) || etichettaSbloccabile(prima.slice(-160)))) return true;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
     if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
-    if (CHIUDE_ETICHETTA.test(fra) || (/^kod/i.test(n[0]) && CHIUDE_KOD.test(fra))) return true;
+    if (CHIUDE_ETICHETTA.test(fra) || (nomePolacco(n[0], prima.slice(Math.max(da, n.index - 60), n.index)) && CHIUDE_KOD.test(fra))) return true;
     return /^[\s•*·>–-]*$/.test(prima.slice(0, n.index)) && !/\d/.test(fra) && fra.trim().split(/\s+/).length <= 4;
   }
   // Un codice usa e getta di lettere e cifre («Steam Guard code: 7K2F9», quello da scrivere sulla TV, «WDJB-MJHT»):

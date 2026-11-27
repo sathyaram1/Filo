@@ -11,6 +11,7 @@
     {
       version: '0.2.307', date: '2026-11-26',
       fixes: [
+        { testo: 'Il PIN o il CVV scritti in polacco col verbo «to», come «Mój PIN to 4829» o «Mój tajny numer to 4829», non arrivano più ai modelli, come già succedeva coi due punti.', segnalazione: 1403 },
         { testo: 'Una password nuova o ricordata scritta come «l\'ho cambiata da «…» a «…»», «ho sostituito la password con «…»», «come password ho messo «…»» o data dopo una domanda come «Ti ricordi la password? Era …», non arriva più a nessun modello, anche in inglese, francese, spagnolo e tedesco.', segnalazione: 1403 },
         { testo: 'Il CVV della carta scritto come «Il CVV è il 123», «CVV — 123» o col suo nome in un\'altra lingua, come «cryptogramme», «Kartenprüfnummer» o «код безопасности», non arriva più a nessun modello.', segnalazione: 2681 },
         { testo: 'Il codice che sblocca il tuo telefono o il tuo computer, scritto come «il codice del mio telefono è 4829» o «my phone code is 4829», non arriva più a nessun modello, in italiano come in francese, spagnolo, inglese e nelle altre lingue.', segnalazione: 1403 },
