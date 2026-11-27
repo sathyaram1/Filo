@@ -37,7 +37,9 @@ ordini che il server applica e apre feedback che le routine lavorano. Dal #2338
 (decisione dell'owner dell'08/11) approva L5 e salta un controllo di sicurezza
 bocciato sui lavori fidati a catena pulita, solo dal suo biglietto pulito; i
 workflow di filo-security, i segreti e le regole dei rami, gli ambienti e i
-prompt delle sessioni, le chiavi e i lavori a catena sporca restano all'owner.
+prompt delle sessioni, le chiavi, i lavori a catena sporca e le sue stesse
+guardie (la prova di tenuta e le regole delle sue approvazioni, elenco dei
+riservati compreso, #2338.3) restano all'owner.
 Una regola sola su chi decide, per le quattro operazioni (L5, L4, `passa`,
 bilanci e tetto) e per i loro elenchi: il biglietto pulito del manutentore, mai
 un biglietto sporco né una chiave. La nota di un controllo bocciato porta la
