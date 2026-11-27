@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAROLA = 'cavallo-blu-7Qx2-ottobre-lampione';
 const DUE_RIGHE = `Parola d'ordine: ${PAROLA}\nDiscutiamo la domanda D-8`;
