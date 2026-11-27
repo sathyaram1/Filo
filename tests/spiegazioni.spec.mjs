@@ -217,8 +217,8 @@ for (const url of ['filo://feedback/feedback.html', 'filo://manage/manage.html']
     await termine.hover();
     await expect(riquadri(page)).toContainText('Traduce il nome di un sito');
     await termine.click({ button: 'right' });
-    await expect(page.locator('.filo-spiega-menu .filo-spiega-voce')).toHaveText(['Copia la spiegazione']);
-    await page.locator('.filo-spiega-menu [data-voce="copia"]').click();
+    expect(await vociSpiega(page)).toEqual(['Copia la spiegazione']);
+    await menuDi(page).scegli('Copia la spiegazione');
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Traduce il nome di un sito nel suo indirizzo.');
   });
 }
