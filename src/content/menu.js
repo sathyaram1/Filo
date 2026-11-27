@@ -1526,12 +1526,7 @@
     if (sub.kind === 'overflow') {
       b.dataset.snDragHoverOpen = '1';
       b.setAttribute('aria-expanded', 'false');
-      const apriFermo = () => {
-        const g = griglia();
-        const altro = g && g.querySelector('.sn-menu-altro');
-        if (!altro) return;
-        const apri = altro.hidden;
-        altro.hidden = !apri;
+      const disegna = (apri) => {
         b.setAttribute('aria-expanded', String(apri));
         b.classList.toggle('sn-menu-row-overflow-aperto', apri);
         setIconContent(b, global.SN_ICONS?.[apri ? 'collapse' : 'plus']?.(16) || (apri ? '−' : '+'));
@@ -1541,8 +1536,16 @@
           lbl.textContent = sub.label;
           b.appendChild(lbl);
         }
+      };
+      disegniDelPiu.set(b, disegna);
+      const apriFermo = () => {
+        const g = griglia();
+        const altro = g && g.querySelector('.sn-menu-altro');
+        if (!altro) return;
+        const apri = altro.hidden;
+        altro.hidden = !apri;
+        disegna(apri);
         contaGesto('altro_del_menu', { aperto: apri });
-        try { sub.onClick && sub.onClick(apri); } catch (er) { console.error(er); }
       };
       apritori.set(b, () => { const g = griglia(); if (g && g.querySelector('.sn-menu-altro')?.hidden) apriFermo(); });
       esecutori.set(b, apriFermo);
