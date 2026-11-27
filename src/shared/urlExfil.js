@@ -450,7 +450,7 @@
       // Fra virgolette il valore è tutto quello che chiudono, anche con gli spazi: «prova «Mela! Verde77»».
       VIRGOLETTE_QUI.lastIndex = da;
       const fra = VIRGOLETTE_QUI.exec(seguito);
-      if (fra) return fra[3].length >= 4 ? { valore: fra[3], regola: 'password', rinvio: true } : null;
+      if (fra) return fra[3].length >= 4 && (!soloCifre || /^\d+$/.test(fra[3])) ? { valore: fra[3], regola: 'password', rinvio: true } : null;
       const cifre = /\d/.test(t);
       // Un codice solo se è un numero: «il codice sconto è scaduto, prova BENVENUTO10» resta.
       if (cifre) return soloAlnum(t).length >= 4 && (!soloCifre || /^\d+$/.test(t)) ? { valore: t, regola: 'codice', rinvio: true } : null;
