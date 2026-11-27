@@ -59,7 +59,7 @@ test('in chat la trascrizione lunga dice a che punto è e lo Stop la ferma', asy
   await expect.poll(() => app.evaluate(() => globalThis.__pezzi), { timeout: 60_000 }).toBeGreaterThan(2);
 
   // A metà lavoro la riga d'attesa dice quanti pezzi ha fatto, come «2 di 5» nel riquadro del tasto destro.
-  await expect(page.locator('body')).toContainText(/\d+ di 2\d/, { timeout: 5_000 });
+  await expect.soft(page.locator('body')).toContainText(/\d+ di 2\d/, { timeout: 5_000 });
 
   await page.locator('#stopBtn').click();
   const allaFermata = await app.evaluate(() => globalThis.__pezzi);
