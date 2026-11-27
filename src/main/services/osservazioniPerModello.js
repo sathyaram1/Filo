@@ -1183,7 +1183,7 @@ function observationsForPrompt(tutte) {
   const actions = Array.isArray(tutte) ? tutte.filter((a) => !(a && a._gettone)) : tutte;
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), memoriaLettaForPrompt(actions), webSearchResultsForPrompt(actions),
-    pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
+    pageReadsForPrompt(actions), trascrizioniForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
     schedeChiuseForPrompt(actions), immaginiForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
