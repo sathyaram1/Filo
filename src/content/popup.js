@@ -1029,8 +1029,11 @@
     const bubble = appendBubble(popup, 'assistant');
     const loading = document.createElement('span');
     loading.className = 'sn-msg-loading';
-    loading.textContent = I18n.t('popup_loading');
+    // La trascrizione di un audio (#1660) arriva a pezzi: la riga sotto dice a che punto è.
+    const trascrizione = popup.action === ACTIONS.TRANSCRIBE_AUDIO;
+    loading.textContent = I18n.t(trascrizione ? 'popup_transcribe_reading' : 'popup_loading');
     bubble.text.appendChild(loading);
+    let durata = '';
 
     let port;
     try {
