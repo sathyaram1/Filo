@@ -2487,9 +2487,9 @@
   // spiegazione: quella la compone il chiamante, una sola anche quando l'immagine è un collegamento.
   function azioniPerImmagine(imgEl, azioni) {
     const a = azioniDellImmagine(imgEl);
-    suOggetto(azioni, 'save', 'immagine', { label: I18n.t('menu_save_image_as'), onClick: a.save, misura: 'copy-download-image' });
-    suOggetto(azioni, 'copy', 'immagine', { label: I18n.t('menu_copy_image'), onClick: a.copy, misura: 'copy-download-image' });
-    suOggetto(azioni, 'copy', 'indirizzoImmagine', { label: I18n.t('menu_copy_image_link'), onClick: a.copyLink, misura: 'copy-download-image' });
+    suOggetto(azioni, 'save', 'immagine', { label: I18n.t('menu_save_image_as'), onClick: a.save, azione: 'copy-download-image' });
+    suOggetto(azioni, 'copy', 'immagine', { label: I18n.t('menu_copy_image'), onClick: a.copy, azione: 'copy-download-image' });
+    suOggetto(azioni, 'copy', 'indirizzoImmagine', { label: I18n.t('menu_copy_image_link'), onClick: a.copyLink, azione: 'copy-download-image' });
     suOggetto(azioni, 'search', 'immagine', { label: I18n.t('menu_search_image'), onClick: a.search, misura: 'search-image' });
     suOggetto(azioni, 'transcribe', 'immagine', { label: I18n.t('menu_transcribe'), onClick: a.transcribe, misura: 'ocr' });
     if (aiutoAcceso()) suOggetto(azioni, 'ask', 'immagine', { label: I18n.t('fila_ask_image'), onClick: a.ask });
