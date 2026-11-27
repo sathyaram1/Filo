@@ -234,7 +234,7 @@ test('dal tasto destro di un tasto gli do una lettera premendola, e due volte qu
 
   // Cambiata dal suo tasto destro, la vecchia lettera non vale più.
   await page.locator('#altro .dash-altro-app[data-id="cerca"]').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Cambia lettera (cc)' }).click();
+  await menuDi(page).scegli('Cambia lettera (cc)');
   await page.keyboard.press('f');
   await expect.poll(() => lettere(app)).toEqual([{ lettera: 'f', tasto: 'cerca' }]);
   await page.locator('#altro .dash-altro-app[data-id="cerca"]').click({ button: 'right' });
