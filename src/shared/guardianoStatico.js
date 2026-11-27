@@ -557,14 +557,25 @@
     for (const x of codiciDelPavimento(s)) out.push(x);
     return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
   }
-  // Quello che il pavimento toglie ai modelli non esce da un'azione senza chiedere (#1403.89): le sue forme si chiedono
-  // a lui invece di copiarle. Il CVV vale la carta: scritto dall'utente esce come il numero accanto.
-  const DAL_PAVIMENTO = { codice: 'codice', password: 'password', cvv: 'carta', carta: 'carta', token: 'chiave', chiave: 'chiave' };
+  // Il codice di ciò che si apre (il mio telefono, il cancello), la password detta col suo complemento («la password del
+  // mio pc è …») e il CVV non escono da un'azione (#1403.89): le forme sono del pavimento, e qui si chiedono a lui. Gli
+  // altri suoi codici no: «se il pin è giusto la pagina è 2048» lì si toglie, qui fermerebbe l'azione.
+  // Il CVV vale la carta: scritto dall'utente esce come il numero accanto.
+  const DAL_PAVIMENTO = {
+    codice: (x) => (x.apre ? 'codice' : ''),
+    password: (x) => (passwordInUscita(x.valore) ? 'password' : ''),
+    cvv: () => 'carta',
+  };
   function codiciDelPavimento(s) {
     if (!global.SN_PAVIMENTO && typeof require === 'function') { try { require('./pavimento.js'); } catch (_) { /* resta senza */ } }
     const P = global.SN_PAVIMENTO;
     if (!P || typeof P.trova !== 'function') return [];
-    return P.trova(s).map((x) => ({ valore: String(x.valore), regola: DAL_PAVIMENTO[x.regola] || 'codice' }));
+    const out = [];
+    for (const x of P.trova(s)) {
+      const regola = DAL_PAVIMENTO[x.regola] ? DAL_PAVIMENTO[x.regola](x) : '';
+      if (regola) out.push({ valore: String(x.valore), regola });
+    }
+    return out;
   }
 
   function raccogli(s, out, forma) {
