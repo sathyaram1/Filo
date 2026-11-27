@@ -31,7 +31,7 @@ async function chatDellEditor(app, { id, ts, messaggi, soggetto = 'tesi' }) {
         }, { autore: m.role === 'user' ? 'utente' : 'filo', ts: passo(k + 1) })),
       ]);
     });
-    globalThis.__filoHandlers?.broadcastToTabs?.({ type: globalThis.SN_MSG.MSG.FILO_RIGHE_APP_CAMBIATE });
+    globalThis.__filoHandlers.broadcastToFiloPages({ type: globalThis.SN_MSG.MSG.FILO_RIGHE_APP_CAMBIATE });
   }, { id, ts, messaggi, soggetto });
 }
 
