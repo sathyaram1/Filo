@@ -184,7 +184,15 @@
   const CHIUDE_CORPO = `${CHIUDE_VERO}?`;
   // Il codice di quello che si apre e il PIN chiudono l'etichetta come il proprio apparecchio (#1403.93): «Il codice del
   // cancello è sempre 4829», «The gate code is now 4829», «Il codice del cancello e 4829».
+  // La virgola e la «e» senza accento sono anche congiunzioni: valgono il verbo solo subito dopo la cosa che si apre
+  // («del cancello e 4829», non «del cancello non funziona e 4829 volte»).
   const CHIUDE_CHI_ENTRA = new RegExp(`${CHIUDE_VERO}\\s*$`, 'iu');
+  const CHIUSURA_DEBOLE = /^\s*,|^(?:\s*,)?(?:\s+\p{L}+)?\s+e(?![\p{L}'’])/iu;
+  const DOPO_CHE_SI_APRE = new RegExp(`(?:^|\\s)(?:${COSE_CHE_SI_APRONO}|port[ae])(?:\\s+[\\p{L}-]+)?$`, 'iu');
+  const chiudeChiEntra = (fra) => {
+    const m = CHIUDE_CHI_ENTRA.exec(fra);
+    return !!m && (!CHIUSURA_DEBOLE.test(m[0]) || DOPO_CHE_SI_APRE.test(fra.slice(0, m.index)));
+  };
   const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])(?:${CHIUDE_VERO})?\\s*$`, 'iu');
   const SOLO_DOPO_IL_NOME = new RegExp(`^(?:${CHIUDE_VERO})?\\s*$`, 'iu');
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
