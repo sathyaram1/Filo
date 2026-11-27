@@ -1422,8 +1422,8 @@ test('#496 un numero che conta anche lavori fuori dalla lista apre un elenco che
 
   for (const [id, quanti] of [['lavorati', 2], ['durata', 2]]) {
     await page.locator(`[data-fs-id="${id}"]`).click({ button: 'right' });
-    await expect(page.locator('.mg-ctxmenu')).toContainText(`le ${quanti} segnalazioni contate`);
-    await page.locator('.mg-ctxmenu .sn-select-option').first().click();
+    expect(await testoDelMenu(page)).toContain(`le ${quanti} segnalazioni contate`);
+    await primaDelMenu(page).click();
     await expect(page.locator('#mgFsDrillTitle')).toContainText(`${quanti} segnalazioni`);
     await expect(page.locator('#mgFsDrillList li')).toHaveCount(quanti);
     // Il lavoro che la lista non ha resta visibile col suo numero.
