@@ -137,9 +137,9 @@ test('nell\'elenco, la voce di un file sparito è attenuata e non offre "Apri fi
 
     // Tasto destro: niente "Apri file" nemmeno lì (parità fra i due cammini).
     await voce.click({ button: 'right' });
-    const menu = dl.locator('.dl-ctxmenu');
-    await expect(menu).toBeVisible();
-    await expect(menu.locator('.sn-select-option', { hasText: 'Apri file' })).toHaveCount(0);
-    await expect(menu.locator('.sn-select-option', { hasText: 'Ri-scarica' })).toBeVisible();
+    const menu = menuDi(dl);
+    await expect(menu.principale).toBeVisible();
+    await expect(menu.voce('Apri file')).toHaveCount(0);
+    await expect(menu.voce('Ri-scarica')).toBeVisible();
   } finally { await close(); }
 });
