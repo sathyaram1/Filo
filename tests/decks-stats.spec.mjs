@@ -445,7 +445,7 @@ test('chat e riquadro danno lo stesso numero alle stesse condizioni (#791)', asy
   await page.fill('#probTurn', '3');
   await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
   await page.click('#probGame');
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizia l\'altro' }).click();
+  await menuDi(page).scegli('Partita a due, inizia l\'altro');
   await page.fill('#probMull', '1');
   await expect(page.locator('#probNeeds input[data-keep="terre"]')).toHaveValue('2');
   const riquadro = await settledPct(page);
