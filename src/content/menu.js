@@ -836,6 +836,11 @@
             try { sit.onClick && sit.onClick(); } catch (e) { console.error(e); }
           });
         }
+        if (sit.bersaglio) {
+          b.addEventListener('mouseenter', () => mostraBersaglio(sit.bersaglio));
+          b.addEventListener('focus', () => mostraBersaglio(sit.bersaglio));
+          b.addEventListener('mouseleave', nascondiBersaglio);
+        }
         sub.appendChild(b);
       }
     }
@@ -850,6 +855,10 @@
     placeSub(sub, anchorEl, 'anchor');
     sorveglia(sub);
     attachSubmenuHover(sub);
+    if (activeMenu.root.contains(document.activeElement)) {
+      const prima = sub.querySelector('button:not(.sn-disabled)');
+      if (prima) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
+    }
   }
 
   // La cronologia degli appunti arriva da altri siti e da altre app, password comprese: nel documento del sito
