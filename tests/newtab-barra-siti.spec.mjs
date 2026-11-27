@@ -113,7 +113,7 @@ test('#1657 dal tasto destro e dal «+»: aggiungi un sito scritto a mano, rinom
   const page = await home(app);
   // «Aggiungi sito…» dal tasto destro sulla barra vuota.
   await page.locator('#barraSiti').click({ button: 'right', position: { x: 200, y: 10 } });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Aggiungi sito…' }).click();
+  await menuDi(page).scegli('Aggiungi sito…');
   await page.locator('.dash-barra-campo input').fill('wikipedia.org');
   await page.keyboard.press('Enter');
   await expect(page.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]')).toHaveAttribute('aria-label', 'wikipedia.org');
