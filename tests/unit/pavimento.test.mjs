@@ -243,6 +243,32 @@ test('un\'etichetta in grassetto o corsivo Markdown coi due punti dentro copre i
   }
 });
 
+// #2673.12 — l'etichetta scritta in HTML («<b>Password:</b> …») spezzava il valore o lo lasciava passare.
+test('un\'etichetta in un pezzo di pagina HTML copre il valore intero, e i tag restano', () => {
+  for (const [t, atteso] of [
+    ['<b>Password:</b> Nyckel!2024', `<b>Password:</b> ${S}`],
+    ['<strong>PIN:</strong> 4821', `<strong>PIN:</strong> ${S}`],
+    ['<B>Password</B>: Nyckel!2024', `<B>Password</B>: ${S}`],
+    ['<em>Password:</em> gattonero', `<em>Password:</em> ${S}`],
+    ['<p><strong>Password:</strong> Nyckel!2024</p>', `<p><strong>Password:</strong> ${S}</p>`],
+    ['<span class="lbl">Password:</span> <span>Nyckel!2024</span>', `<span class="lbl">Password:</span> <span>${S}</span>`],
+    ['<b>Password:</b><br>Nyckel!2024', `<b>Password:</b><br>${S}`],
+    ['<p>Password:</p><p>Nyckel!2024</p>', `<p>Password:</p><p>${S}</p>`],
+    ['<li><b>CVV:</b> 123</li>', `<li><b>CVV:</b> ${S}</li>`],
+    ['<b>Codice di verifica:</b> 482193', `<b>Codice di verifica:</b> ${S}`],
+    ['Password:&nbsp;Nyckel!2024', `Password:&nbsp;${S}`],
+    ['<ul><li><b>Utente:</b> mario</li><li><b>Password:</b> Faro#Blu55</li></ul>',
+      `<ul><li><b>Utente:</b> mario</li><li><b>Password:</b> ${S}</li></ul>`],
+    ['<table><thead><tr><th>Utente</th><th>Password</th></tr></thead><tbody><tr><td>mario</td><td>Nyckel!2024</td></tr></tbody></table>',
+      `<table><thead><tr><th>Utente</th><th>Password</th></tr></thead><tbody><tr><td>mario</td><td>${S}</td></tr></tbody></table>`],
+  ]) assert.equal(P.oscura(t), atteso, t);
+  // Un token in un attributo si vede ancora: il tag si legge come spazi, i suoi attributi no.
+  assert.ok(!P.oscura('<a href="https://x.example/?token=ghp_abcdefghijklmnopqrstuvwxyz0123456789">link</a>').includes('ghp_abcdef'));
+  for (const t of ['<b>Nota:</b> la password va cambiata ogni 90 giorni', 'if (a<b && c>d) return a', '<p>Ciao</p><p>come stai</p>']) {
+    assert.equal(P.oscura(t), t);
+  }
+});
+
 // #2673.6 — in un file di testo di Windows «Password:» a capo e il valore arrivavano ai modelli.
 test('con gli a capo di Windows o col solo \\r il testo si copre come con l\'a capo semplice, e gli a capo restano', () => {
   assert.equal(P.oscura('Password:\r\nNyckel!2024'), `Password:\r\n${S}`);
