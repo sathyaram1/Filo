@@ -162,6 +162,12 @@ test('la password o il PIN detti dopo la domanda, coi due punti o con ogni verbo
     ['la password è divenuta Mela!Verde77', 'Mela!Verde77'], ['the password remained Mela!Verde77', 'Mela!Verde77'],
     ['ho cambiato il pin da 1234 a 4821', '4821'],
   ]) assert.ok(valori(G.segretiInUscita(t)).includes(v), t);
+  // Il registro dei letti usa la stessa regola: una password letta così in una pagina non esce poi da sola altrove.
+  for (const t of ['Ti ricordi la password? Era Mela!Verde77', 'la password è stata sostituita con Mela!Verde77',
+    'la password è divenuta Mela!Verde77', 'the password remained Mela!Verde77', 'ho settato la password a Mela!Verde77',
+    'la password è passata a Mela!Verde77', 'ho cambiato la password da Vecchia1! a Mela!Verde77', 'la password diventa: Mela!Verde77']) {
+    assert.ok(valori(G.segretiNelTesto(t)).includes('Mela!Verde77'), `letto: ${t}`);
+  }
   for (const t of ['Hai cambiato la password? Era ora!', 'ho cambiato la password in PayPal', 'ho cambiato la password in iCloud',
     'ho cambiato la password in WhatsApp', 'Ti ricordi la password? Era scritta sul foglio']) {
     assert.deepEqual(valori(G.segretiInUscita(t)), [], t);
