@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
