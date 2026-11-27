@@ -103,9 +103,11 @@ test('un altro campo o un modo di dire dopo la password restano', () => {
     'Per cambiare la password vai su «Impostazioni» e premi «Salva»',
     'ho cambiato la password con calma',
     'manda la password a «Marco» con «WhatsApp»',
+    'ho messo la password a «Netflix» e a «Spotify»',
+    'Forgot your password? It\'s "easy" to reset',
   ]) {
     const o = P.oscura(t);
-    for (const w of ['ora!', 'mario', 'Clicca qui', 'Impostazioni', 'Salva', 'calma', 'Marco', 'WhatsApp']) {
+    for (const w of ['ora!', 'mario', 'Clicca qui', 'Impostazioni', 'Salva', 'calma', 'Marco', 'WhatsApp', 'Spotify', 'easy']) {
       if (t.includes(w)) assert.ok(o.includes(w), `${t} → ${o}`);
     }
   }
