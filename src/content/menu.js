@@ -1642,41 +1642,6 @@
     g.style.setProperty('--sn-colonne', String(Math.min(max, Math.ceil(n / Math.ceil(n / max)))));
   }
 
-  function makeGridButton(it, opts = {}) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'sn-menu-icon-btn';
-    if (it.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
-    segnaAcceso(b, it);
-    setIconContent(b, it.icon || it.label || '');
-    if (it.id) b.dataset.snIconId = it.id;
-    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, conTasto(it)); }
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (it.disabled) return;
-      if (it.id) contaGesto('altro_del_menu', { icona: it.id });
-      premi(b, it);
-    });
-    if (it.draggable !== false && it.id) attachDrag(b, { id: it.id, source: opts.dropTarget || 'grid' });
-    return b;
-  }
-
-  function populateGrid(sub, items, opts = {}) {
-    sub.innerHTML = '';
-    sub.__snGridOpts = opts;
-    // Larga quanto le icone che ha, fino a `cols` per riga: con due icone non resta un pannello mezzo vuoto.
-    sub.style.setProperty('--sn-icon-cols', String(Math.max(1, Math.min(opts.cols || 4, (items && items.length) || 1))));
-    if (!items || items.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'sn-menu-empty sn-menu-grid-vuota';
-      empty.textContent = I18n.t('fila_altro_vuoto');
-      sub.appendChild(empty);
-    } else {
-      for (const it of items) sub.appendChild(makeGridButton(it, opts));
-    }
-    global.SN_FILO_UI?.soloGestiVeri(sub);
-  }
-
   // Ridisegna sul posto, senza chiudere il menu: chi riordina continua a riordinare.
   // `altro`: le icone dietro il «+». Il blocco aperto resta aperto, e l'icona che aveva il fuoco lo riprende: chi gira la
   // rotella su un valore o riordina continua.
