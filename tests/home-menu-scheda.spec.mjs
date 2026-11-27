@@ -85,7 +85,7 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   // Nuova categoria… → si scrive il nome, Invio: nasce il riquadro con la pagina dentro.
   await riquadro(home, 'Video da guardare').click();
   await scheda(home, 'a').click({ button: 'right' });
-  await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Sposta in…' }).click();
+  await menuDi(home).scegli('Sposta in…');
   // Da una categoria si può anche tornare fra le non categorizzate.
   expect(await vociMenu(home)).toEqual(['Ricette', 'Da vedere', 'Nuova categoria…']);
   await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Nuova categoria…' }).click();
