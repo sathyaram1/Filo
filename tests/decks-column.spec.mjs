@@ -138,10 +138,10 @@ test('cambio vista (per costo) e override di gruppo dal tasto destro', async ({ 
 
   // Torna per tipo e sposta Lightning Bolt in "Creature" (override).
   await page.click('#groupBy');
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'per tipo' }).click();
+  await menuDi(page).scegli('per tipo');
   await page.locator('.dk-row', { hasText: 'Lightning Bolt' }).click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Sposta in gruppo' }).click();
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Creature' }).click();
+  await menuDi(page).scegli('Sposta in gruppo');
+  await menuDi(page).scegli('Creature');
   const creature = page.locator('.dk-group[data-group="Creature"] .dk-row');
   await expect(creature).toHaveCount(2);
   await expect(page.locator('.dk-group[data-group="Istantanei"]')).toHaveCount(0);
