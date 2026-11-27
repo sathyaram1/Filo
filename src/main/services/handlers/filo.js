@@ -676,6 +676,10 @@ module.exports = function register(on, ctx) {
     if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
     return { ok: true, ...r };
   }));
+  on(MSG.FILO_CHAT_CORRENTE, soloFilo(async () => {
+    const c = await Coda.chatCorrente();
+    return { ok: true, id: c ? c.id : null };
+  }));
   on(MSG.FILO_CERCA, soloFilo(async (msg) => (msg && msg.nascoste === 'tutte'
     ? { ok: true, messaggi: [], pagine: [], nascoste: await Coda.nascoste() }
     : { ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
