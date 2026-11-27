@@ -1,5 +1,5 @@
 // Il fusibile di Electron che dà alle pagine file:// privilegi che un browser non dà (#1905.1): spento nel pacchetto
-// (after-pack.js), nel motore delle prove (prima-della-corsa.mjs) e in quello di `npm start` (prestart.mjs).
+// (after-pack.js), nel motore delle prove (prima-della-corsa.mjs) e in quello di `npm start` (avvia-electron.mjs).
 // Regole: patterns/un-file-del-computer-in-una-scheda-vive-in-una-sessione-sua.md. Prove: tests/unit/fusibiliElectron.test.mjs.
 
 const fs = require('node:fs');
