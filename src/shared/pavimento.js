@@ -264,7 +264,7 @@
     const it = [...prima.matchAll(/\b(?:codic[ei]|pin)\b/gi)].pop();
     const en = [...prima.matchAll(/\b([A-Za-z-]+)\s+(?:codes?|pin)\b/g)].pop();
     if (en && (!it || en.index > it.index)) {
-      const solo = /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length));
+      const solo = SOLO_DOPO_IL_NOME.test(prima.slice(en.index + en[0].length));
       if (NOME_CHE_APRE.test(en[1])) return { apre: true, solo };
       if (solo && SI_SBLOCCA_SOLO.test(en[1])) return { apre: true, solo };
     }
