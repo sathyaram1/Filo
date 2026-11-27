@@ -774,21 +774,18 @@
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
   const TEMPO = /^(?:gen(?:naio)?|feb(?:braio)?|mar(?:zo)?|apr(?:ile)?|mag(?:gio)?|giu(?:gno)?|lug(?:lio)?|ago(?:sto)?|set(?:tembre)?|ott(?:obre)?|nov(?:embre)?|dic(?:embre)?|jan(?:uary)?|february|march|april|may|june?|july?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|dec(?:ember)?|fa|ago|giorn[oi]|settiman[ae]|mes[ei]|ann[oi]|or[ae]|minut[oi]|days?|weeks?|months?|years?|hours?|minutes?|ieri|oggi|yesterday|today)[.,;:]?$/i;
-  // Misura e data solo con un numero e in testa alla frase («min 8 caratteri», «otto caratteri», «12 mar 2024», «ultima
-  // modifica 2 mesi fa»): «ci vediamo ogni giorno», «may the force be with you», «ci vediamo tra due giorni» e «il mio
-  // cane ha tre anni» sono frasi-password (#2678.14).
-  const NUMERO = /\d|^(?:due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|quindici|venti|trenta|two|three|four|five|six|seven|eight|nine|ten|twelve|sixteen|twenty|thirty)$/i;
-  const APRE_MISURA = /^(?:almeno|circa|minimo|min|massimo|max|oltre|più|entro|ogni|per|valida|valido|validità|durata|lunghezza|scadenza|ultim[ao]|modifica|cambio|aggiornamento|cambiat[ao]|modificat[ao]|aggiornat[ao]|at|least|most|about|around|every|within|for|over|up|to|last|valid|changed|updated|modified|on)$/i;
-  const FRA_NUMERI = /^(?:o|or|più|more|a|to|e|and|-|–|fino)$/i;
+  // Misura o data solo se, oltre al numero e alla parola di tempo o di misura, ogni parola parla della password
+  // («bloccata per 30 minuti», «la devo cambiare tra due giorni», «between 8 and 64 characters»): una parola d'altro
+  // («tre anni al mare», «ci vediamo tra due giorni», «il mio cane ha tre anni») la fa frase-password (#2678.14).
+  const NUMERO = /^(?:\d+(?:[.,:/-]\d+)*(?:°|º|st|nd|rd|th|gg|\+)?|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|quindici|venti|trenta|sessanta|novanta|two|three|four|five|six|seven|eight|nine|ten|twelve|sixteen|twenty|thirty|sixty|ninety)$/i;
+  const DELLA_PASSWORD = /^(?:scad\w*|cambi\w*|modific\w*|aggiorn\w*|rinnov\w*|impost\w*|reimpost\w*|resett\w*|blocc\w*|sblocc\w*|creat[aoie]|generat[aoie]|ricevut[aoie]|inviat[aoie]|mandat[aoie]|mand[aoi]|manderò|invio|invierò|dico|dirò|diciamo|chied\w*|serv[eo]|servono|dur[ao]|durano|durata|val[eo]|valgono|valid\w*|lung[aoh]\w*|cort[ao]|dev[eio]|devono|dovrà|avere|essere|è|sono|sarà|ha|ho|hai|ultim[aoie]|nuov[aoie]|vecchi[aoe]|quell[aoie]|solit[aoie]|stess[aoie]|sempre|ancora|già|almeno|circa|minimo|massimo|min|max|oltre|meno|più|fino|entro|ogni|tra|fra|da|dal|dalla|dai|dopo|prima|per|di|del|della|il|lo|la|le|gli|l|me|te|ti|mi|ve|si|ne|non|attiv[ao]|scors[ao]|prossim[aoie]|lavorativi|esatti|password|parola|chiave|codice|pin|expir\w*|chang\w*|updat\w*|modif\w*|reset\w*|creat\w*|set|renew\w*|lock\w*|unlock\w*|block\w*|valid|lasts?|long|short|must|should|needs?|required|have|has|be|been|is|are|it|will|you|i|we|send|sent|tell|told|ask\w*|in|within|every|at|least|most|minimum|maximum|between|up|ago|last|next|since|from|on|for|after|before|of|new|old|same|than|less|only|about|around|over|lunghezza|validità|scadenza|aggiornamento|o|or|e|and|a|to|-|–)$/i;
   const misuraODate = (parole) => {
-    const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
-    let i = 0;
-    while (i < p.length && (APRE_MISURA.test(p[i]) || ARTICOLO.test(p[i]))) i++;
-    if (TEMPO.test(p[i] || '') && NUMERO.test(p[i + 1] || '')) return true;
-    if (!NUMERO.test(p[i] || '')) return false;
-    while (i < p.length && (NUMERO.test(p[i]) || FRA_NUMERI.test(p[i]))) i++;
-    return MISURA.test(p[i] || '') || TEMPO.test(p[i] || '');
+    const p = parole.flatMap((x) => x.replace(/[.,;:!]+$/, '').split(/['’]/)).filter(Boolean);
+    return p.some((x) => NUMERO.test(x)) && p.some((x) => MISURA.test(x) || TEMPO.test(x))
+      && p.every((x) => NUMERO.test(x) || MISURA.test(x) || TEMPO.test(x) || ARTICOLO.test(x) || DELLA_PASSWORD.test(x));
   };
+  // «da tre anni vivo a Milano», «tra due giorni parto»: la preposizione col numero dopo apre un tempo, e decide la frase.
+  const APRE_TEMPO = /^(?:da|dal|dai|dalle|tra|fra|in|entro|dopo|for|within|since|after)$/i;
   const ARTICOLO = /^(?:la|il|lo|i|le|gli|una?|the|an?|el|der|die|das|de|het)$/i;
   // Davanti a un verbo «la», «lo», «le» sono un pronome, e la frase dice dove trovarla: «Password: la trovi sul modem».
   const DOPO_PRONOME = /^(?:trov[aio]|trovate|troverai|troverete|ricevi|riceve|ricevete|riceverai|riceverete|mando|mandiamo|manderò|manderemo|invio|inviamo|invierò|invieremo|chiedi|chiedete|sai|sa|sanno|conosci|conosce|ha|hai|hanno|abbiamo|avete|cambi|cambia|cambierai|scegli|sceglierai|imposti|imposterai|scrivo|scriverò|dico|dirò|diamo|daremo|do|darò|one|ones)$/i;
