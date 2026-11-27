@@ -80,7 +80,7 @@ test('nell\'Editor sul testo selezionato la fila ha grassetto e corsivo, e il cl
   const box = await editor.evaluate(() => { const r = getSelection().getRangeAt(0).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   await editor.mouse.click(box.x, box.y, { button: 'right' });
   const menu = menuDi(editor);
-  const fila = menu.locator('.sn-menu-row');
+  const fila = menu.locator('.sn-menu-row:not(.sn-menu-altro)');
   await expect(fila).toBeVisible();
   const ids = await iconeDellaFila(menu);
   expect(ids.slice(0, 2)).toEqual(['scrivibile:bold', 'scrivibile:italic']);
@@ -105,7 +105,7 @@ test('su un\'immagine la fila ha le sue azioni, e il «+» le altre; sul testo d
   const page = await testServer.openReady(openTab, SITO(img));
   await page.locator('#foto').click({ button: 'right' });
   const menu = menuDi(page);
-  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   expect(await iconeDellaFila(menu)).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask']);
   await expect(menu.locator('.sn-menu-row [data-sn-icon-id="immagine:save"]')).toHaveAttribute('aria-label', /Salva immagine/);
   await menu.locator('.sn-menu-row .sn-menu-row-overflow').click();
@@ -118,14 +118,14 @@ test('su un\'immagine la fila ha le sue azioni, e il «+» le altre; sul testo d
   await selezionaTesto(page, '#testo');
   const r = await page.locator('#testo').boundingBox();
   await page.mouse.click(r.x + 30, r.y + r.height / 2, { button: 'right' });
-  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   expect(await iconeDellaFila(menu)).toEqual(['testo:copy', 'testo:translate', 'testo:search']);
   await page.keyboard.press('Escape');
 
   // Niente sotto il mouse: la fila della pagina è vuota di partenza, e non si vede.
   await page.locator('#vuoto').click({ button: 'right' });
   await expect(menu.principale).toBeVisible();
-  await expect(menu.locator('.sn-menu-row')).toBeHidden();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeHidden();
 });
 
 // Seleziona `parola` nel foglio dell'Editor e apre il tasto destro sopra di lei.
@@ -145,7 +145,7 @@ async function destroSullaParola(editor, parola) {
     return { x: q.x + q.width / 2, y: q.y + q.height / 2 };
   }, parola);
   await editor.mouse.click(box.x, box.y, { button: 'right' });
-  await expect(menuDi(editor).locator('.sn-menu-row')).toBeVisible();
+  await expect(menuDi(editor).locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
 }
 
 test('nell\'Editor il collegamento e l\'evidenziato della fila si mettono e restano dopo aver riaperto il documento', async ({ openTab }) => {
@@ -225,7 +225,7 @@ test('un\'icona portata dal «+» alla fila resta dopo il riavvio, e «rimetti c
     await selezionaTesto(page, '#testo');
     const r = await page.locator('#testo').boundingBox();
     await page.mouse.click(r.x + 30, r.y + r.height / 2, { button: 'right' });
-    await expect(menuDi(page).locator('.sn-menu-row')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   };
   try {
     let { app, shell } = await avvia();
@@ -294,7 +294,7 @@ test('un\'icona della barra portata nella fila del tasto destro lascia la barra,
   await page.locator('#vuoto').click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.principale).toBeVisible();
-  await expect(menu.locator('.sn-menu-row')).toBeHidden();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeHidden();
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   const src = await barra.locator('#nav .ico[data-id="saveForLater"]').boundingBox();
@@ -305,8 +305,8 @@ test('un\'icona della barra portata nella fila del tasto destro lascia la barra,
   await barra.mouse.down();
   await barra.mouse.move(src.x + 30, src.y + 10, { steps: 3 });
   await barra.mouse.move(m.x + 40, m.y + 12 - alto, { steps: 10 });
-  await expect(menu.locator('.sn-menu-row')).toBeVisible();
-  const fila = await fermo(menu.locator('.sn-menu-row'));
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
+  const fila = await fermo(menu.locator('.sn-menu-row:not(.sn-menu-altro)'));
   await barra.mouse.move(fila.x + 20, fila.y + fila.height / 2 - alto, { steps: 4 });
   await barra.mouse.up();
   await expect.poll(async () => (await salvata(app))['fila:pagina']).toEqual(['saveForLater']);
@@ -347,7 +347,7 @@ test.describe('col menu nello strato sopra la scheda', () => {
     const page = await testServer.openReady(openTab, SITO(testServer.asset(PNG, 'image/png')));
     await page.locator('#vai').click({ button: 'right' });
     const menu = menuDi(page);
-    await expect(menu.locator('.sn-menu-row')).toBeVisible();
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
     expect(menu.superficie.url()).toMatch(/^filo:\/\/menu\//);
     expect(await iconeDellaFila(menu)).toEqual(['link:openTab', 'link:copy']);
     await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
@@ -355,13 +355,13 @@ test.describe('col menu nello strato sopra la scheda', () => {
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 10_000 }).toBe('https://esempio.it/pagina');
 
     await page.locator('#vai').click({ button: 'right' });
-    await expect(menu.locator('.sn-menu-row')).toBeVisible();
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
     await menu.locator('.sn-menu-row .sn-menu-row-overflow').click();
     const condividi = menu.locator('.sn-menu-icon-grid [data-sn-icon-id="link:share"]');
     await expect(condividi).toBeVisible();
     // Il menu cresce quando arriva la sezione del collegamento, e la griglia segue il «+»: si misura a menu fermo.
     const da = await fermo(condividi);
-    const fila = await fermo(menu.locator('.sn-menu-row'));
+    const fila = await fermo(menu.locator('.sn-menu-row:not(.sn-menu-altro)'));
     const m = menu.superficie;
     await m.mouse.move(da.x + da.width / 2, da.y + da.height / 2);
     await m.mouse.down();
@@ -413,7 +413,7 @@ test('su un filmato e su un audio la fila ha le loro azioni, e in un campo col s
   const menu = menuDi(page);
   for (const sel of ['#vid', '#aud']) {
     await page.locator(sel).click({ button: 'right' });
-    await expect(menu.locator('.sn-menu-row')).toBeVisible();
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
     expect(await iconeDellaFila(menu)).toEqual(['media:playPause', 'media:mute', 'media:save']);
     await expect(menu.locator('.sn-menu-row [data-sn-icon-id="media:playPause"]')).toHaveAttribute('aria-label', /Riproduci/);
     await expect(menu.locator('.sn-menu-row .sn-menu-row-overflow')).toBeVisible();
@@ -431,7 +431,7 @@ test('su un filmato e su un audio la fila ha le loro azioni, e in un campo col s
   await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti'));
   await page.locator('#area').click();
   await page.locator('#area').click({ button: 'right' });
-  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   expect((await iconeDellaFila(menu))[0]).toBe('cursore:paste');
   await menu.locator('.sn-menu-row [data-sn-icon-id="cursore:paste"]').click();
   await expect.poll(() => page.locator('#area').inputValue()).toBe('dagli appunti');
@@ -443,7 +443,7 @@ test('con del testo selezionato altrove, il tasto destro su un\'immagine o un co
   for (const [sel, prima] of [['#foto', 'immagine:save'], ['#vai', 'link:openTab']]) {
     await selezionaTesto(page, '#testo');
     await page.locator(sel).click({ button: 'right' });
-    await expect(menu.locator('.sn-menu-row')).toBeVisible();
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
     expect((await iconeDellaFila(menu))[0]).toBe(prima);
     await page.keyboard.press('Escape');
   }
@@ -451,7 +451,7 @@ test('con del testo selezionato altrove, il tasto destro su un\'immagine o un co
   await selezionaTesto(page, '#testo');
   const r = await page.locator('#testo').boundingBox();
   await page.mouse.click(r.x + 30, r.y + r.height / 2, { button: 'right' });
-  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   expect((await iconeDellaFila(menu))[0]).toBe('testo:copy');
 });
 
@@ -466,7 +466,7 @@ test('con tante icone portate nella stessa fila, vanno a capo dentro il menu', a
   const r = await page.locator('#testo').boundingBox();
   await page.mouse.click(r.x + 30, r.y + r.height / 2, { button: 'right' });
   const menu = menuDi(page);
-  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   const fuori = await menu.principale.evaluate((m) => {
     const box = m.getBoundingClientRect();
     return [...m.querySelectorAll('.sn-menu-row .sn-menu-row-btn')]
