@@ -1240,6 +1240,31 @@
     return y;
   }
 
+  // In una riga di tabella la cella dopo l'etichetta è il suo valore per ogni regola, non solo per la password (#2695.1):
+  // la barra dopo i due punti si legge come uno spazio («| CVV: | 123 |» come «CVV: 123»), e in una riga di due celle
+  // dopo il nome di un campo o di una chiave come i due punti («| login_password | x |»). Null se non cambia niente.
+  const ETICHETTA_SEGRETO_SOLA = new RegExp(`^${ETICHETTA_SEGRETO}$`, 'i');
+  function celleComeRighe(s) {
+    if (!s.includes('|')) return null;
+    let cambiato = false;
+    const righe = s.split('\n').map((riga) => {
+      if (riga.length > 2000 || !/^[ \t]*\|/.test(riga)) return riga;
+      let r = riga.replace(/(?<=[:：=][ \t]*)\|(?=[^|\n]*\S)/g, ' ');
+      const celle = r.trim().replace(/^\||\|$/g, '').split('|');
+      const piene = celle.filter((c) => c.trim());
+      const nome = celle[0].trim();
+      // La password nuda ha già la regola della sua cella, che sa quando la cella dopo la spiega.
+      if (celle.length === 2 && piene.length === 2 && !PAROLA_CHIAVE.test(nome)
+        && ((/^[A-Za-z_][\w.-]{0,60}$/.test(nome) && tipoDiNome(nome)) || ETICHETTA_SEGRETO_SOLA.test(nome))) {
+        const k = r.indexOf('|', r.indexOf('|') + 1);
+        r = `${r.slice(0, k)}:${r.slice(k + 1)}`;
+      }
+      if (r !== riga) cambiato = true;
+      return r;
+    });
+    return cambiato ? righe.join('\n') : null;
+  }
+
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   // `giro`: quante codifiche di un indirizzo si sono già tolte (codificatiNellIndirizzo).
