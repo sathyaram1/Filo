@@ -52,7 +52,7 @@ test('la bozza la prende una volta sola l\'editor preparato, poi l\'editor viene
   pulisci();
 });
 
-test('senza velo l\'editor viene davanti appena ha disegnato; un editor già aperto si rinaviga', () => {
+test('senza velo l\'editor viene davanti appena ha disegnato; un editor non ancora caricato si rinaviga', () => {
   const { t, home } = schede();
   t.openTab('filo://editor/editor.html?file=a');
   const r = D.consegna({ tabs: t, homeTab: home, homeWc: home.view.webContents, testo: 'x', velo: false });
@@ -62,6 +62,18 @@ test('senza velo l\'editor viene davanti appena ha disegnato; un editor già ape
   D.prendi(r.id, editor);
   D.editorPronto(r.id, editor, null);
   assert.deepEqual(t.attivate, [editor.id]);
+  pulisci();
+});
+
+test('un editor già caricato prende la bozza dove sta, senza ricaricarsi', () => {
+  const { t, home } = schede();
+  const id = t.openTab('filo://editor/editor.html?file=a');
+  const editor = t.tabs.find((x) => x.id === id);
+  Object.assign(editor.view.webContents, { getURL: () => 'filo://editor/editor.html?file=a', isLoading: () => false });
+  const r = D.consegna({ tabs: t, homeTab: home, homeWc: home.view.webContents, testo: 'x', velo: false });
+  assert.equal(editor.url, 'filo://editor/editor.html?file=a');
+  assert.deepEqual(editor.view.webContents.mandati, [{ type: MSG.EDITOR_BOZZA, id: r.id }]);
+  assert.equal(t.sotto, editor.id);
   pulisci();
 });
 
