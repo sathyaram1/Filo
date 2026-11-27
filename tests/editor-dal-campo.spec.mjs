@@ -242,6 +242,6 @@ test('fotogrammi dell\'apertura: nessun fotogramma bianco fra la home e l\'edito
       if (bianco / (buf.length / 16) > 0.33) out.push(n);
     }
     return out;
-  }, { cartella: join(process.cwd(), cartella), file });
+  }, file.map((f) => join(process.cwd(), cartella, f)));
   expect(bianchi).toEqual([]);
 });
