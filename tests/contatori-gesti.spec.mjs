@@ -240,7 +240,7 @@ test('l’Editor conta per tipo lo strumento aggiunto, spostato e tolto dal pann
   await aggiungiStrumento(page, 'settings');
   await expect.poll(() => conto(app, 'modulo_editor', 'settings', 'aggiunto'), { timeout: 8_000 }).toBe(1);
   await strumento(page, 'comment').locator('.pd-contenuto').click({ button: 'right' });
-  await page.locator('.pd-menu .sn-select-option', { hasText: 'Sposta su' }).click();
+  await menuDi(page).scegli('Sposta su');
   await expect.poll(() => conto(app, 'modulo_editor', 'comment', 'spostato'), { timeout: 8_000 }).toBe(1);
   await strumento(page, 'word-count').locator('.pd-contenuto').click({ button: 'right' });
   await page.locator('.pd-menu .sn-select-option', { hasText: 'Togli dal pannello' }).click();
