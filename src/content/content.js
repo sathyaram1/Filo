@@ -2396,19 +2396,34 @@
     } catch (_) { return null; }
   }
 
-  function buildZoomItem() {
+  // La dimensione della pagina, solo quando NON è quella reale (#686): una pagina rimasta zoomata da un'altra visita
+  // spiega da sé perché è così. Il valore è l'icona (#2555): il clic apre i valori, con «Dimensione reale» (lo stesso
+  // nome della voce nella barra dei menu), la rotella lo cambia.
+  const ZOOM_VALORI = Object.freeze([50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200]);
+  function azioneZoom() {
     const p = zoomCorrente();
-    if (p == null) return null;
+    const Z = zoomPagina();
+    if (p == null || !Z) return null;
+    const metti = (v) => {
+      try {
+        if (v === 100) { Popup.conta({ misura: 'strada', id: 'zoom_reset', via: 'tasto_destro_altro' }); Z.azzera(); }
+        else if (typeof Z.imposta === 'function') Z.imposta(v);
+      } catch (_) {}
+    };
+    const valori = ZOOM_VALORI.filter((v) => v === 100 || typeof Z.imposta === 'function');
     return {
-      type: 'item',
-      // Stesso nome della voce nella barra dei menu: due strade per la stessa
-      // cosa non si chiamano in due modi.
       label: `Dimensione reale (ora ${p}%)`,
-      shortcut: Tasti.etichetta('Ctrl+0'),
-      onClick: () => {
-        Popup.conta({ misura: 'strada', id: 'zoom_reset', via: 'tasto_destro_altro' });
-        try { zoomPagina()?.azzera(); } catch (_) {}
+      valore: {
+        testo: `${p}%`,
+        valori: valori.map((v) => ({
+          label: v === 100 ? `Dimensione reale (${Tasti.etichetta('Ctrl+0')})` : `${v}%`, scelto: v === p, onClick: () => metti(v),
+        })),
+        passo: typeof Z.imposta === 'function' ? (verso) => {
+          const piu = verso > 0 ? ZOOM_VALORI.find((v) => v > p) : [...ZOOM_VALORI].reverse().find((v) => v < p);
+          if (piu) { metti(piu); setTimeout(() => MenuIcons?.aggiorna?.(), 60); }
+        } : null,
       },
+      onClick: () => metti(100),
     };
   }
 
