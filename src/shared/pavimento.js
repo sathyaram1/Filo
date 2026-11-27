@@ -235,7 +235,7 @@
   const UN_SBLOCCABILE = new RegExp(`(?<![\\p{L}])${SBLOCCABILE}(?![\\p{L}])`, 'giu');
   const etichettaSbloccabile = (coda) => {
     const m = ETICHETTA_SBLOCCABILE.exec(coda);
-    return !!m && !NON_APRE.test(m[0].replace(UN_SBLOCCABILE, ' ')) && !PREDEFINITO.test(m[0]);
+    return !!m && !NON_APRE.test(m[0].replace(UN_SBLOCCABILE, ' ')) && !PREDEFINITO.test(m[0]) && nomeSenzaUnAltroDavanti(coda, m);
   };
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
