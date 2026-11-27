@@ -175,7 +175,7 @@ test('il «+» mostra tutti gli strumenti: uno trascinato dentro resta dopo il r
     await expect(ed.locator('#doc b, #doc strong')).toHaveText('forte');
     // Col tasto destro si toglie.
     await ed.click('.pd-elemento[data-elemento="bold"] .pd-contenuto', { button: 'right' });
-    await ed.locator('.pd-menu .sn-select-option', { hasText: 'Togli dal pannello' }).click();
+    await menuDi(ed).scegli('Togli dal pannello');
     await expect.poll(() => elementi(ed)).toEqual(['word-count', 'search-replace']);
     await chiudiApp(app);
   } finally {
