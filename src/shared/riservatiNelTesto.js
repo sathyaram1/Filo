@@ -459,9 +459,10 @@ const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
 // degli annunci: anche il participio da solo («pw rimasta …», «pw became …») presenta il valore e non lo è (#1403.67).
 const AVVERBI = guardiano().AVVERBIO;
 const CAMBIATA = `${guardiano().PARTICIPI}|${guardiano().PASSATI}`;
-const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:${AVVERBI}\\s+)?(?:[:=]|(?<!\\p{L})(?:${guardiano().ANNUNCIO_LARGO}|${CAMBIATA})(?!\\p{L}))`
+const CAMBIA = `(?:${guardiano().VERBI_CAMBIO.diventa.map((w) => esc(w).replace(/ /g, '\\s+')).join('|')})(?!\\p{L})`;
+const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:${AVVERBI}\\s+)?(?:[:=]|(?<!\\p{L})(?:${guardiano().ANNUNCIO_LARGO}|${CAMBIATA})(?!\\p{L})|(?<!\\p{L})${CAMBIA})`
   + `(?:\\s+${AVVERBI}(?!\\p{L})){0,3}\\s*$`, 'u');
-const PONTE = new RegExp(`^(?:${AVVERBI}|${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO}|${CAMBIATA}|${guardiano().CAMBI})$`, 'u');
+const PONTE = new RegExp(`^(?:${AVVERBI}|${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO}|${CAMBIATA}|${guardiano().CAMBI}|${CAMBIA})$`, 'u');
 const ACCANTO = /^\s*$/u;
 
 // La password detta prima del suo nome (#2695.8): «gattonero è la password», «usa Gatto2024 come password del wifi». Con

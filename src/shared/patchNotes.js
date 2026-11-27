@@ -29,6 +29,7 @@
         { testo: 'Una password, un PIN o un CVV scritti dopo un\'etichetta in grassetto o fra tag HTML, come «<b>Password:</b> …», non arrivano più a nessun modello, nemmeno al correttore.', segnalazione: 2695 },
         { testo: 'Una password scritta prima del suo nome, come «gattonero è la password» o «usa Gatto2024 come password», non arriva più ai modelli del correttore, come quando la scrivi dopo il nome. Con un numero, un simbolo o fra virgolette non arriva più a nessun modello.', segnalazione: 2695 },
         { testo: 'Una password scritta sulla riga sotto «Password:» non arriva più a nessun modello nemmeno con un punto d\'elenco o il segno di citazione davanti, come «- …» o «> …», dopo «Password =», o quando è fatta di più parole, anche fra virgolette.', segnalazione: 2673 },
+        { testo: 'Un PIN o il codice del cancello scritti come «ho cambiato il pin in 4821» o «il codice del cancello è diventato 4821» non arrivano più a nessun modello, e una password detta così o dopo «Ti ricordi la password? Era …» non esce verso un sito senza che tu lo confermi. Una password come «Mela! Verde77» non arriva più a metà.', segnalazione: 2714 },
       ],
     },
     {
