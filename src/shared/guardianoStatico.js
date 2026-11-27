@@ -552,7 +552,7 @@
   const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
     + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI})`
     + `\\s{0,8}(?:["'«“]|[${APRE_VALORE}]\\s{0,8})?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
-  const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)[\\s:=]{0,8}(?:${ANNUNCIO}\\s{1,8})?["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
+  const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)[\\s:=]{0,8}(?:${ANNUNCIO}\\s{1,8}${ARTICOLO})?["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
     try { s = `${s}\n${decodeURIComponent(s.replace(/\+/g, ' '))}`; } catch (_) { /* un % che non codifica niente */ }
