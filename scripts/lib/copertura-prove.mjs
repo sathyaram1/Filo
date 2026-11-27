@@ -4,9 +4,12 @@
 
 import { _electron, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, relative, resolve, dirname } from 'node:path';
 
 const OGNI_MS = 1000;
+// Quando una funzione conta come eseguita lo dice il main, per tutti e due i lati della mappa.
+const regola = () => createRequire(import.meta.url)('../../src/main/copertura.js');
 
 /** Il nome della prova in corsa, relativo al repo (la cartella della config) e a barre normali; vuoto fuori da una prova. */
 function provaInCorsa() {
