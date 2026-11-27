@@ -183,7 +183,7 @@ test('Rinomina… dal tasto destro: il nome nuovo compare sulla scheda, al suo p
   await expect(cards.nth(pos).locator('.sn-card-title')).toHaveText('Artefatti');
 
   await scheda(page, 'Artefatti').click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Rinomina…' }).click();
+  await menuDi(page).scegli('Rinomina…');
   await campo.fill('   ');
   await campo.press('Enter');
   await expect(campo).toHaveCount(0);
