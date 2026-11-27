@@ -25,6 +25,7 @@
         { testo: 'Una password di più parole dopo «Password:» con dentro un numero e una parola di tempo, come «ci vediamo tra due giorni» o «il mio cane ha tre anni», non arriva più a nessun modello.', segnalazione: 2678 },
         { testo: 'Una password scritta in francese, tedesco, spagnolo, portoghese, polacco, russo, greco, cinese, giapponese o coreano, come «Das Passwort ist …» o «WiFi密码是…», non arriva più a nessun modello, come già in italiano e in inglese.', segnalazione: 1403 },
         { testo: 'Una password, un PIN o un CVV in un pezzo di pagina incollato col suo HTML, come «<b>Password:</b> …» o una tabella copiata da un sito, non arrivano più a nessun modello, come già negli appunti in Markdown.', segnalazione: 2673 },
+        { testo: 'Una password, un PIN o un CVV scritti dopo un\'etichetta in grassetto o fra tag HTML, come «<b>Password:</b> …», non arrivano più a nessun modello, nemmeno al correttore.', segnalazione: 2695 },
       ],
     },
     {
