@@ -137,6 +137,7 @@ function pezziOscurati(pezzi, campo, campoDa, sopra = '') {
   const valori = [...new Set([
     ...[base, ...pezzi].flatMap(valoriDi),
     ...(s ? valoriDi(s) : []),
+    ...(s ? sottoLaDomanda(s, base) : []),
     ...(aperta ? R.lunghi(R.valoriRisposta(R.minuscolo(base.slice(0, R.RISPOSTA_MAX)),aperta.tipo, aperta.chiesta, aperta.data)) : []),
   ])].sort((x, y) => y.length - x.length);
   const coperti = [];
