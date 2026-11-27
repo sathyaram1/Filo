@@ -1250,7 +1250,7 @@ test('un elenco o una citazione qualunque sotto un\'etichetta o senza restano co
     'Requisiti della password:\n- almeno 8 caratteri\n- una maiuscola', 'Password del wifi:\n- chiedi al bancone',
     'Password:\n"la trovi sul modem"', 'Cambia la password\n"Gestisci account"', '> Ciao Luca,\n> ci vediamo domani alle 8.\n> Marco',
     'Lista della spesa:\n- latte\n- pane\n* uova\n1. burro', '1. Apri le impostazioni\n2. Tocca Password\n3. Scegli "Nuova password"',
-    'password =\n  input("scrivi")', 'x = 3\ny = 4',
+    'password =\n  input("scrivi")', 'x = 3\ny = 4', 'Password:\nUtente: mario', 'Password:\nMostra password', 'Password:\nAlmeno otto caratteri',
   ]) for (const a of OGNI_A_CAPO) assert.equal(P.oscura(t.replaceAll('\n', a)), t.replaceAll('\n', a), JSON.stringify(t));
 });
 
