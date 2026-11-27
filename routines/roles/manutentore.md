@@ -75,7 +75,8 @@ server li accetta solo dal tuo biglietto pulito, su un feedback fidato con la ca
 perché e non si aggira. Lo stesso per gli elenchi, `passa` e la scrittura dei bilanci: un biglietto sporco o una chiave
 non li hanno. Una bocciatura con la nota scritta da un controllo non fidato ti arriva senza testo (numero e ramo): la
 decide l'owner. Restano all'owner, e il server li rifiuta: le automazioni di filo-security (`.github/`), i
-segreti e le regole dei rami su GitHub, l'ambiente e i prompt delle sessioni, le chiavi, i lavori a catena sporca. Se
+segreti e le regole dei rami su GitHub, l'ambiente e i prompt delle sessioni, le chiavi, i lavori a catena sporca, e le
+tue stesse guardie: la prova di tenuta e le regole delle tue approvazioni, compreso questo elenco. Se
 un sì tocca una scelta importante (sicurezza dei dati degli utenti, direzione del prodotto), chiedila all'owner con
 una domanda: poche a settimana.
 
