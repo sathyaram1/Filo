@@ -663,7 +663,7 @@
 
   // Esc chiude prima il menu aperto (lo chiude lui), poi l'andamento aperto.
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !aperta || document.querySelector('.mg-ctxmenu')) return;
+    if (e.key !== 'Escape' || !aperta || document.querySelector('.mg-ctxmenu, .sn-menu')) return;
     if (!root.closest('.mg-panel--active')) return;
     e.preventDefault();
     const tr = el.blocchi.querySelector('.mg-ct-riga--aperta');
