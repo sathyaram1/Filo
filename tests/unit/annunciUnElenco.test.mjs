@@ -58,6 +58,23 @@ test('il PIN col complemento è annunciato da ogni parola dell\'elenco in uscita
   }
 });
 
+// #1403.83 giro 1 — il verbo seguito dai due punti o dall'uguale annuncia il PIN come il verbo da solo.
+test('il PIN annunciato da «è:» o «è =» esce come segreto, col complemento e senza', () => {
+  const codici = (t) => [...new Set(G.segretiInUscita(t).filter((x) => x.regola === 'codice').map((x) => x.valore))];
+  for (const w of G.ANNUNCI) {
+    for (const frase of [`il pin ${w}: 4821`, `il pin del telefono ${w}: 4821`, `il pin del telefono ${w} = 4821`]) {
+      assert.deepEqual(codici(frase), ['4821'], `uscite: ${frase}`);
+    }
+  }
+  for (const frase of ['the pin for my phone is: 4821', 'il pin del telefono é : 4821', 'il pin del telefono é= 4821',
+    'il pin del telefono è ancora: 4821', 'il codice otp è: 482913']) {
+    assert.equal(codici(frase).length, 1, frase);
+  }
+  for (const frase of ['se il pin è: giusto, la pagina è 2048', 'il pin del telefono è: cambiato 2 volte']) {
+    assert.deepEqual(codici(frase), [], frase);
+  }
+});
+
 test('una parola dell\'elenco attaccata a cifre non annuncia niente', () => {
   assert.deepEqual(G.segretiInUscita('The password war2023 is not valid'), []);
 });
