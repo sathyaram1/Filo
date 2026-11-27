@@ -134,7 +134,7 @@ test('una lettera ridata a un’altra cosa dice cosa apriva prima, dalle Prefere
 
   const page = await casa(app);
   await page.locator('#altro .dash-altro-app[data-id="impostazioni"]').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Assegna una lettera' }).click();
+  await menuDi(page).scegli('Assegna una lettera');
   await page.keyboard.press('y');
   await expect.poll(urlDi).toBe('impostazioni');
   await expect(page.locator('#dashFlash')).toContainText('«yy» nella home: Impostazioni (prima apriva example.com)');
@@ -219,7 +219,7 @@ test('dal tasto destro di un tasto gli do una lettera premendola, e due volte qu
   test.setTimeout(60_000);
   const page = await casa(app);
   await page.locator('#altro .dash-altro-app[data-id="cerca"]').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Assegna una lettera' }).click();
+  await menuDi(page).scegli('Assegna una lettera');
   await page.keyboard.press('c');
   await expect.poll(() => lettere(app)).toEqual([{ lettera: 'c', tasto: 'cerca' }]);
   await expect(page.locator('#altro .dash-altro-app[data-id="cerca"]')).toHaveAttribute('title', /cc$/);
