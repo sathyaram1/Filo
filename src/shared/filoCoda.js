@@ -270,6 +270,8 @@
         if (!testo.trim() || !contiene(testo, ts, largo)) return;
         messaggi.push({
           k: 'msg', chat: c.id, i, ts: m.ts, role: m.role === 'user' ? 'user' : 'filo', testo: estratto(testo, ts, 70, largo),
+          // L'estratto è l'anteprima della riga; «Copia il testo» copia il messaggio intero (#869.2).
+          intero: testo,
           ...(eApp(c) ? { app: c.app } : {}),
         });
       });
