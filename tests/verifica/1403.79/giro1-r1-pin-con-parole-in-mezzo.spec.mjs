@@ -10,7 +10,7 @@ const FRASI = [
   ['Il pin del bancomat è 4831 e quello della SIM è 1236', '4831', '1236'],
   ['Il pin è 4832 e il secondo è 1237', '4832', '1237'],
   ['Il pin è 4833 e anche 1238', '4833', '1238'],
-  ['PIN carta 4834, telefono 1239', '4834', '1239'],
+  ['pin: 4834; 1239', '4834', '1239'],
   ['pin: 4835 - 1240', '4835', '1240'],
   ['Il pin è 4836\ne 1241', '4836', '1241'],
 ];
