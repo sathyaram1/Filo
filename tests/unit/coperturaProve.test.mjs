@@ -31,10 +31,40 @@ test('il main registra le funzioni di src/ che ha eseguito, col nome della prova
     assert.equal(j.prova, 'tests/x.spec.mjs');
     assert.equal(j.processo, 'main');
     const testo = readFileSync(join(ROOT, 'src/main/percorsoFilo.js'), 'utf8');
-    const funzioni = (j.file['src/main/percorsoFilo.js'] || []).map(([da]) => testo.slice(da, da + 21));
+    const funzioni = (j.indirizzi[pathToFileURL(join(ROOT, 'src/main/percorsoFilo.js')).href] || []).map(([da]) => testo.slice(da, da + 21));
     assert.ok(funzioni.includes('function percorsoFilo'),`la funzione chiamata è registrata: ${JSON.stringify(funzioni)}`);
-    assert.ok(Object.keys(j.file).every((f) => f.startsWith('src/')), 'solo file di src/');
+    assert.ok(Object.keys(j.indirizzi).every((u) => percorsoDaIndirizzo(u, ROOT)), 'solo file di src/');
   } finally { togliCartella(dir); }
+});
+
+test('il main registra i file che filo:// serve, anche senza funzioni: così si sa chi carica un foglio di stile', () => {
+  const dir = cartellaTemporanea('filo-copertura-');
+  try {
+    const codice = `
+      const { EventEmitter } = require('node:events');
+      const app = new EventEmitter();
+      const c = require(${JSON.stringify(join(ROOT, 'src/main/copertura.js'))});
+      c.accendi(app);
+      c.servito('filo://newtab/dashboard.css?v=2#x');
+      c.servito('non è un indirizzo');
+      app.emit('will-quit');
+    `;
+    const r = spawnSync(process.execPath, ['-e', codice], { env: { ...process.env, FILO_COPERTURA: dir, FILO_COPERTURA_PROVA: 'tests/x.spec.mjs' }, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    const j = JSON.parse(readFileSync(join(dir, readdirSync(dir).find((f) => f.startsWith('main-'))), 'utf8'));
+    assert.deepEqual(j.indirizzi['filo://newtab/dashboard.css'], []);
+    assert.equal(percorsoDaIndirizzo('filo://newtab/dashboard.css', ROOT), 'src/pages/dashboard/dashboard.css');
+  } finally { togliCartella(dir); }
+});
+
+test('una regola sola dice quando una funzione è eseguita, per il main e per le pagine', () => {
+  const pagine = readFileSync(join(ROOT, 'scripts/lib/copertura-prove.mjs'), 'utf8');
+  assert.ok(!/count\s*>\s*0/.test(pagine), 'le pagine non riscrivono la regola: la prendono dal main');
+  assert.match(pagine, /src\/main\/copertura\.js/);
+  const { accumula, comeIndirizzi } = require_(join(ROOT, 'src/main/copertura.js'));
+  const viste = new Map();
+  accumula(viste, { result: [{ url: 'filo://shell/a.js', functions: [{ ranges: [{ startOffset: 0, endOffset: 9, count: 1 }] }, { ranges: [{ startOffset: 2, endOffset: 5, count: 0 }] }] }] });
+  assert.deepEqual(comeIndirizzi(viste), { 'filo://shell/a.js': [[0, 9]] });
 });
 
 test('senza FILO_COPERTURA il main non registra niente', () => {
