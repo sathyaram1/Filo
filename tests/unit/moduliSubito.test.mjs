@@ -26,6 +26,7 @@ const SU_RICHIESTA = {
   'src/shared/dictationSegmenter.js': 'la dettatura',
   'src/shared/ascolto.js': 'la dettatura e il microfono delle chat',
   'src/shared/voceChat.js': 'il microfono delle chat',
+  'src/shared/trascriviMedia.js': 'i tetti di «Trascrivi» su un audio, letti al clic',
 };
 
 // Il peso dei moduli caricati subito, in byte di sorgente: misurato 2.05 MB a novembre 2026, col margine per crescere.
