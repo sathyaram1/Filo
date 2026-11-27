@@ -7,6 +7,7 @@
 // il totale delle copie si conservi.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CARDS = {
   'c-island': {
