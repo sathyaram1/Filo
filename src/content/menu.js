@@ -307,6 +307,7 @@
 
   function closeSubmenu() {
     if (!activeMenu?.subRoot) return;
+    nascondiBersaglio();
     staccaSub();
     activeMenu.subAnchor = null;
     activeMenu.subMode = null;
