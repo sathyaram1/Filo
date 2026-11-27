@@ -83,7 +83,7 @@ test('tasto destro sulla scheda: «Rispondi alla domanda» fa la stessa cosa del
   await apri(page);
   await page.evaluate(() => window.__mgTest.setTab('queue'));
   await riga(page, 'Colore del tema').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Rispondi alla domanda D-7' }).click();
+  await menuDi(page).scegli('Rispondi alla domanda D-7');
   await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-7"]')).toBeVisible();
 });
