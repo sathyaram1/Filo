@@ -337,6 +337,10 @@
     // decide il nome di ripiego e l'header Accept.
     // { url, kind:'video'|'audio' } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     DOWNLOAD_MEDIA: 'download_media',
+    // #1660 — «Trascrivi» su un audio o un video: il main tiene da parte la sorgente (i byte letti dalla pagina, o
+    // l'indirizzo da scaricare per conto della scheda) e il riquadro della risposta la trascrive con `mediaId`.
+    // { base64?, url?, politiche? } → { ok, id } | { ok:false, code, error }
+    TRASCRIVI_MEDIA_PREPARA: 'trascrivi_media_prepara',
     // #1488 — «Salva video come…» su un video in streaming: lo scarica yt-dlp dall'indirizzo del riquadro che chiede, o
     // da `indirizzo` (quello del video cliccato) se è dello stesso sito.
     // { kind:'video'|'audio', titolo, indirizzo? } → { ok, path, filename } | { ok:false, cancelled? , motivo?, frase?, spento? }
