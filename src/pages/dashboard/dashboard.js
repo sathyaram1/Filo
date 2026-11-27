@@ -1133,6 +1133,20 @@
     threadHistory = [];
   }
 
+  // Il filo è uno fra le schede (#869.2): chi scrive continua la conversazione che la home continua adesso, anche se
+  // l'ha cominciata un'altra scheda. Restano com'erano la conversazione riaperta apposta da qui e l'accoglienza.
+  async function prendiIlFilo() {
+    if (Accoglienza.isActive() || (chatScelta && chatId === chatScelta)) return;
+    let r = null;
+    try { r = await send({ type: MSG.FILO_CHAT_CORRENTE }); } catch (_) { return; }
+    const id = r && r.ok ? r.id : null;
+    if (!id || id === chatId) return;
+    const prima = chatId;
+    const storia = threadHistory;
+    if (!(await adotta(id).catch(() => false))) { chatId = prima; threadHistory = storia; return; }
+    if (prima) { try { send({ type: MSG.FILO_CHAT_CLOSE, id: prima, via: 'home' }); } catch (_) {} }
+  }
+
   function historyWithout(userMessage) {
     const h = threadHistory.slice();
     const last = h[h.length - 1];
