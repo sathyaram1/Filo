@@ -145,7 +145,7 @@ const vistePerLeRegole = (t) => {
 };
 // Il testo come lo leggono le regole: senza enfasi, minuscolo, i due punti a tutta larghezza come i nostri, e il punto e
 // virgola di una riga in greco come punto di domanda (in greco è quello). Stessa lunghezza: le posizioni restano.
-const minuscolo = (t) => senzaEnfasi(t).toLowerCase().replace(/：/g, ':')
+const minuscolo = (t) => senzaMarkdown(t).toLowerCase().replace(/：/g, ':')
   .replace(/^.*\p{Script=Greek}.*$/gmu, (riga) => riga.replace(new RegExp('[;\\u037E]', 'gu'), '?'));
 const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
