@@ -416,13 +416,47 @@
     const k = fuori.search(/\n|[.,;!?](?=\s|$)/);
     return k < 0 ? coda : coda.slice(0, k);
   };
+  // La frase dopo, che rimanda alla password senza nominarla: «la password scade, la nuova è …», «è sbagliata, prova …»,
+  // «expired, new one …», «cambiata ieri, adesso …» (#2695.4). Prove: tests/unit/passwordNellaFraseDopo.test.mjs.
+  const RINVIO = new RegExp('^(?:[.,;!?]+|\\n)[^\\S\\n]*(?:'
+    + "(?:(?:la|il|quella|quello)\\s+)?(?:nuov[ao]|giust[ao]|corrett[ao]|ver[ao]|vecchi[ao]|attuale)"
+    + '|(?:ri)?prova(?:\\s+con)?|usa|metti|inserisci|scrivi|digita|adesso|ora|invece|da\\s+(?:oggi|adesso|ora)'
+    + "|(?:the\\s+)?(?:new|right|correct|real|old|current)(?:\\s+one)?|try(?:\\s+with)?|use|enter|type|now|instead"
+    + "|it['’]?s\\s+now|it\\s+is\\s+now|from\\s+now\\s+on|(?:la\\s+)?nouvelle|essaie|essayez|maintenant|(?:la\\s+)?nueva"
+    + '|prueba|ahora|(?:das\\s+|die\\s+)?neue|versuch(?:e|s)?|jetzt'
+    + ')(?![\\p{L}\\p{N}])', 'u');
+  // Dopo il rimando: l'annuncio, i due punti e gli avverbi si saltano; il valore è la parola dopo. Di sole lettere, senza
+  // annuncio, solo se chiude la frase: «prova gattonero» sì, «adesso vado a cambiarla» no.
+  const CONGIUNZIONE = /^(?:e|ed|ma|o|poi|and|but|or|then)$/u;
+  function dopoIlRinvio(resto, { soloCifre, spiega }) {
+    const r = RINVIO.exec(resto);
+    if (!r) return null;
+    const G = global.SN_GUARDIANO_STATICO;
+    const parole = fineFrase(resto.slice(r[0].length).replace(/^\s+/, '')).split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
+    let annunciato = false;
+    for (const [k, w] of parole.entries()) {
+      const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+      if (/^[:=]+$/.test(w) || (G && (G.ANNUNCI.includes(t) || new RegExp(`^${G.AVVERBIO}$`, 'u').test(t)))) {
+        annunciato = annunciato || !/^(?:ora|adesso|now)$/u.test(t);
+        continue;
+      }
+      if (w.endsWith(':')) annunciato = true;
+      const cifre = /\d/.test(t);
+      if (cifre) return soloAlnum(t).length >= 4 ? { valore: t, regola: 'codice', rinvio: true } : null;
+      const chiude = k === parole.length - 1 || CONGIUNZIONE.test(parole[k + 1]);
+      if (soloCifre || t.length < MIN_TOKEN || RIEMPITIVI.has(t) || (spiega && spiega(parole, k)) || !(annunciato || chiude)) return null;
+      return { valore: t, regola: 'password', rinvio: true };
+    }
+    return null;
+  }
   // `spiega(parole, k)`: la parola k della frase spiega la password («va cambiata ogni 90 giorni») e, di sole lettere, non
   // è il valore. Chi toglie il testo (correttoreRiservati.js) la passa; chi lo confronta con un URL no.
   function segretiDetti(testo, { spiega = null } = {}) {
     const out = [];
     const prendi = (re, soloCifre) => {
       for (const m of testo.matchAll(re)) {
-        const coda = fineFrase(testo.slice(m.index + m[0].length, m.index + m[0].length + 200));
+        const da = m.index + m[0].length;
+        const coda = fineFrase(testo.slice(da, da + 200));
         const parole = coda.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
         for (const [k, w] of parole.entries()) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
@@ -430,6 +464,10 @@
           const spiegata = !cifre && !!spiega && !!spiega(parole, k);
           if (cifre ? soloAlnum(t).length < 4 : (soloCifre || spiegata || t.length < MIN_TOKEN || RIEMPITIVI.has(t))) continue;
           out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
+        }
+        if (coda.length < 200) {
+          const dopo = dopoIlRinvio(testo.slice(da + coda.length, da + coda.length + 200), { soloCifre, spiega });
+          if (dopo) out.push(dopo);
         }
       }
     };
