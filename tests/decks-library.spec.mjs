@@ -173,7 +173,7 @@ test('Rinomina… dal tasto destro: il nome nuovo compare sulla scheda, al suo p
 
   // Esc annulla, un nome vuoto lascia quello di prima.
   await scheda(page, 'Artefatti').click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Rinomina…' }).click();
+  await menuDi(page).scegli('Rinomina…');
   const campo = page.locator('#deckGrid .dk-card-rename');
   await expect(campo).toBeFocused();
   await expect(campo).toHaveValue('Artefatti');
