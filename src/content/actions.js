@@ -1777,6 +1777,15 @@
   // `link`: il collegamento a cui il menu lega il filmato (l'anteprima stesa sopra la scheda di una home).
   function buildMediaItems(el, link = null) {
     const a = azioniDelMedia(el, link);
+    const trascrivi = { type: 'item', azione: 'transcribe-media', label: a.transcribe.label, onClick: a.transcribe.onClick };
+    if (el.staccato) {
+      return [
+        trascrivi,
+        { type: 'separator' },
+        { type: 'item', azione: 'copy-download-video', label: a.copyLink.label, onClick: a.copyLink.onClick },
+        { type: 'item', azione: 'copy-download-video', label: a.save.label, onClick: a.save.onClick },
+      ];
+    }
     const items = [
       { type: 'item', azione: 'video-audio-controls', label: a.playPause.label, onClick: a.playPause.onClick },
       { type: 'item', azione: 'video-audio-controls', label: a.mute.label, onClick: a.mute.onClick },
