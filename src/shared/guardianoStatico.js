@@ -557,14 +557,13 @@
     for (const x of codiciDelPavimento(s)) out.push(x);
     return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
   }
-  // Il codice di ciò che si apre (il mio telefono, il cancello) e il CVV non escono da un'azione (#1403.89): le loro
-  // forme sono del pavimento, e qui si chiedono a lui invece di copiarle.
+  // Il codice di ciò che si apre (il mio telefono, il cancello) non esce da un'azione (#1403.89): le sue forme sono del
+  // pavimento, e qui si chiedono a lui invece di copiarle.
   function codiciDelPavimento(s) {
     if (!global.SN_PAVIMENTO && typeof require === 'function') { try { require('./pavimento.js'); } catch (_) { /* resta senza */ } }
     const P = global.SN_PAVIMENTO;
     if (!P || typeof P.trova !== 'function') return [];
-    return P.trova(s).filter((x) => x.apre || x.regola === 'cvv')
-      .map((x) => ({ valore: String(x.valore), regola: x.regola === 'cvv' ? 'carta' : 'codice' }));
+    return P.trova(s).filter((x) => x.apre).map((x) => ({ valore: String(x.valore), regola: 'codice' }));
   }
 
   function raccogli(s, out, forma) {
