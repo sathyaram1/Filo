@@ -814,7 +814,6 @@
     riquadro_cookie_menu_togli: 'Togli i cookie riattivati di %s',
     // #975 — il menu che un sito si disegna da sé. Il nome viene dalla pagina: si sostituisce con una funzione.
     menu_del_sito: 'Menu di %s',
-    menu_del_sito_scelta: 'Cosa apre il tasto destro qui',
     menu_del_sito_sempre: 'Aprilo subito col tasto destro',
     menu_del_sito_torna_filo: 'Col tasto destro apri il menu di Filo',
     menu_del_sito_proposta: 'Su %s scegli spesso il menu del sito. Te lo apro subito col tasto destro? Quello di Filo resta a %s + tasto destro.',
