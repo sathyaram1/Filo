@@ -1558,7 +1558,8 @@ fidato e figlio. I nipoti contano come figli.
 
 | Compito | Urgenza |
 |---|---|
-| Gestisci la risposta | 47 |
+| Gestisci la domanda (smistamento) | 66 |
+| Gestisci la risposta | 65 |
 | Gestione del lavoro, audit di sicurezza, riordino della coda, suite completa: riporta verde | 45 |
 | Esperimento della gestione del lavoro, e il giudice cieco che ne confronta l'esito (§ 4.6) | 44 |
 | Revisione delle domande, addetto comunicazioni | 30 |
