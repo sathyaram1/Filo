@@ -92,16 +92,17 @@ const TAG_TESTO = 'b|strong|i|em|u|s|strike|del|ins|mark|small|big|sub|sup|span|
   + '|label|time|data|bdi|bdo|wbr|nobr';
 const TAG_A_CAPO = 'br|hr|p|div|li|dt|dd|tr|table|caption|h[1-6]|pre|blockquote|section|article|header|footer|main'
   + '|aside|nav|figure|figcaption|address|details|summary|form|fieldset|legend';
-const TAG_HTML = new RegExp(`<(/?)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|dl|thead|tbody|tfoot|td|th)(?=[\\s/>])`
-  + '((?:[^<>"\']|"[^"<>]*"|\'[^\'<>]*\')*)>', 'giu');
+// Anche scritti come entità («&lt;b&gt;Password:&lt;/b&gt;», il sorgente mostrato in una pagina).
+const TAG_HTML = new RegExp(`(<|&lt;)(/?)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|dl|thead|tbody|tfoot|td|th)(?=[\\s/>]|&gt;)`
+  + '((?:[^<>"\'&]|&(?!gt;)|"[^"<>]*"|\'[^\'<>]*\')*)(>|&gt;)', 'giu');
 const DI_TESTO = new RegExp(`^(?:${TAG_TESTO})$`, 'i');
 const A_CAPO = new RegExp(`^(?:${TAG_A_CAPO})$`, 'i');
 const SPAZIO_HTML = /&(?:nbsp|#160|#x0*a0);/gi;
-const senzaTag = (s) => s.replace(TAG_HTML, (tag, chiude, nome, attributi, k, tutto) => {
+const senzaTag = (s) => s.replace(TAG_HTML, (tag, apre, chiude, nome, attributi, fine, k, tutto) => {
   if (DI_TESTO.test(nome) && /[\p{L}\p{N}]/u.test(tutto[k - 1] || '') && /[\p{L}\p{N}]/u.test(tutto[k + tag.length] || '')) return tag;
   const segno = chiude ? ' ' : A_CAPO.test(nome) ? '\n' : /^t[dh]$/i.test(nome) ? '|' : ' ';
-  const testa = segno + ' '.repeat(1 + chiude.length + nome.length - 1);
-  return testa + attributi.replace(/\/$/, ' ') + ' ';
+  const testa = segno + ' '.repeat(apre.length + chiude.length + nome.length - 1);
+  return testa + attributi.replace(/\/$/, ' ') + ' '.repeat(fine.length);
 }).replace(SPAZIO_HTML, (e) => ' '.repeat(e.length));
 const senzaEnfasi = (t) => {
   let s = String(t == null ? '' : t);
