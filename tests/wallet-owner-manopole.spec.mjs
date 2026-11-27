@@ -649,7 +649,7 @@ test('il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regal
 
   // E la scheda si apre anche da lì.
   await riga.click({ button: 'right' });
-  await page.locator('.sn-wallet-ctxmenu').getByText('Apri la scheda').click();
+  await menuDi(page).scegli('Apri la scheda');
   await expect(page.locator('#ownerUsers .sn-wallet-scheda')).toBeVisible({ timeout: 15_000 });
 
   // Esc lo chiude, e il menu non resta appeso.
