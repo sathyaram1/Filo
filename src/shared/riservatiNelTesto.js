@@ -131,8 +131,6 @@ function cifreAttaccate(testo) {
   const posto = new Int32Array(s.length + 1);
   let piano = '';
   let i = 0;
-  const copia = (fino) => { for (; i < fino; i++) posto[piano.length + (i - (fino - (fino - i)))] = 0; };
-  void copia;
   let k = 0;
   for (const m of tratti) {
     piano += s.slice(i, m.index);
