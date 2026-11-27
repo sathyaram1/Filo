@@ -2420,7 +2420,7 @@
         })),
         passo: typeof Z.imposta === 'function' ? (verso) => {
           const piu = verso > 0 ? ZOOM_VALORI.find((v) => v > p) : [...ZOOM_VALORI].reverse().find((v) => v < p);
-          if (piu) { metti(piu); setTimeout(() => MenuIcons?.aggiorna?.(), 60); }
+          if (piu) { metti(piu); setTimeout(aggiornaFila, 60); }
         } : null,
       },
       onClick: () => metti(100),
