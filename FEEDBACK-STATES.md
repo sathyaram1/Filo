@@ -751,9 +751,10 @@ vedendo ramo e segnalibro — manda
 un **correttore sul ramo** (ruolo `fixer`, testo `resolver-ripresa.md`) con domanda,
 risposta e rilievi fermi nel payload (`ripresa`), non un risolutore da capo; dopo la
 sua consegna riprova un verificatore. Un ramo di due settimane o più di 200 commit
-dietro main il server lo riallinea prima del biglietto, con la fusione del cancello e la
-voce nel registro; si ferma col guasto «ramo vecchio» per il manutentore solo se main
-non si fonde, coi file in conflitto nella nota, e sbloccato riprova la fusione (#2672). Se la domanda era arrivata prima di avere un
+dietro main il server lo riallinea prima del biglietto, con la fusione del cancello (il
+registro delle novità unito con la sua regola) e la voce nel registro; si ferma col guasto
+«ramo vecchio» per il manutentore solo se main non si fonde fuori da quel registro, coi
+file in conflitto nella nota, e sbloccato riprova la fusione (#2672). Se la domanda era arrivata prima di avere un
 ramo, riprende un risolutore con la stessa `ripresa` nel payload. Un `→ In coda`
 senza testo vale «va bene quello che è stato fatto nel frattempo»; un commento
 scritto approvando conta come risposta solo se è arrivato dopo lo stop; (4) fix bocciato
