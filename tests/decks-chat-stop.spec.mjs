@@ -183,8 +183,8 @@ test('tasto destro sulla bolla in attesa o sull\'intestazione della chat: «Ferm
   await scrivi(page, 'carte blu');
   await expect(page.locator('#chatStop')).toBeVisible();
   await page.locator('#chatHead').click({ button: 'right' });
-  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveText(['Ferma la risposta', 'Svuota la chat…']);
-  await voce.click();
+  await expect.poll(() => menu.nomi()).toEqual(expect.arrayContaining(['Ferma la risposta', 'Svuota la chat…']));
+  await menu.scegli('Ferma la risposta');
   await expect(page.locator('.dk-msg-bot').last().locator('.dk-msg-pending')).toHaveText('Risposta fermata.');
   await expect.poll(() => app.evaluate(() => globalThis.__annullate)).toBe(2);
   await page.locator('#chatHead').click({ button: 'right' });
