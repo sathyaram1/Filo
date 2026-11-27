@@ -11,11 +11,14 @@
     {
       version: '0.2.307', date: '2026-11-26',
       fixes: [
-        { testo: 'Una password nuova scritta come «ho cambiato la password in …» o «la password è diventata …», o data dopo una domanda come «Ti ricordi la password? Era …», non arriva più a nessun modello, fra virgolette o senza.', segnalazione: 1403 },
+        { testo: 'Una password nuova o ricordata scritta come «l\'ho cambiata da «…» a «…»», «ho sostituito la password con «…»», «come password ho messo «…»» o data dopo una domanda come «Ti ricordi la password? Era …», non arriva più a nessun modello, anche in inglese, francese, spagnolo e tedesco.', segnalazione: 1403 },
+        { testo: 'Il CVV della carta scritto come «Il CVV è il 123», «CVV — 123» o col suo nome in un\'altra lingua, come «cryptogramme», «Kartenprüfnummer» o «код безопасности», non arriva più a nessun modello.', segnalazione: 2681 },
         { testo: 'Il codice che sblocca il tuo telefono o il tuo computer, scritto come «il codice del mio telefono è 4829» o «my phone code is 4829», non arriva più a nessun modello, in italiano come in francese, spagnolo, inglese e nelle altre lingue.', segnalazione: 1403 },
         { testo: 'Una password, un PIN o un CVV dopo un\'etichetta in grassetto o in corsivo, come «**Password:** …» negli appunti scritti in Markdown o in una risposta copiata da un modello, non arrivano più a nessun modello, come quando l\'etichetta è scritta senza formattazione.', segnalazione: 2673 },
         { testo: 'Una password sotto «Password:» in un file di testo creato su Windows non arriva più ai modelli, come in qualunque altro testo.', segnalazione: 2673 },
         { testo: 'Una password in una tabella, come «| Password: | … |», non arriva più ai modelli, e il correttore non riceve più il CVV della carta. Una frase sulla password, come «va cambiata ogni 90 giorni», arriva intera al correttore.', segnalazione: 2695 },
+        { testo: 'Una pagina in russo, greco, cinese o in un altro alfabeto che ti chiede la password in un campo di testo qualunque passa dal controllo dei siti pericolosi come una in italiano. E Filo non manda fuori da sé una password scritta dopo «пароль:» o «密码：», né in una ricerca né dentro un indirizzo.', segnalazione: 1403 },
+        { testo: 'Una password scritta come «la password diventa …», «dovrebbe essere …», «è ancora …», «è stata cambiata in …», «ho cambiato la password in …», «la password del wifi …» o «pass «…»» non arriva più a nessun modello, come quando scrivi «la password è …».', segnalazione: 2678 },
       ],
     },
     {

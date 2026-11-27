@@ -332,32 +332,50 @@
   const ANNUNCI = Object.freeze(['è', "e'", 'e’', 'é', 'era', 'sarebbe', 'sarà', 'is', 'are', 'was', 'sono', 'ecco', 'here',
     'vale', 'risulta', "c'est", 'c’est', 'est', 'était', 'etait', 'sera', 'ist', 'lautet', 'war', 'wird', 'es', 'será',
     'serà', 'serão', 'luidt', 'jest', 'brzmi', 'będzie', 'это', 'был', 'была', 'было', 'были', 'будет', 'является',
-    'είναι', 'ήταν']);
-  // La password nuova dopo il suo nome («la password diventa …», «è rimasta …»), o dopo un participio di cambio e «in»,
-  // «a», «to» («ho cambiato la password in …»): per correttore e pavimento (#1403.67). Parole intere, come ANNUNCI.
-  const CAMBI = Object.freeze({
-    diventa: Object.freeze(['diventa', 'diventano', 'diventerà', 'diventata', 'diventato', 'resta', 'rimane', 'rimasta',
-      'rimasto', 'becomes', 'became', 'become', 'will be']),
-    participi: Object.freeze(['cambiata', 'cambiato', 'modificata', 'modificato', 'aggiornata', 'aggiornato', 'impostata',
-      'impostato', 'reimpostata', 'reimpostato', 'changed', 'updated', 'set', 'reset']),
-    verso: Object.freeze(['in', 'a', 'to', 'into']),
-  });
+    'είναι', 'ήταν', 'هي', 'هو', 'היא', 'הוא', 'diventa', 'diventerà', 'resta', 'resterà', 'rimane', 'rimarrà', 'sia',
+    'fosse', 'essere', 'becomes', 'remains', 'stays', 'be']);
   // Un annuncio come parola intera, per le regex col flag `u`.
   const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
-  const ATTACCO = new RegExp(`(?:^|[:=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following))$`, 'i');
-  const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
+  // L'annuncio con un modale davanti e un avverbio prima o dopo («dovrebbe essere», «will be», «è ancora», #2678.7): il
+  // valore sta dopo di lui come dopo «è». Spazi senza a capo; il confine lo mette chi lo usa.
+  const AVVERBI = 'sempre|ancora|ora|adesso|invece|attualmente|tuttora|già|anche|comunque|proprio|pure|di[^\\S\\n]+nuovo|now|still|always|currently|also|just|actually|again';
+  const MODALI = 'dovrebbe|potrebbe|deve|dovrà|può|potrà|should|must|might|could|would|will|may|can|shall';
+  // Anche al passato e nei tempi composti («è diventata», «è stata cambiata in», «has been», «was set to», #2678.7), e
+  // dopo chi l'ha cambiata («ho cambiato la password in …»): il verbo di cambio vale solo con «in», «a» o «to» dopo.
+  const SP = '[^\\S\\n]+';
+  const AUSILIARI = "è|e'|e’|é|era|sarà|sarebbe|fosse|sia|ha|aveva|avrà|has|had|have|was|is|will";
+  const PARTICIPI = 'stat[ao]|diventat[ao]|divenut[ao]|rimast[ao]|restat[ao]|been|become';
+  const PASSATI = 'diventò|divenne|rimase|restò|became|become|remained|stayed';
+  const CAMBI = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|messa|messo|changed|set|updated|reset';
+  const CAMBIO = `(?:${CAMBI})${SP}(?:in|a|to)`;
+  const AUSILIARE = `(?:${AUSILIARI})${SP}(?:(?:${AVVERBI})${SP})?`;
+  const CAMBIO_PRIMA = `(?:in|a|to)(?<=(?<![A-Za-z])(?:ho|abbiamo|hai|have|has|had|i|we|ve)${SP}(?:${CAMBI})${SP}[^\\n]{1,40}(?:in|a|to))`;
+  const VERBO_LARGO = `(?:(?:${AUSILIARE})?(?:(?:${PARTICIPI})${SP})?${CAMBIO}|${AUSILIARE}(?:${PARTICIPI})|${PASSATI}|${ANNUNCI.join('|')})`;
+  const ANNUNCIO_LARGO = `(?:${CAMBIO_PRIMA}|(?:(?:${AVVERBI})${SP})?(?:dev['’]|(?:${MODALI})${SP})?${VERBO_LARGO}(?:${SP}(?:${AVVERBI})){0,2})`;
+  // Di cosa è la password, fra il nome e il valore («la password del wifi», «la pass per il router»): lo stesso per il
+  // pavimento e per il correttore. Senza spazi ai lati: li mette chi lo usa.
+  const COMPLEMENTO = "(?:(?:del(?:la|lo)?|di|per|for|of)[ \\t]+|dell['’][ \\t]*)(?:(?:il|la|lo|the|my|your|our|mio|mia|tuo|tua)[ \\t]+)?[A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F][A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F_-]{0,30}";
+  // Le etichette fuori dall'alfabeto latino, e i verbi attaccati del cinese, giapponese, coreano e thai, sono quelli dei
+  // campi segreti (#1403.8); i verbi che sono una parola stanno in ANNUNCI qui sopra.
+  if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
+  const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
+  // Cinese, giapponese e coreano scrivono anche i due punti larghi (：).
+  const ATTACCO = new RegExp(`(?:^|[:：=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following)`
+    + `|(?:${NON_LATINI.ANNUNCI_ATTACCATI}))$`, 'i');
+  const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:：=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
+  const APRE_IN_CODA = new RegExp(`(?:\\s*(?:\\d{1,3}[.)]|[•·*"«»“”(${NON_LATINI.APRE_VALORE}-]|(?<![A-Za-zÀ-ÿ])'))*\\s*$`);
   function annunciato(fra, valore = '', { stretto = false } = {}) {
     if (ALTRA_FRASE.test(fra) || /\/|\bwww\./i.test(fra)) return false;
     // L'apostrofo dopo una lettera è di «e'», non una virgoletta che apre il valore.
-    const g = fra.replace(/(?:\s*(?:\d{1,3}[.)]|[•·*"«»“”(-]|(?<![A-Za-zÀ-ÿ])'))*\s*$/, '');
+    const g = fra.replace(APRE_IN_CODA, '');
     if (stretto && !g.trim()) return false;
     if (!ATTACCO.test(g)) return false;
     if (/=\s*$/.test(g) && !/^\s*=\s*$/.test(g)) return false;
     if (/[,;]\s/.test(g) && !SOLO_ATTACCO.test(g.split(/[,;]\s/).pop())) return false;
     if (!/[A-Za-z0-9À-ÿ]/.test(g.replace(ATTACCO, ''))) return true;
     if (stretto) return false;
-    if (!/:\s*$/.test(g)) return true;
+    if (!/[:：]\s*$/.test(g)) return true;
     return !/^(?:\d{4}|[A-Za-z]{4,}\d{1,4})$/.test(String(valore));
   }
   // «482913 è il tuo codice OTP»: davanti alla parola il codice le si lega con un «è» o con niente.
@@ -375,8 +393,11 @@
   // segue subito l'attacco. Solo qui e non in `controlla`: un avviso che nomina la password e una
   // data non ha niente da fermare.
   // Le precisazioni sono un elenco chiuso, scelto dall'owner (#810): le forme nuove le vede il guardiano.
-  const MARCHIO_PASSWORD = new RegExp('\\b(?:password|passcode|passphrase)(?:\\s+(?:di\\s+accesso|per\\s+il\\s+primo\\s+accesso'
-    + '|iniziale|provvisori[ao]|for\\s+your\\s+account))?\\b', 'i');
+  const NON_LATINE = NON_LATINI.ETICHETTE_NON_LATINE;
+  const FINE_VALORE = NON_LATINI.FINE_VALORE;
+  const APRE_VALORE = NON_LATINI.APRE_VALORE;
+  const MARCHIO_PASSWORD = new RegExp('(?:\\b(?:password|passcode|passphrase)(?:\\s+(?:di\\s+accesso|per\\s+il\\s+primo\\s+accesso'
+    + `|iniziale|provvisori[ao]|for\\s+your\\s+account))?\\b|${NON_LATINE})`, 'i');
   // Gli altri nomi («Passwort», «contraseña», «mot de passe») li tiene urlExfil.js, che si carica dopo: si leggono alla
   // prima ricerca. Nei preload delle pagine urlExfil non c'è, e restano i nomi italiani e inglesi.
   let marchiPassword = null;
@@ -404,7 +425,9 @@
   }
   function passwordAnnunciata(s, fine, stretto, out, polacco = false) {
     const finestra = s.slice(fine, fine + RAGGIO + 64);
-    const re = /\S+/g;
+    // L'attacco attaccato al valore è un attacco: in cinese dopo i due punti larghi (：) lo spazio non c'è, e il valore
+    // finisce dove ricomincia la frase.
+    const re = new RegExp(`[^\\s:：=${FINE_VALORE}][^\\s${FINE_VALORE}]*`, 'g');
     let t;
     while ((t = re.exec(finestra)) && t.index <= RAGGIO) {
       const v = t[0].replace(/[.,;)»”"']+$/, '');
@@ -489,7 +512,8 @@
   const FORMA_LETTA = { token: tokenCasuale, password: sembraPassword };
   function passwordInUscita(v) {
     const s = String(v || '');
-    return s.length >= 4 && (/[0-9]/.test(s) || /[^A-Za-z0-9À-ÿ]/.test(s) || (/[a-z]/.test(s) && /[A-Z]/.test(s.slice(1))));
+    // Le lettere di ogni alfabeto sono lettere: «неверный» (sbagliata) dopo l'etichetta è una parola, non una password.
+    return s.length >= 4 && (/[0-9]/.test(s) || /[^\p{L}\p{N}]/u.test(s) || (/\p{Ll}/u.test(s) && /\p{Lu}/u.test(s.slice(1))));
   }
   const FORMA_USCENTE = { token: () => true, password: passwordInUscita };
   function credenzialiAlPosto(s, out, forma) {
@@ -512,7 +536,9 @@
   // Il PIN anche con un complemento prima del verbo («il pin del telefono è 4821», «the pin for my phone is 4821»): il
   // primo verbo chiude, così «se il pin è giusto la pagina è 2048» non conta (#2678.3).
   const PIN_CON_COMPLEMENTO = /\bpin\b(?:\s{1,8}(?!(?:è|e'|is|era|was)(?=\s))[^\s\d:=.,;!?|"'«“]{1,24}){1,5}?\s{0,8}(?:[:=]|(?:è|e'|is|era|was)(?=\s))\s{0,8}["'«“]?(\d{4,8})(?!\d)/gi;
-  const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret)\\s{0,8}(?:[:=]|${ANNUNCIO})\\s{0,8}["'«“]?([^\\s"'»”,;&]{4,256})`, 'giu');
+  const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
+    + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI})`
+    + `\\s{0,8}(?:["'«“]|[${APRE_VALORE}]\\s{0,8})?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
   const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)[\\s:=]{0,8}(?:${ANNUNCIO}\\s{1,8})?["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
@@ -756,6 +782,6 @@
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
     segretiNelTesto, segretiInUscita, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
-    sembraPassword, indirizzoOEmail, ANNUNCI, CAMBI,
+    sembraPassword, indirizzoOEmail, ANNUNCI, ANNUNCIO_LARGO, AVVERBI, MODALI, COMPLEMENTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

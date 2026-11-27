@@ -83,6 +83,17 @@ test('una password di sole lettere scritta in chat chiede l\'OK; le parole che l
   assert.equal(costo('https://raccolta.example/wifi/password', { parole: 'la password del wifi è gattoneroferoce' }).costo, 1);
 });
 
+// #1403.8 — le etichette della password fuori dall'alfabeto latino presentano la parola che segue come «password».
+test('una password di sole lettere scritta in chat dopo un\'etichetta non latina chiede l\'OK', () => {
+  for (const parole of ['мой пароль от wifi gattoneroferoce', 'Пароль: gattoneroferoce', 'wifi密码 gattoneroferoce',
+    'κωδικός πρόσβασης gattoneroferoce', 'パスワードは gattoneroferoce', '비밀번호 gattoneroferoce', '我的密码是gattoneroferoce',
+    'パスワードはgattoneroferoceです', 'گذرواژه gattoneroferoce', 'პაროლი gattoneroferoce']) {
+    assert.equal(costo('https://raccolta.example/?p=gattoneroferoce', { parole }).costo, 2, parole);
+  }
+  // Un codice greco che non è la password non fa della parola dopo un segreto.
+  assert.equal(costo('https://raccolta.example/?p=gattoneroferoce', { parole: 'ταχυδρομικός κωδικός gattoneroferoce' }).costo, 1);
+});
+
 test('indirizzo di casa ed email scritti in chat chiedono l\'OK', () => {
   for (const url of [
     'https://raccolta.example/r?a=via+Garibaldi+12',

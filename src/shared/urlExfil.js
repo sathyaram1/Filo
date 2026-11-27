@@ -331,13 +331,14 @@
 
   // I nomi della password nelle altre lingue, con le loro desinenze: un posto solo per la chat (qui e
   // riservatiNelTesto.js) e per le etichette del pavimento (pavimento.js). Il confine lo porta la lista, perché \b non
-  // vede le lettere fuori dall'ASCII («şifre», «пароль»); le scritture senza spazi non ne hanno. Le desinenze sono
-  // scritte, non una coda di lettere: «Lösenordshanterare» è il gestore, non l'etichetta. Prove:
-  // tests/unit/passwordAltreLingue.test.mjs.
-  // Il punto di domanda greco (U+037E) e la ano teleia (U+0387) stanno fra le lettere greche ma chiudono la parola.
-  const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u037D\\u037F-\\u0386\\u0388-\\u03FF\\u0400-\\u052F\\u1E00-\\u1EFF]';
+  // vede le lettere fuori dall'ASCII («şifre»); le scritture senza spazi non ne hanno. Le desinenze sono
+  // scritte, non una coda di lettere: «Lösenordshanterare» è il gestore, non l'etichetta. Quelle fuori dall'alfabeto
+  // latino le tiene campiSegreti.js (ETICHETTE_NON_LATINE). Prove: tests/unit/passwordAltreLingue.test.mjs.
+  if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
+  const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
+  const LETTERA = NON_LATINI.LETTERA;
   // «parola» è anche l'italiano: il rumeno conta con chi la possiede, col wifi o dopo chi la chiede («care e parola»).
-  // «palabra clave» è la parola chiave; «κωδικός» è ogni codice: il postale e quelli di prodotto o d'ordine restano.
+  // «palabra clave» è la parola chiave.
   const PAROLE_PASSWORD = [
     'mot\\s+de\\s+passe', 'passwort', 'kennwort', 'contrase[ñn]as?', 'contrasenyes', 'contrasenya', '(?<!palabras?\\s+)claves?',
     'senhas?', 'palavras?-passe', 'wachtwoord(?:en)?', 'has[łl](?:o|a|em|u)', 'parol(?:ă|a\\s+de|ei)',
@@ -347,17 +348,14 @@
     'salasan(?:a|an|aa|asi|ani)', 'jelsz(?:[óo]t?|av(?:a|ad|am|ak|at)?)', 'hesl(?:o|a|em|u|e)', 'gesl(?:o|a|om|u)',
     '[şs][iİı]\\u0307?fre(?:si|yi|n|niz|nizi|ler|m|mi|min|miz|ni|nin)?', 'lozink(?:a|e|u|om|i)', 'slapta[žz]od(?:is|į|žio|i)',
     'm[ậa]t\\s+kh[ẩa]u', 'kata\\s+(?:sandi|laluan)',
-    '(?<!ταχυδρομικ\\S{0,3}\\s+)κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)(?!\\s+(?:προ[ϊι][οό]ντ|πελ[αά]τ|παραγγελ|κρ[αά]τησ|αποστολ|παρακολο[υύ]θ|εκπτ|[εέ]κπτ|κουπον|προσφορ|ταχυδρομ|αφμ|ειδ|σφ[αά]λμ))',
-    'συνθηματικ[οόάαύυ]{1,2}',
   ];
-  // Il russo, l'ucraino, il bulgaro e il serbo declinano troppo per scriverle tutte: lì vale la radice.
-  const RADICI_PASSWORD = ['парол', 'лозинк'];
-  const NOMI_PASSWORD = `(?:(?<!${LETTERA})(?:(?:${PAROLE_PASSWORD.join('|')})(?!${LETTERA})|(?:${RADICI_PASSWORD.join('|')})${LETTERA}*)`
-    + '|密[码碼](?![学學])|口令|パスワード|パスフレーズ|暗証番号|비밀\\s*번호|패스워드|암호(?!화)|كلمة\\s+(?:المرور|السر)|סיסמ[הא]|पासवर्ड|รหัสผ่าน|رمز\\s+عبور)';
+  const NOMI_PASSWORD = `(?:(?<!${LETTERA})(?:${PAROLE_PASSWORD.join('|')})(?!${LETTERA})|${NON_LATINI.ETICHETTE_NON_LATINE})`;
   // Una password di sole lettere o un PIN di quattro cifre sono parole qualunque: li riconosce la parola che li
   // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
   // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
   const PRESENTA_PASSWORD = new RegExp(`(?:\\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\\b|${NOMI_PASSWORD})`, 'g');
+  // Senza spazi fra le parole (cinese, giapponese, thai) il valore finisce dove ricomincia la frase.
+  const FRA_PAROLE = new RegExp(`[\\s${NON_LATINI.FINE_VALORE}]+`);
   // I nomi del PIN senza «codice» («numero segreto», «Geheimzahl») li tiene il pavimento, che urlExfil precede nel loader.
   let presentaCodice = null;
   const PRESENTA_CODICE = () => {
@@ -394,7 +392,7 @@
     const prendi = (re, soloCifre) => {
       for (const m of testo.matchAll(re)) {
         const coda = fineFrase(testo.slice(m.index + m[0].length, m.index + m[0].length + 200));
-        const parole = coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO);
+        const parole = coda.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
         for (const [k, w] of parole.entries()) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
           const cifre = /\d/.test(t);

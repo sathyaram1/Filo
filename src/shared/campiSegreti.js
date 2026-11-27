@@ -16,10 +16,35 @@
     const CAMPO_CON_VALORE = new RegExp(`^(${NOMI_DEI_CAMPI.join('|')})$`, 'i');
     const INPUT_BOTTONE = /^(button|submit|reset|image|checkbox|radio|hidden|file|range|color)$/i;
     const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
+    // Le etichette della password fuori dall'alfabeto latino, per i campi, per il testo e per la chat (pavimento.js e
+    // urlExfil.js le prendono da qui: una lingua nuova si aggiunge solo qui). \b non vede quelle lettere: il confine lo
+    // dice LETTERA, senza il punto di domanda greco (U+037E) e la ano teleia (U+0387) che chiudono la parola. Russo,
+    // ucraino, bulgaro e serbo declinano troppo: lì vale la radice. In greco «κωδικός» è anche ogni altro codice: il
+    // postale, d'errore, d'ordine o del prodotto restano.
+    const LETTERA = '[A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u037D\\u037F-\\u0386\\u0388-\\u03FF\\u0400-\\u052F\\u1E00-\\u1FFF]';
+    const ETICHETTE_NON_LATINE = `(?<!${LETTERA})(?:(?:парол|лозинк)${LETTERA}*|(?:құпия\\s+сөз|нууц\\s+үг|сырсөз)(?!${LETTERA}))`
+      + `|(?<!${LETTERA})(?<!ταχυδρομικ\\S{0,3}\\s+)κωδικ(?:[ωώ]ν|[οό][υύιί]?[ςσ]?)(?!${LETTERA})`
+      + '(?!\\s+(?:προ[ϊι][οό]ντ|πελ[αά]τ|παραγγελ|κρ[αά]τησ|αποστολ|παρακολο[υύ]θ|εκπτ|[εέ]κπτ|κουπον|προσφορ|ταχυδρομ|αφμ|ειδ|σφ[αά]λμ))'
+      + `|(?<!${LETTERA})συνθηματικ[οόάαύυ]{1,2}(?!${LETTERA})`
+      // In arabo «e», «con», «per», «come» e «quindi» si attaccano alla parola: «وكلمة المرور» è «e la password».
+      + '|(?<![\\u0600-\\u06FF])[وفبلك]{0,2}(?:(?:كلمة|رمز)\\s+(?:ال)?(?:مرور|سر|عبور)|گذرواژه|پاس\\s?ورڈ)(?![\\u0600-\\u06FF])'
+      + '|סיסמ[הא]|पासवर्ड|รหัสผ่าน|密[码碼](?![学學])|口令|パスワード|パスフレーズ|暗証番号|비밀\\s*번호|패스워드|암호(?!화)'
+      + '|পাসও(?:\\u09DF|\\u09AF\\u09BC)ার্ড|પાસવર્ડ|கடவுச்சொல்|పాస్\\u200C?వర్డ్|ಪಾಸ್\\u200C?ವರ್ಡ್|പാസ്\\u200C?വേഡ്|මුරපදය'
+      + '|პაროლი|գաղտնաբառ|የይለፍ\\s?ቃል|စကားဝှက်|ពាក្យសម្ងាត់|ລະຫັດຜ່ານ';
+    // Dopo l'etichetta, il verbo che annuncia il valore come «è» attaccato alle parole, in cinese, giapponese, coreano e
+    // thai (#1403.8). Quelli che sono una parola, in ogni alfabeto, stanno in SN_GUARDIANO_STATICO.ANNUNCI.
+    const ANNUNCI_ATTACCATI = '是|为|為|は|는|은|คือ';
+    // Cinese, giapponese, coreano e thai, coi loro segni larghi, non fanno mai parte di una password: chiudono il valore,
+    // che in quelle lingue nessuno spazio separa dalla frase (#1403.8). Corpo di una classe di caratteri.
+    const FINE_VALORE = '\\u0E00-\\u0E7F\\u1100-\\u11FF\\u3000-\\u303F\\u3040-\\u30FF\\u3130-\\u318F\\u3400-\\u4DBF'
+      + '\\u4E00-\\u9FFF\\uAC00-\\uD7AF\\uF900-\\uFAFF\\uFF01-\\uFF0F\\uFF1A-\\uFF20\\uFF5B-\\uFF65';
+    // Fra quei segni le virgolette ad angolo che aprono il valore («password: 「Mela!Verde77」»): chi taglia il valore le
+    // stacca prima, o il valore resta vuoto. Corpo di una classe di caratteri.
+    const APRE_VALORE = '「『';
     // In più, le forme dei nomi di campo: «pass word», «pass_code», «parola d'ordine» con un apostrofo qualunque.
     const PAROLE_SEGRETE = new RegExp([...(etichette ? [etichette] : []), 'pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code',
       'passwort', 'kennwort', 'contrase[ñn]a', 'mot de passe', '\\bsenha\\b', 'parola d.ordine',
-      '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)',
+      '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)', ETICHETTE_NON_LATINE,
       '(^|[^a-z])cc[-_ ]?(num|number|no|csc|cvv|cvc)', 'codice (di )?(sicurezza|verifica)', 'security code',
       'verification code', 'carta di (credito|debito)', 'numero (della |di )?carta', 'credit ?card', 'debit ?card',
       'card ?number', 'card_number', 'cardnumber', 'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)',
@@ -202,7 +227,8 @@
       return out;
     }
 
-    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti, NOMI_DEI_CAMPI };
+    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti, NOMI_DEI_CAMPI, ETICHETTE_NON_LATINE,
+      LETTERA, ANNUNCI_ATTACCATI, FINE_VALORE, APRE_VALORE };
   }
 
   // Il testo della regola delle etichette del pavimento, da passare a `crea`: una lista sola per campi e testo.

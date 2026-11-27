@@ -22,11 +22,18 @@ non può sapere quali siano i più importanti fra tutti.
   un ordine vuoto o senza lavori pronti vale come nessun ordine, e solo in quella
   coda per urgenza le 0 e le 1 restano chiuse fino all'ultimo giorno prima del
   rinnovo. Un rilievo interno messo da parte nasce a 1, a ogni livello.
-- **I giudici assegnano 3 o lasciano 1.** Il giudice di priorità gira sul server
+- **I giudici assegnano 3 o lasciano 1, con una 2 sola.** Il giudice di priorità gira sul server
   (`functions/src/priority/judge.js` di filo-security; l'app ne sceglie solo il
   modello, slot `judge-priority`): critico, o sicurezza con un rischio reale
   oggi → 3, tutto il resto → 1, qualunque numero dica il modello. La soglia di
-  realismo per la sicurezza vive solo nel prompt di quel giudice (#2332). Una
+  realismo per la sicurezza vive solo nel prompt di quel giudice (#2332). La
+  lacuna di copertura di un filtro già presente (una lingua, una grafia, una
+  forma della frase in più) non è mai 3: 2 se il dato privato arriva ai
+  modelli, se no 1; il buco (il filtro non parte su un cammino, o la forma
+  che sfugge la sceglie un attaccante e l'attacco riesce oggi) resta 3
+  (#2700: quaranta 3 di una famiglia avevano riempito le urgenze). Vale
+  anche per i rilievi esterni nati dalle verifiche, che nascono senza
+  priorità e prendono quella del giudice. Una
   priorità scritta dal manutentore non la riscrive a un rientro in coda.
 - **Niente tetti per priorità.** Le 3 partono sempre; il resto fino al
   parallelismo N del manutentore, sotto il freno d'emergenza dell'owner (il

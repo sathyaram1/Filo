@@ -2,7 +2,7 @@
 // L'avviso lo disegna la vista sopra la scheda (src/main/avvisoSito.js), mai la pagina; il content script manda indizi.
 // Niente blocca la navigazione. Regole: patterns/un-avviso-su-una-pagina-non-sta-dentro-la-pagina.md
 
-const { pageHints } = require('../../content/safebrowseHints.js');
+const { PAGE_HINTS_JS } = require('../../content/safebrowseHints.js');
 const Permessi = require('../services/permessiPagine');
 const { riquadroArrivato } = require('../services/riquadroArrivato');
 const ProxyTab = require('../services/proxyTab');
@@ -35,7 +35,7 @@ const MONDO_SCRIPT = require('../../preload/mondo-esente').MONDO;
 // coperto) lo dice il motore, che vede tutta la catena dei riquadri. Senza risposta in tempo vale mostrato.
 const CODICE_RIQUADRO = `(async () => {
   const mostrati = [];
-  const h = (${pageHints.toString()})(document, { mostrati });
+  const h = ${PAGE_HINTS_JS}(document, { mostrati });
   let altroSito = false;
   try { altroSito = window !== window.top && !window.frameElement; } catch (_) { altroSito = true; }
   if (!altroSito || !mostrati.length || typeof IntersectionObserver !== 'function'
@@ -609,7 +609,7 @@ const safebrowseMethods = {
     // Il sospetto che nasce dal campo password lo vede solo la pagina caricata.
     pwc.on('did-finish-load', async () => {
       let h = null;
-      try { h = await pwc.executeJavaScript(`(${pageHints.toString()})(document)`); } catch (_) {}
+      try { h = await pwc.executeJavaScript(`${PAGE_HINTS_JS}(document)`); } catch (_) {}
       if (h && (h.shownPassword || h.shownPayment)) giudica({ hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment, insecureForm: !!h.insecureForm });
     });
   },
@@ -692,7 +692,7 @@ const safebrowseMethods = {
         if (!object || !object.objectId) continue;
         const { result } = await dbg.sendCommand('Runtime.callFunctionOn', {
           objectId: object.objectId, returnByValue: true,
-          functionDeclaration: `function () { return (${pageHints.toString()})(this.ownerDocument, { radici: [this] }); }`,
+          functionDeclaration: `function () { return ${PAGE_HINTS_JS}(this.ownerDocument, { radici: [this] }); }`,
         });
         const h = result && result.value;
         if (h && h.shownPassword) out.shownPassword = true;
