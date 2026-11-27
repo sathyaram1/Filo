@@ -102,7 +102,7 @@ test('«Duplica» della scheda di un file tornata dalla sessione e non ancora gu
   await expect.poll(async () => (ids = await schedeFile(app, 'seconda.html')).length, { timeout: 10_000 }).toBe(1);
   const nuova = await tm(app, (t, i) => t.duplicateTab(i), ids[0]);
   expect(nuova, 'la copia nasce').toBeTruthy();
-  const pagina = await paginaDellaScheda(app, nuova, (p) => p.url().startsWith('file:'));
+  const pagina = await paginaDi(app, nuova, 'seconda.html');
   await expect(pagina).toHaveTitle('Seconda', { timeout: 10_000 });
   await expect.poll(() => pagina.evaluate(() => document.getElementById('i').naturalWidth), { message: 'la copia vede la foto della sua cartella' }).toBeGreaterThan(0);
 });
