@@ -197,6 +197,7 @@ test.describe('il menu nello strato', () => {
     await page.locator('#campo').click({ button: 'right' });
     await apertoNelloStrato(app, page);
     await menu.incolla.click({ button: 'right' });
+    await expect.poll(async () => ((await statoCronologia(app, page))?.voci || []).map((v) => v.testo)).toContain('codice-banca-1054');
     const s2 = await cronologiaPronta(app, page);
     const da = s2.voci.find((v) => v.testo === 'codice-banca-1054');
     await strato.mouse.click(da.rimuovi.x, da.rimuovi.y);
