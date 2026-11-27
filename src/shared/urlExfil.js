@@ -1110,7 +1110,7 @@
 
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
   function valutaAvvisi(tipo, action, { memoria, azioni, daPagina, parole = '', domanda = '' }, niente) {
-    if (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') {
+    if (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA' || tipo === 'TRASCRIVI_MEDIA') {
       const L = global.SN_ACTION_LEVELS;
       const url = L && L.indirizzoDi ? L.indirizzoDi(action) : String(action.url ?? action.href ?? action.link ?? '').trim();
       const v = url ? valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda }) : null;
