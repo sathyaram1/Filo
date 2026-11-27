@@ -127,9 +127,11 @@ test('su ogni altra pratica dei Ricevuti il tasto non c’è, né nel dettaglio 
     await expect(page.locator('#mgAcceptBtn'), p._id).not.toHaveClass(/sn-btn-secondary/);
     await expect(page.locator('#mgAcceptLocalBtn'), p._id).toHaveCount(0);
     await page.locator(`.mg-item[data-id="${p._id}"]`).click({ button: 'right' });
-    await expect(page.locator('.mg-ctxmenu')).toBeVisible();
-    await expect(page.locator('.mg-ctxmenu'), p._id).not.toContainText(/💻|[Ll]avoro server/);
-    await page.keyboard.press('Escape');
+    // A icone (#2555): i nomi delle icone e delle varianti nei loro menu.
+    const menu = menuDi(page);
+    await expect(menu.principale).toBeVisible();
+    expect((await menu.vociScritte()).filter((n) => /💻|[Ll]avoro server/.test(n)), p._id).toEqual([]);
+    await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
   }
 });
 
