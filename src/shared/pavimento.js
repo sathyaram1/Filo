@@ -905,9 +905,7 @@
   // «…»»): dopo il segno solo parole che non aprono un altro discorso, poi l'annuncio, e dopo il valore la frase finisce
   // («It's "easy" to reset» resta).
   const RIEMPI = "(?:ora|adesso|invece|now|mi[ \\t]+pare|mi[ \\t]+sembra|credo|penso|forse|i[ \\t]+think|maybe|it|that|this|s[iì],?|yes,?|beh,?|well,?|allora)";
-  // Anche dopo un inciso fra virgole («la password, che era vecchia, è …», #2678.21).
-  const INCISO = '[ \\t]*,[^\\n.!?:;«»"“”]{1,80}?,';
-  const RISPOSTA = `(?:${INCISO}|[ \\t]*(?:\\?+|[:.,;!]))[ \\t]*(?:${RIEMPI}[ \\t]+){0,2}(?:it['’]s|${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO})(?:[ \\t]*:)?`;
+  const RISPOSTA = `[ \\t]*(?:\\?+|[:.,;!])[ \\t]*(?:${RIEMPI}[ \\t]+){0,2}(?:it['’]s|${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO})(?:[ \\t]*:)?`;
   const FINE_RISPOSTA = `(?=[ \\t]*(?:$|[\\n.,;:!?)]|(?:e|ed|ma|and|but|or|o)[ \\t]))`;
   const MESSA = "[ \\t]+(?:ho|hai|ha|abbiamo|avete|hanno|l['’](?:ho|hai|ha|abbiamo)|i(?:['’]ve)?|we)[ \\t]+(?:mess[ao]|scelt[ao]|usat[ao]|set|chose|picked|used|put)";
   const VIRGOLETTATO_MESSA = new RegExp(`${ETICHETTA}${ACCANTO}${MESSA}${FRA_VIRGOLETTE}`, 'gid');
