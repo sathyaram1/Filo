@@ -420,9 +420,9 @@
     + `|[ \\t]+(?:${ORA}[ \\t]+${PRESENTE}|${PRESENTE}[ \\t]+${ORA})`
     // Dopo «ho cambiato il pin» il valore nella frase che segue: solo le forme che lo presentano, non una frase qualunque.
     + `|(?:[ \\t]+(?:${CLITICO})?${AUSILIARE_CAMBIO}${PARTICIPIO_CAMBIO})?(?<=${PARTICIPIO_CAMBIO}[^\\n.!?:;,]{0,60})`
-    + `(?:[ \\t]*[,.;:][ \\t]*|[ \\t]+)(?:${E_POI}[ \\t]+)?${intera(VERBI_CAMBIO.dopo)}`
-    + `|[ \\t]*\\?[ \\t]*${intera(['è', "e'", 'e’', 'é', 'era', 'is', 'was', 'it was', "it's", 'sarà'])})`;
+    + `(?:[ \\t]*[,.;:][ \\t]*|[ \\t]+)(?:${E_POI}[ \\t]+)?${intera(VERBI_CAMBIO.dopo)})`;
   const CAMBIO_IN_CODA = new RegExp(`(?:${CAMBIO_VALORE})[ \\t]*["'«“‘„(]*[ \\t]*$`, 'i');
+  const DIVENTA_IN_CODA = new RegExp(`${intera(VERBI_CAMBIO.diventa)}[ \\t]*["'«“‘„(]*[ \\t]*$`, 'i');
   // Fra il nome e il verbo di cambio solo un complemento del nome («del cancello», «for my phone»): «il pin non funziona
   // e il prezzo diventa 4821» parla d'altro, il primo verbo chiude il nome come per «è» (#2678.3).
   const COMPLEMENTO_NOME = `(?:[ \\t]+(?:del|della|dello|dei|degli|delle|dell['’]|di|da|per|for|of|on)(?:[ \\t]*[^\\s\\d:=.,;!?|"'«“]{1,24}){1,3}?)`;
