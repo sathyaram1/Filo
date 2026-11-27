@@ -59,9 +59,11 @@ test('sotto il velo del sito la voce della cronologia scelta senza vederla non i
 
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
-  // Il primo quadrato sta sulla freccia di Incolla: la cronologia si apre da sola, sotto il velo.
-  const freccia = await centro(menuDi(page).locator('.sn-menu-paste-arrow'));
+  // Il primo quadrato sta su Incolla, da premere col tasto destro: la cronologia (il menu dell'icona, #2555) si apre
+  // sotto il velo.
+  const freccia = await centro(menuDi(page).incolla);
   await page.mouse.move(freccia.x, freccia.y, { steps: 4 });
+  await page.mouse.click(freccia.x, freccia.y, { button: 'right' });
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
   await page.waitForTimeout(700);
   const voce = (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO);
