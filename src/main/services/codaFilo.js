@@ -137,7 +137,7 @@ async function nascoste(opts) {
     .map((c) => {
       const i = Math.max(0, c.messages.findIndex((m) => m && String(m.text || '').trim()));
       const m = c.messages[i] || {};
-      return { k: 'nascosta', chat: c.id, i, ts: c.closedAt || c.updatedAt || m.ts, role: m.role === 'user' ? 'user' : 'filo', testo: String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, 140), titolo: c.title || CA.fallbackTitle(c.messages) };
+      return { k: 'nascosta', chat: c.id, i, ts: c.closedAt || c.updatedAt || m.ts, role: m.role === 'user' ? 'user' : 'filo', testo: String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, 140), intero: String(m.text || ''), titolo: c.title || CA.fallbackTitle(c.messages) };
     })
     .sort((a, b) => (Date.parse(b.ts) || 0) - (Date.parse(a.ts) || 0));
 }
