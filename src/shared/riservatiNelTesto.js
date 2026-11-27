@@ -101,16 +101,34 @@ const TAG_HTML = new RegExp(`(<|&lt;)(/\\s*|)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|d
 const DI_TESTO = new RegExp(`^(?:${TAG_TESTO})$`, 'i');
 const A_CAPO = new RegExp(`^(?:${TAG_A_CAPO})$`, 'i');
 const SPAZIO_HTML = /&(?:nbsp|#160|#x0*a0);/gi;
-const senzaTag = (s) => s.replace(TAG_HTML, (tag, apre, chiude, nome, attributi, fine, k, tutto) => {
-  if (DI_TESTO.test(nome) && /[\p{L}\p{N}]/u.test(tutto[k - 1] || '') && /[\p{L}\p{N}]/u.test(tutto[k + tag.length] || '')) return tag;
-  const segno = chiude ? ' ' : A_CAPO.test(nome) ? '\n' : /^t[dh]$/i.test(nome) ? '|' : ' ';
-  const testa = segno + ' '.repeat(apre.length + chiude.length + nome.length - 1);
-  return testa + attributi.replace(/\/$/, ' ') + ' '.repeat(fine.length);
-}).replace(SPAZIO_HTML, (e) => ' '.repeat(e.length));
+const DUE_PUNTI_HTML = /&(?:colon|#0*58|#x0*3a);/gi;
+const VERSO_CELLA = /[\r\n](?=[ \t\r\n]*(?:<|&lt;)t[dh](?:[\s/>]|&gt;))/gi;
+// Un segno che sta dentro un valore: non uno spazio, un tag, un due punti, una cella o un'entità.
+const DEL_VALORE = /[^\s<>:：|&]/u;
+// I commenti si leggono in due modi: coi soli segni come spazi (una password scritta dentro si vede) e interi come
+// spazi (non separano più l'etichetta dal suo valore). Le regole girano su tutte e due le letture (vistePerLeRegole).
+const COMMENTO = /(<|&lt;)!--([\s\S]*?)--(>|&gt;)/g;
+const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repeat(apre.length + 3) + dentro + ' '.repeat(fine.length + 2))
+  .replace(VERSO_CELLA, ' ')
+  .replace(TAG_HTML, (tag, apre, chiude, nome, attributi, fine, k, tutto) => {
+    if (DEL_VALORE.test(tutto[k - 1] || '') && DEL_VALORE.test(tutto[k + tag.length] || '')) return tag;
+    const segno = chiude ? ' ' : A_CAPO.test(nome) ? '\n' : /^t[dh]$/i.test(nome) ? '|' : ' ';
+    const testa = segno + ' '.repeat(apre.length + chiude.length + nome.length - 1);
+    return testa + attributi.replace(/\/$/, ' ') + ' '.repeat(fine.length);
+  })
+  .replace(SPAZIO_HTML, (e) => ' '.repeat(e.length))
+  .replace(DUE_PUNTI_HTML, (e) => ':' + ' '.repeat(e.length - 1));
 const senzaEnfasi = (t) => {
   let s = String(t == null ? '' : t);
   if (s.includes('<') || s.includes('&')) s = senzaTag(s);
   return /[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s;
+};
+const vistePerLeRegole = (t) => {
+  const s = String(t == null ? '' : t);
+  const una = senzaEnfasi(s);
+  if (!s.includes('!--')) return [una];
+  const senza = senzaEnfasi(s.replace(COMMENTO, (c) => c.replace(/[^\n]/g, ' ')));
+  return senza === una ? [una] : [una, senza];
 };
 // Il testo come lo leggono le regole: senza enfasi, minuscolo, i due punti a tutta larghezza come i nostri, e il punto e
 // virgola di una riga in greco come punto di domanda (in greco è quello). Stessa lunghezza: le posizioni restano.
