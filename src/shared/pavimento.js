@@ -16,13 +16,18 @@
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
-  // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo dopo «kod».
+  // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo in una frase polacca (SEGNO_POLACCO).
   // Dopo il verbo anche l'articolo («Il CVV è il 123», «Die Prüfnummer ist die 123»), e come per la password il trattino
   // o la freccia fra spazi («CVV — 123», #2681.2).
-  const VERBO_CVV = `(?:${VERBO}|(?<=\\bkod\\b[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
-  const TRATTINO = '[-–—→](?=[ \\t])';
   // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности».
   const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F';
+  // Le parole che fanno polacca la frase, per il suo «to» dopo un nome che non è solo polacco come PIN e CVV («Mój PIN
+  // to 4829», #1403.80): in inglese «send the PIN to …» è una destinazione. Senza \p{L}, perché vale anche senza flag u.
+  const POSSESSIVO_POLACCO = `(?:moj[${LETTERE}]*|mój|twoj[${LETTERE}]*|twój|swoj[${LETTERE}]*|swój|nasz[${LETTERE}]*|wasz[${LETTERE}]*)`;
+  const SEGNO_POLACCO = `(?<![${LETTERE}])(?:${POSSESSIVO_POLACCO}|kod[${LETTERE}]*|numer[${LETTERE}]*|now(?:y|a|e|ego|ej|ym|ą)`
+    + `|(?:tymczasow|jednorazow|tajn|poufn|prywatn|osobist|bankow)[${LETTERE}]*|kart(?:a|y|ę|ą|zie))(?![${LETTERE}])`;
+  const VERBO_CVV = `(?:${VERBO}|(?<=${SEGNO_POLACCO}[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
+  const TRATTINO = '[-–—→](?=[ \\t])';
   // CVV_ALTRE_LINGUE (#2681.1) è la parte che va anche ai campi dei moduli (da etichette() di campiSegreti.js) e agli
   // indizi di pagamento (copia autonoma in safebrowseHints.js, uguale per tests/unit/cvvAltreLingue.test.mjs): coi
   // separatori dei nomi di campo («codigo_de_seguridad»).
