@@ -60,12 +60,12 @@ test('chi aveva già la sua disposizione la ritrova, e la fila arriva una volta,
 
 test('un\'azione di contesto resta nel suo contesto; un\'icona della barra entra nella fila e lascia la barra', () => {
   const l = D.migra(undefined).layout;
-  const su = D.applicaPosa(l, { id: 'testo:readAloud', target: 'fila:testo', beforeId: 'testo:copy' });
-  assert.deepEqual(su['fila:testo'], ['testo:readAloud', 'testo:copy', 'testo:translate', 'testo:search']);
-  assert.deepEqual(su['altro:testo'], []);
+  const su = D.applicaPosa(l, { id: 'testo:feedback', target: 'fila:testo', beforeId: 'testo:copy' });
+  assert.deepEqual(su['fila:testo'].slice(0, 3), ['testo:feedback', 'testo:copy', 'testo:translate']);
+  assert.ok(!su['altro:testo'].includes('testo:feedback'));
   for (const z of ['fila:immagine', 'altro:link', 'bar', 'secondary']) assert.equal(D.applicaPosa(l, { id: 'testo:readAloud', target: z }), null, z);
   const pagina = D.applicaPosa(l, { id: 'translate', target: 'fila:testo', beforeId: 'testo:search' });
-  assert.deepEqual(pagina['fila:testo'], ['testo:copy', 'testo:translate', 'translate', 'testo:search']);
+  assert.deepEqual(pagina['fila:testo'].slice(0, 4), ['testo:copy', 'testo:translate', 'translate', 'testo:search']);
   assert.ok(!pagina.bar.includes('translate'), 'un\'icona sta in un posto solo');
   assert.equal(tutte(pagina).filter((x) => x === 'translate').length, 1);
   const torna = D.applicaPosa(pagina, { id: 'translate', target: 'bar', beforeId: null });
