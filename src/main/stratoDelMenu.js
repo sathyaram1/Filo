@@ -13,6 +13,7 @@ function acceso() {
 }
 
 const INDIRIZZO = 'filo://menu/';
+const TASTI_DEL_MENU = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Home', 'End', 'Tab']);
 
 // Il content script descrive il menu dopo il `context-menu` (aspetta la cronologia e la navigazione, o rigioca il clic
 // in un riquadro appena montato): oltre questo tempo dal tasto destro un menu non si apre più.
