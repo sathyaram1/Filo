@@ -419,8 +419,10 @@
   // La frase dopo, che rimanda alla password senza nominarla: «la password scade, la nuova è …», «è sbagliata, prova …»,
   // «expired, new one …», «cambiata ieri, adesso …» (#2695.4). Prove: tests/unit/passwordNellaFraseDopo.test.mjs.
   // Davanti al rimando possono stare una congiunzione o un avverbio di raccordo: «, e la nuova è …», «, ma ora …»,
-  // «, comunque è …», «, quindi adesso è …»; il rimando può anche essere l'annuncio da solo («è cambiata, è …»).
-  const RACCORDO = "(?:(?:e|ed|ma|però|pero|comunque|quindi|allora|poi|inoltre|cmq|and|but|so|anyway|however|et|mais|donc|y|und|aber|also)\\s+){0,2}";
+  // «, comunque è …», «, quindi adesso è …». L'annuncio da solo rimanda solo dopo la virgola e con un raccordo o un verbo
+  // di cambio prima: «è cambiata, è …» sì, «la pass giornaliera, è carissima» no.
+  const RACCORDO = "(?<raccordo>(?:(?:e|ed|ma|però|pero|comunque|quindi|allora|poi|inoltre|cmq|and|but|so|anyway|however|et|mais|donc|y|und|aber|also)\\s+){0,2})";
+  let cambioDavanti = null;
   const RINVIO = new RegExp('^(?:[.,;!?]+|\\n)[^\\S\\n]*' + RACCORDO + '(?:'
     + "(?:(?:la|il|quella|quello|una|un)\\s+)?(?:nuov[ao]|giust[ao]|corrett[ao]|ver[ao]|vecchi[ao]|attuale|prossim[ao]|definitiv[ao])"
     + '|(?:ri)?prova(?:\\s+con)?|usa|metti|inserisci|scrivi|digita|adesso|ora|invece|da\\s+(?:oggi|adesso|ora)'
