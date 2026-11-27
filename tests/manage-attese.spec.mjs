@@ -15,6 +15,7 @@
 // scrittura ha la sua prova in manage-attese-concorrenti.spec.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const ID_DEL_NUMERO = { 12: 'f12', 13: 'f13' };
