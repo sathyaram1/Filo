@@ -10,12 +10,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 
-export function envDiAvvio({ radice = ROOT, env = process.env, motore = null } = {}) {
+export function envDiAvvio({ radice = ROOT, env = process.env, cache = null } = {}) {
   const out = { ...env };
   if (String(out.ELECTRON_OVERRIDE_DIST_PATH || '').trim()) return { env: out, nota: null };
   try {
     const F = require('./lib/fusibili-electron.js');
-    const m = motore ? motore() : F.motoreSenzaPrivilegi({ radice, cache: F.cartellaDelleCopie() });
+    const m = F.motoreSenzaPrivilegi({ radice, cache: cache || F.cartellaDelleCopie() });
     if (m.errore) return { env: out, nota: `[avvio] Electron resta coi privilegi file:// di fabbrica: ${m.errore}` };
     if (m.copia) out.ELECTRON_OVERRIDE_DIST_PATH = m.dist;
     return { env: out, nota: null };
