@@ -352,6 +352,52 @@
 
   function init(d) { deps = { ...deps, ...d }; }
 
+  // ── Ogni menu del tasto destro è a icone (#2555) ────────────────────────────────────────────────────────────────
+  // Una voce scritta rimasta fuori dalla griglia (il menu di un avviso, di un file trovato dall'Aiuto, il correttore)
+  // ci entra per il suo verbo; restano testo solo le spiegazioni, le proposte e i dati (`dato: true`).
+  const azioneScritta = (x) => !!x && (x.type === 'item' || !x.type) && !!x.label && typeof x.onClick === 'function' && !x.dato;
+  function senzaSeparatoriVuoti(lista) {
+    const out = [];
+    for (const x of lista) {
+      if (x && x.type === 'separator' && (!out.length || out[out.length - 1].type === 'separator' || out[out.length - 1].type === 'row')) continue;
+      out.push(x);
+    }
+    while (out.length && out[out.length - 1] && out[out.length - 1].type === 'separator') out.pop();
+    return out;
+  }
+  function aIcone(items) {
+    const lista = Array.isArray(items) ? items.filter(Boolean) : [];
+    const scritte = lista.filter(azioneScritta);
+    if (!scritte.length) return lista;
+    const resto = lista.filter((x) => !azioneScritta(x));
+    const riga = resto.find((x) => x.type === 'row');
+    if (riga && aperta) {
+      aperta.scritte = [...aperta.scritte, ...scritte];
+      const c = costruisci();
+      Object.assign(riga, { items: c.items, altro: { ...(riga.altro || {}), items: c.inAltro }, vuota: c.vuota });
+      return senzaSeparatoriVuoti(resto);
+    }
+    return senzaSeparatoriVuoti([fila('pagina', {}, { scritte, soloScritte: true, aspetto: deps.aspetto?.() || {} }), ...resto]);
+  }
+
+  // Il menu proprio di una pagina di Filo, a icone come quello del tasto destro (#2555): `voci` [{ label, onClick,
+  // verbo?, icona?, disabled?, bersaglio? }], `elemento` quello su cui agisce, contornato passando sulle icone.
+  function apriVoci({ x, y, voci, elemento = null, oggetto = '', alChiudere } = {}) {
+    let bersaglio = null;
+    try {
+      const r = elemento && elemento.getBoundingClientRect ? elemento.getBoundingClientRect() : null;
+      if (r && r.width > 0 && r.height > 0) bersaglio = [{ x: r.left, y: r.top, w: r.width, h: r.height }];
+    } catch (_) {}
+    const scritte = (Array.isArray(voci) ? voci : []).filter(azioneScritta).map((v) => ({ bersaglio, ...v }));
+    if (!scritte.length) return false;
+    Menu.open({ x, y, alChiudere, items: [fila('pagina', {}, { scritte, soloScritte: true, oggetto, aspetto: deps.aspetto?.() || {} })] });
+    return true;
+  }
+  {
+    const apriPrima = Menu.open;
+    Menu.open = (o) => apriPrima(o && Array.isArray(o.items) ? { ...o, items: aIcone(o.items) } : o);
+  }
+
   // Lo stato delle icone della finestra è cambiato col menu aperto (lo schermo intero spento da un'altra strada, #514).
   function ridisegnaFinestra() {
     chiediFinestra().then(() => ridisegna(), () => ridisegna());
