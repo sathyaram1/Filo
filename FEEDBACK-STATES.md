@@ -167,7 +167,13 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   merge non passa più da solo — non è una bocciatura di qualità, il contatore M
   non si muove; il ramo viene ribasato e ripassa verifica e sicurezza sul
   contenuto nuovo). Chi ribasa non corregge gli unit rossi: li elenca, e chi
-  verifica ne fa rilievi interni (#1204).
+  verifica ne fa rilievi interni (#1204). Gli stessi unit rossi del rifiuto
+  prima non tornano al riallineamento (#2704): vanno al correttore, col
+  segnalibro di ripresa, e dopo il suo giro fermano il lavoro con una domanda
+  di processo al manutentore (all'owner, `loop`, a manutentore spento). Coi
+  bilanci finiti la verifica che segue quel rifiuto manda al correttore,
+  una volta, i rilievi che metterebbe da parte. Regola nel server,
+  `functions/src/routine/rossiDelRamo.js`.
 - `design` —fusione bloccata da L5, approvata dall'owner e finita in conflitto→
   `revision_capability` in DUE passi: la riapertura `design → todo` a nome
   dell'owner (il click di approvazione è la sua decisione) e il rientro
