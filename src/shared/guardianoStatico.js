@@ -413,6 +413,7 @@
   const PRESENTE = intera(['è', "e'", 'e’', 'é', 'is']);
   const ORA = intera(VERBI_CAMBIO.ora);
   const E_POI = intera(['e', 'ed', 'and']);
+  const DOPO_IL_CAMBIO = `(?:[ \\t]*[,.;:][ \\t]*|[ \\t]+)(?:${E_POI}[ \\t]+)?${intera(VERBI_CAMBIO.dopo)}`;
   // «il pin adesso diventa …», «ho cambiato il pin ed è diventato …».
   const CAMBIO_VALORE = `(?:[ \\t]+(?:${E_POI}[ \\t]+)?(?:${ORA}[ \\t]+)?(?:${CLITICO})?${AUSILIARE_CAMBIO}(?:${intera(VERBI_CAMBIO.diventa)}|${PASSO})`
     // Il participio si cerca all'indietro solo dopo la preposizione: un testo lungo non lo rilegge a ogni posizione.
