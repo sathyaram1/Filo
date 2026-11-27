@@ -55,6 +55,9 @@
   }
   function menu(x, y, voci, { ancora = null } = {}) {
     chiudiMenu();
+    // A icone come il tasto destro di Filo (#2555), con l'elemento contornato; il riquadro qui sotto dove non c'è.
+    const I = global.SN_MENU_ICONS;
+    if (I && I.apriVoci && I.apriVoci({ x, y, voci: voci.map(([label, fn]) => ({ label, onClick: fn })), elemento: ancora })) return null;
     const el = doc.createElement('div');
     el.className = 'sn-select-pop sn-rinomina-menu';
     el.setAttribute('role', 'menu');
