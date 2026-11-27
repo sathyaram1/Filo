@@ -442,15 +442,7 @@
     // La fila sta sempre in cima, anche quando chi apre mette altro davanti (le correzioni del correttore).
     for (const it of [...items.filter((x) => x && x.type === 'row'), ...items.filter((x) => !x || x.type !== 'row')]) {
       if (it.type === 'row') {
-        const row = document.createElement('div');
-        row.className = 'sn-menu-row';
-        if (it.dropTarget) row.dataset.snDropTarget = it.dropTarget;
-        // Senza icone e senza «Altro…» la fila non si vede: si apre solo per chi porta un'icona dalla barra.
-        if (it.vuota) { row.dataset.snVuota = '1'; row.hidden = true; }
-        keepPageFocus(row);
-        populateRow(row, it.items || [], { dropTarget: it.dropTarget });
-        if (it.dropTarget) attachDropZone(row, { target: it.dropTarget, onDrop: it.onDrop });
-        root.appendChild(row);
+        root.appendChild(costruisciGriglia(it, cleanups));
         continue;
       }
       if (it.type === 'separator') {
