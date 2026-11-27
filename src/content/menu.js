@@ -1503,8 +1503,10 @@
     }
     if (sub.id) b.dataset.snIconId = sub.id;
     if (sub.tasto) b.dataset.snTasto = String(sub.tasto).toLowerCase();
-    if (sub.azione) b.dataset.snAzione = String(sub.azione);
-    const varianti = Array.isArray(sub.varianti) && sub.varianti.length > 0;
+    if (sub.verbo) b.dataset.snVerbo = String(sub.verbo);
+    // La cronologia degli appunti è il menu dell'icona Incolla: le altre cose da incollare.
+    const cronologia = sub.cronologia && typeof sub.cronologia === 'object' ? sub.cronologia : null;
+    const varianti = (Array.isArray(sub.varianti) && sub.varianti.length > 0) || !!cronologia;
     if (varianti) { b.dataset.snVarianti = '1'; b.setAttribute('aria-haspopup', 'menu'); }
     const griglia = () => b.closest('.sn-menu-griglia');
     const mostra = () => {
