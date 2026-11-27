@@ -11,6 +11,10 @@
     {
       version: '0.2.309', date: '2026-11-27',
       fixes: [
+        { testo: 'Chiudere una conversazione nella home non cancella più quello che stavi scrivendo, e il cursore resta nella casella anche se clicchi di nuovo su «Conversazione chiusa».', segnalazione: [1204, 1115] },
+        { testo: 'Più schede con la home aperta continuano la stessa conversazione, e nella ricerca della home «Copia il testo» copia il messaggio intero, non solo il pezzo mostrato.', segnalazione: [869] },
+        { testo: 'Una conversazione dell\'Editor, dei Mazzi o dell\'Aiuto riaperta nella home arriva a Filo anche se ha più di tre giorni, e aperta scorre con una barra sola.', segnalazione: [974] },
+        { testo: 'Riscattato il codice d\'invito, la home si rifà subito invece di restare sulla risposta che chiedeva il codice.', segnalazione: [751] },
         { testo: 'Una password scritta con un errore di battitura, come «la pasword è …», «la password e …» senza accento o «la password, che era vecchia, è …», non arriva più a nessun modello.', segnalazione: 2678 },
       ],
     },
