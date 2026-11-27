@@ -30,7 +30,7 @@ test('salvata in Automazioni, «Discutiamone» e il tasto destro copiano la paro
   await aspettaAvvio(page);
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
   const cifra = await app.evaluate(({ safeStorage }) => { try { return safeStorage.isEncryptionAvailable(); } catch (_) { return false; } });
-  const menu = page.locator('.mg-ctxmenu').last();
+  const menu = menuDi(page);
   const tasto = dq(page, 'D-8').locator('button[data-fai="discuti"]');
 
   // Senza parola: la riga sola, e l'hover lo dice.
