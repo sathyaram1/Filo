@@ -423,9 +423,11 @@ class StratoDelMenu {
     if (!this.vista || this.vista.webContents.isDestroyed() || this._haTastiera()) return false;
     try {
       const wc = this.vista.webContents;
+      const keyCode = TASTI_DEL_MENU.get(k) || k;
+      const modifiers = input.shift ? ['shift'] : [];
       wc.focus();
-      wc.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: input.shift ? ['shift'] : [] });
-      wc.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: input.shift ? ['shift'] : [] });
+      wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+      wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
     } catch (_) { return false; }
     return true;
   }
