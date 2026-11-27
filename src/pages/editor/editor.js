@@ -1239,17 +1239,8 @@
     closeTitleMenu();
     if (!file) closeDocPop();
     titleMenuScorso = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
-    const menu = document.createElement('div');
-    menu.className = 'sn-select-pop ed-title-ctxmenu';
-    menu.setAttribute('role', 'menu');
-    const add = (label, onClick) => {
-      const o = document.createElement('div');
-      o.className = 'sn-select-option';
-      o.setAttribute('role', 'menuitem');
-      o.textContent = label;
-      o.addEventListener('click', () => { closeTitleMenu(); onClick(); });
-      menu.appendChild(o);
-    };
+    const voci = [];
+    const add = (label, onClick) => { voci.push({ label, onClick }); };
     if (file) {
       const voce = () => docPopEl && docPopEl.querySelector(`.ed-doc-item[data-id="${CSS.escape(file.id)}"]`);
       if (file.id !== collection.activeId) add('Apri', () => { switchToFile(file.id); closeDocPop(); });
