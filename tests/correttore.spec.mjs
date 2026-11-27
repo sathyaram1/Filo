@@ -118,11 +118,9 @@ test('«quseta» compare sbiadito e diventa pieno alla conferma, con «questa» 
   await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 4000 });
   await expect.poll(() => coloreDelSegno(segno)).not.toBe(sbiadito);
   const menu = await tastoDestroSu(page, segno);
-  const prima = menu.primaVoce;
-  await expect(prima).toHaveClass(/sn-menu-correction/);
+  // La griglia delle icone resta sopra anche alla correzione (#1434, #2555), che le sta subito sotto.
+  const prima = menu.primaCorrezione;
   await expect(prima).toHaveText(/questa/);
-  // La fila contestuale resta sopra anche alla correzione (#1434), che le sta subito sotto.
-  await expect(menu.principale.locator(':scope > .sn-menu-row + .sn-menu-correction')).toHaveText(/questa/);
   await expect(menu.locator('.sn-menu-segno')).toHaveText('Refuso: «questa».');
   await expect(menu.voce('Ignora')).toBeVisible();
   await expect(menu.voce('Aggiungi al dizionario')).toBeVisible();
