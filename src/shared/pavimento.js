@@ -1259,8 +1259,9 @@
     for (const v of valori) {
       const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
       // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga». Una lettera cinese o
-      // giapponese attaccata non è della stessa parola (FINE_VALORE), e nemmeno uno spazio codificato («%20Mela!Verde77»).
-      const confine = /^[\p{L}\p{N}]/u.test(v) ? `(?:(?<=%[0-9A-Fa-f]{2})|(?<!(?![${NON_LATINI.FINE_VALORE}])[\\p{L}\\p{N}]))` : '';
+      // giapponese attaccata non è della stessa parola (FINE_VALORE), e nemmeno uno spazio codificato, anche due volte
+      // («%20Mela!Verde77», «%2520Mela»: codificatiNellIndirizzo).
+      const confine = /^[\p{L}\p{N}]/u.test(v) ? `(?:(?<=%(?:25){0,2}[0-9A-Fa-f]{2})|(?<!(?![${NON_LATINI.FINE_VALORE}])[\\p{L}\\p{N}]))` : '';
       const fine = /[\p{L}\p{N}]$/u.test(v) ? `(?![\\p{L}\\p{N}](?<![${NON_LATINI.FINE_VALORE}]))` : '';
       // Un valore lunghissimo non entra in un'espressione regolare: si toglie com'è, senza confini.
       try { t = t.replace(new RegExp(`${confine}${forma}${fine}`, 'gu'), SEGNAPOSTO); } catch (_) { t = t.split(v).join(SEGNAPOSTO); }
