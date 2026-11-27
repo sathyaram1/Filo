@@ -238,9 +238,9 @@ test('il testo incollato dal tasto destro di Filo riceve subito i segni, anche s
   const page = await apri(app, openTab, testServer);
   await app.evaluate(({ clipboard }) => clipboard.writeText('oggi quseta e domani '));
   await page.locator('#ta').click({ button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu-paste-main').first()).toBeVisible();
+  await expect(menuDi(page).incolla).toBeVisible();
   await page.waitForTimeout(2000);
-  await menuDi(page).locator('.sn-menu-paste-main').first().click();
+  await menuDi(page).incolla.click();
   await expect(page.locator('#ta')).toHaveValue('oggi quseta e domani ');
   await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
 });
