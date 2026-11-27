@@ -825,8 +825,10 @@
   // 2019»): la password con gli spazi, quante che siano le parole (#2678.5). Toglierla toglie solo quella frase, mai una
   // parola sola altrove. Una frase che comincia come una spiegazione («disponibile alla reception», «sul retro del
   // modem», «vedi email»), anche dopo un articolo («la stessa di prima»), o che misura la password («min. 8 caratteri»)
-  // dice dove trovarla o come sceglierla, e resta. Il tetto in caratteri tiene fuori un paragrafo intero.
-  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*([^\\n|\\t]{3,160}?)[ \\t]*(?=\\n|$)`, 'gi');
+  // dice dove trovarla o come sceglierla, e resta. Il tetto in caratteri tiene fuori un paragrafo intero. Così sulla riga
+  // sotto l'etichetta sola, se non è un altro campo né un bottone (#2673.14).
+  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*(\\n(?:[ \\t]*\\n)?[ \\t]*)?([^\\n|\\t]{3,160}?)[ \\t]*(?=\\n|$)`, 'gi');
+  const ALTRO_CAMPO = /^[^\s:：]{1,30}[:：](?:\s|$)/;
   const INIZIO_SPIEGAZIONE = /^(?:a|al|allo|alla|ai|agli|alle|da|dal|dallo|dalla|dai|dagli|dalle|in|nel|nello|nella|nei|negli|nelle|su|sul|sullo|sulla|sui|sugli|sulle|presso|tra|fra|con|senza|dentro|sotto|sopra|dietro|at|on|from|under|behind|inside|with|see|ask|check|contact|available|provided|sent|printed|same|vedi|vedere|guarda|chiedere|richiedi|richiedila|contatta|rivolgiti|disponibile|disponibili|fornita|fornito|inviata|inviato|stampata|scritta|indicata|riportata|deve|devono|può|must|should|can|minimo|min|massimo|max|stessa|stesso|quella|quello|uguale|identica|come|vuota|nessuna|nessuno|scegli|sceglila|usa|use|cambiata|cambiato|modificata|modificato|aggiornata|aggiornato|scaduta|scaduto|scade|scadrà|changed|updated|expired|expires|не|нет|должен|должна|должно|см|смотрите|спросите|минимум|максимум|от|из|на|в|у|при|без|πρέπει|δείτε)$/i;
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
   // Quando è cambiata o scade («12 mar 2024», «2 mesi fa», «tra 30 giorni»): la data di una password non è la password.
