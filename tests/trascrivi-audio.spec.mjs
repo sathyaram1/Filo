@@ -134,6 +134,26 @@ test('un lettore disegnato dal sito con l\'audio blob: nascosto, e uno che suona
   await expect.poll(() => testoDelRiquadro(app, page), { timeout: 60_000 }).toContain('PEZZO-2');
 });
 
+test('senza un modello per la dettatura, «Trascrivi» dice dove sceglierlo invece di girare a vuoto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await trascrittoreFinto(app);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const s = await globalThis.SN_STORAGE.getSettings();
+    const models = { ...s.models };
+    delete models[C.ACTIONS.TRANSCRIBE_AUDIO];
+    await globalThis.SN_STORAGE.setSettings({ ...s, models });
+  });
+  const src = testServer.asset(wav(3), 'audio/wav');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
+    <audio id="a" src="${src}" controls style="display:block;width:320px"></audio></body></html>`);
+  const menu = await apriMenu(page, '#a');
+  await menu.voce('Trascrivi').click();
+  await expect.poll(() => testoDelRiquadro(app, page), { timeout: 20_000 }).toMatch(/Dettatura|dettatura/);
+  expect(await app.evaluate(() => globalThis.__pezzi.length)).toBe(0);
+  await expect((await paginaDelloStrato(app, page)).locator('.sn-popup .sn-msg-rimedio, .sn-popup a, .sn-popup button', { hasText: /Opzioni|Gestione|Modelli/ }).first()).toBeVisible();
+});
+
 // La chat: il modello finto chiama web(trascrivi) con l'indirizzo che l'utente ha scritto, e risponde col testo che
 // gli è tornato dallo strumento. Lo scaricatore vero rifiuta 127.0.0.1: qui passa.
 async function chatFinta(app) {
