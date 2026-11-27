@@ -165,3 +165,22 @@ test('il motore di un\'altra cartella non si tocca: le prove ne usano una copia 
     assert.match(F.motoreSenzaPrivilegi({ radice }).errore, /copia/, 'senza cartella per la copia lo dice');
   } finally { togliCartella(dir); }
 });
+
+test('npm start da un clone coi moduli di un\'altra cartella parte sulla copia spenta, come le prove', async () => {
+  const { envDiAvvio } = await import('../../scripts/avvia-electron.mjs');
+  const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'package.json'), 'utf8'));
+  assert.equal(pkg.scripts.start, 'node scripts/avvia-electron.mjs');
+  assert.match(pkg.scripts.dev, /^node scripts\/avvia-electron\.mjs\b/);
+  const dir = cartellaTemporanea('fusibili-');
+  try {
+    const { radice, binarioOriginale } = progetto(dir, { collegato: true });
+    const { env, nota } = envDiAvvio({ radice, env: {}, cache: join(dir, 'cache') });
+    assert.equal(nota, null);
+    assert.equal(F.privilegiFile(join(env.ELECTRON_OVERRIDE_DIST_PATH, 'electron')), 'spento');
+    assert.equal(F.privilegiFile(binarioOriginale), 'acceso');
+    assert.deepEqual(envDiAvvio({ radice, env: { ELECTRON_OVERRIDE_DIST_PATH: '/mio' }, cache: join(dir, 'cache') }).env, { ELECTRON_OVERRIDE_DIST_PATH: '/mio' }, 'il motore di chi lancia resta il suo');
+    const suo = progetto(join(dir, 'b'));
+    assert.equal(envDiAvvio({ radice: suo.radice, env: {}, cache: join(dir, 'cache') }).env.ELECTRON_OVERRIDE_DIST_PATH, undefined);
+    assert.equal(F.privilegiFile(suo.binarioOriginale), 'spento', 'il motore suo si spegne sul posto');
+  } finally { togliCartella(dir); }
+});
