@@ -67,7 +67,7 @@ test('tolta la carta dei Crediti torna la home intera, e da «altro» la si rime
   const page = await home(app);
   await expect(crediti(page)).toBeVisible({ timeout: 15_000 });
   await crediti(page).click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await menuDi(page).scegli('Togli dalla home');
   await expect(crediti(page)).toHaveCount(0);
   await expect(page.locator('#tieni .dash-carta[data-chiave="editor"]')).toBeVisible();
   const rimetti = page.locator('#altro .dash-altro-app[data-id="crediti"][data-tolta="1"] + .dash-altro-rimetti');
