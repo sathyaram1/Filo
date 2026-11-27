@@ -174,8 +174,13 @@
       }
       voci.push(D.descrivi(it, op));
     });
+    // Il punto del tasto destro qui e lo zoom: lo strato ci riporta i contorni degli oggetti (#2555), che sono in px di
+    // questo documento.
+    let zoom = 1;
+    try { zoom = (Number(global.SN_ZOOM_PAGINA?.percentuale?.()) || 100) / 100; } catch (_) {}
+    const origine = { x: Number(opzioni && opzioni.x) || 0, y: Number(opzioni && opzioni.y) || 0, zoom };
     // Rifiutato (il tasto destro non era di questo riquadro, o troppo vecchio): non resta un menu che si crede aperto.
-    invia(MSG.STRATO_MENU_APRI, { id: m.id, menu: { items: voci, keepOnScroll: !!(opzioni && opzioni.keepOnScroll) } })
+    invia(MSG.STRATO_MENU_APRI, { id: m.id, menu: { items: voci, keepOnScroll: !!(opzioni && opzioni.keepOnScroll), origine } })
       .then((r) => { if (!(r && r.ok) && corrente === m) pulisci(m); });
     for (const fn of m.montaggi.splice(0)) { try { fn(); } catch (e) { console.error(e); } }
   }
