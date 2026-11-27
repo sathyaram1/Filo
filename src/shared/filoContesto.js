@@ -506,6 +506,8 @@
     const tieni = stessaAncora && inizio < n && lista[inizio].ts === ancora.ts && Array.isArray(ancora.riprese);
     const riprese = new Set(tieni ? ancora.riprese : []);
     if (chatCorrente) riprese.add(chatCorrente);
+    // La conversazione di un'altra app riaperta nella home (#974.1): la sua riga resta davanti a ogni età.
+    if (typeof inVista === 'string' && inVista) riprese.add(inVista);
     const mie = [];
     for (let i = 0; i < n; i++) if (riprese.has(lista[i].chat) && !compattato(lista[i])) mie.push(i);
     let mieDavanti = 0;
