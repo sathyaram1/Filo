@@ -875,13 +875,13 @@
   function risposta(d) {
     const box = el('div', 'mg-dq-risposta');
     const occupata = inCorso.has(d.id);
-    const rispondibile = d.stato === 'aperta' || d.stato === 'in_lavorazione';
-    // In smistamento la tiene un agente: si legge e basta, e l'unica cosa che si può fare è archiviarla.
+    const rispondibile = daRispondere(d) || d.stato === 'in_lavorazione';
+    // In smistamento una sessione non ci arriva da «Discutiamone»: il server risponde solo all'owner.
     const inSmistamento = d.stato === 'in_smistamento';
     if (rispondibile && !d.illeggibile) {
       const ta = el('textarea', 'mg-dq-testo');
       ta.rows = 3;
-      ta.placeholder = d.stato === 'aperta' ? 'Rispondi a parole…' : 'Aggiungi qualcosa…';
+      ta.placeholder = daRispondere(d) ? 'Rispondi a parole…' : 'Aggiungi qualcosa…';
       ta.value = bozze.get(d.id) || '';
       ta.dataset.id = d.id;
       ta.disabled = occupata;
