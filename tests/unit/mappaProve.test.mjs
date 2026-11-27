@@ -54,14 +54,15 @@ const fine = (rel, frammento) => off(rel, frammento) + frammento.length;
 
 function registrazioni() {
   const x = 'src/main/x.js';
+  const ux = `file://${ROOT}/${x}`;
   const s = 'src/renderer/shell.js';
   return [
     // la prova A esegue a(), in due lanci; la B carica x e basta; la C passa dalla shell e da d()
-    { prova: 'tests/a.spec.mjs', processo: 'main', file: { [x]: [[0, SORGENTE[x].length], [off(x, 'function a'), fine(x, 'return 1;\n}')]] } },
-    { prova: 'tests/a.spec.mjs', processo: 'main', file: { [x]: [[off(x, 'function a'), fine(x, 'return 1;\n}')]] } },
-    { prova: 'tests/b.spec.mjs', processo: 'main', file: { [x]: [[0, SORGENTE[x].length]] } },
+    { prova: 'tests/a.spec.mjs', processo: 'main', indirizzi: { [ux]: [[0, SORGENTE[x].length], [off(x, 'function a'), fine(x, 'return 1;\n}')]] } },
+    { prova: 'tests/a.spec.mjs', processo: 'main', indirizzi: { [ux]: [[off(x, 'function a'), fine(x, 'return 1;\n}')]] } },
+    { prova: 'tests/b.spec.mjs', processo: 'main', indirizzi: { [ux]: [[0, SORGENTE[x].length]] } },
     { prova: 'tests/c.spec.mjs', processo: 'pagine', indirizzi: { 'filo://shell/shell.js': [[0, SORGENTE[s].length], [off(s, '() => {'), fine(s, 'c();\n})')], [off(s, 'function d'), fine(s, 'function d() {}')]], 'node:events': [[0, 10]] } },
-    { prova: '', processo: 'main', file: { [x]: [[0, 3]] } },
+    { prova: '', processo: 'main', indirizzi: { [ux]: [[0, 3]] } },
   ];
 }
 
