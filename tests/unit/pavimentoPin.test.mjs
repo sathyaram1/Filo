@@ -122,3 +122,74 @@ test('in uscita il PIN col complemento si riconosce, e il primo verbo chiude il 
     assert.deepEqual(codici(frase), [], frase);
   }
 });
+
+// #1403.79 — di due PIN detti nella stessa frase si toglieva solo il primo.
+test('più PIN, codici o CVV in elenco nella stessa frase si tolgono tutti, al modello e in uscita', () => {
+  for (const [frase, atteso] of [
+    ['Il pin è 4829 e 1234', `Il pin è ${S} e ${S}`],
+    ['I pin sono 4829 e 1234', `I pin sono ${S} e ${S}`],
+    ['i pin sono 4829, 1234 e 5678', `i pin sono ${S}, ${S} e ${S}`],
+    ['il pin è 4829 o 1234', `il pin è ${S} o ${S}`],
+    ['il pin è «4829» e «1234»', `il pin è «${S}» e «${S}»`],
+    ['il pin è 4829 / 123456', `il pin è ${S} / ${S}`],
+    ['il pin del telefono è 4829 e 1234', `il pin del telefono è ${S} e ${S}`],
+    ['codice di verifica 482913 oppure 123456', `codice di verifica ${S} oppure ${S}`],
+    ['il cvv è 123 e 456', `il cvv è ${S} e ${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+  const codici = (t) => G.segretiInUscita(t).filter((x) => x.regola === 'codice').map((x) => x.valore);
+  for (const frase of ['Il pin è 4829 e 1234', 'I pin sono 4829 e 1234', 'pin%20%C3%A8%204829%20e%201234']) {
+    assert.deepEqual(codici(frase), ['4829', '1234'], frase);
+  }
+});
+
+test('il secondo PIN si toglie anche dopo qualche parola, un trattino, un punto e virgola o un a capo', () => {
+  for (const [frase, atteso] of [
+    ['Il pin del bancomat è 4831 e quello della SIM è 1236', `Il pin del bancomat è ${S} e quello della SIM è ${S}`],
+    ['Il pin è 4832 e il secondo è 1237', `Il pin è ${S} e il secondo è ${S}`],
+    ['Il pin è 4833 e anche 1238', `Il pin è ${S} e anche ${S}`],
+    ['Il pin è 4829 ma quello della SIM è 1234', `Il pin è ${S} ma quello della SIM è ${S}`],
+    ['PIN carta 4829, telefono 1234', `PIN carta ${S}, telefono ${S}`],
+    ['pin: 4834; 1239', `pin: ${S}; ${S}`],
+    ['pin: 4835 - 1240', `pin: ${S} - ${S}`],
+    ['Il pin è 4836\ne 1241', `Il pin è ${S}\ne ${S}`],
+    ['Il pin è 4836 e\n1241', `Il pin è ${S} e\n${S}`],
+    ['il pin è il 4829 o il 1234', `il pin è il ${S} o il ${S}`],
+    ['il cvv è 123; 456', `il cvv è ${S}; ${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+  const codici = (t) => G.segretiInUscita(t).filter((x) => x.regola === 'codice').map((x) => x.valore);
+  for (const frase of ['Il pin del bancomat è 4829 e quello della SIM è 1234', 'il pin è il 4829 o il 1234', 'pin: 4829 - 1234']) {
+    assert.deepEqual(codici(frase), ['4829', '1234'], frase);
+  }
+});
+
+test('dopo un punto, o a capo senza congiunzione né trattino, il numero non è un secondo PIN', () => {
+  for (const [frase, atteso] of [
+    ['Il pin è 4829. Nel 2024 e nel 2025 ho pagato.', `Il pin è ${S}. Nel 2024 e nel 2025 ho pagato.`],
+    ['PIN: 4829\nCAP 20100 Milano', `PIN: ${S}\nCAP 20100 Milano`],
+    ['Il pin è 4829, abito al civico 12 e ho 30 anni', `Il pin è ${S}, abito al civico 12 e ho 30 anni`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+});
+
+test('il primo PIN o CVV e quelli accanto hanno le stesse lunghezze', () => {
+  const tolto = (frase, valore) => !P.oscura(frase).includes(valore);
+  for (const [regola, nome] of [['codice', 'pin'], ['cvv', 'cvv']]) {
+    const [min, max] = G.MISURE_CIFRE[regola];
+    for (let n = 2; n <= 10; n++) {
+      const primo = '7'.repeat(n);
+      const secondo = '3'.repeat(n);
+      const dentro = n >= min && n <= max;
+      assert.equal(tolto(`il ${nome} è ${primo}`, primo), dentro, `${nome} di ${n} cifre, il primo`);
+      if (dentro) assert.ok(tolto(`il ${nome} è ${primo} e ${secondo}`, secondo), `${nome} di ${n} cifre, il secondo`);
+    }
+  }
+});
+
+test('accanto al PIN un numero che non ha la sua forma resta', () => {
+  for (const [frase, atteso] of [
+    ['il pin è 4829 e 2 volte l\'ho sbagliato', `il pin è ${S} e 2 volte l'ho sbagliato`],
+    ['il pin è 4829 e 1234,50 euro di spesa', `il pin è ${S} e 1234,50 euro di spesa`],
+    ['il pin è 4829 e 12/05 la scadenza', `il pin è ${S} e 12/05 la scadenza`],
+    ['il pin è 4829 e 1234567890 il telefono', `il pin è ${S} e 1234567890 il telefono`],
+    ['il cvv è 123 e 4567890 il conto', `il cvv è ${S} e 4567890 il conto`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+});

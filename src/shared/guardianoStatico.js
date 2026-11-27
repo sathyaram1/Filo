@@ -541,11 +541,18 @@
   // «conferma» o lascia fare a mano; nel registro dei letti fermerebbe per un mese ogni uscita con quel valore.
   // Il PIN anche con un complemento prima del verbo («il pin del telefono è 4821», «the pin for my phone is 4821»): il
   // primo verbo chiude, così «se il pin è giusto la pagina è 2048» non conta (#2678.3).
-  const PIN_CON_COMPLEMENTO = /\bpin\b(?:\s{1,8}(?!(?:è|e'|is|era|was)(?=\s))[^\s\d:=.,;!?|"'«“]{1,24}){1,5}?\s{0,8}(?:[:=]|(?:è|e'|is|era|was)(?=\s))\s{0,8}["'«“]?(\d{4,8})(?!\d)/gi;
+  // Le lunghezze di un PIN (o codice) e di un CVV, da qui sole: le leggono le regole che trovano il primo valore, qui e
+  // nel pavimento, e quella dei numeri accanto in elenco; una misura allargata in un posto solo lascerebbe uscire il secondo.
+  const MISURE_CIFRE = Object.freeze({ codice: Object.freeze([4, 8]), cvv: Object.freeze([3, 4]) });
+  const cifre = (regola) => `\\d{${MISURE_CIFRE[regola][0]},${MISURE_CIFRE[regola][1]}}`;
+  // Dopo il verbo anche l'articolo, come per il CVV: «il pin è il 4829».
+  const ARTICOLO = '(?:(?:il|lo|la|el|le|die|der|das|the)\\s{1,8})?';
+  const PIN_CON_COMPLEMENTO = new RegExp(`\\bpin\\b(?:\\s{1,8}(?!(?:è|e'|is|era|was)(?=\\s))[^\\s\\d:=.,;!?|"'«“]{1,24}){1,5}?\\s{0,8}`
+    + `(?:[:=]|(?:è|e'|is|era|was)(?=\\s))\\s{0,8}${ARTICOLO}["'«“]?(${cifre('codice')})(?!\\d)`, 'gi');
   const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
     + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI})`
     + `\\s{0,8}(?:["'«“]|[${APRE_VALORE}]\\s{0,8})?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
-  const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)[\\s:=]{0,8}(?:${ANNUNCIO}\\s{1,8})?["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
+  const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)[\\s:=]{0,8}(?:${ANNUNCIO}\\s{1,8}${ARTICOLO})?["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
     try { s = `${s}\n${decodeURIComponent(s.replace(/\+/g, ' '))}`; } catch (_) { /* un % che non codifica niente */ }
@@ -554,7 +561,40 @@
     for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
     for (const m of s.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) out.push({ valore: m[1], regola: 'codice' });
     for (const m of s.matchAll(PIN_CON_COMPLEMENTO)) out.push({ valore: m[1], regola: 'codice' });
+    out.push(...codiciInElenco(s, out.valori));
     return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
+  }
+
+  // Un PIN, un codice o un CVV trovato vale per i numeri della stessa forma che lo seguono nella stessa frase: «i pin
+  // sono 4829 e 1234», «il cvv è 123, 456», «4829 e quello della SIM è 1234», «4829; 1234», a capo «e 1234» (#1403.79).
+  // Le parole in mezzo hanno un tetto e non passano un punto; un a capo vale solo con la congiunzione o il trattino d'elenco.
+  const CONGIUNZIONE = '(?:e|ed|o|oppure|ma|mentre|and|or|but|while|und|oder|aber|et|ou|mais|y|pero|i|oraz|lub|albo|en|of)';
+  const SEPARA = `(?:[ \\t]*[,;/&][ \\t]*|[ \\t]+[-–—][ \\t]+|[ \\t]*\\n[ \\t]*(?:[-–—•*][ \\t]+|(?=${CONGIUNZIONE}[ \\t]))`
+    + `|[ \\t]+${CONGIUNZIONE}[ \\t]*\\n[ \\t]*|[ \\t]+(?=${CONGIUNZIONE}[ \\t]))`;
+  const PAROLE_IN_MEZZO = "(?:[\\p{L}'’]{1,24}(?:[ \\t]*[:=][ \\t]*|[ \\t]+)){0,6}";
+  const CIFRE_ACCANTO = `\\d{${Math.min(...Object.values(MISURE_CIFRE).map((x) => x[0]))},${Math.max(...Object.values(MISURE_CIFRE).map((x) => x[1]))}}`;
+  const ACCANTO_IN_ELENCO = new RegExp(`["'»”)*_]{0,4}${SEPARA}${PAROLE_IN_MEZZO}["'«“(*_]{0,4}(${CIFRE_ACCANTO})(?![\\d\\p{L}]|[.,/:-]\\d)`, 'uy');
+  function codiciInElenco(s, valori) {
+    const nuovi = [];
+    const visti = new Set((valori || []).map((x) => `${x.regola}:${x.valore}`));
+    const letti = new Set();
+    for (const x of valori || []) {
+      const misura = MISURE_CIFRE[x.regola];
+      const v = String(x.valore);
+      if (!misura || !/^\d+$/.test(v) || letti.has(`${x.regola}:${v}`)) continue;
+      letti.add(`${x.regola}:${v}`);
+      for (let i = s.indexOf(v); i >= 0; i = s.indexOf(v, i + 1)) {
+        if (/[\p{L}\p{N}]/u.test(s[i - 1] || '') || /[\p{L}\p{N}]/u.test(s[i + v.length] || '')) continue;
+        ACCANTO_IN_ELENCO.lastIndex = i + v.length;
+        let m;
+        for (let n = 0; n < 40 && (m = ACCANTO_IN_ELENCO.exec(s)); n++) {
+          if (m[1].length < misura[0] || m[1].length > misura[1]) break;
+          const k = `${x.regola}:${m[1]}`;
+          if (!visti.has(k)) { visti.add(k); nuovi.push({ valore: m[1], regola: x.regola }); }
+        }
+      }
+    }
+    return nuovi;
   }
 
   function raccogli(s, out, forma) {
@@ -787,7 +827,7 @@
 
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
-    segretiNelTesto, segretiInUscita, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
+    segretiNelTesto, segretiInUscita, codiciInElenco, MISURE_CIFRE, cifre, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
     sembraPassword, indirizzoOEmail, ANNUNCI, ANNUNCIO_LARGO, AVVERBI, MODALI, COMPLEMENTO, CAMBI, PARTICIPI, PASSATI,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

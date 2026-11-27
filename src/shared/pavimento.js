@@ -13,6 +13,9 @@
   // del controllo delle uscite (#1403.33). Il «to» polacco sta accanto al nome che lo regge.
   if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
   const VERBO = `(?:${global.SN_GUARDIANO_STATICO.ANNUNCI.join('|')})`;
+  // Le lunghezze di PIN e CVV sono quelle del guardiano, che le usa anche per i numeri accanto in elenco.
+  const CIFRE_PIN = global.SN_GUARDIANO_STATICO.cifre('codice');
+  const CIFRE_DEL_CVV = global.SN_GUARDIANO_STATICO.cifre('cvv');
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
@@ -55,7 +58,7 @@
   const INTORNO_APERTE = `[${APERTE}([{]`;
   const INTORNO_CHIUSE = `[${CHIUSE})\\]}]`;
   const DAVANTI = `(?:${INTORNO_APERTE}[ \\t]*){0,3}`;
-  const CIFRE_CVV = `${DAVANTI}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
+  const CIFRE_CVV = `${DAVANTI}(${CIFRE_DEL_CVV})(?![\\d/]|[.,:-]\\d)`;
   const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
   const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*(?:[:=|\\t]|${TRATTINO})|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
@@ -63,9 +66,11 @@
   // Le cifre in coda a una parola («Girasole2024») non sono il codice: è la password intera, e la toglie la regola delle
   // etichette; togliere solo «2024» lascerebbe il resto e cancellerebbe l'anno da tutto il messaggio.
   // Anche nelle lingue delle etichette (#1403.13): «le code d'accès 482913», «el código de acceso 482913».
-  const CODICE_ACCESSO = /\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
-  const CODICE_ACCESSO_EN = /\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
-  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|${VERBO}(?=\\s))?\\s*${DAVANTI}(\\d{4,8})\\b`, 'gi');
+  const CODICE_ACCESSO = new RegExp(/\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])/.source
+    + `(${CIFRE_PIN})\\b`, 'gi');
+  const CODICE_ACCESSO_EN = new RegExp(/\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])/.source
+    + `(${CIFRE_PIN})\\b`, 'gi');
+  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|${VERBO}(?=\\s))?\\s*${DAVANTI}(${CIFRE_PIN})\\b`, 'gi');
   // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
   // posto del codice (vedi alPostoDelCodice), nella frase che lo nomina o sulla riga sotto. Col nome del codice conta, a
   // meno che la frase lo dica un identificativo che non apre niente (cliente, ordine, prenotazione) senza parole
@@ -202,12 +207,12 @@
   const DOPO_IL_NUMERO = new RegExp(`^\\s*(?:[:=-]\\s*)?${VERBO_SBLOCCO}\\s+(?:(?:il|lo|la|the|le|el|o|der|de|het)\\s+)?${NUCLEO}(?![\\p{L}])`, 'iu');
   // «Quello del pc è 5512» dopo il codice del telefono, nella frase o in quella dopo: il pronome sta per il codice.
   const QUELLO_DEL_MIO = new RegExp(`(?<![\\p{L}])(?:quell[oa]|celui|celle|the\\s+one|that|der|die|el|la)\\s+(?:${LEGAME_SBLOCCO}\\s+)*`
-    + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
+    + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
   const NUCLEO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${NUCLEO}`, 'iu');
   // Lo sblocco detto col verbo, senza «codice»: «Per sbloccare il mio telefono uso 6118», «I unlock my phone with 6215».
   const SBLOCCO_COL_NUMERO = new RegExp(`(?<![\\p{L}])${SBLOCCA}\\s+(?:${LEGAME_SBLOCCO}\\s+)*(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}`
     + '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)'
-    + `\\s*[:=]?\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
+    + `\\s*[:=]?\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
   // Le regole lunghe partono solo dove c'è un apparecchio: su una riga di 120.000 caratteri senza, costerebbero secondi.
   const UN_APPARECCHIO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${APPARECCHIO}`, 'iu');
   function codiceDelMioApparecchio(s, out) {
@@ -1154,6 +1159,7 @@
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
     for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
+    if (G && typeof G.codiciInElenco === 'function') out.push(...G.codiciInElenco(s, out));
     out.push(...interiFraVirgolette(s, out));
     return out;
   }
