@@ -68,3 +68,31 @@ test('un\'etichetta scritta si riconosce dal verbo, e il resto è l\'oggetto', (
   assert.equal(D.verboDellEtichetta('Copiature'), null);
   assert.equal(D.verboDellEtichetta(''), null);
 });
+
+test('le voci che le pagine di Filo scrivono per i loro menu si riconoscono tutte, e diventano un\'icona vera', async () => {
+  const { readFileSync } = await import('node:fs');
+  const leggi = (p) => readFileSync(join(ROOT, p), 'utf8');
+  // Le etichette scritte nel codice dei menu propri e delle voci date al tasto destro: un verbo nuovo va nell'elenco.
+  const FONTI = {
+    'src/pages/editor/editor.js': /\badd\('([^'$]+)'/g,
+    'src/pages/dashboard/dashboard-carte.js': /etichetta: '([^'$]+)'/g,
+    'src/shared/pannelloDestro.js': /etichetta: '([^'$]+)'/g,
+    'src/pages/decks/decks.js': /label: '([^'$]+)', run/g,
+    'src/pages/manage/manageRicorrenti.js': /testo: '([^'$]+)'/g,
+    'src/pages/manage/manageCompiti.js': /testo: '([^'$]+)'/g,
+    'src/pages/manage/manageUtenti.js': /\[\s*'([^'$]+)',/g,
+    'src/pages/downloads/downloads.js': /\['([^'$]+)', /g,
+    'src/pages/dashboard/dashboard-coda.js': /label: '([^'$]+)'/g,
+    'src/pages/quaderno/quaderno.js': /label: '([^'$]+)'/g,
+  };
+  const ignote = [];
+  let viste = 0;
+  for (const [f, re] of Object.entries(FONTI)) {
+    for (const m of leggi(f).matchAll(re)) {
+      viste += 1;
+      if (!D.verboDellEtichetta(m[1])) ignote.push(`${f}: «${m[1]}»`);
+    }
+  }
+  assert.ok(viste >= 30, `le etichette si leggono (${viste})`);
+  assert.deepEqual(ignote, [], 'voci senza un verbo dell\'elenco: avrebbero l\'icona generica');
+});
