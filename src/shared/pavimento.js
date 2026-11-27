@@ -631,7 +631,7 @@
   // dopo la domanda o dopo il cambio, staccata da un segno («Ti ricordi la password? Era «…»», «l'ho cambiata, ora è
   // «…»»): dopo il segno solo parole che non aprono un altro discorso, poi l'annuncio.
   const RIEMPI = "(?:ora|adesso|invece|now|mi[ \\t]+pare|mi[ \\t]+sembra|credo|penso|forse|i[ \\t]+think|maybe|it|that|this)";
-  const RISPOSTA = `[ \\t]*(?:\\?+|[:.,;!])[ \\t]*(?:${RIEMPI}[ \\t]+){0,2}(?:it['’]s|${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO})`;
+  const RISPOSTA = `[ \\t]*(?:\\?+|[:.,;!])[ \\t]*(?:${RIEMPI}[ \\t]+){0,2}(?:it['’]s|${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO})(?:[ \\t]*:)?`;
   const MESSA = "[ \\t]+(?:ho|hai|ha|abbiamo|avete|hanno|l['’](?:ho|hai|ha|abbiamo)|i(?:['’]ve)?|we)[ \\t]+(?:mess[ao]|scelt[ao]|usat[ao]|set|chose|picked|used|put)";
   const VIRGOLETTATO_PONTE = new RegExp(`${ETICHETTA}${ACCANTO}(?:${MESSA}|${RISPOSTA})${FRA_VIRGOLETTE}`, 'gid');
   // Dopo la sola domanda («Ti ricordi la password? «…»») conta la forma della password, come senza verbo.
