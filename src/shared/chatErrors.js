@@ -95,6 +95,8 @@
   const CODICI_GIA_SCRITTI = [
     'NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
     'NO_ALLOWED_HOST', 'FEEDBACK_READ_DENIED',
+    // La trascrizione di un audio intero (#1815): il messaggio dice il numero del tetto o cosa non si legge.
+    'NO_TRANSCRIBE_HOST', 'MEDIA_TROPPO', 'MEDIA_ILLEGGIBILE', 'MEDIA_SCADUTO',
   ];
 
   // Dove chi usa Filo cambia il modello di una funzione. «Modelli predefiniti» è una scheda della Gestione: chi non
