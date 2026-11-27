@@ -231,6 +231,8 @@ const AUSILIARE = /^(?:è|e|é|e['’]|is|was|has|ha)$/;
 const ACCENTO_SBAGLIATO = /^(?:è['’`]|é['’`]|e`)$/;
 const PRIMA_DEL_VERBO = /^(?:del|della|dello|di|per|for|of|il|la|lo|the|my|mio|mia|tuo|tua|nuova|new|attuale|current|wifi)$/;
 const INGLESE_PRIMA = /(?:^|\s)(?:the|my|your|our|his|her)\s+$/i;
+// Le parole inglesi a un tasto da «is» che dopo il nome hanno un senso loro («the password in the file»).
+const NON_IS = /^(?:is|it|in|if|as|us|i|s|a|id|its)$/;
 const tra = (w, lista) => lista.includes(w);
 const vicino = (w, lista) => w.length >= 4 && lista.some((x) => x !== w && NOVITA().distanza(w, x, 1) <= 1);
 function verbiDopoIlNome(s) {
