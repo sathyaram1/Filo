@@ -13,7 +13,7 @@ function ms(fn) {
   return performance.now() - t;
 }
 
-const RIGHE = 2000;
+const RIGHE = 4000;
 const testo = `Password:\n${'x\n'.repeat(RIGHE)}`;
 
 for (const [nome, riga] of [['citati', '> ```\n'], ['senza citazione', '```\n']]) {
