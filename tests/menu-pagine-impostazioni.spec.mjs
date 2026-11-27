@@ -329,5 +329,5 @@ test('Editor: il tasto destro su un documento dell’elenco è di quel documento
   // Sul titolo del documento aperto resta il menu di sempre.
   await page.keyboard.press('Escape');
   await page.locator('#docSwitch').click({ button: 'right' });
-  await expect(page.locator('.ed-title-ctxmenu .sn-select-option').first()).toHaveText('Rigenera titolo');
+  await expect(menu.primaVoce).toHaveAttribute('aria-label', 'Rigenera titolo');
 });
