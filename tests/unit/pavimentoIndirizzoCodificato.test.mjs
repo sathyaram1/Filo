@@ -27,6 +27,15 @@ test('la password scritta in una query codificata non arriva al modello; indiriz
   }
 });
 
+test('anche nel pezzo d\'indirizzo scritto senza «https://»', () => {
+  for (const [riga, atteso] of [
+    ['?q=password%3A%20Mela!Verde77', `?q=password%3A%20${S}`],
+    ['apri www.x.example/?q=la%20password%20%C3%A8%20Mela!Verde77 grazie', `apri www.x.example/?q=la%20password%20%C3%A8%20${S} grazie`],
+    ['il testo era: password%3A%20Mela%21Verde77', `il testo era: password%3A%20${S}`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const t of ['sconto del 50%25 su tutto, codice%20promo', 'Il file Relazione%20finale%202024.pdf è pronto']) assert.equal(P.oscura(t), t, t);
+});
+
 test('anche codificata due volte, o dentro un indirizzo di rimando codificato', () => {
   for (const url of [
     'https://x.example/?q=password%253A%2520Mela%2521Verde77',
