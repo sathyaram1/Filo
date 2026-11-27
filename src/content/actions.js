@@ -1796,10 +1796,119 @@
     items.push(
       { type: 'item', azione: 'video-audio-controls', label: a.controls.label, onClick: a.controls.onClick },
       { type: 'separator' },
+      trascrivi,
       { type: 'item', azione: 'copy-download-video', label: a.copyLink.label, onClick: a.copyLink.onClick },
       { type: 'item', azione: 'copy-download-video', label: a.save.label, onClick: a.save.onClick },
     );
     return items;
+  }
+
+  // ── Trascrivi un audio o un video (#1660) ──────────────────────────────────
+  // I byte di un blob: li legge solo la pagina; un indirizzo lo scarica il main per conto della scheda. Il testo arriva
+  // nel riquadro della risposta, pezzo dopo pezzo, dal main (src/main/services/trascriviMedia.js).
+  function base64DelBlob(blob) {
+    return new Promise((ok, no) => {
+      const r = new FileReader();
+      r.onload = () => { const s = String(r.result || ''); ok(s.slice(s.indexOf(',') + 1)); };
+      r.onerror = () => no(r.error || new Error('lettura'));
+      r.readAsDataURL(blob);
+    });
+  }
+
+  function ancoraDelMedia(el) {
+    const vicino = (el && el.lettore) || el;
+    try {
+      if (vicino && vicino.isConnected && typeof vicino.getBoundingClientRect === 'function') {
+        const r = vicino.getBoundingClientRect();
+        if (r.width || r.height) return { x: r.left + r.width / 2, y: r.bottom, top: r.top, bottom: r.bottom };
+      }
+    } catch (_) {}
+    const m = deps.getLastMouseEvent();
+    return { x: m.clientX, y: m.clientY, top: m.clientY, bottom: m.clientY };
+  }
+
+  async function trascriviMedia(el) {
+    const audio = isAudioEl(el);
+    const src = mediaSrc(el);
+    let richiesta = null;
+    if (/^(blob:|data:)/i.test(src)) {
+      let blob = null;
+      try {
+        const r = await fetch(src);
+        if (r.ok) blob = await r.blob();
+      } catch (_) { blob = null; }
+      // Un blob: di MediaSource non è un file: arriva a segmenti, e non c'è niente da leggere.
+      if (!blob || !blob.size) { Popup.toastErrore('toast_media_transcribe_stream', { duration: 9000 }); return; }
+      const T = global.SN_TRASCRIVI_MEDIA;
+      if (T && blob.size > T.MAX_BYTE) { Popup.showToast(T.troppoGrande(blob.size).message, { duration: 9000 }); return; }
+      try { richiesta = { base64: await base64DelBlob(blob) }; } catch (_) { richiesta = null; }
+    } else if (/^https?:/i.test(src)) {
+      richiesta = { url: src, politiche: el.staccato ? [] : politicheReferrer(el) };
+    }
+    if (!richiesta) { Popup.toastErrore('toast_media_transcribe_failed'); return; }
+    let res = null;
+    try { res = await chrome.runtime.sendMessage({ type: MSG.TRASCRIVI_MEDIA_PREPARA, ...richiesta }); } catch (_) { res = null; }
+    if (!res || !res.ok) {
+      if (res && res.error) Popup.showToast(res.error, { duration: 9000 });
+      else Popup.toastErrore('toast_media_transcribe_failed');
+      return;
+    }
+    Popup.openStreaming({
+      action: ACTIONS.TRANSCRIBE_AUDIO,
+      payload: { mediaId: res.id },
+      anchor: ancoraDelMedia(el),
+      title: I18n.t(audio ? 'popup_transcribe_audio_title' : 'popup_transcribe_video_title'),
+    });
+  }
+
+  // I lettori disegnati dal sito (#1660): il vocale di WhatsApp Web è un riquadro suo, con un <audio> nascosto o creato
+  // fuori dal documento e suonato da lì. Una sonda nel mondo della pagina (preload/media-staccati.js) dice l'indirizzo
+  // di chi suona fuori dal documento; il clic che l'ha fatto partire dice a quale lettore appartiene.
+  const STACCATI_MAX = 40;
+  const CLIC_PRIMA_MS = 3000;
+  const staccati = [];
+  let ultimoClic = null;
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.isTrusted) return;
+    const qui = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+    ultimoClic = { el: qui, t: Date.now() };
+  }, true);
+  if (global.SN_MEDIA_STACCATI) {
+    window.addEventListener(global.SN_MEDIA_STACCATI, (e) => {
+      const src = typeof e.detail === 'string' ? e.detail : '';
+      if (!src || !/^(blob:|https?:|data:audio\/)/i.test(src) || src.length > 4096) return;
+      const clic = ultimoClic && Date.now() - ultimoClic.t < CLIC_PRIMA_MS ? ultimoClic.el : null;
+      if (!clic) return;
+      const audio = !/^data:video|\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(src);
+      for (let i = staccati.length - 1; i >= 0; i--) if (staccati[i].src === src) staccati.splice(i, 1);
+      staccati.push({ src, el: clic, audio });
+      if (staccati.length > STACCATI_MAX) staccati.shift();
+    });
+  }
+
+  const sopra = (n) => n.parentElement || (n.parentNode && n.parentNode.host) || null;
+
+  // Il media del riquadro che contiene `target`: un solo <audio>/<video> dentro, o un solo media staccato fatto partire
+  // da lì. Il riquadro resta piccolo (un messaggio, un lettore): uno grande come la pagina non è «il lettore».
+  const LETTORE_ALTO_MAX = 400;
+  const LETTORE_AREA_MAX = 0.3;
+  function mediaDelLettore(target) {
+    const vista = Math.max(1, window.innerWidth * window.innerHeight);
+    let n = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    for (let i = 0; n && n !== document.body && n !== document.documentElement && i < 12; i++, n = sopra(n)) {
+      let r;
+      try { r = n.getBoundingClientRect(); } catch (_) { break; }
+      if (r.height > LETTORE_ALTO_MAX || r.width * r.height > LETTORE_AREA_MAX * vista) break;
+      const dentro = Array.from(n.querySelectorAll('audio, video')).filter((m) => mediaSrc(m));
+      const suonati = [...new Set(staccati.filter((s) => n.contains(s.el)).map((s) => s.src))];
+      if (dentro.length + suonati.length > 1) break;
+      if (dentro.length === 1) return dentro[0];
+      if (suonati.length === 1) {
+        const s = staccati.filter((x) => x.src === suonati[0]).pop();
+        return { staccato: true, tagName: s.audio ? 'AUDIO' : 'VIDEO', currentSrc: s.src, src: s.src, lettore: n };
+      }
+    }
+    return null;
   }
 
   // Lens-style reverse search (più affidabile di searchbyimage)
