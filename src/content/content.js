@@ -2830,7 +2830,8 @@
       const m = Actions.azioniDelMedia(contesto.media, contesto.link || null);
       const misura = 'video-audio-controls';
       azioni.playPause = { label: m.playPause.label, nome: m.playPause.label, icona: m.playPause.icona, onClick: m.playPause.onClick, misura };
-      azioni.mute = { label: m.mute.label, icona: m.mute.icona, acceso: !contesto.media.muted, onClick: m.mute.onClick, misura };
+      // Acceso o spento: l'icona dice com'è l'audio adesso, il nome cosa farà il clic.
+      azioni.mute = { label: m.mute.label, icona: contesto.media.muted ? 'volumeMute' : 'volume', acceso: !contesto.media.muted, onClick: m.mute.onClick, misura };
       if (m.speed) azioni.speed = { label: m.speed.label, valore: m.speed.valore, onClick: m.speed.onClick, misura };
       azioni.loop = { label: m.loop.label, acceso: !!contesto.media.loop, onClick: m.loop.onClick, misura };
       if (m.pip) azioni.pip = { label: m.pip.label, acceso: !!m.pip.acceso, onClick: m.pip.onClick, misura: 'video-pip' };
