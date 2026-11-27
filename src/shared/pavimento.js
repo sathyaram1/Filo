@@ -271,8 +271,13 @@
   const NOMI_CODICE = new RegExp(NOMI_DEL_CODICE, 'gi');
   // L'articolo dopo il verbo («El código es el 482913») non cambia il posto del numero.
   const CHIUDE_ETICHETTA = new RegExp(`(?:[:=#]|(?:^|\\s)(?:${VERBO}|will\\s+be)(?:\\s+(?:il|el|le|o|the))?|\\bn\\.|\\bnr\\.?|\\bno\\.)\\s*$`, 'i');
-  // Il polacco «to» solo dopo «kod»: in inglese «code to …» è una destinazione.
+  // Il polacco «to» solo dopo un nome polacco: «kod», «tajny numer», o il PIN con una parola polacca davanti («Mój PIN
+  // to», «kod PIN to», #1403.80). In inglese «code to …» e «send the PIN to …» sono una destinazione.
   const CHIUDE_KOD = /\sto\s*$/i;
+  const NOME_POLACCO = /^(?:kod|tajn)/i;
+  const PRIMA_DEL_PIN_POLACCO = new RegExp(`(?<![\\p{L}])(?:${POSSESSIVO_POLACCO}|kod\\p{L}*|numer\\p{L}*|now(?:y|ego|ym)`
+    + '|tymczasow\\p{L}*|jednorazow\\p{L}*|tajn\\p{L}*|poufn\\p{L}*|prywatn\\p{L}*|osobist\\p{L}*|bankow\\p{L}*)(?:\\s+[\\p{L}-]+)?\\s+$', 'iu');
+  const nomePolacco = (nome, prima) => NOME_POLACCO.test(nome) || (/^pin$/i.test(nome) && PRIMA_DEL_PIN_POLACCO.test(prima));
   const PRIMA_DEL_NOME = new RegExp(`^\\s*(?:[:=-]\\s*)?(?:${VERBO}|=)\\s+(?:[\\p{L}'’-]+\\s+){0,4}?${NOMI_DEL_CODICE}`, 'iu');
   // Prima del numero si guarda solo la coda: il nome conta a 60 caratteri al più, e rileggere da capo la riga a ogni
   // numero rendeva quadratico un testo lungo che ripete «el código es 482913».
