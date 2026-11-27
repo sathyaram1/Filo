@@ -9,6 +9,7 @@
 // la probabilità è un caso deterministico al 100%.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CARDS = {
   'c-bolt': {
