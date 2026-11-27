@@ -382,10 +382,10 @@
     return t.replace(AVVERBI_DOPO_ANNUNCIO, (_, a, resto) => a + (stessaLunghezza ? resto.replace(/\S/g, ' ') : ''));
   }
   // Il valore nuovo detto da un verbo di cambio invece che da «è» («il pin diventa …», «è stata cambiata in …», «ho
-  // cambiato il pin in …»), o dato dopo la domanda («ti ricordi la password? Era …»): #1403.67, #2714. Parole intere.
+  // cambiato il pin in …»): #1403.67, #2714. Parole intere. Il valore detto dopo la domanda ha la regola sua, nel pavimento.
   const VERBI_CAMBIO = Object.freeze({
-    diventa: Object.freeze(['diventa', 'diventano', 'diventerà', 'diventata', 'diventato', 'resta', 'rimane', 'rimasta',
-      'rimasto', 'becomes', 'became', 'become', 'will be']),
+    diventa: Object.freeze(['diventa', 'diventano', 'diventerà', 'diventata', 'diventato', 'resta', 'resterà', 'rimane',
+      'rimarrà', 'rimasta', 'rimasto', 'becomes', 'became', 'become', 'remains', 'stays', 'will be']),
     participi: Object.freeze(['cambiata', 'cambiato', 'modificata', 'modificato', 'aggiornata', 'aggiornato', 'impostata',
       'impostato', 'reimpostata', 'reimpostato']),
     verso: Object.freeze(['in', 'a']),
