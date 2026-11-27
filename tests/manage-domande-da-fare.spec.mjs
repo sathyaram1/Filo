@@ -136,18 +136,23 @@ test('il tasto destro su un «da fare» offre «Fatto» e «Non lo faccio», e m
   const page = await openTab(MANAGE);
   await apriDomande(page, [DA_FARE, DA_FARE_SOLO, DA_DECIDERE]);
   await mainFinto(page);
-  const menu = page.locator('.mg-ctxmenu').last();
+  // A icone (#2555): il testo di tutte le voci, icone e varianti nei loro menu.
+  const menu = menuDi(page);
+  const testo = async () => { await expect(menu.principale).toBeVisible(); return (await menu.vociScritte()).join('\n'); };
+  const chiudi = () => expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
 
   await page.locator('#mgDomandeLista .mg-domanda[data-id="D-22"]').click({ button: 'right' });
-  await expect(menu).toContainText('Fatto');
-  await expect(menu).not.toContainText('Applica il consiglio');
-  await page.keyboard.press('Escape');
+  let t = await testo();
+  expect(t).toContain('Fatto');
+  expect(t).not.toContain('Applica il consiglio');
+  await chiudi();
 
   await page.locator('#mgDomandeLista .mg-domanda[data-id="D-21"]').click({ button: 'right' });
-  await expect(menu).toContainText('Fatto: riprendi #1736');
-  await expect(menu).toContainText('Non lo faccio: archivia #1736');
+  t = await testo();
+  expect(t).toContain('Fatto: riprendi #1736');
+  expect(t).toContain('Non lo faccio: archivia #1736');
   await page.screenshot({ path: 'tests/.shots/domande-da-fare-tasto-destro.png' });
-  await menu.getByText('Fatto: riprendi #1736').click();
+  await menu.scegli('Fatto: riprendi #1736');
   await expect.poll(() => page.evaluate(() => window.__domande.filter((m) => m.type === 'domanda_rispondi'))).toEqual([
     expect.objectContaining({ id: 'D-21', scelta: 0 }),
   ]);
