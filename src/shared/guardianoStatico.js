@@ -658,7 +658,7 @@
   const intere = (re) => new RegExp(`^(?:${re})$`, 'iu');
   const PRESENTA_VALORE = intere(`${ANNUNCI.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}|${CAMBI}|${PARTICIPI}|${PASSATI}`);
   const UN_CAMBIO = intere(`${CAMBI}|${PARTICIPI}|${PASSATI}`);
-  const CAMBIO_INGLESE = /^(?:changed|set|updated|reset|replaced|became|remained|stayed)$/i;
+  const CAMBIO_INGLESE = intere(`${CAMBI_EN}|${PASSATI_EN}`);
   const PONTE_DEL_CAMBIO = intere(VERSO);
   // Parole che non spostano il valore e non lo descrivono: ausiliari, avverbi, negazioni, il pronome, «il nuovo».
   const NEUTRA = intere(`${AVVERBIO}|${AVVERBI}|${MODALI}|non|più|piu|not|no|sì|si|yes|ok|okay|it|its|it's|that|lo|la|l|ho|hai|abbiamo|avete|hanno`
