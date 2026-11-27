@@ -178,8 +178,29 @@ test('dopo il PIN o un codice, un numero di un\'altra frase o un anno restano', 
   for (const t of ['il pin non funziona e il prezzo diventa 4821', 'il pin non funziona e il prezzo resterà 4821',
     'se sbagli il pin, la multa diventa 2000',
     'il codice del cancello è rotto, il preventivo diventa 4821', 'il pin è giusto e la pagina diventa 2048',
-    'I changed my PIN in 2024', 'the pin was set in 2023']) {
+    'I changed my PIN in 2024', 'the pin was set in 2023', 'il pin non funziona e il prezzo passa a 4821',
+    'la password cambia ogni mese', 'la password passa per il server', 'il pin passa a 6 cifre']) {
     assert.equal(P.oscura(t), t, t);
     assert.deepEqual(valori(G.segretiInUscita(t)), [], t);
+  }
+});
+
+test('un codice detto con una relativa, il PIN accanto a un altro segreto e i verbi al presente', () => {
+  for (const t of ['il codice che apre il cancello diventa 4821', 'il codice che apre il cancello resta 4821',
+    'il codice che apre la porta diventa 4821', 'il codice che uso per il cancello diventa 4821',
+    "il codice che disattiva l'allarme diventa 4821", 'ho cambiato il codice che apre il cancello in 4821',
+    'il codice che apre il cancello è diventato 4821', 'il codice che apre il cancello è 4821']) {
+    assert.doesNotMatch(P.oscura(t), /4821/, `pavimento: ${t}`);
+    assert.doesNotMatch(C.oscura(t), /4821/, `correttore: ${t}`);
+  }
+  for (const t of ['il pin e il puk sono 4821 e 12345678', 'il pin della sim e il puk sono 4821 e 12345678']) {
+    assert.ok(valori(G.segretiInUscita(t)).includes('4821'), `in uscita: ${t}`);
+  }
+  for (const [t, v] of [['il pin passa a 4821', '4821'], ['il codice del cancello cambia in 4821', '4821'],
+    ['il pin cambia in 4821', '4821'], ['la password cambia in Mela!Verde77', 'Mela!Verde77'],
+    ['la password passa a Mela!Verde77', 'Mela!Verde77']]) {
+    assert.ok(!P.oscura(t).includes(v), `pavimento: ${t}`);
+    assert.ok(!C.oscura(t).includes(v), `correttore: ${t}`);
+    assert.ok(valori(G.segretiInUscita(t)).includes(v), `in uscita: ${t}`);
   }
 });
