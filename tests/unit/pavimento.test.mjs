@@ -270,8 +270,28 @@ test('un\'etichetta in un pezzo di pagina HTML copre il valore intero, e i tag r
   }
 });
 
+// #2673.12 giro 1 — le celle su righe diverse (il sorgente rientrato), il due punti come entità, un commento o un tag di
+// chiusura con lo spazio fra etichetta e valore; e un tag stretto dentro la password non la spezza.
+test('una tabella rientrata, le entità, i commenti e un tag dentro la password non lasciano uscire il valore', () => {
+  for (const [t, atteso] of [
+    ['<td>Password</td>\n<td>Nyckel!2024</td>', `<td>Password</td>\n<td>${S}</td>`],
+    ['<th>PIN</th>\n<td>4821</td>', `<th>PIN</th>\n<td>${S}</td>`],
+    ['<tr>\n    <td>PIN:</td>\n    <td>4821</td>\n  </tr>', `<tr>\n    <td>PIN:</td>\n    <td>${S}</td>\n  </tr>`],
+    ['<b>Password</b>&#58; Nyckel!2024', `<b>Password</b>&#58; ${S}`],
+    ['<b>Password&colon;</b> Nyckel!2024', `<b>Password&colon;</b> ${S}`],
+    ['<b >Password:</ b> Nyckel!2024', `<b >Password:</ b> ${S}`],
+    ['<!-- password: Nyckel!2024 -->', `<!-- password: ${S} -->`],
+    ['Password: Pa$$<br>word99', `Password: ${S}`],
+    ['Password: x7<p>Kq9!z', `Password: ${S}`],
+    ['Rete: Casa<br>Password: Nyckel!2024', `Rete: Casa<br>Password: ${S}`],
+  ]) assert.equal(P.oscura(t), atteso, t);
+  assert.ok(!P.oscura('<b>Password:</b> <!-- x --> Nyckel!2024').includes('Nyckel!2024'));
+  const tabella = '<table>\n  <tr>\n    <td>Rete</td>\n    <td>Casa</td>\n  </tr>\n  <tr>\n    <td>Password</td>\n    <td>Nyckel!2024</td>\n  </tr>\n</table>';
+  assert.equal(P.oscura(tabella), tabella.replace('Nyckel!2024', S));
+});
+
 test('un testo di 120.000 caratteri pieno di tag aperti e mai chiusi si controlla in fretta', () => {
-  for (const pezzo of ['&lt;b ', '<b &', '&lt;b title=&quot;x ', '<span title="x&']) {
+  for (const pezzo of ['&lt;b ', '<b &', '&lt;b title=&quot;x ', '<span title="x&', '<!-- ', '&lt;!--', '\n \n', '\n<x']) {
     const s = `${pezzo.repeat(Math.ceil(120000 / pezzo.length))}<b>Password:</b> Nyckel!2024`;
     let fuori = '';
     const c = costoInUnita(() => { fuori = P.oscura(s); }, { tetto: 60 });
