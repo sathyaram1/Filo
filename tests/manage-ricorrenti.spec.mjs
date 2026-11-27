@@ -377,9 +377,11 @@ test('una bozza resta sotto una rilettura che cambia la riga, e alla riapertura 
 test('tasto destro: le azioni della riga, più nuovo ricorrente e rilettura', async ({ openTab }) => {
   const page = await apri(openTab);
   await riga(page, 'rev-domande').locator('.mg-cp-nome').click({ button: 'right' });
-  const voci = page.locator('.mg-ctxmenu .sn-select-option');
-  await expect(voci).toHaveText(['Modifica', 'Avvia adesso', 'Spegni', 'Togli', 'Apri C-12 nei Compiti', 'Copia il rapporto', 'Copia il nome', 'Nuovo compito ricorrente', 'Rileggi dal server']);
-  await voci.filter({ hasText: 'Togli' }).click();
+  // A icone (#2555): le stesse voci, ogni icona seguita dalle varianti del suo verbo (l'ordine lo dà il verbo).
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  expect((await menu.vociScritte()).sort()).toEqual(['Modifica', 'Avvia adesso', 'Spegni', 'Togli', 'Apri C-12 nei Compiti', 'Copia il rapporto', 'Copia il nome', 'Nuovo compito ricorrente', 'Rileggi dal server'].sort());
+  await menu.scegli(menu.locator('.sn-menu-griglia .sn-menu-row-btn[aria-label="Togli"]'));
   await expect(riga(page, 'rev-domande').locator('button[data-azione="togli"]')).toHaveText('Sì, toglilo');
 });
 
