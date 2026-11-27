@@ -36,7 +36,7 @@
     strike: v('Barrato', 'strike', 'w', 'barrare', ['barra']),
     clear: v('Togli stile', 'eraser', 'y', 'togliere la formattazione'),
     save: v('Salva', 'download', 's', 'salvare', ['salva', 'scarica']),
-    openTab: v('Apri', 'openTab', 'a', 'aprire', ['apri', 'vai', 'avvia']),
+    openTab: v('Apri', 'openTab', 'a', 'aprire', ['apri', 'riapri', 'vai', 'avvia']),
     ask: v('Chiedi', 'sparkles', 'k', 'chiedere a Filo', ['chiedi', 'spiega', 'spiegami']),
     transcribe: v('Trascrivi', 'transcribe', 'r', 'trascrivere', ['trascrivi']),
     saveForLater: v('Per dopo', 'saveForLater', 'd', 'tenere per dopo'),
