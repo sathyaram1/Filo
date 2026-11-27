@@ -587,7 +587,7 @@ test('il riquadro resta compatto: senza mulligan nessuna colonna in più, con il
     { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
     { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await page.click('#probGame');
-  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveCount(3);
+  await expect(menuDi(page).voce('Partita').first()).toBeVisible();
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'tests/.shots/decks-prob-791-scuro.png' });
 });
