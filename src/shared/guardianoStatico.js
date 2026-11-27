@@ -338,7 +338,8 @@
   const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
   // Le parole che dopo «password» ne dicono una proprietà, non il valore («password manager», «password policy»): un elenco
   // solo per le etichette del pavimento e per la password detta prima del suo nome (riservatiNelTesto.js, #2695.8).
-  const PROPRIETA_PASSWORD = 'managers?|policy|reset|recovery|generator|hint|strength|field|length|vault|checker|hash';
+  // «password field: …» o «password hash: …» restano etichette: lì il valore c'è davvero.
+  const PROPRIETA_PASSWORD = 'managers?|policy|reset|recovery|generator|hint|strength';
   // L'annuncio con un modale davanti e un avverbio prima o dopo («dovrebbe essere», «will be», «è ancora», #2678.7): il
   // valore sta dopo di lui come dopo «è». Spazi senza a capo; il confine lo mette chi lo usa.
   const AVVERBI = 'sempre|ancora|ora|adesso|invece|attualmente|tuttora|già|anche|comunque|proprio|pure|di[^\\S\\n]+nuovo|now|still|always|currently|also|just|actually|again';
