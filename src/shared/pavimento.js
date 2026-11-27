@@ -545,7 +545,7 @@
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
   const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
   const FINE_VALORE = new RegExp(`[${NON_LATINI.FINE_VALORE}]`);
-  // Dopo il verbo attaccato anche i due punti o la virgola («密码是：Mima2024!»): non sono parte del valore.
+  // Dopo il verbo attaccato anche i due punti o la virgola («口令是：Mima2024!»): non sono parte del valore.
   const ANNUNCI_NON_LATINI = `(?:${NON_LATINI.ANNUNCI_ATTACCATI})[ \\t]*[:：、，,]?[ \\t]*`;
   const APRE_VALORE = new RegExp(`^[${NON_LATINI.APRE_VALORE}]+`);
   const finoAllaFrase = (v) => v.replace(APRE_VALORE, '').split(FINE_VALORE)[0];
