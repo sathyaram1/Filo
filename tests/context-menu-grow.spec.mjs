@@ -108,7 +108,7 @@ test('#500 la spiegazione cresce: il menu del collegamento rientra invece di far
 
   // E si può davvero puntare e cliccare l'ultima voce: Playwright rifiuta di
   // agire su un elemento fuori dalla finestra, quindi questo è il test vero.
-  const ultima = menu.locator('.sn-menu-item').last();
+  const ultima = menu.locator('.sn-menu-item:not(.sn-menu-row-overflow):visible').last();
   await ultima.hover({ timeout: 3000 });
   await attendiUltimaVoceCliccabile(app, page);
   await ultima.click({ timeout: 3000 });
@@ -130,7 +130,7 @@ test('#500 il menu di una scheda filmato dentro un collegamento rientra a sua vo
   const g = await geometria(page);
   expect(g.menuTop).toBeGreaterThanOrEqual(0);
   if (!g.scorrevole) expect(g.ultimaBottom).toBeLessThanOrEqual(g.vh);
-  await menu.locator('.sn-menu-item').last().hover({ timeout: 3000 });
+  await menu.locator('.sn-menu-item:not(.sn-menu-row-overflow):visible').last().hover({ timeout: 3000 });
 });
 
 test('#500 se la spiegazione supera la finestra intera il menu diventa scorrevole', async ({ openTab, testServer }) => {
@@ -231,7 +231,7 @@ test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non po
   await expect(menu).toBeVisible();
 
   // E l'ultima voce si raggiunge davvero, scorrendo.
-  const ultima = menu.locator('.sn-menu-item').last();
+  const ultima = menu.locator('.sn-menu-item:not(.sn-menu-row-overflow):visible').last();
   await ultima.hover({ timeout: 3000 });
   await attendiUltimaVoceCliccabile(app, page);
   await ultima.click({ timeout: 3000 });
@@ -397,7 +397,7 @@ test('#500 la finestra si accorcia sotto al menu di una selezione: il menu rient
 
     // La prova vera: Playwright rifiuta di puntare e cliccare un elemento
     // fuori dalla finestra.
-    const ultima = menu.locator('.sn-menu-item').last();
+    const ultima = menu.locator('.sn-menu-item:not(.sn-menu-row-overflow):visible').last();
     await ultima.hover({ timeout: 3000 });
     await attendiUltimaVoceCliccabile(app, page);
     await ultima.click({ timeout: 3000 });
@@ -420,7 +420,7 @@ test('#500 la finestra si accorcia sotto al menu di un collegamento: resta apert
     const dopo = await geometria(page);
     expect(dopo.menuTop).toBeGreaterThanOrEqual(0);
     expect(dopo.menuBottom).toBeLessThanOrEqual(dopo.vh);
-    await menu.locator('.sn-menu-item').last().hover({ timeout: 3000 });
+    await menu.locator('.sn-menu-item:not(.sn-menu-row-overflow):visible').last().hover({ timeout: 3000 });
   } finally {
     await ripristina();
   }
