@@ -47,6 +47,7 @@ test('r1 un cambio a una costante di modulo letta da una funzione che la prova e
   const diff = `diff --git a/src/main/protocol.js b/src/main/protocol.js\n--- a/src/main/protocol.js\n+++ b/src/main/protocol.js\n@@ -${r},1 +${r},1 @@\n-${righe[r - 1]}\n+${righe[r - 1]} \n`;
   const out = chiedi(['--diff', '-'], diff);
   const io = out.prove.find((p) => p.spec === QUESTA);
+  console.log('DEBUG', JSON.stringify(out).slice(0, 600), JSON.parse(readFileSync(mappa, 'utf8')).prove, JSON.parse(readFileSync(mappa, 'utf8')).senzaProva);
   expect(io, 'la prova ha caricato le pagine filo://, quindi ha eseguito la funzione che legge la CSP').toBeTruthy();
   expect(io.livello).toBe('funzione');
 });
