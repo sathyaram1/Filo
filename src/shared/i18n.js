@@ -89,6 +89,8 @@
     toast_video_save_failed: 'Non sono riuscito a salvare il video',
     toast_audio_save_failed: 'Non sono riuscito a salvare l\'audio',
     toast_media_stream_only: 'Questo contenuto arriva in streaming: non c\'è un file da salvare',
+    toast_media_transcribe_stream: 'Questo contenuto arriva in streaming a segmenti: non c\'è un file da trascrivere',
+    toast_media_transcribe_failed: 'Non sono riuscito a leggere questo audio per trascriverlo',
     // #1488 — il video in streaming lo salva un programma (yt-dlp): le fasi sulla riga dei Download, e i perché di un no.
     toast_video_streaming_started: 'Salvo il video: l\'avanzamento è nei Download',
     toast_audio_streaming_started: 'Salvo l\'audio: l\'avanzamento è nei Download',
