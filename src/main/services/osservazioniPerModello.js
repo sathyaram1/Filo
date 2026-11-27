@@ -907,6 +907,37 @@ function notaDeiGettoni(letture) {
     + `(i nomi fra ⟦ ⟧): parla di ${letture.length === 1 ? 'questa pagina' : 'queste pagine'}. Eccone il testo.]\n${pagine}`;
 }
 
+// Il parlato trascritto con TRASCRIVI_MEDIA (#519): l'ha detto uno sconosciuto, entra imbustato come una pagina letta.
+// Un audio che non si legge torna col perché e l'alternativa, perché il modello non risponda vuoto né inventi.
+function trascrizioniForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'TRASCRIVI_MEDIA') continue;
+    const out = a._output;
+    if (!out) continue;
+    const indirizzo = E.perCanaleSistema(tagliaInteri(String(out.trascritto || globalThis.SN_ACTION_LEVELS.indirizzoDi(a) || ''), 500));
+    if (out.errore) {
+      const frase = E.perCanaleSistema(String(out.frase || 'trascrizione non riuscita'));
+      const alternativa = out.alternativa ? ` ${E.perCanaleSistema(String(out.alternativa))}` : '';
+      blocks.push(`[Audio "${indirizzo}" NON trascritto: ${frase}${alternativa} Dillo all'utente; non inventare il contenuto.]`);
+      continue;
+    }
+    if (!out.trascrizione) {
+      blocks.push(`[Audio "${indirizzo}" trascritto (durata ${out.durata || '?'}): nell'audio non si sente parlato. Dillo all'utente.]`);
+      continue;
+    }
+    const dove = out.fonte === 'scheda' ? 'dalla scheda aperta' : out.fonte === 'pagina' ? 'dal media della pagina' : 'scaricato';
+    const seguito = Number.isFinite(out.seguito)
+      ? `\n[La trascrizione continua: il seguito con web(trascrivi), lo stesso url e da: ${out.seguito}.]` : '';
+    blocks.push(`[Trascrizione del parlato di un audio o un video (${dove}, durata ${out.durata || '?'}, ${out.pezzi || 1} pezzi)]\n`
+      + E.imbustaCampi({ tipo: 'PAGINA_WEB', campi: { Indirizzo: indirizzo }, corpo: String(out.trascrizione), conIntestazione: true })
+      + seguito);
+  }
+  return blocks.join('\n\n');
+}
+
 // Re-immissione del TESTO di una pagina web letta con LEGGI_PAGINA (#553). Lo scrive chi possiede il sito: entra
 // imbustato, e nelle righe di Filo il titolo, l'indirizzo e il motivo di un rifiuto passano solo ripuliti.
 function pageReadsForPrompt(actions) {
