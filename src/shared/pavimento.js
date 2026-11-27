@@ -1111,10 +1111,10 @@
     return giro(valore, 0);
   }
 
-  // ETICHETTE e CVV_ALTRE_LINGUE: il testo delle regole dei nomi della password e del CVV, per i campi dei moduli
-  // (campiSegreti.js); NOMI_DEL_PIN per i segreti detti dall'utente che non devono uscire in un indirizzo (urlExfil.js);
-  // SPIEGA, le parole che spiegano la password, per il correttore.
+  // ETICHETTE, NOMI_CVV e CVV_ALTRE_LINGUE: il testo delle regole dei nomi della password e del CVV, per i campi dei
+  // moduli (campiSegreti.js); NOMI_DEL_PIN per i segreti detti dall'utente che non devono uscire in un indirizzo
+  // (urlExfil.js); SPIEGA, le parole che spiegano la password, per il correttore.
   const SPIEGA = { inizio: INIZIO_SPIEGAZIONE, misura: MISURA, tempo: TEMPO, descrive: DESCRIVE, nonValore: NON_VALORE };
-  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, SPIEGA, ETICHETTE: ETICHETTA_NUDA, CVV_ALTRE_LINGUE, NOMI_DEL_PIN };
+  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, SPIEGA, ETICHETTE: ETICHETTA_NUDA, NOMI_CVV, CVV_ALTRE_LINGUE, NOMI_DEL_PIN };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAVIMENTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
