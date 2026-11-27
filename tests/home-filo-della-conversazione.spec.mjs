@@ -113,7 +113,7 @@ test('#869.2 due schede home continuano una conversazione sola, da tutte e due l
   await expect(seconda.locator('#input')).toBeVisible();
   await modelloFinto(app, [{ text: 'Le orche cacciano in gruppo.' }, { text: 'Le balene filtrano il krill.' }, { text: 'Anche i delfini.' }]);
 
-  await shell.locator('.tab').first().click();
+  await davanti(shell, prima, 0);
   await chiedi(prima, 'come cacciano le orche?');
   await expect(prima.locator('.dash-bubble-filo', { hasText: 'Le orche cacciano' })).toBeVisible({ timeout: 10_000 });
   await expect(prima.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
