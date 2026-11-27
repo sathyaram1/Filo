@@ -79,7 +79,7 @@ test('sotto il velo del sito la voce della cronologia scelta senza vederla non i
   // Tolto il velo, la stessa strada fatta vedendo il menu incolla come sempre.
   await page.evaluate(() => window.togli());
   await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
+  await menuDi(page).incolla.click({ button: 'right' });
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
   const vista = (await cronologiaPronta(app, page)).voci.find((v) => v.testo === SEGRETO);
   await page.mouse.move(vista.incolla.x, vista.incolla.y, { steps: 4 });
