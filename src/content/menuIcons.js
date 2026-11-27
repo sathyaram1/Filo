@@ -194,7 +194,7 @@
         label: a.label || nomeConOggetto(nome, oggetto), onClick: a.onClick, tieneAperto: !!a.tieneAperto,
         disabled: !!a.disabled, draggable: true, bersaglio: a.bersaglio || bersaglioDi(a.oggetto),
       };
-      if (a.misura) v.azione = a.misura;
+      if (typeof a.azione === 'string' && a.azione) v.azione = a.azione;
       if (typeof a.acceso === 'boolean') v.acceso = a.acceso;
       if (a.valore) v.valore = a.valore;
       if (a.iconaImg) v.iconaImg = a.iconaImg;
