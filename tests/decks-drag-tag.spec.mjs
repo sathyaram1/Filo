@@ -136,7 +136,7 @@ test('vista tag, carta senza tag → nessun popup, il tag si aggiunge subito', a
   // Goblin Guide non ha tag: aggiungi e sostituisci coincidono → niente popup.
   await dragCardOnto(page, 'c-goblin', 'ramp');
   await expect.poll(() => tagsOf(page, deckId, 'c-goblin')).toEqual(['ramp']);
-  await expect(page.locator('.dk-ctxmenu')).toHaveCount(0);
+  await expect(menuDi(page).pannelli).toHaveCount(0);
 });
 
 test('vista tag, rilascio su "Senza tag" rimuove tutti i tag', async ({ app, openTab }) => {
