@@ -392,7 +392,8 @@
   // Il primo verbo chiude il nome del codice, anche quello di cambio: in «il pin è giusto e la pagina diventa 2048» o «il
   // pin non funziona e il prezzo diventa 4821» il numero è d'altro, salvo che il nuovo soggetto sia una cosa che si apre (#2714).
   const UN_VERBO_PRIMA = new RegExp(`(?<![\\p{L}\\p{N}])${VERBO}(?![\\p{L}\\p{N}])`, 'iu');
-  const UN_ALTRO_SOGGETTO = /(?:,|\s(?:e|ed|ma|and|but))\s+(?:il|lo|la|l['’]|i|gli|le|un[oa]?|the|an?|my|your|his|her|its)\s*[\p{L}-]+\s*$/iu;
+  const UN_ALTRO_SOGGETTO = new RegExp(`(?:,|\\s(?:e|ed|ma|and|but))\\s+(?:il|lo|la|l['’]|i|gli|le|un[oa]?|the|an?|my|your|his|her|its)\\s*`
+    + `(?!${global.SN_GUARDIANO_STATICO.ALTRO_SEGRETO})[\\p{L}-]+\\s*$`, 'iu');
   const chiusoPrima = (fra) => {
     const fine = CHIUDE_CHI_ENTRA.exec(fra);
     if (!fine || /\d/.test(fra)) return false;
