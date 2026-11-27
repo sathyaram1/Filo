@@ -189,8 +189,7 @@ test('Editor: il nome nuovo del documento resta anche chiudendo la scheda', asyn
   const page = await openTab(EDITOR);
   await page.waitForSelector('#docTitle', { timeout: 20_000 });
   await page.click('#docTitle', { button: 'right' });
-  await page.waitForSelector('.ed-title-ctxmenu', { timeout: 5000 });
-  await page.locator('.ed-title-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).first().click();
+  await menuDi(page).scegli('Rinomina');
   await page.waitForSelector('.ed-doc-title-input', { timeout: 5000 });
   await page.keyboard.type('nome scritto e chiuso subito');
 
