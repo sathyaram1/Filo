@@ -15,6 +15,7 @@ trascinado un icona/modulo su un'altra icona/modulo analoghi devo spostarli.
 
 hover:
 metti un hover con una o due parole su ogni icona cliccabile. usa hover anche più corposi dove serve. evita di usare hover su componenti grosse e usate frequentemente. in generale su un pagina visitata sporadicamente (es un menu) un hover è quasi sempre una buona idea se serve comunicare altre informazioni mentre in una pagina visitata spesso o di uso (editor di testo) un hover può risultare fastidioso e va usato solo se il contenuto è dinamico, o sia l'elemento che l'hover sono piccoli (es hover di una parola su un icona).
+un'icona isolata ha il nome vicino al puntatore; un gruppo di icone dentro un riquadro (il menu del tasto destro) ha il nome in una riga fissa del riquadro, che compare senza ritardo: un'etichetta vicino al puntatore coprirebbe le icone accanto.
 
 
 L'ATTESA è ATTRITO
