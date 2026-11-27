@@ -251,3 +251,4 @@ test('fotogrammi dell\'apertura: nessun fotogramma bianco fra la home e l\'edito
   }, file.map((f) => join(process.cwd(), cartella, f)));
   expect(bianchi).toEqual([]);
 });
+});
