@@ -3,6 +3,7 @@
 // che vede l'utente: bolle e liste di nuovo lì, il + che mette la carta nel mazzo, lo storico che arriva al modello.
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 import { _electron as electron } from '@playwright/test';
 import { readFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
