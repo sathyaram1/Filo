@@ -162,6 +162,7 @@ require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'ttsVoices.js'));
 require(path.join(SHARED, 'pulsantiPreferenze.js'));  // #1619 — i pulsanti delle Preferenze chiesti in chat
 require(path.join(SHARED, 'dictationSegmenter.js'));
+require(path.join(SHARED, 'trascriviMedia.js'));  // #1815 — pezzi e tetti della trascrizione di un audio intero
 // Solo nei test: l'app non ha modelli scritti nel codice.
 if (process.env.NODE_ENV === 'test') {
   try { require(path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'testModels.js')); } catch (e) { console.warn('[loader] testModels non caricato:', e.message); }
