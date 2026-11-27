@@ -146,10 +146,12 @@ test('un rifiuto del main si legge col suo motivo, e la pratica non cambia', asy
 test('tasto destro sulla scheda: «Aspetta un altro feedback…» apre la casella, «Non aspettare più» toglie tutto', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page);
-  const menu = page.locator('.mg-ctxmenu');
+  // A icone (#2555): una voce è un'icona o una variante nel menu di un'icona.
+  const menu = menuDi(page);
   await page.locator('.mg-item[data-id="f903"]').click({ button: 'right' });
-  await expect(menu.locator('.sn-select-option', { hasText: 'Non aspettare più' })).toHaveCount(0);
-  await menu.locator('.sn-select-option', { hasText: 'Aspetta un altro feedback' }).click();
+  await expect(menu.principale).toBeVisible();
+  expect(await menu.haVoce('Non aspettare più')).toBe(false);
+  await menu.scegli('Aspetta un altro feedback');
   await expect(page.locator('#mgAtteseInput')).toBeFocused();
   await page.locator('#mgAtteseInput').fill('12');
   await page.locator('#mgAtteseInput').press('Enter');
