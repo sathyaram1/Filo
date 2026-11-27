@@ -182,6 +182,11 @@
   const CHIUDE_VERO = `(?:\\s*[:=#,]|\\s*,?${AVV}\\s+(?:${VERBO_SBLOCCO}(?![\\p{L}])(?:${AVV}\\s+${PARTICIPIO})?|${AUSILIARE}${AVV}\\s+${PARTICIPIO})`
     + `(?![\\p{L}])(?:\\s*[:=])?${AVV}(?:\\s+(?:il|el|le|o|the))?)`;
   const CHIUDE_CORPO = `${CHIUDE_VERO}?`;
+  // Il codice di quello che si apre e il PIN chiudono l'etichetta come il proprio apparecchio (#1403.93): «Il codice del
+  // cancello è sempre 4829», «The gate code is now 4829», «Il codice del cancello e 4829».
+  const CHIUDE_CHI_ENTRA = new RegExp(`${CHIUDE_VERO}\\s*$`, 'iu');
+  const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])(?:${CHIUDE_VERO})?\\s*$`, 'iu');
+  const SOLO_DOPO_IL_NOME = new RegExp(`^(?:${CHIUDE_VERO})?\\s*$`, 'iu');
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
   // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung», «13»): elencate, perché dopo
   // «phone» può venire «number»; e solo col verbo dopo: «codice del mio telefono nuovo serie 71034» è un altro dato.
