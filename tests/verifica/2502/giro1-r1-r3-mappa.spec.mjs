@@ -30,7 +30,8 @@ test.beforeAll(async () => {
     env: { ...process.env, FILO_USER_DATA: userData, FILO_TEST_ACCOLTO: '1', NODE_ENV: 'test', FILO_DOWNLOAD_DIR: join(userData, 'downloads') },
   });
   await expect.poll(() => app.windows().some((w) => /^filo:\/\/newtab/.test(w.url())), { timeout: 30_000 }).toBe(true);
-  await new Promise((r) => setTimeout(r, 3000));
+  await new Promise((r) => setTimeout(r, 6000));
+  console.log('DEBUG3', await app.evaluate(() => [process.env.FILO_COPERTURA, process.env.FILO_COPERTURA_PROVA]), (await import('node:fs')).readdirSync(REG));
   await chiudiApp(app, { tetto: 10_000 });
   console.log('DEBUG2', Object.getPrototypeOf(electron).__filoCopertura, REG, (await import('node:fs')).readdirSync(REG));
   mappa = join(cartellaTemporanea('filo-v2502-mappa-'), 'mappa.json');
