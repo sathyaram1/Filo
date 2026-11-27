@@ -839,8 +839,7 @@
 }
 .sn-menu-link-ok:hover { background: rgba(var(--sn-accent-rgb), 0.35); }
 
-.sn-menu-row-btn[data-sn-draggable="1"],
-.sn-menu-icon-btn[data-sn-draggable="1"] {
+.sn-menu-row-btn[data-sn-draggable="1"] {
   touch-action: none;
 }
 .sn-dragging { opacity: 0.3; }
