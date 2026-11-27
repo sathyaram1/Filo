@@ -244,14 +244,15 @@ const conMenuDelSito = (html) => html.replace('<body ', '<body oncontextmenu="re
 
 // Un clic durante la comparsa del menu (sn-fade-in) fa scorrere a Playwright un menu già scorrevole: la freccetta
 // finisce in cima e lo scorrimento breve del test la porta giù invece che su (#2323). Una persona non scorre cliccando.
+// La «freccetta» oggi è l'icona «Menu di <sito>», e il suo sottomenu si apre col tasto destro su di lei (#2555).
 async function apriSottomenu(page, menu) {
-  const freccetta = menu.locator('.sn-menu-split-arrow').first();
+  const freccetta = menu.locator('.sn-menu-griglia [data-sn-verbo="siteMenu"]').first();
   await expect(freccetta).toBeVisible();
   await expect.poll(() => menuDi(page).valuta(() => {
     const m = document.querySelector('.sn-menu:not(.sn-menu-sub)');
     return m ? m.getAnimations().filter((a) => a.playState === 'running').length : -1;
   }), { timeout: 3000, message: 'la comparsa del menu non finisce' }).toBe(0);
-  await freccetta.click();
+  await freccetta.click({ button: 'right' });
   await expect(menuDi(page).locator('.sn-menu-sub')).toBeVisible();
 }
 
