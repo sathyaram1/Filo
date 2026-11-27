@@ -37,7 +37,11 @@ export function menuDi(scheda) {
   async function scegli(icona, opzioni) {
     const v = typeof icona === 'string' ? voce(icona).first() : icona;
     await v.waitFor({ state: 'attached' });
-    if (!(await v.isVisible()) && await v.evaluate((b) => !!b.closest('.sn-menu-altro'))) await piu.click();
+    if (!(await v.isVisible()) && await v.evaluate((b) => !!b.closest('.sn-menu-altro'))) {
+      await piu.click();
+      // Una voce appena scoperta conta un clic solo dopo mezzo secondo (RITARDO_MS in src/content/vistoDavvero.js).
+      await new Promise((ok) => setTimeout(ok, 600));
+    }
     await v.click(opzioni);
   }
   // Una variante sta nel menu della sua icona, che si apre col tasto destro sull'icona.
