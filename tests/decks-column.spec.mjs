@@ -4,6 +4,7 @@
 // Scryfall è mockato nel main: niente rete.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CARDS = {
   'c-bolt': {
