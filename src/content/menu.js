@@ -105,22 +105,67 @@
     .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   // Ritorna true se il tasto l'ha usato il menu. Solo i tasti veri: sul sito anche il suo script ne fabbrica.
+  // La voce più vicina nella riga sopra o sotto (`verso` 1 giù, -1 su), in una griglia di icone o in una lista.
+  function vicinaInVerticale(voci, i, verso) {
+    if (i < 0) return verso > 0 ? 0 : voci.length - 1;
+    const r = voci[i].getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    let meglio = -1, dy = Infinity, dx = Infinity;
+    voci.forEach((b, j) => {
+      if (j === i) return;
+      const q = b.getBoundingClientRect();
+      const d = (q.top + q.height / 2 - (r.top + r.height / 2)) * verso;
+      if (d < 4) return;
+      const ddx = Math.abs(q.left + q.width / 2 - cx);
+      if (d < dy - 4 || (Math.abs(d - dy) <= 4 && ddx < dx)) { meglio = j; dy = d; dx = ddx; }
+    });
+    if (meglio >= 0) return meglio;
+    return verso > 0 ? 0 : voci.length - 1;
+  }
+
+  // Il tasto singolo di un'icona (#2555): vale anche per quelle dietro il «+», mostrato nella riga del nome.
+  function tastoDellIcona(root, k) {
+    const c = String(k || '').toLowerCase();
+    if (!/^[a-z0-9]$/.test(c)) return null;
+    return [...root.querySelectorAll('[data-sn-tasto]')].find((b) => b.dataset.snTasto === c && b.dataset.snDisabled !== '1') || null;
+  }
+
   function tastoNelMenu(e, m) {
     if (!e.isTrusted) return false;
-    const root = m.root;
     const attivo = document.activeElement;
-    // La cronologia degli appunti ha il suo campo e le sue frecce: lì il menu non si prende i tasti.
-    if (nelSub(attivo)) return false;
+    // La cronologia degli appunti ha il suo campo e le sue frecce: lì il menu non si prende i tasti. Nelle varianti e
+    // nei valori di un'icona le frecce si muovono fra le voci, e a sinistra si torna all'icona.
+    const inSub = nelSub(attivo);
+    if (inSub && m.subHost) return false;
+    const root = inSub ? m.subRoot : m.root;
     const dentro = root.contains(attivo);
     if (dentro && scrivibile(attivo)) return false;
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    const k = e.key;
+    if (inSub && k === 'ArrowLeft') {
+      const torna = m.subAnchor;
+      closeSubmenu();
+      if (torna && torna.isConnected) { try { torna.focus({ preventScroll: true }); } catch (_) {} }
+      return true;
+    }
+    // Il menu dell'icona col fuoco, dalla tastiera: il tasto Menu o Maiusc+F10.
+    if (!inSub && dentro && (k === 'ContextMenu' || (k === 'F10' && e.shiftKey)) && attivo.dataset.snVarianti === '1') {
+      attivo.dispatchEvent(new CustomEvent('sn-varianti'));
+      return true;
+    }
+    if (!inSub && k.length === 1) {
+      const b = tastoDellIcona(root, k);
+      if (b && esecutori.has(b)) { esecutori.get(b)(); return true; }
+    }
     const voci = vociDaTastiera(root);
     if (!voci.length) return false;
     const i = dentro ? voci.indexOf(attivo) : -1;
     const vai = (j) => { const b = voci[(j + voci.length) % voci.length]; try { b.focus({ preventScroll: false }); } catch (_) { b.focus(); } };
-    const k = e.key;
-    if (k === 'ArrowDown') { vai(i < 0 ? 0 : i + 1); return true; }
-    if (k === 'ArrowUp') { vai(i < 0 ? voci.length - 1 : i - 1); return true; }
+    const inGriglia = i >= 0 && !!voci[i].closest('.sn-menu-griglia');
+    if (k === 'ArrowDown') { vai(inGriglia || i < 0 ? vicinaInVerticale(voci, i, 1) : i + 1); return true; }
+    if (k === 'ArrowUp') { vai(inGriglia || i < 0 ? vicinaInVerticale(voci, i, -1) : i - 1); return true; }
+    if (k === 'ArrowRight' && (inGriglia || i < 0)) { vai(i + 1); return true; }
+    if (k === 'ArrowLeft' && (inGriglia || i < 0)) { vai(i < 0 ? voci.length - 1 : i - 1); return true; }
     if (!dentro && !m.tastiera) return false;
     if (k === 'Home') { vai(0); return true; }
     if (k === 'End') { vai(voci.length - 1); return true; }
