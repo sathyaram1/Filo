@@ -3156,6 +3156,19 @@
     };
   }
 
+  // Il tasto destro a icone (#2555): grandezza delle icone in px e colonne della griglia, dentro i limiti.
+  const MENU_ICONE_LIMITI = Object.freeze({ icona: Object.freeze([14, 32]), colonne: Object.freeze([3, 10]) });
+  function opzioniMenuIcone(v) {
+    const o = v && typeof v === 'object' ? v : {};
+    const d = DEFAULT_SETTINGS.menuIcone;
+    const n = (k) => {
+      const x = Math.round(Number(o[k]));
+      const [min, max] = MENU_ICONE_LIMITI[k];
+      return Number.isFinite(x) && o[k] !== null && o[k] !== '' ? Math.max(min, Math.min(max, x)) : d[k];
+    };
+    return { icona: n('icona'), colonne: n('colonne') };
+  }
+
   // Il pannello di destra delle app: stessi limiti e stessa lettura della barra, più il lucchetto.
   function opzioniPannelloDestro(v) {
     const o = v && typeof v === 'object' ? v : {};
