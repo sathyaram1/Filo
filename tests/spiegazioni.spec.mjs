@@ -83,10 +83,11 @@ test('una risposta con due termini spiegati: passaggio, annidati, clic, Esc, tas
 
   // Tasto destro: le due voci; «Copia la spiegazione» copia il testo della spiegazione.
   await parola(page, 'cache').click({ button: 'right' });
-  const menu = page.locator('.filo-spiega-menu');
-  await expect(menu.locator('.filo-spiega-voce')).toHaveText(['Spiegami di più', 'Copia la spiegazione']);
-  await menu.locator('[data-voce="copia"]').click();
-  await expect(menu).toHaveCount(0);
+  // A icone come ogni menu di Filo (#2555): le stesse voci, ogni icona seguita dalle varianti del suo verbo.
+  const menu = menuDi(page);
+  expect(await vociSpiega(page)).toEqual(['Spiegami di più', 'Copia la spiegazione']);
+  await menu.scegli('Copia la spiegazione');
+  await expect(menu.pannelli).toHaveCount(0);
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Una copia vicina dei dati, per non chiederli di nuovo.');
 
   // «Spiegami di più» arriva in chat, nella stessa conversazione, senza toccare quello che stavi scrivendo.
