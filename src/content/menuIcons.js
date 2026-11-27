@@ -304,7 +304,10 @@
     const o = opzioni && typeof opzioni === 'object' ? opzioni : {};
     // `rifai`: come rifare le azioni quando lo stato dell'elemento cambia a menu aperto (la velocità girata con la rotella).
     rifacitore = typeof o.rifai === 'function' ? o.rifai : null;
-    aperta = { contesto, azioni: azioni || {}, bersagli: o.bersagli || {}, oggetti: o.oggetti || {}, scritte: o.scritte || [], aspetto: o.aspetto || {} };
+    aperta = {
+      contesto, azioni: azioni || {}, bersagli: o.bersagli || {}, oggetti: o.oggetti || {}, scritte: o.scritte || [],
+      aspetto: o.aspetto || {}, soloScritte: o.soloScritte === true,
+    };
     const c = costruisci();
     return {
       type: 'row',
