@@ -204,8 +204,8 @@ test('scelto tre volte, Filo propone una volta il menu del sito; accettato, il t
 test('la scelta si fa anche dalla freccia della voce, e si toglie dalle Preferenze', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, MENU_SUO, { pubblico: true });
   await page.locator('#area').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu .sn-menu-split-arrow').first().hover();
-  await menuDi(page).locator('.sn-menu-sub .sn-menu-item', { hasText: 'Aprilo subito col tasto destro' }).click();
+  // La «freccia» è il menu dell'icona, col tasto destro su di lei (#2555).
+  await menuDi(page).variante(menuDi(page).icona('siteMenu'), 'Aprilo subito col tasto destro');
   await expect.poll(() => sitiScelti(app)).toEqual(['sito-pubblico.test']);
   await tastoDestroApre(page, page.locator('#menu-suo'));
 
