@@ -32,6 +32,7 @@ test.beforeAll(async () => {
   await expect.poll(() => app.windows().some((w) => /^filo:\/\/newtab/.test(w.url())), { timeout: 30_000 }).toBe(true);
   await new Promise((r) => setTimeout(r, 3000));
   await chiudiApp(app, { tetto: 10_000 });
+  console.log('DEBUG2', Object.getPrototypeOf(electron).__filoCopertura, REG, (await import('node:fs')).readdirSync(REG));
   mappa = join(cartellaTemporanea('filo-v2502-mappa-'), 'mappa.json');
   execFileSync(process.execPath, ['scripts/mappa-prove.mjs', 'costruisci', '--registrazioni', REG, '--out', mappa], { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
 });
