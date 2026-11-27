@@ -134,7 +134,10 @@ test('salvata in Automazioni, «Discutiamone» e il tasto destro copiano la paro
   await expect.poll(() => appunti(app)).toBe('Discutiamo la domanda D-8');
   await expect(dq(page, 'D-8').locator('.mg-dq-msg')).toHaveText('Copiato: «Discutiamo la domanda D-8»');
   await riga(page, 'D-8').click({ button: 'right' });
-  await expect(menu.locator('.sn-select-option', { hasText: 'Discutiamo la domanda D-8' })).toHaveText('Copia «Discutiamo la domanda D-8»');
+  await expect(menu.principale).toBeVisible();
+  const voci = await menu.vociScritte();
+  expect(voci).toContain('Copia «Discutiamo la domanda D-8»');
+  expect(voci.filter((v) => v.includes('parola d’ordine'))).toEqual([]);
 });
 
 test('appunti che non rispondono: «Discutiamone» lo dice e mostra la riga da ricopiare, non un «Copiato» falso', async ({ app, openTab }) => {
