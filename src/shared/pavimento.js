@@ -721,6 +721,17 @@
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
+  // Una nota fra parentesi o quadre o un'emoji (anche una faccina scritta) dopo il valore non è del valore: «Password: casa
+  // mia al mare (tutto minuscolo).», «Password: tramonto 😊 grazie» (#2678.13). Una sola regola per la parola e per la
+  // frase. Dopo la nota la riga può continuare solo dopo un segno o dopo un'emoji: in «casa (mia) al mare» è la password.
+  const EMOJI = '(?:[\\p{Extended_Pictographic}\\p{Regional_Indicator}][\\p{Emoji_Modifier}\\u{FE0F}\\u{20E3}]*(?:\\u{200D}\\p{Extended_Pictographic}[\\p{Emoji_Modifier}\\u{FE0F}]*)*|[0-9#*]\\u{FE0F}?\\u{20E3}|[:;=]-?[)(DPp]|<3)';
+  const NOTA = `(?:[ \\t]*(?:\\([^()\\n]{0,80}\\)|\\[[^\\[\\]\\n]{0,80}\\])|[ \\t]+${EMOJI}+)`;
+  const NOTA_IN_FONDO = new RegExp(`(?<![ \\t])(?:${NOTA}*[ \\t]+${EMOJI}+(?:[ \\t][^\\n]*)?|${NOTA}+)(?:[ \\t]*[.!?;,…–—-]+(?:[ \\t][^\\n]*)?)?[ \\t]*$`, 'u');
+  // Solo la coda: su una riga lunga piena di emoji o parentesi la ricerca da ogni punto diventerebbe quadratica.
+  const senzaNota = (resto) => {
+    const k = Math.max(0, resto.length - 200);
+    return resto.slice(0, k) + resto.slice(k).replace(NOTA_IN_FONDO, '');
+  };
   const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*$`, 'i');
   const TESTA_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}`, 'i');
   function alPostoDelValore(s, out) {
@@ -731,7 +742,7 @@
     for (let i = 0; i < righe.length; i++) {
       for (const m of righe[i].matchAll(AL_POSTO)) {
         // Una parentesi attaccata («password = input(…)») è una chiamata nel codice, non una nota dopo il valore.
-        if (!DA_SOLA.test(m[2]) || m[2].startsWith('(')) continue;
+        if (!DA_SOLA.test(senzaNota(m[2])) || m[2].startsWith('(')) continue;
         const v = valorePassword(m[1]);
         if (v) out.push(alPosto(v, inizi[i] + m.indices[1][0], m[1]));
       }
@@ -778,7 +789,7 @@
   function fraseDopo(s, out) {
     for (const m of s.matchAll(FRASE_DOPO)) {
       // Le virgolette intorno alla frase («Password: «casa mia al mare»») non sono della password (#1403.27).
-      const tutta = m[1].trim();
+      const tutta = senzaNota(` ${m[1]}`).trim();
       const q = tutta.match(SOLO_FRA_VIRGOLETTE);
       const v = q ? q[3] : tutta;
       const parole = v.split(/\s+/);

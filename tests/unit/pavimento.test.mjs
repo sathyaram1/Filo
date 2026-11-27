@@ -639,6 +639,56 @@ test('#2678.5: senza virgolette la frase-password si toglie anche con un articol
     `Password: ${'parola '.repeat(40).trim()}`]) assert.equal(P.oscura(riga), riga, riga);
 });
 
+test('#2678.13: una nota fra parentesi o un\'emoji in fondo alla riga non salva la password, di una parola o di più', () => {
+  for (const [riga, atteso] of [
+    ['Password: casa mia al mare (tutto minuscolo)', `Password: ${S} (tutto minuscolo)`],
+    ['Password: casa mia al mare 😊', `Password: ${S} 😊`],
+    ['Password: casa mia al mare 👍🏽', `Password: ${S} 👍🏽`],
+    ['Password: casa mia al mare ❤️ (minuscolo)', `Password: ${S} ❤️ (minuscolo)`],
+    ['Password: casa mia al mare :)', `Password: ${S} :)`],
+    ['Password: tramonto (minuscolo)', `Password: ${S} (minuscolo)`],
+    ['Password: tramonto 😊', `Password: ${S} 😊`],
+    ['Utente: mario\nPassword: la casa al mare (tutto minuscolo)\nServer: imap.esempio.it',
+      `Utente: mario\nPassword: ${S} (tutto minuscolo)\nServer: imap.esempio.it`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const riga of ['Password: disponibile alla reception (piano terra)', 'Password: la stessa di prima 😊',
+    'Password: deve avere almeno otto caratteri (una maiuscola)', 'Password: (vedi email)', 'Password: dimenticata 😢',
+    'Password: vedi email 😊 (oggetto «accesso»)']) assert.equal(P.oscura(riga), riga, riga);
+});
+
+test('#2678.13: la riga può continuare dopo la nota, con un segno o dopo un\'emoji; la nota anche fra quadre o attaccata', () => {
+  for (const [riga, atteso] of [
+    ['Password: casa mia al mare (tutto minuscolo).', `Password: ${S} (tutto minuscolo).`],
+    ['Password: casa mia al mare (tutto minuscolo)!', `Password: ${S} (tutto minuscolo)!`],
+    ['Password: casa mia al mare (tutto minuscolo), utente mario', `Password: ${S} (tutto minuscolo), utente mario`],
+    ['Password: casa mia al mare (tutto minuscolo). Utente: mario', `Password: ${S} (tutto minuscolo). Utente: mario`],
+    ['Password: casa mia al mare (minuscolo) — mi raccomando', `Password: ${S} (minuscolo) — mi raccomando`],
+    ['Password: casa mia al mare 😊.', `Password: ${S} 😊.`],
+    ['Password: casa mia al mare 😊 grazie', `Password: ${S} 😊 grazie`],
+    ['Password: casa mia al mare (tutto minuscolo) 😊 a presto', `Password: ${S} (tutto minuscolo) 😊 a presto`],
+    ['Password: tramonto 😊.', `Password: ${S} 😊.`],
+    ['Password: casa mia al mare [tutto minuscolo]', `Password: ${S} [tutto minuscolo]`],
+    ['Password: tramonto [minuscolo]', `Password: ${S} [minuscolo]`],
+    ['Password: casa mia al mare(tutto minuscolo)', `Password: ${S}(tutto minuscolo)`],
+    ['Password: casa mia al mare 1️⃣', `Password: ${S} 1️⃣`],
+    ['Password: casa mia al mare 🇮🇹', `Password: ${S} 🇮🇹`],
+    ['Password: casa mia al mare 👨‍👩‍👧', `Password: ${S} 👨‍👩‍👧`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const riga of ['Password: la trovi nel cassetto (quello in alto).', 'Password: dimenticata 😅.',
+    'Password: vedi email 😊 grazie', 'password = input("Password: ")']) assert.equal(P.oscura(riga), riga, riga);
+});
+
+// La nota si cerca solo nella coda della riga: da ogni punto di una riga lunga piena di emoji o di parentesi la ricerca
+// costerebbe secondi (cresce col quadrato della lunghezza), su ogni chiamata a un modello.
+test('#2678.13: una riga lunghissima di emoji o di parentesi dopo «Password:» si controlla in fretta', () => {
+  // Le code che finiscono con una parola fanno fallire la ricerca da ogni punto: senza il limite costano secondi.
+  for (const coda of [' (a)'.repeat(20000) + ' x', ' [a]'.repeat(20000) + ' x', ' 😊'.repeat(20000), ' ('.repeat(20000)]) {
+    const s = `Password: casa mia al mare${coda}`;
+    const c = costoInUnita(() => P.oscura(s), { tetto: 60 });
+    assert.ok(c.entro, `${coda.slice(0, 4)}: ${c.come}`);
+  }
+});
+
 test('una chiave o una password per nome, in un file di configurazione o sulla pagina di un servizio, non esce', () => {
   const segreti = {
     'PGPASSWORD=Girasole2024': 'Girasole2024',
