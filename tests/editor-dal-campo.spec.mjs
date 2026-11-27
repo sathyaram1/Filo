@@ -208,6 +208,9 @@ test('nell\'editor l\'Aiuto vede la selezione e «riscrivilo più breve» cambia
   expect(ultimo).toContain('digli di selezionarla');
 });
 
+// La finestra a schermo: i fotogrammi sono quelli che compone X, la cosa che vede l'utente.
+test.describe('a schermo', () => {
+  test.use({ envInPiu: { FILO_HIDE_WINDOW: '0' } });
 test('fotogrammi dell\'apertura: nessun fotogramma bianco fra la home e l\'editor', async ({ app }) => {
   test.skip(process.platform !== 'linux' || !process.env.DISPLAY || spawnSync('ffmpeg', ['-version']).status !== 0, 'fotogrammi solo con ffmpeg su X');
   test.setTimeout(60_000);
