@@ -642,6 +642,82 @@
     + `(?:${CAMBIO_VALORE}|\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI}))`
     + `\\s{0,8}(?:["'«“]|[${APRE_VALORE}]\\s{0,8})?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
   const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)(?:${CAMBIO_VALORE}\\s{0,8}|[\\s:=]{0,8}(?:${ANNUNCIO}(?:\\s{1,8}|\\s{0,8}[:=]\\s{0,8})${ARTICOLO})?)["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
+  // Il valore che segue il nome del dato (PIN, codice che apre, password) nella sua frase, o nella risposta dopo la sua
+  // domanda, presentato da una parola degli elenchi comuni (ANNUNCI, CAMBI, PARTICIPI, PASSATI, VERSO dopo un cambio):
+  // una regola sola per il pavimento e le uscite al posto dei casi (#2714 giro 7). Un altro soggetto («e il prezzo
+  // diventa 4821») chiude; una parola che dice com'è il dato («è giusto») toglie l'annuncio. Prove: tests/unit/cambioDelValore.test.mjs.
+  const NOME_DEL_VALORE = new RegExp('(?<![\\p{L}\\p{N}])(?:(pin)|(codic[ei]\\s+(?:del|della|dello|dell[\'’]\\s*)\\s*(?:cancello|portone|allarme|cassaforte|garage|box|lucchetto|porta|antifurto))'
+    + '|(password|passwd|pwd|passphrase|parola\\s+d[\'’]ordine))(?![\\p{L}\\p{N}])', 'giu');
+  const intere = (re) => new RegExp(`^(?:${re})$`, 'iu');
+  const PRESENTA_VALORE = intere(`${ANNUNCI.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}|${CAMBI}|${PARTICIPI}|${PASSATI}|ha|has|have|had`);
+  const UN_CAMBIO = intere(`${CAMBI}|${PARTICIPI}|${PASSATI}`);
+  const CAMBIO_INGLESE = /^(?:changed|set|updated|reset|replaced|became|remained|stayed)$/i;
+  const PONTE_DEL_CAMBIO = intere(VERSO);
+  // Parole che non spostano il valore e non lo descrivono: ausiliari, avverbi, negazioni, il pronome, «il nuovo».
+  const NEUTRA = intere(`${AVVERBIO}|${AVVERBI}|${MODALI}|non|più|piu|not|no|sì|si|yes|ok|okay|it|its|it's|that|lo|la|l|ho|hai|abbiamo|avete|hanno`
+    + '|ce|c|quello|quella|nuovo|nuova|new|one|vecchio|vecchia|old|prima|poi|before|after|era|il|the|mio|mia|my|e|ed|and|ma|but|invece');
+  const DETERMINANTE = /^(?:il|lo|la|l|i|gli|le|un|uno|una|the|a|an|my|your|his|her|our|their|mio|mia|tuo|tua|suo|sua)$/i;
+  const PREPOSIZIONE = /^(?:di|del|della|dello|dei|degli|delle|dell|per|for|of|on|su|sul|sulla|nel|nella|in|da|dal|dalla|con|with|a|al|alla|to)$/i;
+  const UNITA = /^(?:euro|eur|€|\$|usd|dollari|dollars?|km|kg|pagine|pagina|pages?|anni|giorni|ore|minuti|mesi|metri|persone|volte|cifre|caratteri|%)$/i;
+  const ANNO_VALORE = /^(?:19|20)\d\d$/;
+  const LUOGO_DEL_CAMBIO = /^(?:in|su|on|a)$/i;
+  function valoriDopoIlNome(testoIntero, { uscita = false } = {}) {
+    const s = testo(testoIntero);
+    const out = [];
+    for (const n of s.matchAll(NOME_DEL_VALORE)) {
+      const password = !!n[3];
+      const fine = n.index + n[0].length;
+      const clausola = s.slice(Math.max(0, n.index - 80), n.index).split(/[.!?;,\n]/).pop();
+      let cambio = clausola.split(/[\s'’]+/).some((w) => UN_CAMBIO.test(w));
+      let inglese = clausola.split(/[\s'’]+/).some((w) => CAMBIO_INGLESE.test(w));
+      let presentato = false;
+      let passati = 0;
+      let parole = 0;
+      let prec = '';
+      const toks = [...s.slice(fine, fine + 200).matchAll(/[^\s'’]+['’]?/g)];
+      for (let k = 0; k < toks.length && parole < 16 && out.length < 40; k++) {
+        const grezzo = toks[k][0];
+        if (/\n/.test(s.slice(fine + (k ? toks[k - 1].index + toks[k - 1][0].length : 0), fine + toks[k].index)) && passati) break;
+        const nucleo = grezzo.replace(/^["'«“‘„(]+/, '').replace(/[.,;:!?)»”"'’]+$/, '');
+        const coda = grezzo.slice(grezzo.length - (grezzo.length - grezzo.replace(/[.,;:!?)»”"'’]+$/, '').length));
+        const parola = nucleo.toLowerCase();
+        parole++;
+        if (!nucleo) { /* solo punteggiatura */ } else if (/^\d+$/.test(nucleo)) {
+          const misura = MISURE_CIFRE.codice;
+          const dopo = toks[k + 1] ? toks[k + 1][0].replace(/[.,;:!?)»”"']+$/, '') : '';
+          if (password || !presentato || nucleo.length < misura[0] || nucleo.length > misura[1] || UNITA.test(dopo) || /[%€$]/.test(coda)) break;
+          if (ANNO_VALORE.test(nucleo) && (/^(?:nel|dal|since)$/i.test(prec) || (inglese && /^in$/i.test(prec)))) break;
+          out.push({ valore: nucleo, regola: 'codice' });
+          presentato = true;
+        } else if (password && presentato && (uscita ? passwordInUscita(nucleo) : sembraPassword(nucleo))
+          && !(LUOGO_DEL_CAMBIO.test(prec) && /^\p{L}+$/u.test(nucleo)) && !PRESENTA_VALORE.test(parola) && !NEUTRA.test(parola)) {
+          out.push({ valore: nucleo, regola: 'password' });
+        } else if (PRESENTA_VALORE.test(parola)) {
+          presentato = true;
+          if (UN_CAMBIO.test(parola)) cambio = true;
+          if (CAMBIO_INGLESE.test(parola)) inglese = true;
+        } else if (cambio && PONTE_DEL_CAMBIO.test(parola)) {
+          presentato = true;
+        } else if (DETERMINANTE.test(parola) && !PREPOSIZIONE.test(prec) && toks[k + 1] && /^\p{L}{2,}/u.test(toks[k + 1][0])
+          && !NEUTRA.test(toks[k + 1][0].replace(/[.,;:!?)»”"']+$/, '')) && !NOME_DEL_VALORE.test(toks[k + 1][0])) {
+          NOME_DEL_VALORE.lastIndex = 0;
+          break;
+        } else if (!NEUTRA.test(parola) && !PREPOSIZIONE.test(parola)) {
+          // «è giusto», «è scritta sul foglio»: dopo l'annuncio una parola che lo descrive, e il valore non c'è.
+          if (presentato) presentato = false;
+        }
+        NOME_DEL_VALORE.lastIndex = 0;
+        prec = parola;
+        if (/[.!?;]$/.test(coda)) {
+          // Si passa una frase sola: la risposta dopo la domanda, o quella dopo «ho cambiato il pin».
+          if (passati || !(/\?$/.test(coda) || cambio)) break;
+          passati++;
+        }
+      }
+    }
+    return out;
+  }
+
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
     try { s = `${s}\n${decodeURIComponent(s.replace(/\+/g, ' '))}`; } catch (_) { /* un % che non codifica niente */ }
