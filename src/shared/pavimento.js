@@ -786,7 +786,7 @@
   // «Copia», «••••»), che le pagine mettono fra l'etichetta e la password. `saltate`: quante righe piene ha scavalcato.
   const SOLO_BOTTONI = /^(?:[\s•*·●]|mostra|nascondi|copia|copy|show|hide|reveal|rivela|visualizza|view|modifica|edit|cambia|change|accedi|entra|login|log\s+in|sign\s+in|invia|continua|avanti|next|ok|annulla|cancel|registrati|sign\s+up|register)*$/i;
   function rigaSotto(righe, i) {
-    for (let j = i + 1, vuote = 0, bottoni = 0; j < righe.length && vuote <= 3 && bottoni <= 2; j++) {
+    for (let j = i + 1, vuote = 0, bottoni = 0; j < righe.length && vuote <= VUOTE_SOTTO && bottoni <= 2; j++) {
       if (!righe[j].trim()) { vuote++; continue; }
       if (SOLO_BOTTONI.test(righe[j])) { bottoni++; continue; }
       return { riga: righe[j], j, saltate: bottoni };
