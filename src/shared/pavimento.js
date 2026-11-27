@@ -1413,12 +1413,14 @@
     // Un avverbio fra il verbo e il valore («il pin è ancora 4821») si legge come spazi, come l'enfasi (guardianoStatico.js).
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
-    // Un refuso del nome («pasword», «passwrd») si legge come il nome, alla stessa lunghezza (riservatiNelTesto.js).
-    const viste = (R ? R.vistePerLeRegole(piano).map((v) => R.refusiComeNome(v)) : [piano]).map((v) => G.avverbiComeSpazi(virgoletteStrette(v)));
+    // Un refuso del nome («pasword») o del verbo («diventta») si legge giusto, alla stessa lunghezza, e un inciso fra nome
+    // e verbo come spazi in una lettura in più (riservatiNelTesto.js).
+    const viste = (R ? R.vistePerLeRegole(piano).map((v) => R.verbiDopoIlNome(R.refusiComeNome(v))) : [piano])
+      .map((v) => G.avverbiComeSpazi(virgoletteStrette(v)));
     if (!viste[0].trim() || /^data:image\//i.test(viste[0].slice(0, 16))) return [];
     const out = [];
     for (const s of viste) {
-      for (const lettura of [s, celleComeRighe(s)]) {
+      for (const lettura of [s, celleComeRighe(s), R ? R.incisiComeSpazi(s) : null]) {
         if (lettura === null) continue;
         const qui = regole(lettura, giro);
         // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
