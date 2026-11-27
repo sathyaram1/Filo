@@ -166,13 +166,14 @@ test('tasto destro sulla bolla in attesa o sull\'intestazione della chat: «Ferm
   test.setTimeout(60_000);
   const { page } = await openBuilder(app, openTab);
   await app.evaluate(() => { globalThis.__modelloMuto = true; });
-  const voce = page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Ferma la risposta' });
+  const menu = menuDi(page);
+  const voce = menu.voce('Ferma la risposta');
 
   await scrivi(page, 'draghi rossi');
   const bot = page.locator('.dk-msg-bot').last();
   await expect(bot.locator('.dk-msg-pending', { hasText: 'sta pensando' })).toBeVisible();
   await bot.click({ button: 'right' });
-  await voce.click();
+  await menu.scegli('Ferma la risposta');
   await expect(bot.locator('.dk-msg-pending')).toHaveText('Risposta fermata.');
   await expect.poll(() => app.evaluate(() => globalThis.__annullate)).toBe(1);
   // A chat libera la voce non c'è più, nemmeno sulla bolla fermata.
