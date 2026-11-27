@@ -388,7 +388,7 @@ function domandaNelFilo(lista, chatId, userMessage) {
 // `immagini: false`: il modello ha rifiutato le immagini dei turni passati, al loro posto resta la nota.
 // `domanda(...)`: la domanda di adesso resa come la renderà il tratto dei turni dopo, con le note di questo turno.
 // `senzaEsiti`: oltre il listino, anche dopo la compattazione, gli esiti dei turni passati escono (SPEC-CONTESTO).
-async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true, senzaEsiti = false } = {}) {
+async function componi({ chatId = null, inVista = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true, senzaEsiti = false } = {}) {
   // Deciso alla richiesta, come fa il filo: dall'incognito si legge il filo in memoria, mai quello sul disco.
   if (incognito == null) incognito = require('../shim/storage').inIncognito();
   const lato = incognito ? 'incognito' : 'normale';
