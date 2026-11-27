@@ -214,11 +214,12 @@ test('i quattro casi insieme: una carta ciascuno col numero, «Apri Inviti e ute
     await home.screenshot({ path: join(SHOTS, `wallet-owner-avvisi-${tema}.png`) });
   }
 
-  const voci = home.locator('.dash-menu .dash-menu-voce');
+  // A icone (#2555): le voci della carta sono icone col loro nome.
+  const voci = menuDi(home);
   const inviti = carte(home).filter({ hasText: 'Resta 1 ingresso con invito' });
   await inviti.click({ button: 'right', position: { x: 30, y: 12 } });
-  await expect(voci.filter({ hasText: 'Apri Inviti e utenti' })).toBeVisible();
-  await expect(voci.filter({ hasText: 'Chiudi' }).first()).toBeVisible();
+  await expect(voci.voce('Apri Inviti e utenti')).toBeVisible();
+  await expect(voci.voce('Chiudi').first()).toBeVisible();
   await home.screenshot({ path: join(SHOTS, 'wallet-owner-avvisi-menu.png') });
   await home.keyboard.press('Escape');
 
