@@ -1502,8 +1502,11 @@
   function makeRowButton(sub, opts = {}) {
     const b = document.createElement('button');
     b.type = 'button';
+    // Un'icona è una voce del menu come le altre (#2555): stessa classe e stesso ruolo, il disegno è suo.
     b.className = 'sn-menu-row-btn';
     if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
+    else { b.classList.add('sn-menu-item'); b.setAttribute('role', 'menuitem'); }
+    if (opts.classeVoce) b.classList.add(...String(opts.classeVoce).split(/\s+/).filter(Boolean));
     // Spenta con una classe: l'attributo `disabled` azzera i pointer event e l'icona non si trascinerebbe più.
     if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     segnaAcceso(b, sub);
