@@ -17,8 +17,18 @@
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
   // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo dopo «kod».
-  const VERBO_CVV = `(?:${VERBO}|(?<=\\bkod\\b[^\\n]{0,40})to)`;
-  const NOME_CVV = '\\b(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?)\\b';
+  // Dopo il verbo anche l'articolo («Il CVV è il 123», «Die Prüfnummer ist die 123»), e come per la password il trattino
+  // o la freccia fra spazi («CVV — 123», #2681.2).
+  const VERBO_CVV = `(?:${VERBO}|(?<=\\bkod\\b[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
+  const TRATTINO = '[-–—→](?=[ \\t])';
+  // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности».
+  const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F';
+  // Il nome del CVV nelle lingue delle etichette, quelle del verbo.
+  const NOME_CVV = `(?<![${LETTERE}])(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:code|value|number)`
+    + '|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?|cryptogrammes?(?:\\s+visuels?)?|code\\s+de\\s+s[ée]curit[ée]'
+    + '|c[óo]digos?\\s+de\\s+(?:seguridad|seguran[çc]a)|(?:karten)?pr[üu]f(?:nummer|ziffern?|zahl|code)|sicherheits(?:code|nummer)'
+    + '|beveiligingscode|kaartverificatiecode|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa)'
+    + `|код\\s+(?:безопасности|проверки))(?![${LETTERE}])`;
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
   const APERTE = '«"\'“‘„';
@@ -35,8 +45,8 @@
   const INTORNO_CHIUSE = `[${CHIUSE})\\]}]`;
   const DAVANTI = `(?:${INTORNO_APERTE}[ \\t]*){0,3}`;
   const CIFRE_CVV = `${DAVANTI}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
-  const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
-  const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*[:=|\\t]|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
+  const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
+  const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*(?:[:=|\\t]|${TRATTINO})|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
   // falso allarme ferma un'azione; qui un falso allarme toglie un numero, e il codice di verifica non esce.
   // Le cifre in coda a una parola («Girasole2024») non sono il codice: è la password intera, e la toglie la regola delle
@@ -410,8 +420,8 @@
     + '|codice\\s+(?:di\\s+)?(?:accesso|segreto))\\b';
   // La chiave del wifi come la chiamano i router nelle altre lingue (#1403.19): «Ключ сети», «暗号化キー». Il confine
   // come in urlExfil.js: \b non vede le lettere fuori dall'ASCII.
-  const FUORI = '(?![A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F])';
-  const CHIAVI_DI_RETE = '|(?<![A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F])(?:'
+  const FUORI = `(?![${LETTERE}])`;
+  const CHIAVI_DI_RETE = `|(?<![${LETTERE}])(?:`
     + '(?:ключ(?:а|ом|у)?|klucz(?:a|em|u)?)\\s+(?:сети|безопасности(?:\\s+сети)?|шифрования|sieci(?:\\s+bezprzewodowej)?|zabezpiecze[ńn]|wi-?fi|wlan|wpa[23]?(?:-psk)?)'
     + '|сетевой\\s+ключ|(?:netwerk|beveiligings|wpa[23]?(?:-psk)?-?|wi-?fi-?|wlan-?)sleutel'
     + `)${FUORI}|密[钥鑰]|暗号化キー|セキュリティ\\s*キー|ネットワーク\\s*キー|事前共有キー|(?:네트워크\\s*)?보안\\s*키|(?:네트워크|무선|wpa[23]?(?:-psk)?|wi-?fi)\\s*키`;
