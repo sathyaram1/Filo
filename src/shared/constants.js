@@ -1811,7 +1811,12 @@
         + `A una domanda o a una richiesta di analisi rispondi solo con "text", senza "formatta".\n`
         + `Gli strumenti dell'Editor stanno nel pannello che si apre dal bordo destro: per aprirlo, chiuderlo, tenerlo aperto o `
         + `metterci e toglierci uno strumento usa l'azione di Filo {"action":"filo","filo":{"type":"PANNELLO_APP","operazione":"apri"|"chiudi"|"blocca"|"sblocca"|"aggiungi"|"togli","elemento":"<per aggiungi e togli>"},"text":"<breve conferma>"}.\n`
-        + esterno().imbusta({ tipo: 'DOCUMENTO_EDITOR', testo: `${titolo ? `Titolo: ${titolo}\n\n` : ''}${documento.testo}` }) + '\n';
+        + esterno().imbusta({ tipo: 'DOCUMENTO_EDITOR', testo: `${titolo ? `Titolo: ${titolo}\n\n` : ''}${documento.testo}` }) + '\n'
+        + (selezione
+          ? `\nLa parte del documento che l'utente ha selezionato: quando dice «questo», «il paragrafo», «riscrivilo», parla di lei.`
+            + `${documento.selezioneTagliata ? ' È troppo lunga: ne vedi solo l\'inizio, e non la puoi riscrivere.' : ''}\n`
+            + esterno().imbusta({ tipo: 'DOCUMENTO_EDITOR', testo: selezione }) + '\n'
+          : '');
     },
 
     // #593 — la busta dei risultati di una ricerca web.
