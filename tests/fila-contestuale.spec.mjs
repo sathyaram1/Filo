@@ -234,6 +234,8 @@ test('un\'icona portata dal «+» alla fila resta dopo il riavvio, e «rimetti c
   };
   try {
     let { app, shell } = await avvia();
+    // Leggi sta nella fila di partenza (#2555): a parole lo si porta nel «+», da cui il gesto lo riprende.
+    expect((await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), { type: 'SPOSTA_ICONA', icona: 'testo:readAloud', dove: 'altro_fila' })).executed).toBe(true);
     let page = await apriSito(app, shell, 1);
     await destroSulTesto(page);
     const menu = menuDi(page);
