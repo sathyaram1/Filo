@@ -691,12 +691,16 @@ test('le carte fisse in cima a sinistra non si scavalcano: il menu non lo offre 
   await expect.poll(() => ordineSx(page)).toEqual(['crediti', 'timer', 'timer']);
   const pasta = page.locator('#accade .dash-carta', { hasText: 'Pasta' });
   await pasta.click({ button: 'right', position: { x: 30, y: 12 } });
-  await expect(page.locator('.dash-menu .dash-menu-voce', { hasText: 'Apri nel filo' })).toBeVisible();
-  await expect(page.locator('.dash-menu .dash-menu-voce', { hasText: /^Sposta/ })).toHaveCount(0);
-  await page.keyboard.press('Escape');
+  // A icone (#2555): «Sposta su/giù» sono un verbo, quindi basta che nessuna icona si chiami «Sposta…».
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  expect((await menu.scritte()).filter((n) => /^Sposta/.test(n))).toEqual([]);
+  expect(await menu.haVoce('Apri nel filo')).toBe(true);
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
   const crediti = page.locator('#accade .dash-carta[data-tipo="crediti"]');
   await crediti.click({ button: 'right', position: { x: 30, y: 12 } });
-  await expect(page.locator('.dash-menu .dash-menu-voce', { hasText: /^Sposta/ })).toHaveCount(0);
+  await expect(menu.principale).toBeVisible();
+  expect((await menu.scritte()).filter((n) => /^Sposta/.test(n))).toEqual([]);
   await page.keyboard.press('Escape');
 
   await modelloSpia(app, [
