@@ -2800,7 +2800,7 @@
       if (nome !== 'cursore' && !contesto.segreto) {
         daSel('search', 'search', { label: I18n.t('menu_search_text'), azione: 'search-web' });
         const leggi = TTS.buildReadAloudItem(testo);
-        if (leggi) suOggetto(azioni, 'readAloud', 'selezione', { label: leggi.label, onClick: leggi.onClick, misura: leggi.azione });
+        if (leggi) suOggetto(azioni, 'readAloud', 'selezione', { label: leggi.label, onClick: leggi.onClick, azione: leggi.azione });
         suOggetto(azioni, 'edit', 'selezione', { label: I18n.t('menu_edit_selection'), onClick: () => EditBox.openEditBox(selInfo.selection) });
       }
     }
@@ -2825,7 +2825,7 @@
         daSel('search', 'search', { label: I18n.t('menu_search_text'), azione: 'search-web' });
         suOggetto(azioni, 'translate', 'selezione', { label: I18n.t('fila_translate'), onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) });
         const leggi = TTS.buildReadAloudItem(testo);
-        if (leggi) suOggetto(azioni, 'readAloud', 'selezione', { label: leggi.label, onClick: leggi.onClick, misura: leggi.azione });
+        if (leggi) suOggetto(azioni, 'readAloud', 'selezione', { label: leggi.label, onClick: leggi.onClick, azione: leggi.azione });
       }
     } else if (nome === 'immagine' && contesto.img) {
       azioniPerImmagine(contesto.img, azioni);
