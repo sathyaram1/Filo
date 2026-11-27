@@ -615,6 +615,69 @@
     closeDocPop();
   }
 
+  // Il documento che nasce dal campo della home (#2389): la bozza la tiene il main, una volta sola; una riga del campo,
+  // un paragrafo. L'editor si prepara sotto la home e dice dove ha disegnato testo e Aiuto: lì finisce il velo della
+  // home. Regia: src/main/services/editorDalCampo.js.
+  function fileDalTesto(testo) {
+    const f = blankFileSerialized();
+    const righe = String(testo).replace(/\r\n?/g, '\n').split('\n');
+    f.content = { type: 'doc', content: righe.map((r) => ({ type: 'paragraph', content: r ? [{ type: 'text', text: r }] : [] })) };
+    return f;
+  }
+  async function nasceDalCampo(id) {
+    const r = await sendMessage({ type: MSG.EDITOR_BOZZA, id });
+    const testo = r && r.ok && typeof r.testo === 'string' ? r.testo : '';
+    if (testo) {
+      if (doc) { maybeRecordManualVersion(); syncActiveIntoCollection(); }
+      activateFile(STORE.addFile(collection, fileDalTesto(testo), () => newId('file')));
+      writeCollection();
+      segnaAperto();
+    }
+    // Riaperta (sessione, ricarica) la scheda mostra il documento, e la bozza non si chiede di nuovo.
+    try { history.replaceState(null, '', doc ? `?file=${encodeURIComponent(doc.id)}` : location.pathname); } catch (_) {}
+    if (!testo) return;
+    const html = document.documentElement;
+    html.classList.add('ed-dal-campo');
+    const davanti = () => html.classList.remove('ed-dal-campo');
+    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === MSG.EDITOR_ARRIVO && m.id === id && m.davanti) davanti(); });
+    setTimeout(davanti, 8000);
+    await aiutoAccanto();
+    cursoreInFondo();
+    await new Promise((ok) => setTimeout(ok, 260));
+    sendMessage({ type: MSG.EDITOR_BOZZA_PRONTA, id, geometria: geometriaArrivo() });
+  }
+  // L'Aiuto è la chat del documento: chi arriva dalla chat della home la ritrova di lato. È un content script, che può
+  // arrivare dopo la pagina.
+  async function aiutoAccanto() {
+    for (let i = 0; i < 60 && !(window.SN_SIDEBAR && window.SN_SIDEBAR.open); i++) await new Promise((ok) => setTimeout(ok, 50));
+    try { if (window.SN_SIDEBAR && !window.SN_SIDEBAR.isOpen()) window.SN_SIDEBAR.open(); } catch (_) {}
+  }
+  function cursoreInFondo() {
+    const r = document.createRange();
+    r.selectNodeContents(docEl);
+    r.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    try { docEl.focus({ preventScroll: true }); } catch (_) {}
+  }
+  function geometriaArrivo() {
+    const p = docEl.querySelector('p, h1, h2, h3, li') || docEl;
+    const cs = getComputedStyle(p);
+    const col = docEl.getBoundingClientRect();
+    const rp = p.getBoundingClientRect();
+    const aiuto = document.querySelector('html > .sn-sidebar:not(.sn-sidebar-nascosta)');
+    const ra = aiuto && aiuto.getBoundingClientRect();
+    const ca = aiuto && getComputedStyle(aiuto);
+    return {
+      vw: window.innerWidth, vh: window.innerHeight,
+      testo: { left: col.left, top: rp.top, width: col.width, height: rp.height },
+      font: { size: parseFloat(cs.fontSize), lineHeight: parseFloat(cs.lineHeight), spazio: parseFloat(cs.marginBottom), famiglia: cs.fontFamily, colore: cs.color },
+      sfondo: getComputedStyle(document.body).backgroundColor,
+      colonna: ra && ra.width ? { left: ra.left, top: ra.top, width: ra.width, height: ra.height, sfondo: ca.backgroundColor, bordo: ca.borderTopColor, raggio: parseFloat(ca.borderTopLeftRadius) } : null,
+    };
+  }
+
   function cloneJson(v) {
     try { return v == null ? v : JSON.parse(JSON.stringify(v)); }
     catch (_) { return v; }
