@@ -106,7 +106,9 @@
     + `(${CIFRE_PIN})\\b`, 'gi');
   const CODICE_ACCESSO_EN = new RegExp(/\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])/.source
     + `(${CIFRE_PIN})\\b`, 'gi');
-  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|${VERBO}(?=\\s))?\\s*${DAVANTI}(${CIFRE_PIN})\\b`, 'gi');
+  // Il verbo di cambio è del guardiano («il pin diventa 4821», «ho cambiato il pin in 4821», #2714), e si prova per primo.
+  const CAMBIO = global.SN_GUARDIANO_STATICO.CAMBIO;
+  const PIN = new RegExp(`\\bpin\\b(?:${CAMBIO}|\\s*(?:[:=]|${VERBO}(?=\\s))?)\\s*${DAVANTI}(${CIFRE_PIN})\\b`, 'gi');
   // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
   // posto del codice (vedi alPostoDelCodice), nella frase che lo nomina o sulla riga sotto. Col nome del codice conta, a
   // meno che la frase lo dica un identificativo che non apre niente (cliente, ordine, prenotazione) senza parole
@@ -144,8 +146,9 @@
   // L'etichetta che dice di che cosa è il codice, subito prima del numero («Codice abbonamento: 4829», «Il codice del
   // corso è 4829», «event code 4829»): un nome comune qualunque lo fa un identificativo, senza elencarli. Restano codici
   // il nome di un servizio («Telegram code», «codice Amazon») e le parole del monouso qui sotto.
-  const ETICHETTA_IT = /\b[Cc]odic[ei]\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\s*)?([a-zà-ÿ]{3,})\s*(?:[:=#]|è|\bn\.?|\bnr\.?)?\s*$/;
-  const ETICHETTA_EN = /\b([a-z][a-z-]{2,})\s+codes?\s*(?:[:=#]|\bis\b|\bno\.?)?\s*$/;
+  // Anche col verbo di cambio: «il codice del corso diventa 4829» resta un identificativo come con «è».
+  const ETICHETTA_IT = new RegExp(`\\b[Cc]odic[ei]\\s+(?:d(?:i|el|ella|ello|ei|egli|elle|ell['’])\\s*)?([a-zà-ÿ]{3,})(?:${CAMBIO}|\\s*(?:[:=#]|è|\\bn\\.?|\\bnr\\.?)?)\\s*$`);
+  const ETICHETTA_EN = new RegExp(`\\b([a-z][a-z-]{2,})\\s+codes?(?:${CAMBIO}|\\s*(?:[:=#]|\\bis\\b|\\bno\\.?)?)\\s*$`);
   // Le stesse due regole nelle lingue dei nomi del codice (#1403.13): «Le code de suivi est …», «El código del pedido es …»,
   // «Kod rabatowy to …», «Der Code der Bestellung ist …». «Code» solo col complemento, perché da solo è anche inglese.
   const SEPARA_ALTRE = `(?:\\s*[:=#]|\\s+(?:${VERBO}|to)(?![\\p{L}]))?\\s*$`;
@@ -386,6 +389,18 @@
   const CHIUDE_ETICHETTA = new RegExp(`(?:[:=#]|(?:^|\\s)(?:${VERBO}|will\\s+be)(?:\\s+(?:il|el|le|o|the))?|\\bn\\.|\\bnr\\.?|\\bno\\.)\\s*$`, 'i');
   // Il polacco «to» dopo un nome polacco («kod», «tajny numer»), o dopo il PIN in una frase polacca (SEGNO_POLACCO).
   const CHIUDE_KOD = /\sto\s*$/i;
+  // Il primo verbo chiude il nome del codice, anche quello di cambio: in «il pin è giusto e la pagina diventa 2048» o «il
+  // pin non funziona e il prezzo diventa 4821» il numero è d'altro, salvo che il nuovo soggetto sia una cosa che si apre (#2714).
+  const UN_VERBO_PRIMA = new RegExp(`(?<![\\p{L}\\p{N}])${VERBO}(?![\\p{L}\\p{N}])`, 'iu');
+  const UN_ALTRO_SOGGETTO = new RegExp(`(?:,|\\s(?:e|ed|ma|and|but))\\s+(?:il|lo|la|l['’]|i|gli|le|un[oa]?|the|an?|my|your|his|her|its)\\s*`
+    + `(?!${global.SN_GUARDIANO_STATICO.ALTRO_SEGRETO})[\\p{L}-]+\\s*$`, 'iu');
+  const chiusoPrima = (fra) => {
+    const fine = CHIUDE_CHI_ENTRA.exec(fra);
+    if (!fine || /\d/.test(fra)) return false;
+    const testa = fra.slice(0, fine.index);
+    if (DOPO_CHE_SI_APRE.test(testa)) return false;
+    return UN_VERBO_PRIMA.test(testa) || UN_ALTRO_SOGGETTO.test(testa);
+  };
   const NOME_POLACCO = /^(?:kod|tajn)/i;
   const FRASE_POLACCA = new RegExp(SEGNO_POLACCO, 'i');
   const nomePolacco = (nome, prima) => NOME_POLACCO.test(nome) || (/^pin$/i.test(nome) && FRASE_POLACCA.test(prima));
@@ -412,6 +427,11 @@
     // Una relativa fra virgole non chiude la frase del codice («Der Code, den du erhalten hast, ist 482913»).
     const fra = prima.slice(n.index + n[0].length).replace(RELATIVA, ' ');
     if (!fra.trim()) return true;
+    const nome = n.index + n[0].length;
+    const G = global.SN_GUARDIANO_STATICO;
+    if (fra.length <= 60 && !/\d/.test(fra)
+      && G.cambioFra(prima.slice(Math.max(0, nome - 120), nome), fra, { solo: false, testa: (t) => DOPO_CHE_SI_APRE.test(t) })) return true;
+    if (chiusoPrima(fra)) return false;
     // Il codice del proprio apparecchio ha la sua etichetta, con le sue virgole e i suoi refusi («, c'est», «e» senza accento).
     if (!/\d/.test(fra) && (delMioApparecchio(prima.slice(-160)) || etichettaSbloccabile(prima.slice(-160)))) return true;
     if (entra && !/\d/.test(fra) && fra.length <= 60 && !/[;!?]/.test(fra) && chiudeChiEntra(fra)) return true;
@@ -620,7 +640,8 @@
   const UNA_FRECCIA = new RegExp(`^(?:${FRECCIA}|[-–—→])$`);
   // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra.
   const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*(${FRECCIA}|[:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
-  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:(?:[ \\t]+|${VIRGOLA_CEST})${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
+  // Il verbo di cambio vale quanto «è» («la password diventa …», «ho cambiato la password in …», #2714).
+  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:(?:[ \\t]+|${VIRGOLA_CEST})${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*|${CAMBIO}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=]?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
@@ -778,7 +799,7 @@
   // qualunque solo da sola: dopo di lei la riga finisce o comincia un altro campo o una parentesi. Seguita da altre
   // parole è una frase («Password: deve avere almeno otto caratteri») e resta.
   const AL_POSTO = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*([^\\s|\\t\\[(]{3,64})([^\\n|\\t]*)`, 'gid');
-  const DOPO = `[ \\t]*(?:${FRECCIA}|[:：=|\\t]|[-–—→](?=[ \\t])|(?:[ \\t]|${VIRGOLA_CEST})${VERBO_PASSWORD}(?=[ \\t])|${ANNUNCI_NON_LATINI})[ \\t]*([^\\s|\\t]{6,70})`;
+  const DOPO = `(?:${CAMBIO}|[ \\t]*(?:${FRECCIA}|[:：=|\\t]|[-–—→](?=[ \\t])|(?:[ \\t]|${VIRGOLA_CEST})${VERBO_PASSWORD}(?=[ \\t])|${ANNUNCI_NON_LATINI}))[ \\t]*([^\\s|\\t]{6,70})`;
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
@@ -877,7 +898,7 @@
   // due punti o il verbo è il valore salvo che la descriva («la stessa di prima», «vedi email»); senza nessuno dei due
   // più parole contano solo con la forma di una password, perché lì sono spesso una voce («password «Gestisci account»»).
   const FRA_VIRGOLETTE = `[ \\t]*(?:[${DOPPIE}](?<d>[^\\n|\\t${DOPPIE}]{1,2000})[${DOPPIE}]|[${SINGOLE}](?<s>[^\\n|\\t${SINGOLE}]{1,2000})[${SINGOLE}])`;
-  const VIRGOLETTATO_DOPO = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]*(?<sep>${FRECCIA}|[:=])|[ \\t]+${VERBO_PASSWORD})${FRA_VIRGOLETTE}`, 'gid');
+  const VIRGOLETTATO_DOPO = new RegExp(`${ETICHETTA}${ACCANTO}(?:${CAMBIO}|[ \\t]*(?<sep>${FRECCIA}|[:=])|[ \\t]+${VERBO_PASSWORD})${FRA_VIRGOLETTE}`, 'gid');
   const VIRGOLETTATO_IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]${FRA_VIRGOLETTE}`, 'gid');
   // Gli altri ponti fra il nome e il valore (#1403.67): chi l'ha messa («come password ho messo «…»»), e la risposta
   // dopo la domanda o dopo il cambio, staccata da un segno («Ti ricordi la password? Era «…»», «l'ho cambiata, ora è
@@ -1346,6 +1367,31 @@
     return cambiato ? righe.join('\n') : null;
   }
 
+  // Una password che finisce col segno di una frase («Mela!») continua nella parola dopo quando quella ha la forma di un
+  // pezzo di password: in «la password è Mela! Verde77» togliere solo «Mela!» fa passare metà della password (#2714).
+  // Il segno può essere un simbolo qualunque da password e gli spazi più d'uno; la prima metà da sola, che le altre regole
+  // non trovano dopo una virgola o un verbo di cambio («Ciao, la password è Mela! Verde77»), la cerca SPEZZATA.
+  const SEGNO = '[!?#$%&*@^~+=]';
+  const PEZZO_DOPO_IL_SEGNO = /^([ \t]{1,3})([^\s|\t[\]<>]{2,64})/;
+  const SPEZZATA = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}(?:${CAMBIO}|[ \\t]*[:：=]|[ \\t]+${VERBO_PASSWORD})[ \\t]*["'«“]?`
+    + `([^\\s|\\t"'«»“”]{0,63}[A-Za-zÀ-ÿ0-9]${SEGNO})(?=[ \\t])`, 'gi');
+  const primaMetà = (v) => !NON_VALORE.test(v.replace(new RegExp(`${SEGNO}+$`), ''));
+  function continuaDopoIlSegno(s, out) {
+    const lunghe = [];
+    const prova = (v, i) => {
+      const m = PEZZO_DOPO_IL_SEGNO.exec(s.slice(i + v.length, i + v.length + 70));
+      const pezzo = m ? m[2].replace(CODA_VALORE, '').replace(/[!?]+$/, '') : '';
+      if (FORMA_FORTE(pezzo)) lunghe.push({ valore: s.slice(i, i + v.length + m[1].length + pezzo.length), regola: 'password' });
+    };
+    for (const x of out) {
+      const v = String(x.valore);
+      if (x.regola !== 'password' || !new RegExp(`${SEGNO}$`).test(v) || !primaMetà(v)) continue;
+      for (let i = s.indexOf(v); i >= 0; i = s.indexOf(v, i + v.length)) prova(v, i);
+    }
+    for (const m of s.matchAll(SPEZZATA)) if (primaMetà(m[1])) prova(m[1], m.index + m[0].length - m[1].length);
+    out.push(...lunghe);
+  }
+
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   // `giro`: quante codifiche di un indirizzo si sono già tolte (codificatiNellIndirizzo).
@@ -1452,6 +1498,8 @@
       for (const m of s.matchAll(re)) if (!FINE_DI_UN_NUMERO.test(m[0].slice(0, -m[1].length))) out.push({ valore: m[1], regola: 'codice' });
     }
     for (const m of s.matchAll(PIN)) out.push({ valore: m[1], regola: 'codice' });
+    // Il valore detto nella frase del nome o nella risposta alla domanda: la regola è quella delle uscite (#2714 giro 7).
+    out.push(...global.SN_GUARDIANO_STATICO.valoriDopoIlNome(s));
     codiciVicini(s, out);
     codiceDelMioApparecchio(s, out);
     codiciDiRecupero(s, out);
@@ -1464,6 +1512,7 @@
     scritteAMano(s, out);
     if (G && typeof G.codiciInElenco === 'function') out.push(...G.codiciInElenco(s, out));
     codiciConLettereInElenco(s, out);
+    continuaDopoIlSegno(s, out);
     out.push(...interiFraVirgolette(s, out));
     return out;
   }
