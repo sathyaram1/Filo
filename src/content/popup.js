@@ -1132,10 +1132,22 @@
         // L'errore va LETTO: è l'unica cosa rimasta da leggere, la vista ci va.
         // E va letto in italiano: la riga grezza del servizio («OpenRouter 402:
         // {…}») non dice niente a chi ha finito i crediti (#663).
-        scrollaConservando(popup, () => {
-          scriviErrore(bubble.text, m);
-          bubble.wrap.classList.add('sn-msg-error');
-        }, true);
+        // Una trascrizione fermata a metà tiene i pezzi già scritti: l'errore va sotto, col testo da copiare.
+        if (trascrizione && buf.trim()) {
+          scrollaConservando(popup, () => {
+            bubble.text.innerHTML = renderMarkdown(buf);
+            tastoCopia(bubble.wrap, buf);
+            const nota = document.createElement('div');
+            nota.className = 'sn-key-fallback sn-msg-error';
+            bubble.wrap.appendChild(nota);
+            scriviErrore(nota, m);
+          }, true);
+        } else {
+          scrollaConservando(popup, () => {
+            scriviErrore(bubble.text, m);
+            bubble.wrap.classList.add('sn-msg-error');
+          }, true);
+        }
         popup.activePort = null;
       }
     });
