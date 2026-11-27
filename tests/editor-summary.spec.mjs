@@ -170,8 +170,8 @@ test('il tasto destro sul titolo espone "Rigenera riassunto" e rigenerarlo aggio
   const rigenera = menu.icona('reload');
   await expect(rigenera).toHaveAttribute('aria-label', 'Rigenera titolo');
   await rigenera.click({ button: 'right' });
-  await expect(menu.sottomenu.locator('.sn-menu-item', { hasText: 'Rigenera riassunto' })).toHaveCount(1);
-  await page.keyboard.press('Escape');
+  const voce = menu.sottomenu.locator('.sn-menu-item', { hasText: 'Rigenera riassunto' });
+  await expect(voce).toHaveCount(1);
 
   // Scrive un po' di testo, poi rigenera il riassunto dal menu (nessuna soglia).
   await page.evaluate(() => {
