@@ -2888,18 +2888,19 @@
   });
 
   // La griglia in cima al menu (#1434, #2555). `scritte`: le voci che una pagina di Filo dà al suo elemento.
-  let rifaiAzioni = null;
-  function aggiornaFila() { if (rifaiAzioni) MenuIcons?.aggiorna?.(rifaiAzioni()); }
+  function aggiornaFila() { MenuIcons?.aggiorna?.(); }
   function filaContestuale(contesto, { selInfo, target, clipboardHistory, sito = null, scritte = [] }) {
     const nome = contesto && contesto.nome;
     if (!nome || !MenuIcons?.fila) return null;
-    rifaiAzioni = () => azioniDelContesto(contesto, { selInfo, target, clipboardHistory, sito });
+    const rifai = () => azioniDelContesto(contesto, { selInfo, target, clipboardHistory, sito });
     const oggetti = oggettiDel(contesto);
-    const aspetto = self.SN_CONST?.opzioniMenuIcone ? self.SN_CONST.opzioniMenuIcone(settings && settings.menuIcone) : {};
-    return MenuIcons.fila(nome, rifaiAzioni(), {
-      bersagli: bersagliDel(contesto, selInfo, target), oggetti, scritte, aspetto,
+    return MenuIcons.fila(nome, rifai(), {
+      bersagli: bersagliDel(contesto, selInfo, target), oggetti, scritte, aspetto: aspettoDelMenu(), rifai,
       oggetto: oggetti.media && nome === 'media' ? oggetti.media : RIPOSO[nome],
     });
+  }
+  function aspettoDelMenu() {
+    return self.SN_CONST?.opzioniMenuIcone ? self.SN_CONST.opzioniMenuIcone(settings && settings.menuIcone) : {};
   }
 
 
