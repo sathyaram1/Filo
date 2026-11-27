@@ -794,6 +794,7 @@
   const USCITE = Object.freeze({
     NAVIGA: "non ho aperto l'indirizzo",
     LEGGI_PAGINA: 'non ho letto la pagina',
+    TRASCRIVI_MEDIA: 'non ho trascritto l\'audio',
     CERCA_WEB: 'non ho fatto la ricerca',
     IMMAGINI_WEB: 'non ho cercato le immagini',
     ESEGUI_COMANDO: 'non ho eseguito il comando',
