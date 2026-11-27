@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.309', date: '2026-11-27',
+      features: [
+        { testo: 'Un messaggio che sta diventando una lettera passa all\'Editor: con del testo nel campo della home, clic su Editor e il campo si allarga fino a diventare un documento nuovo con quel testo, con la chat di Filo di lato. Selezioni un paragrafo e chiedi «riscrivilo più breve»: Filo cambia quello.', segnalazione: 2389 },
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.308', date: '2026-11-27',
       fixes: [
         { testo: 'Una password detta nella frase dopo, senza nominarla di nuovo, come «la password scade, la nuova è …», «è sbagliata, prova …» o «the password expired, new one …», non arriva più ai modelli che correggono quello che scrivi; con numeri o simboli non arriva a nessun modello.', segnalazione: 2695 },
