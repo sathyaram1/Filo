@@ -633,9 +633,10 @@
   const ARTICOLO = '(?:(?:il|lo|la|el|le|die|der|das|the)\\s{1,8})?';
   const PIN_CHIUDE = `(?!(?:be|essere|here|ecco)(?![\\p{L}\\p{N}]))${ANNUNCIO}`;
   // Il verbo di cambio (CAMBIO_VALORE) si prova per primo, e solo dopo un complemento del nome: dopo «è» di «è diventata» il
-  // valore non c'è ancora, e «il pin non funziona e il prezzo diventa 4821» parla d'altro.
+  // valore non c'è ancora, e «il pin non funziona e il prezzo diventa 4821» parla d'altro: lì chiude anche il soggetto nuovo.
+  const NUOVO_SOGGETTO = `(?:e|ed|ma|and|but)\\s{1,8}(?:(?:il|lo|la|i|gli|le|uno?|una|the|an?|my|your)\\s|l['’])`;
   const PIN_CON_COMPLEMENTO = new RegExp(`\\bpin\\b(?:${COMPLEMENTO_NOME}${CAMBIO_VALORE}`
-    + `|(?:\\s{1,8}(?!${PIN_CHIUDE})(?!(?:${intera(VERBI_CAMBIO.diventa)})(?=\\s))[^\\s\\d:=.,;!?|"'«“]{1,24}){1,5}?`
+    + `|(?:\\s{1,8}(?!${PIN_CHIUDE})(?!(?:${intera(VERBI_CAMBIO.diventa)})(?=\\s))(?!${NUOVO_SOGGETTO})[^\\s\\d:=.,;!?|"'«“]{1,24}){1,5}?`
     + `\\s{0,8}(?:[:=]|(?<![\\p{L}\\p{N}])(?:${ANNUNCIO_LARGO})(?=[\\s:=])(?:\\s{0,8}[:=])?))`
     + `\\s{0,8}${ARTICOLO}["'«“]?(${cifre('codice')})(?!\\d)`, 'giu');
   const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
