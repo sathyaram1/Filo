@@ -1240,6 +1240,32 @@
     return y;
   }
 
+  // In una riga di tabella la cella dopo l'etichetta è il suo valore per ogni regola, non solo per la password (#2695.1):
+  // la barra dopo i due punti si legge come uno spazio («| CVV: | 123 |» come «CVV: 123»), e in una riga di due celle
+  // dopo il nome di un campo o di una chiave come i due punti («| login_password | x |»). Null se non cambia niente.
+  const ETICHETTA_SEGRETO_SOLA = new RegExp(`^${ETICHETTA_SEGRETO}$`, 'i');
+  function celleComeRighe(s) {
+    if (!s.includes('|')) return null;
+    let cambiato = false;
+    const righe = s.split('\n').map((riga) => {
+      // Anche la tabella senza la barra in testa («CVV: | 123»), come per la password.
+      if (riga.length > 2000 || !/^[ \t]*\||^[^|]{1,80}[:：=][ \t]*\|/.test(riga)) return riga;
+      let r = riga.replace(/(?<=[:：=][ \t]*)\|(?=[ \t]*[^|\s])/g, ' ');
+      const celle = r.trim().replace(/^\||\|$/g, '').split('|');
+      const piene = celle.filter((c) => c.trim());
+      const nome = celle[0].trim();
+      // La password nuda ha già la regola della sua cella, che sa quando la cella dopo la spiega.
+      if (/^[ \t]*\|/.test(r) && celle.length === 2 && piene.length === 2 && !PAROLA_CHIAVE.test(nome)
+        && ((/^[A-Za-z_][\w.-]{0,60}$/.test(nome) && tipoDiNome(nome)) || ETICHETTA_SEGRETO_SOLA.test(nome))) {
+        const k = r.indexOf('|', r.indexOf('|') + 1);
+        r = `${r.slice(0, k)}:${r.slice(k + 1)}`;
+      }
+      if (r !== riga) cambiato = true;
+      return r;
+    });
+    return cambiato ? righe.join('\n') : null;
+  }
+
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
   // `giro`: quante codifiche di un indirizzo si sono già tolte (codificatiNellIndirizzo).
@@ -1255,10 +1281,20 @@
     const G = global.SN_GUARDIANO_STATICO;
     const s = G.avverbiComeSpazi(virgoletteStrette(R ? R.senzaEnfasi(piano) : piano));
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return [];
-    const out = regole(s, giro);
-    // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
-    const attaccate = R && R.cifreAttaccate(s);
-    if (attaccate) for (const x of comeScritti(regole(attaccate.piano, giro), attaccate, s)) out.push(x);
+    const out = [];
+    for (const lettura of [s, celleComeRighe(s)]) {
+      if (lettura === null) continue;
+      const trovati = regole(lettura, giro);
+      // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
+      const attaccate = R && R.cifreAttaccate(lettura);
+      if (attaccate) trovati.push(...comeScritti(regole(attaccate.piano, giro), attaccate, s));
+      // La lettura delle celle ha la stessa lunghezza del testo: vale quello che nel testo c'è così com'è.
+      for (const x of trovati) {
+        if (lettura === s) { out.push(x); continue; }
+        const v = String(x.valore || '');
+        if (Number.isInteger(x.inizio) ? s.startsWith(v, x.inizio) : s.includes(v)) out.push(x);
+      }
+    }
     return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano, s)))
       .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
       .filter((x) => String(x.valore).length >= 3);

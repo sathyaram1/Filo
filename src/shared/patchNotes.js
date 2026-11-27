@@ -20,6 +20,7 @@
         { testo: 'Un PIN scritto come «il pin del telefono é 4821», «il pin della carta è ancora 4821» o «der PIN meines Handys ist 4821» non esce più verso un sito senza la tua conferma, come già succedeva con «è».', segnalazione: 1403 },
         { testo: 'Il codice del tuo telefono o del cancello, la password del pc o della mail e il CVV della carta, come «il codice del mio telefono è 4829», non escono più da un\'azione di Filo verso un sito se non li hai scritti tu.', segnalazione: 1403 },
         { testo: 'Una password in un file di configurazione sotto un nome come «password_login», «pwd_admin» o «PASSWORD_DB» non arriva più a nessun modello, come già sotto «login_password».', segnalazione: 2695 },
+        { testo: 'In una tabella, il CVV, una password come «login_password» o una chiave scritti nella cella accanto al loro nome, come «| CVV: | 123 |», non arrivano più ai modelli, come già succedeva per «| Password: | … |».', segnalazione: 2695 },
       ],
     },
     {
