@@ -2777,8 +2777,8 @@
     const scrittura = nome === 'scrivibile' || nome === 'campo' || nome === 'cursore';
     if (scrittura) {
       if (nome !== 'cursore') {
-        daSel('cut', 'cut', { label: I18n.t('menu_cut'), misura: 'copy-cut' });
-        daSel('copy', 'copy', { label: I18n.t('menu_copy'), misura: 'copy-cut' });
+        daSel('cut', 'cut', { label: I18n.t('menu_cut'), azione: 'copy-cut' });
+        daSel('copy', 'copy', { label: I18n.t('menu_copy'), azione: 'copy-cut' });
       }
       const incolla = Actions.buildPasteItem(clipboardHistory);
       azioni.paste = {
@@ -2820,7 +2820,7 @@
       const stato = statoFormattazione();
       for (const k of Object.keys(stato)) azioni[k].acceso = stato[k];
     } else if (nome === 'testo') {
-      daSel('copy', 'copy', { label: I18n.t('menu_copy'), misura: 'copy-cut' });
+      daSel('copy', 'copy', { label: I18n.t('menu_copy'), azione: 'copy-cut' });
       if (!contesto.segreto) {
         daSel('search', 'search', { label: I18n.t('menu_search_text'), misura: 'search-web' });
         suOggetto(azioni, 'translate', 'selezione', { label: I18n.t('fila_translate'), onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) });
