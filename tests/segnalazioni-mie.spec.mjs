@@ -335,7 +335,7 @@ test('tasto destro su una riga: copia il testo, rimanda quella non partita già 
   // Il menu ascolta i tasti dal giro dopo quello che l'ha aperto: un Esc partito nello stesso istante si ripete.
   await expect.poll(async () => { await bacheca.keyboard.press('Escape'); return menu.count(); }).toBe(0);
   await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
-  await menu.getByText('Togli dall’elenco').click();
+  await m.scegli('Togli dall’elenco');
   await expect(righe(bacheca)).toHaveCount(1);
   const ids = await app.evaluate(async () => (await globalThis.SN_SEGNALAZIONI_MIE.elenco()).map((v) => v.id));
   expect(ids).toEqual(['ok']);
