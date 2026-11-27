@@ -261,7 +261,8 @@ test('una pagina appena aperta non apre da sola il menu e non legge appunti né 
 test('a menu aperto dall\'utente il sito non preme Invia feedback né Aiuto; l\'utente sì', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
-  const voce = (testo) => menuDi(page).locator('.sn-menu button').filter({ hasText: testo }).first();
+  // Le icone del menu (#2555): «Invia feedback» sta dietro il «+», e il nome è il testo nascosto dell'icona.
+  const voce = (testo) => menuDi(page).locator(`.sn-menu-griglia [aria-label="${testo}"]`).first();
   // menu-dal-sito: è il sito a cercare la voce e a premerla.
   const preme = (testo, fuori) => page.evaluate(({ t, f }) => {
     const b = [...document.querySelectorAll('.sn-menu button')].find((x) => (x.textContent || '').trim().startsWith(t));
