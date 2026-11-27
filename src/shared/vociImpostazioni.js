@@ -55,6 +55,8 @@
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
         barraBloccata: 'barraLaterale.bloccata',
+        menuIconeIcona: 'menuIcone.icona',
+        menuIconeColonne: 'menuIcone.colonne',
         pannelloSpinta: 'pannelloDestro.spinta',
         pannelloStriscia: 'pannelloDestro.striscia',
         pannelloBloccato: 'pannelloDestro.bloccato',
