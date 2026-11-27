@@ -820,7 +820,8 @@ test('il codice del mio telefono, del cancello o il CVV non escono da un\'azione
       const ing = AL.ingressi(action, {});
       assert.equal(ing.costo, A.COSTO_MAX, `${action.type}: ${frase}`);
       assert.equal(ing.chiesta, false, `${action.type}: ${frase}`);
-      assert.equal(risposta(action), 'conferma', `${action.type}: ${frase}`);
+      assert.equal(risposta(action), 'no', `${action.type}: ${frase}`);
+      assert.equal(risposta(action, { richiesta: `scrivi: ${frase}` }), 'conferma', `${action.type}: ${frase}`);
     }
   }
   assert.equal(A.segreto('Il codice del mio telefono è 4829'), 'codice');
