@@ -60,8 +60,8 @@ test('trascino le Impostazioni nel «+», dopo il riavvio sono ancora lì e le r
     expect(await inVista(page)).toEqual(['cerca', 'perDopo', 'scaricamenti', 'cronologia', 'bacheca']);
     await expect(page.locator('.dash-altro-griglia.vista > .dash-altro-cella').last().locator('#altroPiu')).toHaveCount(1);
     await page.locator('#altroPiu').click({ button: 'right' });
-    await expect(page.locator('.dash-menu .dash-menu-voce')).not.toContainText(['Metti nel «+»']);
-    await page.keyboard.press('Escape');
+    expect(await menuDi(page).haVoce('Metti nel «+»')).toBe(false);
+    await expect.poll(async () => { await page.keyboard.press('Escape'); return menuDi(page).pannelli.count(); }).toBe(0);
     await chiudiApp(app);
 
     app = await lancia();
