@@ -166,7 +166,7 @@ test('imposta come commander dal tasto destro: header, identity check e rimozion
 
   // Rimuovi le Island: l'avviso sparisce e il conteggio scende.
   await page.locator('.dk-row', { hasText: 'Island' }).click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Rimuovi' }).click();
+  await menuDi(page).scegli('Rimuovi');
   await expect(page.locator('#deckLegality')).toBeHidden();
   await expect(page.locator('#deckCount')).toHaveText('1/100 carte');
 });
