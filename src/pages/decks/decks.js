@@ -340,11 +340,12 @@
   }
   function ctxKey(e) { if (e.key === 'Escape') closeCtx(); }
 
-  function openCtx(x, y, items) {
+  function openCtx(x, y, items, { valori = false } = {}) {
     closeCtx();
-    // Le azioni a icone come il tasto destro di Filo (#2555); un menu che mostra un dato sotto la voce resta testo.
+    // Le azioni a icone come il tasto destro di Filo (#2555); una scelta fra valori (raggruppamento, partita, mazzo,
+    // modulo) o un dato sotto la voce restano testo, perché il testo è il dato.
     const I = window.SN_MENU_ICONS;
-    if (!items.some((it) => it.detail) && I && I.apriVoci && I.apriVoci({ x, y, voci: items.map((it) => ({ label: it.label, onClick: () => it.run() })) })) return;
+    if (!valori && !items.some((it) => it.detail) && I && I.apriVoci && I.apriVoci({ x, y, voci: items.map((it) => ({ label: it.label, onClick: () => it.run() })) })) return;
     const pop = document.createElement('div');
     pop.className = 'sn-select-pop dk-ctxmenu';
     for (const it of items) {
