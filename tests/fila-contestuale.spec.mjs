@@ -427,7 +427,7 @@ test('su un filmato e su un audio la fila ha le loro azioni, e in un campo col s
   for (const sel of ['#vid', '#aud']) {
     await page.locator(sel).click({ button: 'right' });
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
-    expect(await iconeDellaFila(menu)).toEqual(['media:playPause', 'media:mute', 'media:save']);
+    expect(await iconeDellaFila(menu)).toEqual(['media:playPause', 'media:mute', 'media:speed', 'media:save', 'media:copy', 'media:help']);
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="media:playPause"]')).toHaveAttribute('aria-label', /Riproduci/);
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow')).toBeVisible();
     await page.keyboard.press('Escape');
