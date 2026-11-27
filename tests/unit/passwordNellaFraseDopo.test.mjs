@@ -124,6 +124,8 @@ test('le parole del discorso dopo il rimando arrivano intere, anche dopo un nome
   ]) {
     assert.equal(alCorrettore(frase), frase, frase);
   }
+  assert.match(alCorrettore('la pass è sbagliata, prova domani'), /prova domani$/);
+  assert.match(alCorrettore('la pass è debole, usa numeri'), /usa numeri$/);
 });
 
 test('un testo lungo che ripete il nome e il rimando costa quanto la sua lunghezza, non il suo quadrato', () => {
