@@ -113,8 +113,9 @@
       scritto.appendChild(p);
     }
     el.append(colonna, scritto);
-    // Un velo rimasto lì per sbaglio non tiene ferma la home: un clic lo toglie.
-    el.addEventListener('pointerdown', () => togli());
+    // Un velo rimasto lì dopo la consegna non tiene ferma la home: un clic lo toglie. Mentre cresce, un doppio clic
+    // sul bottone non lo deve interrompere.
+    el.addEventListener('pointerdown', () => { if (velo && velo.stato === 'aperto') togli(); });
     document.body.appendChild(el);
     return { el, colonna, scritto };
   }
