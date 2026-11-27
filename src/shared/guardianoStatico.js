@@ -354,7 +354,7 @@
   const VERSO = 'in|a|to|into|con|with|da|from|en|à|por';
   const CAMBIO = `(?:${CAMBI})${SP}(?:in|a|to)`;
   const AUSILIARE = `(?:${AUSILIARI})${SP}(?:(?:${AVVERBI})${SP})?`;
-  const CAMBIO_PRIMA = `(?:(?:${VERSO})(?<=(?<![A-Za-zÀ-ÿ])(?:${CAMBI})${SP}[^\\n.!?]{1,40}(?:${VERSO}))`
+  const CAMBIO_PRIMA = `(?:(?:${VERSO})(?<=(?<![A-Za-zÀ-ÿ])(?:${CAMBI})${SP}[^\\n.!?«»"“”„]{1,40}(?:${VERSO}))`
     + `|(?:in|auf|zu)(?=[^\\n]{1,82}?${SP}(?:geändert|gesetzt|aktualisiert)(?![A-Za-zÀ-ÿ])))`;
   const VERBO_LARGO = `(?:(?:${AUSILIARE})?(?:(?:${PARTICIPI})${SP})?${CAMBIO}|${AUSILIARE}(?:${PARTICIPI})|${PASSATI}|${ANNUNCI.join('|')})`;
   const ANNUNCIO_LARGO = `(?:${CAMBIO_PRIMA}|(?:(?:${AVVERBI})${SP})?(?:dev['’]|(?:${MODALI})${SP})?${VERBO_LARGO}(?:${SP}(?:${AVVERBI})){0,2})`;
