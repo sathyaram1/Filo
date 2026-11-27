@@ -246,7 +246,15 @@ test.describe('col menu nello strato sopra la scheda', () => {
     // Il tasto singolo, premuto sulla scheda: a menu aperto è del menu, anche nello strato.
     await page.locator('#vai').click({ button: 'right' });
     await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
-    await page.keyboard.press('c');
+    // Il tasto vero passa dal main (il tasto delle prove arriva dritto alla pagina e salterebbe quel passaggio).
+    await app.evaluate(({ BrowserWindow }, u) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        const tab = (win._filoTabs?.tabs || []).find((t) => { try { return t.view?.webContents?.getURL() === u; } catch (_) { return false; } });
+        if (!tab) continue;
+        tab.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'c' });
+        tab.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'c' });
+      }
+    }, page.url());
     await expect(menu.pannelli).toHaveCount(0);
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://esempio.it/pagina');
   });
