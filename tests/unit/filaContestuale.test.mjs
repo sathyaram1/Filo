@@ -75,19 +75,19 @@ test('un\'azione di contesto resta nel suo contesto; un\'icona della barra entra
 
 test('spostare da «Altro…» alla fila è un cambio con la sua frase, e annullarlo la rimette dov\'era', () => {
   const a = D.migra(undefined).layout;
-  const b = D.applicaPosa(a, { id: 'immagine:search', target: 'fila:immagine', beforeId: 'immagine:copy' });
-  const cambi = C.cambiIcone(a, b, { mossa: 'immagine:search' });
-  assert.deepEqual(cambi.map((c) => c.chiave), ['icona:immagine:search']);
-  assert.equal(C.fraseCambio(cambi[0]), 'icona «Cerca immagine»: «Altro…» della fila del tasto destro su un\'immagine → fila del tasto destro su un\'immagine');
+  const b = D.applicaPosa(a, { id: 'immagine:transcribe', target: 'fila:immagine', beforeId: 'immagine:copy' });
+  const cambi = C.cambiIcone(a, b, { mossa: 'immagine:transcribe' });
+  assert.deepEqual(cambi.map((c) => c.chiave), ['icona:immagine:transcribe']);
+  assert.equal(C.fraseCambio(cambi[0]), 'icona «Trascrivi»: «Altro…» della fila del tasto destro su un\'immagine → fila del tasto destro su un\'immagine');
   assert.equal(C.annullabile({ cambi }), true);
   // Un altro spostamento dopo resta dove l'utente l'ha messo.
-  const c = D.applicaPosa(b, { id: 'link:share', target: 'fila:link', beforeId: null });
+  const c = D.applicaPosa(b, { id: 'link:feedback', target: 'fila:link', beforeId: null });
   const rimessa = C.annulloIcone({ cambi }, c);
-  assert.equal(D.posizione(rimessa, 'immagine:search').zona, 'altro:immagine');
+  assert.equal(D.posizione(rimessa, 'immagine:transcribe').zona, 'altro:immagine');
   assert.deepEqual(rimessa['fila:immagine'], [...D.DEFAULT['fila:immagine']]);
-  assert.equal(D.posizione(rimessa, 'link:share').zona, 'fila:link');
+  assert.equal(D.posizione(rimessa, 'link:feedback').zona, 'fila:link');
   // Nella stessa fila si dicono i posti.
-  const giu = D.applicaPosa(a, { id: 'testo:copy', target: 'fila:testo', beforeId: null });
+  const giu = D.applicaPosa(a, { id: 'testo:copy', target: 'fila:testo', beforeId: 'testo:readAloud' });
   assert.equal(C.fraseCambio(C.cambiIcone(a, giu, { mossa: 'testo:copy' })[0]), 'icona «Copia» nella fila del tasto destro sul testo selezionato: 1° posto → 3° posto');
 });
 
