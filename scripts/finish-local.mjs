@@ -512,7 +512,7 @@ export function sceltaDallaMappa({ mappa, file, base, root = ROOT }) {
   const primaDi = mb.ok ? mb.out.trim() : base;
   const diff = git(['diff', '-U0', '--no-color', '--no-ext-diff', primaDi, '--', ...file], { cwd: root }).out;
   const { cambi, nota } = cambiDelDiff({ diff, primaDi, commitMappa: mappa.commit, root });
-  const { prove } = proveDelCambio(mappa, cambi);
+  const { prove } = proveDelCambio(mappa, cambi, { sorgente: sorgenteDellaMappa(mappa.commit, root) });
   const togli = (s) => s.replace(/\.spec\.mjs$/, '');
   return {
     specs: prove.filter((p) => p.livello === 'funzione').map((p) => togli(p.spec)),
