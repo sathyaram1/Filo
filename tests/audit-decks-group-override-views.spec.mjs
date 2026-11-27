@@ -77,7 +77,7 @@ test('l\'override di gruppo non inquina le altre viste (per costo di mana)', asy
   // Flusso utente: tasto destro su Sol Ring → Sposta in gruppo… → Terre.
   await page.locator('.dk-row', { hasText: 'Sol Ring' }).click({ button: 'right' });
   await menuDi(page).scegli('Sposta in gruppo');
-  await menuDi(page).scegli('Terre');
+  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Terre' }).click();
   await expect(page.locator('.dk-group[data-group="Terre"] .dk-row', { hasText: 'Sol Ring' })).toHaveCount(1);
 
   // Cambio vista: per costo di mana.
