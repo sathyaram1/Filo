@@ -1288,6 +1288,7 @@
 
   // Gli a capo di Windows e quelli col solo \r (un file di testo allegato) valgono il nostro (#2673.6): le regole leggono
   // una copia col solo \n, e `posto` riporta ogni suo carattere nel testo vero, dove torna il valore di più righe.
+  const A_CAPO_ALTRI = /[\r\v\f\u0085  ]/;
   // Così gli a capo di Unicode (U+2028, U+2029, NEL) e i salti di pagina, che contano uno per uno (#2673.14).
   function aCapo(vero) {
     if (!A_CAPO_ALTRI.test(vero)) return null;
