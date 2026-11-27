@@ -88,6 +88,7 @@ function consegna({ tabs, homeTab, homeWc, testo, sfondo, velo }) {
   a.timer = setTimeout(() => davanti(id), PRONTO_MS);
   attese.set(id, a);
   try { tabs.arrivoSotto(editor.id); } catch (_) {}
+  if (caricato) manda(wcEditor, { type: globalThis.SN_MSG.MSG.EDITOR_BOZZA, id });
   return { ok: true, id };
 }
 
