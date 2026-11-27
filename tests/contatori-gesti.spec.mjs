@@ -159,7 +159,7 @@ test('le carte della home: l’uso per colonna e gesto, le mosse scritte dal mai
   const altro = home.locator('#altro');
   const box = await altro.boundingBox();
   await home.mouse.click(box.x + box.width - 4, box.y + 4, { button: 'right' });
-  await home.locator('.dash-menu-voce', { hasText: 'Rimetti le carte' }).click();
+  await menuDi(home).scegli('Rimetti le carte');
   await expect(editor).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => conto(app, 'carta_home', 'tutte', 'ripristina'), { timeout: 8_000 }).toBe(1);
   expect(await conto(app, 'ripristino', 'carte_home')).toBe(1);
