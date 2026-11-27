@@ -1579,7 +1579,10 @@
         e.stopPropagation();
         if (e.isTrusted && varianti) apriVarianti(b, sub);
       });
-      if (varianti) b.addEventListener('sn-varianti', () => apriVarianti(b, sub));
+      if (varianti) {
+        b.addEventListener('sn-varianti', () => apriVarianti(b, sub));
+        menuDellIcona.set(b, () => apriVarianti(b, sub));
+      }
     }
     if (sub.draggable && sub.id) attachDrag(b, { id: sub.id, source: opts.dropTarget || 'row' });
     return b;
