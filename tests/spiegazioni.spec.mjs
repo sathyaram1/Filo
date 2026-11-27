@@ -309,8 +309,8 @@ test('nell\'Aiuto sui siti la parola spiegata apre il riquadro, e «Spiegami di 
   await expect(riquadri(aiuto)).toHaveCount(1);
   await aiuto.keyboard.press('Escape');
   await termine.click({ button: 'right' });
-  await expect(aiuto.locator('.filo-spiega-menu .filo-spiega-voce')).toHaveText(['Spiegami di più', 'Copia la spiegazione']);
-  await aiuto.locator('.filo-spiega-menu [data-voce="piu"]').click();
+  expect(await vociSpiega(aiuto)).toEqual(['Spiegami di più', 'Copia la spiegazione']);
+  await menuDi(aiuto).scegli('Spiegami di più');
   await expect.poll(() => app.evaluate(() => globalThis.__aiutoSp.chiamate.length)).toBe(2);
   expect(await app.evaluate(() => globalThis.__aiutoSp.chiamate[1])).toContain('Spiegami di più su «DNS».');
   await app.evaluate(() => {
