@@ -351,7 +351,7 @@ test('rimandata dal tasto destro, la segnalazione «non partita» lascia il post
   const bacheca = await openTab(`${BACHECA}#segnalazioni`);
   await expect(righe(bacheca)).toHaveCount(1);
   await righe(bacheca).first().locator('.bd-mia-titolo').click({ button: 'right' });
-  await bacheca.locator('.bd-mia-menu').getByText('Rimanda').click();
+  await menuDi(bacheca).scegli('Rimanda');
   await expect(bacheca.locator('.sn-fb-modal')).toBeVisible();
   await bacheca.locator('.sn-fb-send').click();
   await expect(bacheca.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 6_000 });
