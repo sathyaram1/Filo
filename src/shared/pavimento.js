@@ -19,9 +19,8 @@
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
-  // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo in una frase polacca (SEGNO_POLACCO).
-  // Dopo il verbo anche l'articolo («Il CVV è il 123», «Die Prüfnummer ist die 123»), e come per la password il trattino
-  // o la freccia fra spazi («CVV — 123», #2681.2).
+  // Come per la password il trattino o la freccia fra spazi («CVV — 123», #2681.2).
+  const TRATTINO = '[-–—→](?=[ \\t])';
   // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности».
   const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F';
   // Le parole che fanno polacca la frase, per il suo «to» dopo un nome che non è solo polacco come PIN e CVV («Mój PIN
@@ -29,20 +28,30 @@
   const POSSESSIVO_POLACCO = `(?:moj[${LETTERE}]*|mój|twoj[${LETTERE}]*|twój|swoj[${LETTERE}]*|swój|nasz[${LETTERE}]*|wasz[${LETTERE}]*)`;
   const SEGNO_POLACCO = `(?<![${LETTERE}])(?:${POSSESSIVO_POLACCO}|kod[${LETTERE}]*|numer[${LETTERE}]*|now(?:y|a|e|ego|ej|ym|ą)`
     + `|(?:tymczasow|jednorazow|tajn|poufn|prywatn|osobist|bankow)[${LETTERE}]*|kart(?:a|y|ę|ą|zie))(?![${LETTERE}])`;
-  const VERBO_CVV = `(?:${VERBO}|(?<=${SEGNO_POLACCO}[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
-  const TRATTINO = '[-–—→](?=[ \\t])';
-  // CVV_ALTRE_LINGUE (#2681.1) è la parte che va anche ai campi dei moduli (da etichette() di campiSegreti.js) e agli
-  // indizi di pagamento (copia autonoma in safebrowseHints.js, uguale per tests/unit/cvvAltreLingue.test.mjs): coi
-  // separatori dei nomi di campo («codigo_de_seguridad»).
+  // CVV_ALTRE_LINGUE (#2681.1) e NOMI_CVV (#1403.61) vanno ai campi dei moduli (da etichette() di campiSegreti.js);
+  // CVV_ALTRE_LINGUE anche agli indizi di pagamento (copia autonoma in safebrowseHints.js, uguale per
+  // tests/unit/cvvAltreLingue.test.mjs), coi separatori dei nomi di campo («codigo_de_seguridad»). Nel testo vale
+  // NOME_CVV, dove «Prüfnummer» da sola non è il CVV.
   const CVV_ALTRE_LINGUE = 'cryptogramme|code[\\s_-]*(?:de[\\s_-]*)?s[ée]curit[ée]|c[óo]digo[\\s_-]*(?:de[\\s_-]*)?(?:seguridad|seguran[çc]a)|(?:karten)?pr(?:ü|ue|u)f(?:nummer|ziffer)|sicherheits[\\s_-]*code|beveiligings[\\s_-]*code|kod[\\s_-]*bezpiecze[ńn]stwa';
-  // I nomi a parole in tutte le lingue delle etichette (#1403.61), anche senza accenti; li usano anche i campi dei moduli.
   const NOMI_CVV = '(?:(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:code|value|number)'
     + '|codice\\s+(?:di\\s+)?sicurezza|cryptogrammes?(?:\\s+visuels?)?|code\\s+(?:de\\s+)?s[ée]curit[ée]'
     + '|c[óo]digos?\\s+(?:de\\s+)?segur(?:idad|an[çc]a)|(?:karten-?)?pr(?:ü|ue?)f(?:nummer|ziffern?|zahl|code)'
     + '|(?:karten)?sicherheits-?(?:code|nummer)|(?:beveiligings|veiligheids)code|kaartverificatiecode'
     + '|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa)|код\\s+(?:безопасности|проверки))';
   const DELLA_CARTA = '(?:\\s+(?:(?:della|de\\s+la|de|do|da|der|van\\s+de|of\\s+the)\\s+(?:carta|carte|tarjeta|cart[ãa]o|karte|kaart|card)|karty))?';
-  const NOME_CVV = `(?<![${LETTERE}])(?:cvv2?|cvc2?|csc|cid|${NOMI_CVV}${DELLA_CARTA}|${CVV_ALTRE_LINGUE})(?![${LETTERE}])`;
+  // Il nome anche nelle lingue del verbo (#2681), anche senza accenti (#1403.61): «cryptogramme», «código de seguridad»,
+  // «Kartenprüfnummer». Il confine vede anche le lettere greche. «Prüfnummer» solo con la carta: da sola è il numero di
+  // controllo di qualunque cosa («Die Prüfnummer des Gutachtens ist 2024»).
+  const LETTERA_CVV = '[A-Za-z0-9_\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u052F]';
+  const NOME_CVV = `(?<!${LETTERA_CVV})(?:cvv2?|cvc2?|csc|cid|(?:(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:value|code|number)`
+    + '|codice\\s+(?:di\\s+)?sicurezza|cryptogrammes?(?:\\s+visuels?)?|code\\s+(?:(?:de\\s+)?s[ée]curit[ée]|de\\s+v[ée]rification)'
+    + '|c[óo]digos?\\s+(?:(?:de\\s+)?segur(?:idad|an[çc]a)|de\\s+(?:verificaci[óo]n|verifica[çc][ãa]o))|codi\\s+de\\s+(?:seguretat|verificaci[óo])'
+    + '|(?:kredit)?karten-?(?:pr(?:ü|ue|u)f(?:nummer|ziffern?|zahl|code)|verifizierungsnummer)|(?:(?:kredit)?karten)?sicherheits-?(?:code|nummer)'
+    + '|kaartverificatiecode|(?:beveiligings|veiligheids)code|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa|weryfikacyjny\\s+karty|cvv2?|cvc2?|csc)'
+    + `|код\\s+(?:безопасности|проверки)|κωδικ[όο]ς\\s+ασφαλε[ίι]ας)${DELLA_CARTA})(?!${LETTERA_CVV})`;
+  // «Prüfziffer», «Prüfcode» senza la carta solo annunciati subito dal verbo o dal separatore («Die Prüfziffer wird 321»,
+  // #2681.2): con altre parole in mezzo o senza annuncio sono il controllo di altro («Der Prüfcode des Produkts ist 456»).
+  const NOME_PRUF = `(?<!${LETTERA_CVV})pr(?:ü|ue|u)f(?:ziffern?|zahl|code)(?!${LETTERA_CVV})`;
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
   const APERTE = '«"\'“‘„';
@@ -59,8 +68,35 @@
   const INTORNO_CHIUSE = `[${CHIUSE})\\]}]`;
   const DAVANTI = `(?:${INTORNO_APERTE}[ \\t]*){0,3}`;
   const CIFRE_CVV = `${DAVANTI}(${CIFRE_DEL_CVV})(?![\\d/]|[.,:-]\\d)`;
-  const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
+  // Il «to» polacco e il catalano «és» solo qui: in VERBO il «to» porterebbe a chi riceve. Conta se dopo il numero non
+  // segue una parola («send the CVV to 123 Main St»), o in una frase polacca (SEGNO_POLACCO: «Kod CVV to 123 z tyłu»).
+  // Dopo il verbo anche l'articolo («Il CVV è il 123», «Die Kartenprüfnummer ist die 123», #2681.2).
+  const VERBO_CVV = `(?:${VERBO}|és|to(?=\\s+${CIFRE_DEL_CVV}(?![\\d/]|[.,:-]\\d)(?![ \\t]*${LETTERA_CVV}))|(?<=${SEGNO_POLACCO}[^\\n]{0,40})to)`
+    + '(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?';
+  const CVV = new RegExp(`(?:${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV})?`
+    + `|${NOME_PRUF}\\s*(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV}))\\s*${CIFRE_CVV}`, 'gi');
   const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*(?:[:=|\\t]|${TRATTINO})|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
+  // I refusi del nome («crytogramme», «seguirdad»): le parole lunghe dei nomi, riconosciute a un errore di distanza.
+  const PAROLE_CVV = ['cryptogramme', 'securite', 'verification', 'seguridad', 'seguranca', 'verificacion', 'verificacao',
+    'seguretat', 'kartenprufnummer', 'kartenpruefnummer', 'kartenprufziffer', 'sicherheitscode', 'kartensicherheitscode',
+    'kaartverificatiecode', 'beveiligingscode', 'bezpieczenstwa', 'безопасности', 'ασφαλειας', 'sicurezza', 'security'];
+  const NOVITA = () => global.SN_NOVITA || (typeof require === 'function' ? (require('./novita.js'), global.SN_NOVITA) : null);
+  const piatta = (w) => w.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function nomiCvvCorretti(s) {
+    if (!/\d{3}/.test(s)) return s;
+    const N = NOVITA();
+    if (!N || typeof N.distanza !== 'function') return s;
+    return s.replace(/\p{L}{6,}/gu, (w) => {
+      const p = piatta(w);
+      // Prima la parola giusta: «security» è a un errore da «securite», e la lingua cambierebbe sotto il nome.
+      if (PAROLE_CVV.includes(p)) return w;
+      for (const giusta of PAROLE_CVV) {
+        if (Math.abs(p.length - giusta.length) > 1 || (p[0] !== giusta[0] && p[1] !== giusta[1])) continue;
+        if (N.distanza(p, giusta, 1) <= 1) return giusta;
+      }
+      return w;
+    });
+  }
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
   // falso allarme ferma un'azione; qui un falso allarme toglie un numero, e il codice di verifica non esce.
   // Le cifre in coda a una parola («Girasole2024») non sono il codice: è la password intera, e la toglie la regola delle
@@ -1214,7 +1250,8 @@
       for (const x of G.segretiNelTesto(s)) if (REGOLE_GUARDIANO.has(x.regola)) out.push(x);
     }
     passwordAccanto(s, out);
-    for (const re of [CVV, CVV_DOPO]) for (const m of s.matchAll(re)) out.push({ valore: m[1], regola: 'cvv' });
+    const conNomiCvv = nomiCvvCorretti(s);
+    for (const re of [CVV, CVV_DOPO]) for (const m of conNomiCvv.matchAll(re)) out.push({ valore: m[1], regola: 'cvv' });
     for (const re of [CODICE_ACCESSO, CODICE_ACCESSO_EN]) {
       for (const m of s.matchAll(re)) if (!FINE_DI_UN_NUMERO.test(m[0].slice(0, -m[1].length))) out.push({ valore: m[1], regola: 'codice' });
     }

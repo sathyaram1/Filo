@@ -78,6 +78,32 @@ test('il CVV chiamato col suo nome nelle lingue delle etichette si toglie come �
     assert.equal(P.oscura(riga), riga);
 });
 
+test('il CVV col suo nome nelle lingue delle etichette si toglie; la frase che lo descrive resta (#2681)', () => {
+  for (const [riga, v] of [
+    ['Le cryptogramme est 123', '123'], ['El código de seguridad es 123', '123'], ['Die Kartenprüfnummer ist 123', '123'],
+    ['Le CVV est 123', '123'], ['Le cryptogramme visuel : 592', '592'], ['Le code de sécurité de la carte est 789', '789'],
+    ['O código de segurança é 321', '321'], ['Codi de seguretat: 888', '888'], ['KARTENPRÜFNUMMER: 4321', '4321'],
+    ['Ihr Sicherheitscode lautet 555', '555'], ['De beveiligingscode is 222', '222'], ['Kod bezpieczeństwa karty to 333', '333'],
+    ['Код безопасности: 444', '444'], ['Κωδικός ασφαλείας: 666', '666'], ['Card verification value: 777', '777'],
+    ['Il CVV era 615', '615'],
+    ['Kod CVV to 123', '123'], ['Mój CVV to 124', '124'], ['Kod CVC2 to 125 z tyłu karty', '125'],
+    ['El código de verificación es 126', '126'], ['El código de verificación de la tarjeta: 127', '127'],
+    ['O código de verificação é 128', '128'], ['Le code de vérification de la carte est 129', '129'],
+    ['Kartenpruefnummer: 131', '131'], ['Kreditkartenprüfnummer: 132', '132'], ['Kreditkartensicherheitscode: 133', '133'],
+    ['El codi de seguretat és 134', '134'], ['Security code: 135', '135'], ['Card security code is 136', '136'],
+  ]) assert.ok(!P.oscura(riga).includes(v), riga);
+  for (const riga of ['Le cryptogramme est un code à 3 chiffres', 'El código de seguridad tiene 3 dígitos',
+    'Die Prüfziffer der IBAN ist 89', 'Kod bezpieczeństwa to trzy cyfry', 'Send the CVV to 123 Main St',
+    'Cryptogrammeur 123', 'Die Prüfnummer des Gutachtens ist 2024', 'Der Prüfcode des Produkts ist 456',
+    'Prüfziffer 1234 im Bericht', 'Prüfnummer 123 des TÜV']) assert.equal(P.oscura(riga), riga);
+});
+
+test('il nome del CVV con un errore di battitura si riconosce lo stesso (#2681)', () => {
+  for (const riga of ['Le crytogramme est 123', 'Le cryptograme est 123', 'El codigo de seguirdad es 123',
+    'Die Kartenprüfnumer ist 123']) assert.ok(!P.oscura(riga).includes('123'), riga);
+  for (const riga of ['Le cryptogrammeur est 123', 'La securite est 123 fois mieux']) assert.equal(P.oscura(riga), riga);
+});
+
 test('un codice usa e getta e una chiave col suo prefisso non escono', () => {
   const t = P.oscura('Il tuo codice OTP è 482913. Chiave: sk-abcdefghijklmnop1234567890');
   assert.ok(!t.includes('482913'));
@@ -946,7 +972,11 @@ const CODICI_GRECI = ['Ταχυδρομικός κωδικός', 'ΤΑΧΥΔΡΟ
 test('l\'elenco delle etichette della password sta in un posto solo, per il testo e per i moduli', () => {
   const codice = (p) => readFileSync(new URL(`../../src/shared/${p}`, import.meta.url), 'utf8').split('\n')
     .filter((r) => !/^\s*\/\//.test(r)).join('\n');
-  assert.doesNotMatch(codice('pavimento.js'), /парол|κωδικ|密[码碼]|wachtwoord|kennwort/, 'il pavimento le prende da urlExfil.js');
+  // «κωδικός ασφαλείας» è il nome greco del CVV (#2681), non un'etichetta della password: solo lui fa eccezione.
+  const ETICHETTA = /парол|κωδικ(?![^\n]{0,12}?ασφαλ)|密[码碼]|wachtwoord|kennwort/;
+  for (const t of ['κωδικός', 'κωδικός πρόσβασης', 'κωδικ(?:[ωώ]ν|[οό])']) assert.match(t, ETICHETTA, t);
+  for (const t of ['κωδικός ασφαλείας', 'κωδικ[όο]ς\\\\s+ασφαλε[ίι]ας']) assert.doesNotMatch(t, ETICHETTA, t);
+  assert.doesNotMatch(codice('pavimento.js'), ETICHETTA, 'il pavimento le prende da urlExfil.js');
   // #1403.19: i campi dei moduli ricevono le latine dal pavimento; le non latine stanno qui (ETICHETTE_NON_LATINE, #1403.8).
   assert.doesNotMatch(codice('campiSegreti.js'), /wachtwoord|has\[łl\]|chiave\\\\s|network\\\\s/, 'i campi le prendono dal pavimento');
 });

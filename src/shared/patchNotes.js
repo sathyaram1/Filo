@@ -14,6 +14,7 @@
         { testo: 'Se in una chat qualcuno ti chiede il PUK della SIM e tu lo scrivi nella risposta, il correttore non lo manda ai suoi modelli, come già succedeva per il PIN e la password.', segnalazione: 2692 },
         { testo: 'Un PIN o una password con una parola prima del valore, come «il pin è ancora 4821» o «the pin is still 4821», non arriva più a nessun modello, e un\'azione di Filo non li manda a un sito senza la tua conferma.', segnalazione: 2678 },
         { testo: 'Una password o un codice scritti in un indirizzo coi caratteri codificati, come «%20» al posto degli spazi, non arrivano più a nessun modello, come quando li scrivi in chiaro.', segnalazione: 1403 },
+        { testo: 'Il CVV della carta non arriva a nessun modello nemmeno con un errore di battitura nel suo nome, come «Le crytogramme est 123», o chiamato «código de verificación», «Kreditkartenprüfnummer» o «codi de seguretat».', segnalazione: 2681 },
       ],
     },
     {
