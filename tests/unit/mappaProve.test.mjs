@@ -173,7 +173,8 @@ test('finish:check: coi file che la mappa conosce sceglie lei dalle righe cambia
     g('init', '-q', '-b', 'main');
     g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
     scrivi('src/main/x.js', SORGENTE['src/main/x.js']);
-    for (const s of ['a', 'b', 'x-area', 'y-cosa']) scrivi(`tests/${s}.spec.mjs`, '');
+    scrivi('src/pages/dashboard/dashboard.css', 'a { color: red; }\n');
+    for (const s of ['a', 'b', 'x-area', 'y-cosa', 'dashboard-home']) scrivi(`tests/${s}.spec.mjs`, '');
     g('add', '-A'); g('commit', '-qm', 'base');
     const commitMappa = g('rev-parse', 'HEAD');
     // Dopo la mappa main aggiunge due righe in cima: la riga cambiata dal ramo va riportata indietro di due.
