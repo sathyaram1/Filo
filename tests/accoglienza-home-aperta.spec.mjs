@@ -163,6 +163,33 @@ test('scritto nella home prima che arrivi l’invito del primo avvio: poi Filo s
   await intervistaDalBenvenuto(app);
 });
 
+// #751 — chi l'intervista l'ha già fatta e resta senza crediti: riscattato il codice, «serve un codice d'invito» lascia
+// il posto alla home rifatta col modello, invece di restare davanti a lei.
+test.describe('a intervista già fatta', () => {
+  test.use({ accoglienzaFatta: true });
+
+  test('scritto senza crediti, riscatto da «Apri Crediti»: tornato alla home, la risposta del codice non c’è più', async ({ app, shell }) => {
+    test.setTimeout(120_000);
+    const home = await homeCheChiedeIlCodice(app);
+    await scrittoSenzaCrediti(home);
+    await home.locator('#bubbles button', { hasText: 'Apri Crediti' }).click();
+    let crediti = null;
+    await expect.poll(() => { crediti = app.windows().find((w) => w.url().startsWith('filo://credits')); return !!crediti; }, { timeout: 15_000 }).toBe(true);
+    await crediti.waitForLoadState('domcontentloaded');
+    await expect(crediti.locator('#redeemForm')).toBeVisible({ timeout: 20_000 });
+    await crediti.fill('#inviteCode', 'ABCD-EFGH');
+    await crediti.click('#redeemBtn');
+    await expect(crediti.locator('#redeemMsg')).toContainText('riscattato', { timeout: 20_000 });
+    await shell.locator('.tab').first().click();
+    await expect(home.locator('#bubbles button', { hasText: 'Apri Crediti' })).toHaveCount(0, { timeout: 20_000 });
+    await expect(home.locator('body')).not.toContainText(/codice d.invito|riscatta l.invito/i);
+    await expect(home.locator('body')).toHaveAttribute('data-state', 'home');
+    await expect.poll(() => app.evaluate(() => globalThis.__homeDalModello), { timeout: 20_000, message: 'la home rifatta col modello' }).toBeGreaterThan(0);
+    await expect(home.locator('#bubbles')).not.toContainText('Ciao, sono Filo');
+    await home.screenshot({ path: 'tests/.shots/751-home-dopo-il-riscatto.png' });
+  });
+});
+
 test('una conversazione vera nella home non viene interrotta quando arrivano i crediti', async ({ app }) => {
   test.setTimeout(120_000);
   const home = await homeCheChiedeIlCodice(app);
