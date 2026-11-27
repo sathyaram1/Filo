@@ -1602,16 +1602,18 @@
     const domanda = domandaDi(c);
     const rispostaA = Rispondi.perIlMain(c.citata);
     const nelloStorico = Rispondi.perLoStorico(c.citata);
-    threadHistory.push({
+    const riga = {
       role: 'user', text: domanda,
       ...(c.immagini.length ? { images: c.immagini.length } : {}),
       ...(daModello ? { daModello: true } : {}), ...(c.daFuori ? { daFuori: true } : {}),
       ...(nelloStorico ? { rispostaA: nelloStorico } : {}),
       ...(c.schede && c.schede.length ? { schede: c.schede } : {}),
-    });
+    };
     if (!bolla) bubblesEl.appendChild(bollaUtente(c));
     Coda.segnaGiorni();
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    await prendiIlFilo();
+    threadHistory.push(riga);
 
     await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori, ...(rispostaA ? { rispostaA } : {}), composizione: c });
   }
