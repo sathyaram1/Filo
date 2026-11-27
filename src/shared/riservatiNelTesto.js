@@ -501,6 +501,8 @@ function primaDelNome(testo) {
     const nudo = pulito(m[1]);
     if (nudo.length < 4) continue;
     const virgolette = APRE_VIRGOLETTA.test(m[1]);
+    // Dopo una virgola o un punto il verbo apre spesso un'altra frase («dopo il 2024, è la password che…»).
+    if (!virgolette && /[.,;:…]$/u.test(m[1]) && !formaDiPassword(nudo)) continue;
     if (!virgolette && !/[^\p{L}'’]/u.test(nudo)) {
       // Di sole lettere: una parola seguita da un segno chiude la frase («Grazie! è la password che cercavo»).
       if (n.corto || m.groups.senzaAccento || nudo !== v || /[,;:.!?…]$/u.test(m[1])) continue;
