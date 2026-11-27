@@ -203,7 +203,7 @@
         v.varianti = altre.map((x) => ({
           label: x.label || nomeConOggetto(nome, x.fraseOggetto || fraseOggetto(x.oggetto)),
           onClick: x.onClick, bersaglio: x.bersaglio || bersaglioDi(x.oggetto), disabled: !!x.disabled,
-          ...(x.misura ? { azione: x.misura } : {}),
+          ...(typeof x.azione === 'string' && x.azione ? { azione: x.azione } : {}),
         }));
       }
       if (Array.isArray(a.varianti)) v.varianti = [...(v.varianti || []), ...a.varianti];
