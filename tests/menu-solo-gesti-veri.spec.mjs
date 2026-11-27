@@ -157,8 +157,8 @@ test('il sito non preme Incolla, la freccia o Detta spostandoli fuori dal menu c
   // Il pulsante spostato resta della pagina, ma la mano dell'utente sul menu vero incolla come sempre.
   await page.keyboard.press('Escape');
   await page.locator('#campo').fill('');
-  await apri('.sn-menu-paste-main');
-  await menuDi(page).locator('.sn-menu .sn-menu-paste-main').first().click();
+  await apri(INCOLLA);
+  await menuDi(page).incolla.click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
 });
 
