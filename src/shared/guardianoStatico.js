@@ -567,10 +567,12 @@
   function codiciInElenco(s, valori) {
     const nuovi = [];
     const visti = new Set((valori || []).map((x) => `${x.regola}:${x.valore}`));
+    const letti = new Set();
     for (const x of valori || []) {
       const misura = CIFRE_IN_ELENCO[x.regola];
       const v = String(x.valore);
-      if (!misura || !/^\d+$/.test(v)) continue;
+      if (!misura || !/^\d+$/.test(v) || letti.has(`${x.regola}:${v}`)) continue;
+      letti.add(`${x.regola}:${v}`);
       for (let i = s.indexOf(v); i >= 0; i = s.indexOf(v, i + 1)) {
         if (/[\p{L}\p{N}]/u.test(s[i - 1] || '') || /[\p{L}\p{N}]/u.test(s[i + v.length] || '')) continue;
         ACCANTO_IN_ELENCO.lastIndex = i + v.length;
