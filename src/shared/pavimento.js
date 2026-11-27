@@ -218,9 +218,22 @@
       || POSSESSIVO_SOLO.test(w[1]);
   };
   const POSSESSIVO_SOLO = new RegExp(`^${POSSESSIVO}$`, 'iu');
-  // Il codice del telefono o della carta li sblocca anche senza possessivo (#2678.10), ma solo se l'etichetta finisce lì:
-  // «il codice del telefono del cliente è 4821» resta un identificativo.
-  const SI_SBLOCCA_SOLO = new RegExp(`^(?:${APPARECCHIO}|cart[ae]|cards?)$`, 'iu');
+  // Il codice del telefono o della carta li sblocca anche senza possessivo (#2678.10), con la stessa chiusura della frase
+  // col possessivo e chi lo possiede («di mia madre»); un identificativo nell'etichetta («del cliente») ne fa un altro dato.
+  const CARTA = '(?:cart[ae]|cards?|postepay|prepagat[ae]|mastercard|visa|amex|revolut|hype)';
+  const SBLOCCABILE = `(?:${APPARECCHIO}|${CARTA})`;
+  const SI_SBLOCCA_SOLO = new RegExp(`^${SBLOCCABILE}$`, 'iu');
+  const DI_QUALCUNO = `(?:\\s+(?:di|del|della|dello|de|du|da|of|von|vom|van|od)\\s+(?:${POSSESSIVO}\\s+)?[\\p{L}]+)?`;
+  const DOPO_SBLOCCABILE = `(?:${DOPO_APPARECCHIO})?${DI_QUALCUNO}`;
+  const PRIMA_DI_SBLOCCABILE = `(?:\\s+|\\s+(?:dell|all|nell|d|l)['’]\\s*)${AGGETTIVO}`;
+  const ETICHETTA_SBLOCCABILE = new RegExp(`(?<![\\p{L}])(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}${PRIMA_DI_SBLOCCABILE}${SBLOCCABILE}`
+    + `${DOPO_SBLOCCABILE}(?:${CHIUDE_VERO})?|${SBLOCCABILE}${DOPO_SBLOCCABILE}\\s+(?:ha|has|hat|heeft|tiene|tem)`
+    + `(?:\\s+(?:il|un|the|a|el|o|den|einen|de|le))?\\s+${NOME_SBLOCCO}(?:${CHIUDE_VERO})?)\\s*$`, 'iu');
+  const UN_SBLOCCABILE = new RegExp(`(?<![\\p{L}])${SBLOCCABILE}(?![\\p{L}])`, 'giu');
+  const etichettaSbloccabile = (coda) => {
+    const m = ETICHETTA_SBLOCCABILE.exec(coda);
+    return !!m && !NON_APRE.test(m[0].replace(UN_SBLOCCABILE, ' ')) && !PREDEFINITO.test(m[0]);
+  };
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
