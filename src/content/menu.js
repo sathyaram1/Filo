@@ -1448,13 +1448,12 @@
   function apriVarianti(b, it) {
     const voci = (Array.isArray(it.varianti) ? it.varianti : []).filter((x) => x && typeof x.onClick === 'function');
     if (!voci.length) return false;
-    const griglia = b.closest('.sn-menu-griglia');
     openGenericSubmenu(b, voci.map((x) => ({
       label: x.label || testoDelNome(x),
       onClick: x.onClick,
       bersaglio: x.bersaglio,
       disabled: !!x.disabled,
-    })), { griglia });
+    })));
     if (activeMenu) { activeMenu.subOwner = b; activeMenu.subLocked = true; }
     return true;
   }
