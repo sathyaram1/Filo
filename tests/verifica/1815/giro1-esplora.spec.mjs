@@ -97,7 +97,7 @@ test('avanzamento visibile e chiusura a metà ferma le chiamate', async ({ app, 
 
 test('crediti finiti: avviso', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
-  await trascrittoreFinto(app, { errore: { status: 402, message: 'Insufficient credits' } });
+  await trascrittoreFinto(app, { errore: { status: 402, message: 'OpenRouter 402: {"error":{"message":"Insufficient credits","code":402}}' } });
   const src = testServer.asset(wav(5), 'audio/wav');
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
     <audio id="a" src="${src}" controls style="display:block;width:320px"></audio></body></html>`);
