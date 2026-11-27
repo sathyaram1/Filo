@@ -147,7 +147,7 @@ test('bloccato, aperto dal bordo resta aperto anche uscendo, e il foglio si rest
     await expect.poll(() => aperto(ed), { timeout: 3000 }).toBe(true);
     // Chiuso dal suo menu, si riapre dal bordo.
     await ed.locator('.pd-testa').click({ button: 'right', position: { x: 20, y: 10 } });
-    await ed.locator('.pd-menu .sn-select-option', { hasText: 'Chiudi il pannello' }).click();
+    await menuDi(ed).scegli('Chiudi il pannello');
     await expect.poll(() => aperto(ed)).toBe(false);
     puntatore(`move:${xDentro}:${y};wait:150;move:${destra - 1}:${y};wait:40;move:${destra}:${y + 1};wait:800`);
     await expect.poll(() => aperto(ed), { timeout: 2000 }).toBe(true);
