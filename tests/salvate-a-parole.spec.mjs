@@ -6,6 +6,7 @@
 import { test, expect } from './helpers/reteFinta.mjs';
 import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Le tre pagine salvate stanno sulla rete finta: aprirle carica una pagina vera, non una d'errore.
 function pagineDi(rete) {
