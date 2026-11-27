@@ -69,7 +69,7 @@
     // Il disegno e il nome di qui valgono per trascinarle e per la chat; aperta sul filmato, l'icona dice il suo stato.
     media: { playPause: ['play', 'fila_media_play'], mute: ['volumeMute', 'menu_media_mute'], save: ['download', 'fila_media_save'],
       loop: ['repeat', 'menu_media_loop'], pip: ['pip', 'menu_media_pip'], copyLink: ['link', 'fila_media_copy_link'],
-      ...DEL_COLLEGAMENTO },
+      transcribe: ['transcribe', 'menu_transcribe'], ...DEL_COLLEGAMENTO },
     cursore: { paste: ['clipboard', 'menu_paste'], dictate: ['mic', 'menu_dictate'] },
     pagina: {},
   });
