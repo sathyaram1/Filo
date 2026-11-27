@@ -191,7 +191,7 @@ test('Rinomina… dal tasto destro: il nome nuovo compare sulla scheda, al suo p
 
   // Clic, spazio e Invio dentro il campo restano al campo: la scheda non apre il mazzo.
   await scheda(page, 'Artefatti').click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Rinomina…' }).click();
+  await menuDi(page).scegli('Rinomina…');
   await campo.fill('Goblin');
   for (const tema of ['light', 'dark']) {
     await page.evaluate((t) => window.SN_PAGE_BOOTSTRAP.applyTheme(t), tema);
