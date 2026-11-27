@@ -1058,7 +1058,15 @@
 
     port.onMessage.addListener((m) => {
       if (m.type === 'reset' || m.type === 'done' || m.type === 'error') ridisegno.annulla();
-      if (m.type === 'meta') {
+      if (m.type === 'meta' && m.avanzamento && !m.model) {
+        const a = m.avanzamento;
+        if (Number.isFinite(a.secondi)) durata = I18n.t('popup_transcribe_duration', durataLeggibile(a.secondi));
+        if (Number.isFinite(a.totale) && a.totale > 0) {
+          const riga = I18n.t('popup_transcribe_progress', String(a.fatti || 0), String(a.totale));
+          setMeta(popup, durata ? `${riga} • ${durata}` : riga);
+          if (firstDelta && loading.isConnected) loading.textContent = riga;
+        }
+      } else if (m.type === 'meta') {
         popup.model = m.model; popup.provider = m.provider;
         // Il prompt vero è quello composto dal main: le domande successive
         // devono ripartire da lì, non dalla copia locale senza cambi (#724).
