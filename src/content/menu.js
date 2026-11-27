@@ -1666,12 +1666,6 @@
     }
   }
 
-  function refreshIconGrid(items) {
-    if (!activeMenu || !activeMenu.subRoot || !activeMenu.subRoot.classList.contains('sn-menu-icon-grid')) return;
-    populateGrid(activeMenu.subRoot, items, activeMenu.subRoot.__snGridOpts || {});
-    repositionSub();
-  }
-
   function isSubMenuOpen() {
     return !!(activeMenu && activeMenu.subRoot && activeMenu.subRoot.isConnected);
   }
