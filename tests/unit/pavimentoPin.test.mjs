@@ -69,6 +69,51 @@ test('il codice del telefono o della carta diventa il segnaposto, come quello de
   ]) assert.equal(P.oscura(frase), frase, frase);
 });
 
+// Senza possessivo l'etichetta chiude come quella col possessivo: chi possiede il telefono, un aggettivo, l'articolo,
+// le maiuscole, un avverbio, la virgola; e i nomi comuni del cellulare e delle carte.
+test('il codice del telefono o della carta senza possessivo, in ogni forma di quello del cellulare', () => {
+  for (const frase of [
+    'il codice del telefono di mia madre è 4821',
+    'il codice del telefono di Marco è 4821',
+    'il codice del telefono di lavoro è 4821',
+    'il codice del telefono aziendale è 4821',
+    'il codice del telefono nuovo è 4821',
+    'il codice del vecchio telefono è 4821',
+    'il telefono ha il codice 4821',
+    'il codice del telefono è il 4821',
+    'il codice del telefono è: 4821',
+    'il codice del telefono È 4821',
+    'IL CODICE DEL TELEFONO È 4821',
+    'il codice del telefono è sempre 4821',
+    'il codice del telefono, 4821',
+    'il codice della carta è ancora 4821',
+    'il codice del cell è 4821',
+    'il codice della postepay è 4821',
+    'il codice della prepagata è 4821',
+    'il codice della mastercard è 4821',
+    'il codice della revolut è 4821',
+    'el código del teléfono de mi madre es 4821',
+    'le code du téléphone de ma mère est 4821',
+  ]) assert.equal(P.oscura(frase).includes('4821'), false, frase);
+  for (const frase of [
+    'il codice del telefono del cliente è 4821',
+    'il telefono del cliente ha il codice 4821',
+    'el código del teléfono del cliente es 4821',
+    'le code du téléphone du client est 4821',
+    'il codice prodotto del telefono è 4821',
+    'codice articolo telefono 4821',
+    'il codice del telefono è cambiato nel 4821',
+    'The serial code of my phone is 5200',
+  ]) assert.equal(P.oscura(frase), frase, frase);
+});
+
+test('un\'etichetta lunga senza chiusura non rallenta il pavimento', () => {
+  const t = `il codice ${'del nuovo vecchio di mia '.repeat(400)}telefono x 4821`;
+  const inizio = Date.now();
+  P.oscura(t);
+  assert.ok(Date.now() - inizio < 2000, `${Date.now() - inizio} ms`);
+});
+
 test('in uscita il PIN col complemento si riconosce, e il primo verbo chiude il complemento', () => {
   const codici = (t) => G.segretiInUscita(t).filter((x) => x.regola === 'codice').map((x) => x.valore);
   for (const frase of ['il pin del telefono è 4821', 'il pin del telefono è «4821»', 'the pin for my phone is 4821',
