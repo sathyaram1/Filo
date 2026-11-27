@@ -579,8 +579,8 @@ test('la carta dei Crediti tolta va in «altro» e si rimette da sola: la destra
   await expect(inAltro).toHaveCount(1);
   await fuoriVista(page);
   await inAltro.click({ button: 'right' });
-  await expect(page.locator('.dash-menu .dash-menu-voce')).toHaveText(['Apri Crediti', 'Rimetti nella home']);
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rimetti' }).click();
+  await expect.poll(() => menuDi(page).scritte()).toEqual(['Apri Crediti', 'Rimetti nella home']);
+  await menuDi(page).scegli('Rimetti');
   await expect(crediti).toBeVisible();
   await expect(inAltro).toHaveCount(0);
   expect(await ordineDestra(page)).toEqual(disposta);
