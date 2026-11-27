@@ -342,6 +342,9 @@
 
   function openCtx(x, y, items) {
     closeCtx();
+    // Le azioni a icone come il tasto destro di Filo (#2555); un menu che mostra un dato sotto la voce resta testo.
+    const I = window.SN_MENU_ICONS;
+    if (!items.some((it) => it.detail) && I && I.apriVoci && I.apriVoci({ x, y, voci: items.map((it) => ({ label: it.label, onClick: () => it.run() })) })) return;
     const pop = document.createElement('div');
     pop.className = 'sn-select-pop dk-ctxmenu';
     for (const it of items) {
