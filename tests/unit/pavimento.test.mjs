@@ -972,7 +972,11 @@ const CODICI_GRECI = ['Ταχυδρομικός κωδικός', 'ΤΑΧΥΔΡΟ
 test('l\'elenco delle etichette della password sta in un posto solo, per il testo e per i moduli', () => {
   const codice = (p) => readFileSync(new URL(`../../src/shared/${p}`, import.meta.url), 'utf8').split('\n')
     .filter((r) => !/^\s*\/\//.test(r)).join('\n');
-  assert.doesNotMatch(codice('pavimento.js'), /парол|κωδικ|密[码碼]|wachtwoord|kennwort/, 'il pavimento le prende da urlExfil.js');
+  // «κωδικός ασφαλείας» è il nome greco del CVV (#2681), non un'etichetta della password: solo lui fa eccezione.
+  const ETICHETTA = /парол|κωδικ(?![^\n]{0,12}?ασφαλ)|密[码碼]|wachtwoord|kennwort/;
+  for (const t of ['κωδικός', 'κωδικός πρόσβασης', 'κωδικ(?:[ωώ]ν|[οό])']) assert.match(t, ETICHETTA, t);
+  for (const t of ['κωδικός ασφαλείας', 'κωδικ[όο]ς\\\\s+ασφαλε[ίι]ας']) assert.doesNotMatch(t, ETICHETTA, t);
+  assert.doesNotMatch(codice('pavimento.js'), ETICHETTA, 'il pavimento le prende da urlExfil.js');
   // #1403.19: i campi dei moduli ricevono le latine dal pavimento; le non latine stanno qui (ETICHETTE_NON_LATINE, #1403.8).
   assert.doesNotMatch(codice('campiSegreti.js'), /wachtwoord|has\[łl\]|chiave\\\\s|network\\\\s/, 'i campi le prendono dal pavimento');
 });
