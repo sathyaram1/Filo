@@ -48,7 +48,7 @@ async function prepara(app) {
   });
 }
 
-test('in chat la trascrizione lunga dice a che punto è e lo Stop la ferma', async ({ app, openTab, testServer }) => {
+test('r1 in chat la trascrizione lunga dice a che punto è e lo Stop la ferma', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
   await prepara(app);
   // 10 minuti: una ventina di pezzi da mezzo minuto, due alla volta da due secondi l'uno → una ventina di secondi di lavoro.
