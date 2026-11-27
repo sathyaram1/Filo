@@ -112,11 +112,11 @@ test('dal tasto destro sulla scheda fa la stessa cosa del tasto, e apre la prati
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: fb._id }]);
   // Da fidato la voce diventa il suo contrario, come il tasto.
   await page.locator(`.mg-item[data-id="${fb._id}"]`).click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toBeVisible();
-  await expect(page.locator('.mg-ctxmenu')).not.toContainText('Segna fidato');
-  const togli = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Togli fiducia' });
-  await expect(togli).toHaveAttribute('title', /Un clic la toglie/);
-  await togli.click();
+  await expect(menu.principale).toBeVisible();
+  const voci = await menu.vociScritte();
+  expect(voci.join('\n')).not.toContain('Segna fidato');
+  expect(voci).toContain('Togli fiducia');
+  await menu.scegli('Togli fiducia');
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'false');
   expect((await page.evaluate(() => window.__fiducia)).at(-1)).toEqual({ type: 'fiducia_segna', feedbackId: fb._id, fidato: false });
 });
