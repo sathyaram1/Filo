@@ -155,11 +155,10 @@ export function costruisciMappa({ registrazioni, sorgente, root, durate = new Ma
   };
   const file = {};
   for (const rel of [...perFile.keys()].sort()) {
-    const tutte = new Set();
+    const tutte = caricati.get(rel);
     const funzioni = [];
     for (const [k, chi] of perFile.get(rel)) {
       const [da, a] = k.split(':').map(Number);
-      for (const p of chi) tutte.add(p);
       funzioni.push([da, a, idInsieme(chi)]);
     }
     funzioni.sort((x, y) => x[0] - y[0] || y[1] - x[1]);
