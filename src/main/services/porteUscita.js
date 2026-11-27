@@ -463,7 +463,7 @@ const chiamataPerModello = (type) => (globalThis.SN_ACTION_TOOLS ? globalThis.SN
 
 // Cosa sente il modello quando l'indirizzo che ha scritto non compare da nessuna parte (#553).
 function rifiutoNonCompare(type) {
-  const verbo = type === 'LEGGI_PAGINA' ? 'letto' : 'aperto';
+  const verbo = type === 'LEGGI_PAGINA' ? 'letto' : type === 'TRASCRIVI_MEDIA' ? 'trascritto' : 'aperto';
   return `Azione ${chiamataPerModello(type)} NON fatta: l'indirizzo l'hai scritto tu e non compare da nessuna parte (nelle parole dell'utente, `
     + 'nei risultati, nelle pagine lette o nei loro link, nelle schede, nella cronologia). Non l\'ho ' + verbo + '. Trovalo: '
     + 'cercalo con web(cerca) o segui un link di una pagina letta, e usa l\'indirizzo esatto. Per un sito comune puoi '
