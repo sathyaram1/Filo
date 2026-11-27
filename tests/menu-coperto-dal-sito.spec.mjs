@@ -93,7 +93,7 @@ test('sotto il velo non partono nemmeno Incolla e Detta', async ({ app, openTab,
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  await menuDi(page).locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue(), 'gli appunti non arrivano al campo del sito').not.toContain(SEGRETO);
 
@@ -109,7 +109,7 @@ test('sotto il velo non partono nemmeno Incolla e Detta', async ({ app, openTab,
   // menu-dal-sito
   await page.evaluate(() => {
     window.togli();
-    window.alMenu(() => { window.stendi(); document.querySelector('.sn-menu-paste-main').focus(); });
+    window.alMenu(() => { window.stendi(); document.querySelector('.sn-menu-griglia [data-sn-verbo="paste"]').focus(); });
   });
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
@@ -126,16 +126,16 @@ test('un velo tolto mentre la mano arriva sulla voce non lascia passare il clic:
   // Il sito toglie il velo quando il puntatore arriva su Incolla. menu-dal-sito
   await page.evaluate(() => window.alMenu(() => {
     window.stendi();
-    const via = (e) => { if (e.target.closest && e.target.closest('.sn-menu-paste-main')) { window.togli(); window.removeEventListener('pointerover', via, true); } };
+    const via = (e) => { if (e.target.closest && e.target.closest('.sn-menu-griglia [data-sn-verbo="paste"]')) { window.togli(); window.removeEventListener('pointerover', via, true); } };
     window.addEventListener('pointerover', via, true);
   }));
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  const incolla = await centro(menuDi(page).locator('.sn-menu-paste-main'));
+  const incolla = await centro(menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]'));
   await page.mouse.move(incolla.x, incolla.y, { steps: 4 });
   await expect(page.locator('#velo')).toHaveCount(0);
-  await expect.poll(() => statoVoce(app, page, '.sn-menu-paste-main')).toBe('visibile');
+  await expect.poll(() => statoVoce(app, page, '.sn-menu-griglia [data-sn-verbo="paste"]')).toBe('visibile');
   await page.mouse.click(incolla.x, incolla.y);
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
@@ -147,9 +147,9 @@ test('un velo tolto mentre la mano arriva sulla voce non lascia passare il clic:
     setTimeout(() => window.togli(), 200);
   }));
   await page.locator('#campo').click({ button: 'right' });
-  await expect.poll(() => statoVoce(app, page, '.sn-menu-paste-main')).toBe('visibile');
+  await expect.poll(() => statoVoce(app, page, '.sn-menu-griglia [data-sn-verbo="paste"]')).toBe('visibile');
   await page.waitForTimeout(700);
-  await menuDi(page).locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
 });
 
@@ -160,7 +160,7 @@ test('un velo che non tocca il menu non ferma niente, e il primo clic sul menu a
     <input id="campo" style="width:320px;font-size:16px">
   </body></html>`);
   await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
   await expect(avvisoCoperto(page)).toHaveCount(0);
 });
@@ -169,13 +169,13 @@ test('il menu rimpicciolito per compensare lo zoom della pagina conta i clic com
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
   const page = await apri(openTab, testServer);
   await page.locator('#campo').click({ button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu-paste-main')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]')).toBeVisible();
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     tm.tabs.find((t) => t.id === tm.activeId).view.webContents.setZoomFactor(1.5);
   });
   await expect.poll(() => menuDi(page).locator('.sn-menu').first().evaluate((m) => m.style.transform)).toMatch(/scale\(0\.6/);
-  await menuDi(page).locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
 });
 
@@ -196,7 +196,7 @@ test('il foglio di stile del sito non porta il menu sotto il suo velo', async ({
   // Lo stesso, se a cambiarlo è lo script del sito.
   await menu.evaluate((m) => { m.style.zIndex = '1'; m.style.position = 'static'; });
   await expect.poll(() => menu.evaluate((m) => getComputedStyle(m).zIndex)).toBe('2147483646');
-  await expect.poll(() => statoVoce(app, page, '.sn-menu-paste-main')).toBe('visibile');
+  await expect.poll(() => statoVoce(app, page, '.sn-menu-griglia [data-sn-verbo="paste"]')).toBe('visibile');
 });
 
 test('un velo della pagina sopra un riquadro incorporato copre anche il menu aperto lì dentro', async ({ app, openTab, testServer }) => {
@@ -214,9 +214,9 @@ test('un velo della pagina sopra un riquadro incorporato copre anche il menu ape
   await frame.waitForSelector('#campo');
 
   await frame.locator('#campo').click({ button: 'right' });
-  await expect(menuDi(frame).locator('.sn-menu-paste-main')).toBeVisible();
+  await expect(menuDi(frame).locator('.sn-menu-griglia [data-sn-verbo="paste"]')).toBeVisible();
   await page.waitForTimeout(700);
-  await menuDi(frame).locator('.sn-menu-paste-main').click();
+  await menuDi(frame).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(frame.locator('.sn-toast', { hasText: 'Il menu era coperto' })).toBeVisible();
   expect(await frame.locator('#campo').inputValue()).not.toContain(SEGRETO);
 });
@@ -251,7 +251,7 @@ test('su una pagina tutta in scala di grigi il menu risponde, il velo resta ferm
   const filtro = () => page.evaluate(() => getComputedStyle(document.documentElement).filter);
 
   await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
   await expect(avvisoCoperto(page)).toHaveCount(0);
   await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
@@ -263,7 +263,7 @@ test('su una pagina tutta in scala di grigi il menu risponde, il velo resta ferm
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  await menuDi(page).locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
   await expect.poll(filtro).toBe('grayscale(1)');
@@ -290,11 +290,11 @@ test('una pagina scura per inversione dei colori resta scura col menu aperto, e 
   await expect.poll(() => luce(app, page, 900, 600)).toBeLessThan(60);
 
   await page.locator('#campo').click({ button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu-paste-main')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]')).toBeVisible();
   await page.waitForTimeout(400);
   expect(await luce(app, page, 900, 600), 'lontano dal menu la pagina resta scura').toBeLessThan(60);
   await page.screenshot({ path: 'tests/.shots/589-11-pagina-invertita-menu.png' });
-  await menuDi(page).locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
   expect(await luce(app, page, 900, 600)).toBeLessThan(60);
 
@@ -303,7 +303,7 @@ test('una pagina scura per inversione dei colori resta scura col menu aperto, e 
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  await menuDi(page).locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').click();
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
 });
@@ -320,7 +320,7 @@ test('su una pagina scura per inversione la bolla della chat al piano più alto 
   const chiusa = await luce(app, page, x, y);
 
   await page.locator('#campo').click({ button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu-paste-main')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]')).toBeVisible();
   await page.waitForTimeout(400);
   const aperta = await luce(app, page, x, y);
   expect(Math.abs(aperta - chiusa), `la bolla cambia colore col menu aperto (${chiusa} → ${aperta})`).toBeLessThan(25);
@@ -353,7 +353,7 @@ for (const [nome, [stileHtml, stileScheda]] of Object.entries(SCHEDE)) {
     const coperto = frame.locator('.sn-toast', { hasText: 'Il menu era coperto' });
 
     await frame.locator('#campo').click({ button: 'right' });
-    const incolla = menuDi(frame).locator('.sn-menu-paste-main');
+    const incolla = menuDi(frame).locator('.sn-menu-griglia [data-sn-verbo="paste"]');
     await expect(incolla).toBeVisible();
     await page.waitForTimeout(150);
     await incolla.click();
@@ -395,11 +395,11 @@ test('su una pagina con lo zoom sul documento un velo steso solo sopra il menu r
   for (const zoom of ['', '2']) {
     await page.evaluate(() => { document.getElementById('velo')?.remove(); document.getElementById('campo').value = ''; });
     await page.locator('#campo').click({ button: 'right' });
-    await expect(menuDi(page).locator('.sn-menu-paste-main')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]')).toBeVisible();
     await page.evaluate((z) => window.veloSulMenu(z), zoom);
     await expect(page.locator('#velo')).toHaveCount(1);
     await page.waitForTimeout(700);
-    const b = await menuDi(page).locator('.sn-menu-paste-main').boundingBox();
+    const b = await menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]').boundingBox();
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
     await expect(avvisoCoperto(page).last()).toBeVisible();
@@ -414,7 +414,7 @@ test('su una pagina con lo zoom sul documento il menu si apre accanto al campo, 
     <input id="campo" style="position:absolute;right:20px;top:200px;width:150px;font-size:16px"></body></html>`);
   const campo = await page.locator('#campo').boundingBox();
   await page.locator('#campo').click({ button: 'right', position: { x: 10, y: 5 } });
-  const incolla = menuDi(page).locator('.sn-menu-paste-main');
+  const incolla = menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]');
   await expect(incolla).toBeVisible();
   const menu = await menuDi(page).locator('.sn-menu').first().boundingBox();
   const vw = await page.evaluate(() => innerWidth);
@@ -452,7 +452,7 @@ test('nel campo di una finestra modale del sito il menu si vede sopra la finestr
     <div id="velo" popover="manual" style="position:fixed;inset:0;margin:0;width:100vw;height:100vh;border:0;background:#fff;pointer-events:none">Clicca i quadrati</div>
     <script>document.getElementById('d').showModal();</script></body></html>`);
   await page.locator('#campo').click({ button: 'right' });
-  const incolla = menuDi(page).locator('.sn-menu-paste-main');
+  const incolla = menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="paste"]');
   await expect(incolla).toBeVisible();
   const b = await incolla.boundingBox();
   const x = b.x + b.width / 2, y = b.y + b.height / 2;
