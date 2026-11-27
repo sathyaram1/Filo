@@ -393,6 +393,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
+  on(MSG.TRASCRIVI_MEDIA_PREPARA, (msg, sender) => require('../trascriviMedia').prepara(msg, sender));
 
   // #1488 — un video in streaming non ha un file: lo salva yt-dlp dalla pagina. L'indirizzo è quello del riquadro
   // che chiede, o quello del video cliccato se è dello stesso sito; una build da negozio non ha la funzione
