@@ -185,7 +185,10 @@
       }));
     }
     // Le stesse voci già nella forma del menu del tasto destro: ogni chat le passa così com'è.
-    const vociMenu = (target) => voci(target).map((v) => ({ type: 'item', icon: icona(v.icona, 16), label: v.label, onClick: () => { v.fai(); } }));
+    // `elemento`: il messaggio, che il menu a icone contorna passando sull'azione (#2555).
+    const vociMenu = (target) => voci(target).map((v) => ({
+      type: 'item', icon: icona(v.icona, 16), label: v.label, elemento: messaggioDi(target), onClick: () => { v.fai(); },
+    }));
     return { voci, vociMenu, messaggioDi };
   }
 
