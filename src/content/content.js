@@ -1922,10 +1922,23 @@
     // usava un contesto stantio e incollava all'inizio del campo.
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await primaDelMenu();
+    const clipboardHistory = await primaDelMenu(sito);
     return buildMenuItems({
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
+      sito, mouse: mouseEvent, minimoCorreggi, scritte,
     });
+  }
+
+  // Le voci del correttore (#2555): proposte e spiegazioni restano testo in cima, le azioni («Ignora», «Aggiungi al
+  // dizionario», «Apri la fonte») vanno nella griglia per il loro verbo.
+  function separaLeAzioni(voci) {
+    const testo = [];
+    const azioni = [];
+    for (const v of voci) {
+      if (v && (v.type === 'item' || !v.type) && v.label && typeof v.onClick === 'function') azioni.push(v);
+      else if (v) testo.push(v);
+    }
+    return { testo, azioni };
   }
 
   // La freccetta di una correzione: le altre proposte del dizionario, poi aggiungi, correggi da sé, gestisci.
