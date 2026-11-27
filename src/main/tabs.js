@@ -3250,7 +3250,7 @@ class TabManager {
         if (process.env.FILO_SMOKE) {
           console.log(`[layout] tab ${tab.id.slice(0, 6)} active bounds`, JSON.stringify(b), 'win', w, 'x', h);
         }
-      } else if (this.anteprime.inCattura(tab)) {
+      } else if (this.anteprime.inCattura(tab) || tab.id === this._inArrivo) {
         tab.view.setBounds(this._areaPagina());
       } else {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
