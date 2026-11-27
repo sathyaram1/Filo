@@ -1207,6 +1207,7 @@
       segretiNellIndirizzo(m[0], out);
       codificatiNellIndirizzo(m[0], m.index, out, giro);
     }
+    for (const m of s.matchAll(CODIFICATO)) if (!m[0].includes('://')) codificatiNellIndirizzo(m[0], m.index, out, giro);
     scritteAMano(s, out);
     if (G && typeof G.codiciInElenco === 'function') out.push(...G.codiciInElenco(s, out));
     out.push(...interiFraVirgolette(s, out));
