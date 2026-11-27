@@ -154,6 +154,21 @@ export function cambiDelDiff({ diff, primaDi = '', file = [], commitMappa = '', 
   return { cambi, nuovi: nuovi.filter((f) => f.startsWith('src/')), nota };
 }
 
+/** Il testo di un file al commit della mappa, per seguire i nomi delle righe cambiate; senza quel commit, quello di adesso. */
+export function sorgenteDellaMappa(commitMappa, root = ROOT) {
+  const c = commitMappa && git(['cat-file', '-e', `${commitMappa}^{commit}`], root).ok ? commitMappa : '';
+  const letti = new Map();
+  return (rel) => {
+    if (!letti.has(rel)) {
+      const g = c ? git(['show', `${c}:${rel}`], root) : null;
+      let t = g && g.ok ? g.out : null;
+      if (t == null) { try { t = readFileSync(join(root, rel), 'utf8'); } catch (_) { t = null; } }
+      letti.set(rel, t);
+    }
+    return letti.get(rel);
+  };
+}
+
 const secondi = (ms) => (ms >= 90_000 ? `${Math.round(ms / 60_000)} min` : `${ms > 0 ? Math.max(1, Math.round(ms / 1000)) : 0} s`);
 
 /** Il testo per chi lavora. PURA. */
