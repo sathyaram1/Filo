@@ -678,9 +678,8 @@
       const toks = [...s.slice(fine, fine + 200).matchAll(/[^\s'’]+['’]?/g)];
       for (let k = 0; k < toks.length && parole < 16 && out.length < 40; k++) {
         const grezzo = toks[k][0];
-        if (/\n/.test(s.slice(fine + (k ? toks[k - 1].index + toks[k - 1][0].length : 0), fine + toks[k].index)) && passati) break;
         const nucleo = grezzo.replace(/^["'«“‘„(]+/, '').replace(/[.,;:!?)»”"'’]+$/, '');
-        const coda = grezzo.slice(grezzo.length - (grezzo.length - grezzo.replace(/[.,;:!?)»”"'’]+$/, '').length));
+        const coda = /[.,;:!?)»”"'’]*$/.exec(grezzo)[0];
         const parola = nucleo.toLowerCase();
         parole++;
         if (!nucleo) { /* solo punteggiatura */ } else if (/^\d+$/.test(nucleo)) {
