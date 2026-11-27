@@ -1415,9 +1415,9 @@
     contaContesto(bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }));
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await primaDelMenu();
+    const clipboardHistory = await primaDelMenu(sito);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, sito, mouse: e,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
