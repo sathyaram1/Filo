@@ -62,8 +62,8 @@
     return e;
   }
 
-  const mb = (b) => Math.round(b / (1024 * 1024));
-  const ore = (s) => (s / 3600).toLocaleString('it-IT', { maximumFractionDigits: 1 });
+  const mb = (b) => Math.round(b / (1024 * 1024)).toLocaleString('it-IT', { useGrouping: true });
+  const ore = (s) => (s / 3600).toLocaleString('it-IT', { maximumFractionDigits: 1, useGrouping: true });
 
   // I messaggi arrivano a chi usa Filo così come sono (SN_CHAT_ERRORS li lascia passare): dicono il numero e cosa fare.
   function troppoGrande(byte) {
