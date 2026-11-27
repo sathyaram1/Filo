@@ -2806,13 +2806,14 @@
     }
     if (nome === 'scrivibile') {
       Object.assign(azioni, {
-        bold: { onClick: () => formatta('bold') },
-        italic: { onClick: () => formatta('italic') },
-        underline: { onClick: () => formatta('underline') },
-        strike: { onClick: () => formatta('strikeThrough') },
-        highlight: { onClick: () => evidenzia() },
-        clear: { onClick: () => { formatta('removeFormat'); formatta('unlink'); } },
+        bold: { label: I18n.t('fila_bold'), onClick: () => formatta('bold') },
+        italic: { label: I18n.t('fila_italic'), onClick: () => formatta('italic') },
+        underline: { label: I18n.t('fila_underline'), onClick: () => formatta('underline') },
+        strike: { label: I18n.t('fila_strike'), onClick: () => formatta('strikeThrough') },
+        highlight: { label: I18n.t('fila_highlight'), onClick: () => evidenzia() },
+        clear: { label: I18n.t('fila_clear'), onClick: () => { formatta('removeFormat'); formatta('unlink'); } },
         link: {
+          label: I18n.t('fila_link'),
           tieneAperto: true,
           onClick: (ancora) => Menu.openLinkSubmenu(ancora, { valore: collegamentoProposto(selInfo, clipboardHistory), onApplica: (v) => collega(v) }),
         },
