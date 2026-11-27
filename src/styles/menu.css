@@ -357,49 +357,6 @@
   color: var(--sn-muted);
 }
 
-.sn-menu-paste {
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-}
-.sn-menu-paste-main {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  padding: 8px 8px 8px 12px;
-  cursor: pointer;
-  color: var(--sn-fg);
-  font-family: var(--sn-font);
-  font-size: 13px;
-  line-height: 1.2;
-}
-.sn-menu-paste-main:hover:not(:disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.35);
-}
-.sn-menu-paste-main:disabled {
-  color: var(--sn-muted);
-  cursor: not-allowed;
-}
-.sn-menu-paste-arrow {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  cursor: pointer;
-  color: var(--sn-muted);
-  border-left: 1px solid var(--sn-border);
-  border-radius: 0 6px 6px 0;
-  font-size: 11px;
-}
-.sn-menu-paste-arrow:hover {
-  background: rgba(var(--sn-accent-rgb), 0.35);
-  color: var(--sn-fg);
-}
 
 /* Item "split" generico: main più freccetta che apre i subItems (Spiega ▸ approfondisci, Detta ▸ modello). */
 .sn-menu-split {
