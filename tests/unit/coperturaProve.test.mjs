@@ -100,7 +100,7 @@ test('il lancio dalle prove passa cartella e prova al main, e alla chiusura scri
     proto.launch = async (o) => { opzioni = o; return { context: () => contesto, close: async () => { chiusa = true; }, once() {} }; };
     process.env.FILO_COPERTURA = dir;
     const { accendiCopertura } = await import('../../scripts/lib/copertura-prove.mjs');
-    accendiCopertura();
+    accendiCopertura(require_(join(ROOT, 'src/main/copertura.js')));
     try {
       // Il lancio patchato col lancio vero sostituito: qui Electron non parte.
       const app = await proto.launch.call(_electron, { env: { ALTRO: '1' } });
