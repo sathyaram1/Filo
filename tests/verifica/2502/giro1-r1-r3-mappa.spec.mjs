@@ -1,5 +1,5 @@
 // Verifica #2502 giro 1: la mappa prova → file fatta da un avvio vero di Filo con la registrazione accesa, poi
-// interrogata come la interroga chi lavora. r1: un cambio a una costante di modulo usata da una funzione eseguita;
+// interrogata come la interroga chi lavora. r1: un cambio a una costante di modulo letta da una funzione eseguita;
 // r3: un CSS della home caricato dalla prova.
 
 import { test, expect, _electron as electron } from '@playwright/test';
@@ -20,8 +20,6 @@ accendiCopertura();
 
 let mappa = '';
 
-test.describe.configure({ mode: 'serial' });
-
 test.beforeAll(async () => {
   test.setTimeout(120_000);
   const userData = cartellaTemporanea('filo-v2502-ud-');
@@ -32,9 +30,7 @@ test.beforeAll(async () => {
   });
   await expect.poll(() => app.windows().some((w) => /^filo:\/\/newtab/.test(w.url())), { timeout: 30_000 }).toBe(true);
   await new Promise((r) => setTimeout(r, 6000));
-  console.log('DEBUG3', await app.evaluate(() => [process.env.FILO_COPERTURA, process.env.FILO_COPERTURA_PROVA]), (await import('node:fs')).readdirSync(REG));
   await chiudiApp(app, { tetto: 10_000 });
-  console.log('DEBUG2', Object.getPrototypeOf(electron).__filoCopertura, REG, (await import('node:fs')).readdirSync(REG));
   mappa = join(cartellaTemporanea('filo-v2502-mappa-'), 'mappa.json');
   execFileSync(process.execPath, ['scripts/mappa-prove.mjs', 'costruisci', '--registrazioni', REG, '--out', mappa], { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
 });
@@ -43,16 +39,22 @@ function chiedi(args, input) {
   return JSON.parse(execFileSync(process.execPath, ['scripts/mappa-prove.mjs', '--mappa', mappa, '--json', ...args], { cwd: ROOT, encoding: 'utf8', input }));
 }
 
+function livelloPerRiga(rel, r) {
+  const righe = readFileSync(join(ROOT, rel), 'utf8').split('\n');
+  const diff = `diff --git a/${rel} b/${rel}\n--- a/${rel}\n+++ b/${rel}\n@@ -${r},1 +${r},1 @@\n-${righe[r - 1]}\n+${righe[r - 1]} \n`;
+  return chiedi(['--diff', '-'], diff).prove.find((p) => p.spec === QUESTA)?.livello;
+}
+
 test('r1 un cambio a una costante di modulo letta da una funzione che la prova esegue nomina la prova fra le specifiche', () => {
-  const righe = readFileSync(join(ROOT, 'src/main/protocol.js'), 'utf8').split('\n');
-  const r = righe.findIndex((l) => l.startsWith('const FILO_PAGE_CSP = [')) + 2;
-  expect(r).toBeGreaterThan(1);
-  const diff = `diff --git a/src/main/protocol.js b/src/main/protocol.js\n--- a/src/main/protocol.js\n+++ b/src/main/protocol.js\n@@ -${r},1 +${r},1 @@\n-${righe[r - 1]}\n+${righe[r - 1]} \n`;
-  const out = chiedi(['--diff', '-'], diff);
-  const io = out.prove.find((p) => p.spec === QUESTA);
-  console.log('DEBUG', JSON.stringify(out).slice(0, 600), JSON.parse(readFileSync(mappa, 'utf8')).prove, JSON.parse(readFileSync(mappa, 'utf8')).senzaProva);
-  expect(io, 'la prova ha caricato le pagine filo://, quindi ha eseguito la funzione che legge la CSP').toBeTruthy();
-  expect(io.livello).toBe('funzione');
+  const rel = 'src/main/protocol.js';
+  const righe = readFileSync(join(ROOT, rel), 'utf8').split('\n');
+  const usa = righe.findIndex((l) => l.includes("headers.set('Content-Security-Policy', FILO_PAGE_CSP)")) + 1;
+  const costante = righe.findIndex((l) => l.startsWith('const FILO_PAGE_CSP = [')) + 2;
+  expect(usa).toBeGreaterThan(0);
+  expect(costante).toBeGreaterThan(1);
+  // La funzione che legge la costante l'ha eseguita la prova: un cambio dentro di lei la nomina fra le specifiche.
+  expect(livelloPerRiga(rel, usa)).toBe('funzione');
+  expect(livelloPerRiga(rel, costante)).toBe('funzione');
 });
 
 test('r3 un CSS della home che la prova ha caricato la nomina', () => {
