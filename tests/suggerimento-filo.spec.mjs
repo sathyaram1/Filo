@@ -377,7 +377,7 @@ test('lo scorrimento e la finestra che perde il fuoco chiudono il fumetto', asyn
   expect(await haTitolo(el), 'perso il fuoco, il title torna al suo posto').toBe(true);
 });
 
-// Le icone del menu del tasto destro: una sola etichetta, quella del fumetto, col nome della scorciatoia (r3).
+// Le icone del menu del tasto destro: una sola etichetta. Da #2555 è la riga del nome del menu, senza fumetto.
 async function provaIconeDelMenu(page) {
   await page.evaluate(() => {
     const r = document.createRange();
