@@ -13,6 +13,7 @@
       fixes: [
         { testo: 'Se in una chat qualcuno ti chiede il PUK della SIM e tu lo scrivi nella risposta, il correttore non lo manda ai suoi modelli, come già succedeva per il PIN e la password.', segnalazione: 2692 },
         { testo: 'Un PIN o una password con una parola prima del valore, come «il pin è ancora 4821» o «the pin is still 4821», non arriva più a nessun modello, e un\'azione di Filo non li manda a un sito senza la tua conferma.', segnalazione: 2678 },
+        { testo: 'Prima di mandare a un sito un PIN scritto come «il pin del telefono é 4821», «il pin della carta è ancora 4821» o «der PIN meines Handys ist 4821», Filo ti chiede conferma, come già faceva con «è».', segnalazione: 1403 },
       ],
     },
     {
