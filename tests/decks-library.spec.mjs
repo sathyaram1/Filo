@@ -3,6 +3,7 @@
 // di lavoro), Rinomina… ed Elimina…, con l'animazione al passaggio come gli altri menu.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CARDS = {
   'c-bolt': {
