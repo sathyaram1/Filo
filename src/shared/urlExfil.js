@@ -447,10 +447,12 @@
   let avverbio = null;
   const VIRGOLETTE_QUI = new RegExp(FRA_VIRGOLETTE.source, 'uy');
   // Un elenco: anche l'alternativa dopo il valore («prova gattonero oppure micio77») è un valore.
-  function dopoIlRinvio(resto, { soloCifre, spiega }) {
+  function dopoIlRinvio(resto, { soloCifre, spiega, prima }) {
     const r = RINVIO.exec(resto);
     if (!r) return [];
     const G = global.SN_GUARDIANO_STATICO;
+    if (!cambioDavanti && G) cambioDavanti = new RegExp(`(?<!\\p{L})(?:${G.CAMBI}|${G.PARTICIPI}|${G.PASSATI})(?!\\p{L})`, 'iu');
+    if (r.groups.annuncio && !(/^[,;]/.test(r[0]) && (r.groups.raccordo || (cambioDavanti && cambioDavanti.test(prima))))) return [];
     if (!avverbio && G) avverbio = new RegExp(`^(?:${G.AVVERBIO}|${G.AVVERBI}|${G.MODALI})$`, 'u');
     const seguito = fineFrase(resto.slice(r[0].length).replace(/^\s+/, ''));
     const parole = seguito.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
