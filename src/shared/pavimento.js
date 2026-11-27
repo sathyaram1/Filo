@@ -793,7 +793,7 @@
     const k = Math.max(0, resto.length - 200);
     return resto.slice(0, k) + resto.slice(k).replace(NOTA_IN_FONDO, '');
   };
-  const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：=]?[ \\t]*$`, 'i');
+  const SOLO_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*$`, 'i');
   const TESTA_ETICHETTA = new RegExp(`^[ \\t]*${ETICHETTA}`, 'i');
   function alPostoDelValore(s, out) {
     const righe = s.split('\n');
@@ -1288,11 +1288,9 @@
 
   // Gli a capo di Windows e quelli col solo \r (un file di testo allegato) valgono il nostro (#2673.6): le regole leggono
   // una copia col solo \n, e `posto` riporta ogni suo carattere nel testo vero, dove torna il valore di più righe.
-  const A_CAPO_ALTRI = /[\r\v\f\u0085  ]/;
-  // Così gli a capo di Unicode (U+2028, U+2029, NEL) e i salti di pagina, che contano uno per uno (#2673.14).
   function aCapo(vero) {
-    if (!A_CAPO_ALTRI.test(vero)) return null;
-    const piano = vero.replace(/\r\n?|[\v\f\u0085  ]/g, '\n');
+    if (!vero.includes('\r')) return null;
+    const piano = vero.replace(/\r\n?/g, '\n');
     const posto = new Int32Array(piano.length + 1);
     for (let i = 0, k = 0; i < vero.length; i++) {
       if (vero[i] === '\r' && vero[i + 1] === '\n') continue;
