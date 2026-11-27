@@ -10,6 +10,12 @@ import { home, modelloFinto, chiedi, chiamateAlModello, ripristina } from './hel
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
+// Le voci del menu di una parola spiegata, a icone (#2555).
+async function vociSpiega(page) {
+  await expect(menuDi(page).principale).toBeVisible();
+  return menuDi(page).vociScritte();
+}
+
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 const SVG = '<svg viewBox="0 0 40 20"><script>window.parent.__svgEseguito = true; window.__svgEseguito = true;</script>'
   + '<rect x="2" y="4" width="16" height="12" rx="3" fill="#c45a3b" onload="window.__svgEseguito = true"/>'
