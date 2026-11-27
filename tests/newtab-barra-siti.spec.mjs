@@ -95,10 +95,12 @@ test('#1657 una scheda trascinata sulla barra diventa una voce: resta al riavvio
   await attiva(shell, casa.id);
   const p = await home(app);
   await p.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]').click({ button: 'right' });
-  const menu = p.locator('.dash-menu');
-  await expect(menu.locator('.dash-menu-voce')).toHaveText(['Apri Ricette di casa', 'Rinomina…', 'Copia l\'indirizzo', 'Togli dalla barra']);
+  // A icone (#2555): le stesse voci, ogni icona seguita dalle varianti del suo verbo.
+  const menu = menuDi(p);
+  await expect(menu.principale).toBeVisible();
+  expect(await menu.vociScritte()).toEqual(['Apri Ricette di casa', 'Rinomina…', 'Copia l\'indirizzo', 'Togli dalla barra']);
   await scatta(p, 'menu-voce');
-  await menu.locator('.dash-menu-voce', { hasText: 'Togli dalla barra' }).click();
+  await menu.scegli('Togli dalla barra');
   await expect(p.locator('#barraSiti .dash-barra-voce[data-tipo="sito"]')).toHaveCount(0);
   await expect.poll(() => salvate(app)).toEqual([]);
   await p.locator('.dash-barra-rimetti').click();
