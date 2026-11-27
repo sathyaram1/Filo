@@ -330,7 +330,7 @@ test('le voci di comando del tasto destro fanno quello che dicono: Collega, Togl
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega').map((c) => c[1].collega)).toEqual([true]);
 
   await opzione(page, 'Cuffie').click({ button: 'right' });
-  await menuDi(page).voce('Togli dai preferiti').first().click();
+  await menuDi(page).scegli('Togli dai preferiti');
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti)).toEqual([]);
   await expect(righe(page).first()).not.toHaveClass(/dash-sis-preferito/);
   await page.keyboard.press('Escape');
