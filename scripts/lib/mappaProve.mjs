@@ -102,9 +102,11 @@ export function durateDaRapporto(rapporto) {
 }
 
 /**
- * La tabella da registrazioni [{ prova, processo, file?: {rel: [[da,a]…]}, indirizzi?: {url: [[da,a]…]} }].
- * `sorgente(rel)` dà il testo del file al commit provato (null se non c'è). Le funzioni passano da offset a righe;
- * gli insiemi di spec uguali si scrivono una volta. Le registrazioni senza prova si contano e basta.
+ * La tabella da registrazioni [{ prova, processo, file?: {rel: [[da,a]…]}, indirizzi?: {url: [[da,a]…]} }]
+ * (`file` è la forma di `unisciRegistrazioni`, `indirizzi` quella dei processi). Un indirizzo senza intervalli è un
+ * file servito alla pagina (un foglio di stile, un HTML): lo carica chi l'ha chiesto. `sorgente(rel)` dà il testo del
+ * file al commit provato (null se non c'è). Le funzioni passano da offset a righe; gli insiemi di spec uguali si
+ * scrivono una volta. Le registrazioni senza prova si contano e basta.
  */
 export function costruisciMappa({ registrazioni, sorgente, root, durate = new Map(), commit = '', corsa = '' }) {
   const prove = [];
