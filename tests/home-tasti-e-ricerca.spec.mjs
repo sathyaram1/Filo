@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { home, modelloFinto } from './helpers/chatFinta.mjs';
 import { homeIntera } from './helpers/tastiHome.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(ROOT, 'tests', '.shots');
