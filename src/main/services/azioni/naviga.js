@@ -273,17 +273,34 @@ async function azioneLeggiPagina(action, { sender, schedeViste }) {
   const numero = Number(action.scheda ?? action.tab ?? 0);
   let r = null;
   if (!String(url || '').trim() && Number.isInteger(numero) && numero > 0) {
-    let schede = [];
-    try {
-      const tutte = await globalThis.SN_FILO_STATE.listTabs({ windowId: winOf(sender)?.id ?? null });
-      schede = (await schedeNumerate(winOf(sender), schedeViste)).map((id) => tutte.find((x) => x.id === id) || null);
-    } catch (_) {}
-    const t = schede[numero - 1];
+    const t = await schedaDelNumero(numero, sender, schedeViste);
     if (!t) r = { pageRead: `scheda ${numero}`, ok: false, errore: 'scheda', dettaglio: `nessuna scheda numero ${numero}`, testo: '' };
     else url = t.url || '';
   }
   if (!r) r = await leggiPaginaDa(url, da, sender);
   return { executed: !!r.ok, kept: true, output: r };
+}
+
+async function schedaDelNumero(numero, sender, schedeViste) {
+  try {
+    const tutte = await globalThis.SN_FILO_STATE.listTabs({ windowId: winOf(sender)?.id ?? null });
+    const ids = await schedeNumerate(winOf(sender), schedeViste);
+    return tutte.find((x) => x.id === ids[numero - 1]) || null;
+  } catch (_) { return null; }
+}
+
+// #519 — il parlato di un audio o un video: file diretto, pagina che lo contiene, o scheda aperta (per numero o indirizzo).
+async function azioneTrascriviMedia(action, { sender, schedeViste }) {
+  let url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+  const numero = Number(action.scheda ?? action.tab ?? 0);
+  if (!String(url || '').trim() && Number.isInteger(numero) && numero > 0) {
+    const t = await schedaDelNumero(numero, sender, schedeViste);
+    if (!t) return { executed: false, kept: true, output: { errore: 'scheda', frase: `Nell'elenco delle schede non c'è la numero ${numero}.` } };
+    url = t.url || '';
+  }
+  if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url)) url = PageRead.normalizzaUrl(url).url || url;
+  const da = Number(action.da ?? action.offset ?? 0) || 0;
+  return require('../trascriviMedia').perLaChat({ url, da, origin: 'chat' });
 }
 
 async function azionePulisciTab(action, { confirmed, sender, decisione, daChiedere, sospesa }) {
