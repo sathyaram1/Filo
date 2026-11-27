@@ -194,7 +194,8 @@ test('nell\'editor l\'Aiuto vede la selezione e «riscrivilo più breve» cambia
   expect(visto).toContain('"op":"riscrivi"');
   // Annullabile, come le altre modifiche di Filo.
   await expect(ed.locator('.ed-toast-action', { hasText: 'Annulla' })).toBeVisible();
-  await ed.locator('.ed-toast-action', { hasText: 'Annulla' }).click();
+  // L'avviso sta sotto l'Aiuto aperto: il clic arriva al bottone come lo manda la tastiera.
+  await ed.locator('.ed-toast-action', { hasText: 'Annulla' }).evaluate((b) => b.click());
   await expect(ed.locator('#doc p').nth(1)).toContainText('vi scrivo per dirvi');
 
   // Senza selezione il modello non ha la parte da riscrivere, e una «riscrivi» non tocca niente.
