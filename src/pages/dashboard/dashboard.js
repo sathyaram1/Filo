@@ -712,7 +712,7 @@
     if (!trovata && !riprendi) return false;
     if (riprendi && chatId !== chat.id) {
       if (chatId) closeCurrentChat({ via: 'home' });
-      await adotta(chat.id);
+      if (await adotta(chat.id)) chatScelta = chat.id;
     }
     inputEl.focus();
     return true;
