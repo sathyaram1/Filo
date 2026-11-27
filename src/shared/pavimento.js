@@ -1021,9 +1021,12 @@
   const virgoletteStrette = (s) => (HA_VIRGOLETTE.test(s)
     ? s.replace(CON_SPAZI_DENTRO, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
   // Un valore preso con le virgolette attaccate («»Mela!Verde77«») nel testo vero le ha staccate: si cerca senza.
-  function nelTestoVero(x, vero) {
+  // Uno con dentro un avverbio letto come spazi («Password: casa è ancora mia») si riprende allo stesso posto.
+  function nelTestoVero(x, vero, letto) {
     const v = String(x.valore);
     if (vero.includes(v)) return x;
+    const k = /\s{2}/.test(v) && letto ? letto.indexOf(v) : -1;
+    if (k >= 0 && letto.length === vero.length) return { ...x, valore: vero.slice(k, k + v.length) };
     const testa = (v.match(TESTA_VIRGOLETTE) || [''])[0].length;
     const y = { ...x, valore: v.slice(testa).replace(CODA_VIRGOLETTE, '') };
     if (Number.isInteger(x.inizio)) y.inizio = x.inizio + testa;
