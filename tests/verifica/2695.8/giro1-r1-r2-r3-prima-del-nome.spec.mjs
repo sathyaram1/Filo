@@ -23,6 +23,7 @@ test('r1 il punto esclamativo o di domanda in fondo alla password non la fa pass
     'Gatto2024! è la mia password',
     'Gatto2024!! è la password',
     'Gatto2024? è la password',
+    'Gatto2024, è la password',
   ]) nessunoLaVede(frase, 'Gatto2024');
   // Dopo il nome la stessa password si toglie già: il confronto che dice cosa ci si aspetta.
   nessunoLaVede('la password è Gatto2024!', 'Gatto2024');
