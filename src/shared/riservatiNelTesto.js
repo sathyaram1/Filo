@@ -204,6 +204,9 @@ function richieste(l, tutte = false) {
 function valoriRisposta(risposta, tipo, chiesta = true, data = false) {
   const X = exfil();
   if (!X || !X.segretiDetti) return [];
+  // «4 8 2 1» dato in risposta è un valore solo, non quattro parole corte.
+  const attaccate = cifreAttaccate(risposta);
+  if (attaccate) risposta = attaccate.piano;
   const presentata = presenta().map(([re]) => new RegExp(`^(?:${re.source})$`, 'u'));
   const out = [];
   let lettere = tipo === 'password' && chiesta && !data;
