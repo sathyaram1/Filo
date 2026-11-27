@@ -1154,7 +1154,7 @@ test('#496 nell\'elenco una segnalazione senza titolo vero non resta una riga vu
   });
   await page.locator('[data-fs-range="30g"]').click();
   await page.locator('[data-fs-id="ricevuti"]').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Mostra' }).click();
+  await menuDi(page).scegli('Mostra');
   await expect(page.locator('.mg-fs-drill-t').first()).toHaveText('(senza titolo)');
 });
 
