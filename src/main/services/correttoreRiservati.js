@@ -120,10 +120,13 @@ function oscura(testo, valori = null) {
   return v;
 }
 
-// Il campo è il messaggio sotto il testo sopra: il pavimento lo legge lì, come il cancello dei modelli legge la
-// conversazione intera, così la risposta a «mi dici il puk?» non parte nemmeno se la domanda sta fuori dal campo (#2692.5).
-function sottoLaDomanda(sopra, campo) {
-  try { return PAV().trova(/\n\s*$/.test(sopra) ? sopra + campo : `${sopra}\n${campo}`).map((x) => String(x.valore)); } catch (_) { return []; }
+// Il campo è il messaggio sotto il testo sopra: i codici il pavimento li legge lì, come il cancello dei modelli nella
+// conversazione intera, così la risposta a «mi dici il puk?» non parte nemmeno con la domanda fuori dal campo (#2692.5).
+// La password no: la risposta sotto chi la chiede la legge richiestaAperta, che sa quando il legame è finito (#1723).
+function codiciSottoLaDomanda(sopra, campo) {
+  try {
+    return PAV().trova(/\n\s*$/.test(sopra) ? sopra + campo : `${sopra}\n${campo}`).filter((x) => x.regola === 'codice').map((x) => String(x.valore));
+  } catch (_) { return []; }
 }
 
 // I pezzi contigui del campo (prima, nuovo, dopo), oscurati sul campo intero: la parola che presenta una password, o
