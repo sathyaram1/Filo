@@ -580,7 +580,7 @@
     + '|сетевой\\s+ключ|(?:netwerk|beveiligings|wpa[23]?(?:-psk)?-?|wi-?fi-?|wlan-?)sleutel'
     + `)${FUORI}|密[钥鑰]|暗号化キー|セキュリティ\\s*キー|ネットワーク\\s*キー|事前共有キー|(?:네트워크\\s*)?보안\\s*키|(?:네트워크|무선|wpa[23]?(?:-psk)?|wi-?fi)\\s*키`;
   // Le parole che dopo «password» ne dicono una proprietà, non il valore: nel testo e nei nomi delle chiavi (tipoDiNome).
-  const PROPRIETA_PASSWORD = 'managers?|policy|reset|recovery|generator|hint|strength';
+  const PROPRIETA_PASSWORD = global.SN_GUARDIANO_STATICO.PROPRIETA_PASSWORD;
   const NON_ETICHETTA = `(?!\\s*(?:(?:${PROPRIETA_PASSWORD})\\b|マネージャ|管理|관리))`;
   const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
@@ -1471,8 +1471,10 @@
     if (!R) return;
     const basso = s.toLowerCase();
     const stesso = basso.length === s.length;
-    for (const v of R.trova(s, { sotto: true })) {
-      if (!/[^\p{L}'’]/u.test(v)) continue;
+    // Fra virgolette prima del suo nome («“gattonero” è la password») vale anche di sole lettere, come dopo il nome.
+    const virgolettate = new Set(R.primaDelNome(s).filter((x) => x.virgolette).map((x) => x.valore));
+    for (const v of [...R.trova(s, { sotto: true }), ...virgolettate]) {
+      if (!virgolettate.has(v) && !/[^\p{L}'’]/u.test(v)) continue;
       // Il valore torna minuscolo: si toglie com'è scritto, in ogni punto del testo.
       let i = stesso ? basso.indexOf(v) : -1;
       if (i < 0) { out.push({ valore: v, regola: 'password' }); continue; }

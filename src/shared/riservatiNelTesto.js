@@ -460,6 +460,67 @@ const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:${AVVE
 const PONTE = new RegExp(`^(?:${AVVERBI}|${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO}|${CAMBIATA}|${guardiano().CAMBI})$`, 'u');
 const ACCANTO = /^\s*$/u;
 
+// La password detta prima del suo nome (#2695.8): «gattonero è la password», «usa Gatto2024 come password del wifi». Con
+// cifre, simboli o virgolette il valore conta sempre; di sole lettere solo dove una parola qualunque non sta: non dopo un
+// articolo («il problema è la password»), non come «quello che serve è …», e prima di «come» solo dopo il verbo che la
+// mette («usa gattonero come password», non «vale come password»). Prove: tests/unit/passwordPrimaDelNome.test.mjs.
+const DAVANTI_AL_NOME = "(?:(?:l['’]|(?:la|il|lo|le|the|a|an|una|un|my|your|our|his|her|their|mia|mio|tua|tuo|sua|suo"
+  + '|nostra|nostro|vostra|vostro|loro|nuova|nuovo|vecchia|vecchio|attuale|vera|vero|giusta|giusto|corretta|solita|stessa'
+  + '|unica|new|old|current|real|right|correct|usual|same|only|das|der|die|dein|deine|mein|meine|unser|unsere|neue|neues'
+  + '|les|mon|ma|ton|ta|votre|notre|nouveau|nouvelle|el|mi|tu|su|nueva|nuevo)[^\\S\\n]+))*';
+// I verbi sono l'elenco condiviso degli annunci, coi modali davanti («dovrebbe essere»): «ecco» e «here» presentano
+// quello che segue. «e» e «sara» senza accento valgono solo per un valore con cifre, simboli o virgolette.
+const VERBI_PRIMA = ANNUNCI.filter((w) => w !== 'ecco' && w !== 'here').map(esc).join('|');
+const PRIMA_DEL_NOME = new RegExp(`(?:^|\\s)(\\S{1,128})[^\\S\\n]+(?:${AVVERBI}[^\\S\\n]+)?`
+  + `(?:(?:(?:${guardiano().MODALI})[^\\S\\n]+)?(?<verbo>${VERBI_PRIMA})(?:[^\\S\\n]+${AVVERBI})?|(?<senzaAccento>e|sara)`
+  + `|(?<come>come|as|als|comme|como))[^\\S\\n]+${DAVANTI_AL_NOME}$`, 'u');
+const NOME_DI_ALTRO = new RegExp(`^[^\\S\\n]*-?[^\\S\\n]*(?:${guardiano().PROPRIETA_PASSWORD})(?![\\p{L}\\p{N}])`, 'u');
+// «pass» e «pw» da soli, che menzioni non legge come nomi: prima del nome solo per un valore con cifre o simboli.
+const NOME_CORTO = /(?<![\p{L}\p{N}])(?:pass|pw)(?![\p{L}\p{N}'’-])/gu;
+// Una parola di sole lettere col verbo conta solo in testa alla frase: dopo un segno, un saluto, un «se» o un «ma».
+// «la cosa che mi manca è la password» è una frase qualunque.
+const APRE_FRASE = /^(?:se|if|ma|but|e|and|però|pero|quindi|poi|ok|sì|si|no|intanto|ricorda|ricordati|remember|nota|ciao|hey|hi|ehi|hello|senti|think|guess|believe|suppose)$/u;
+const NON_UN_VALORE = /^(?:quest[aoie]|quell[aoie]|quale|qual|cosa|che|chi|dove|come|non|ecco|qui|qua|ciò|cio|lei|lui|ess[ao]|tutto|niente|nulla|sol[oa]|soltanto|anche|perché|perche|quando|forse|allora|dunque|quindi|this|that|what|which|here|there|it|nothing|everything|something|who|where|how|why|then|also|only|not|mine|yours|ours|mia|tua|sua|nostra|vostra|loro|davvero|sicuro|beh|però|pero|okay|really|maybe|perhaps|probably|actually|surely|well|cuál|cual|qué|que|cómo|dónde|donde|esto|eso|esta|esa|was|wie|welche[srm]?|dies|quel|quelle|quoi|comment|où|ça|ceci|cela|\p{L}{4,}mente)$/u;
+const ARTICOLO = /^(?:il|lo|la|i|gli|le|un|uno|una|del|della|dello|dei|degli|delle|di|da|dal|dalla|al|alla|nel|nella|sul|sulla|con|per|tra|fra|ogni|quel|mio|mia|tuo|tua|suo|sua|nostro|nostra|vostro|vostra|the|an|of|my|your|his|her|our|their|these|those|every|each|any|some)$|^(?:dell|nell|sull|dall|all|un|l|quell)['’]/u;
+const RELATIVO = /^(?:che|chi|cui|which|that|what|who)$/u;
+const METTE = /^(?:us[aoi]|usare|usate|usiamo|usat[aoie]|mett[iao]|mettere|mettete|mess[aoie]|impost[aoi]|impostare|impostat[aoie]|scegl[iao]|scegliere|scelt[aoie]|scriv[iao]|scrivere|inserisc[ia]|inserire|inserit[aoie]|digit[aoi]|digitare|prov[aoi]|provare|use|using|used|set|put|try|choose|chose|chosen|pick|picked|type|enter|entered|benutze|benutzen|verwende|verwenden|nimm|nehmen|setze|setzen|utilise|utiliser|utilisez|mets|mettre|mettez|choisis|choisir|usar|utiliza|utilizar|pon|poner|elige|elegir)$/u;
+const APRE_VIRGOLETTA = /^[«“„‘"']/u;
+function primaDelNome(testo) {
+  const l = minuscolo(testo);
+  const out = [];
+  const nomi = menzioni(l).filter((n) => n.tipo === 'password');
+  const visti = new Set(nomi.map((n) => n.i));
+  for (const m of l.matchAll(NOME_CORTO)) if (!visti.has(m.index)) nomi.push({ i: m.index, j: m.index + m[0].length, corto: true });
+  for (const n of nomi) {
+    if (/credenziali/u.test(l.slice(n.i, n.j)) || NOME_DI_ALTRO.test(l.slice(n.j, n.j + 40))) continue;
+    const prima = l.slice(Math.max(0, n.i - 200), n.i);
+    const m = PRIMA_DEL_NOME.exec(prima);
+    if (!m) continue;
+    // Il «!» o il «?» in fondo sono spesso della password («Gatto2024!»): restano nel valore; virgola e punto no.
+    const v = m[1].replace(/^[«“„‘"'(\[]+/u, '').replace(/[.,;:…)\]»”"'’]+$/u, '');
+    const nudo = pulito(m[1]);
+    if (nudo.length < 4) continue;
+    const virgolette = APRE_VIRGOLETTA.test(m[1]);
+    // Dopo una virgola o un punto il verbo apre spesso un'altra frase («dopo il 2024, è la password che…»).
+    if (!virgolette && /[.,;:…]$/u.test(m[1]) && !formaDiPassword(nudo)) continue;
+    if (!virgolette && !/[^\p{L}'’]/u.test(nudo)) {
+      // Di sole lettere: una parola seguita da un segno chiude la frase («Grazie! è la password che cercavo»).
+      if (n.corto || m.groups.senzaAccento || nudo !== v || /[,;:.!?…]$/u.test(m[1])) continue;
+      const testa = prima.slice(0, m.index + m[0].indexOf(m[1]));
+      const grezze = testa.split(/\s+/).filter(Boolean).slice(-2);
+      const davanti = grezze.map(pulito);
+      const w1 = davanti[davanti.length - 1] || '';
+      if (NON_UN_VALORE.test(v) || PONTE.test(v) || AVVII.has(v) || PRESENTA_DATO.has(v) || nomeDiPassword(v)) continue;
+      if (m.groups.come ? !(METTE.test(w1) || (PONTE.test(w1) && METTE.test(davanti[0] || ''))) : davanti.some((w) => ARTICOLO.test(w))) continue;
+      if (m.groups.verbo && RELATIVO.test(w1) && !/^(?:sia|fosse)$/u.test(m.groups.verbo)) continue;
+      const inTesta = !grezze.length || /[:,;.!?…]$/u.test(grezze[grezze.length - 1]) || /\n[^\S\n]*$/u.test(testa);
+      if (m.groups.verbo && !inTesta && !APRE_FRASE.test(w1) && !RELATIVO.test(w1) && !AVVII.has(w1)) continue;
+    }
+    out.push({ valore: v, virgolette });
+  }
+  return out;
+}
+
 function formeLibere(testo) {
   const X = exfil();
   const G = guardiano();
@@ -500,6 +561,7 @@ function formeLibere(testo) {
   // una password, un numero («prova 4821», come «il pin è 4821») o fra virgolette con gli spazi; di sole lettere la prende
   // il correttore dalla sua lettura, che sa quali parole spiegano.
   for (const v of X.segretiDetti(l)) if (v.rinvio) out.push(...(/\s/.test(v.valore) || /^\d+$/.test(v.valore) ? [v] : forma(v.valore)));
+  out.push(...primaDelNome(l));
   return out;
 }
 
@@ -527,6 +589,6 @@ function trova(testo, { sotto = false } = {}) {
   return lunghi(out);
 }
 
-global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, SEPARA_CIFRE, cifreAttaccate, senzaEnfasi, vistePerLeRegole, minuscolo, trova, formeLibere, valoriRisposta, richiestaAperta, lunghi, parlaInChat, chiede, PRESENTA_DATO };
+global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, SEPARA_CIFRE, cifreAttaccate, senzaEnfasi, vistePerLeRegole, minuscolo, trova, formeLibere, primaDelNome, valoriRisposta, richiestaAperta, lunghi, parlaInChat, chiede, PRESENTA_DATO };
 if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
