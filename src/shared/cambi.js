@@ -142,6 +142,8 @@
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
     'barraLaterale.bloccata': { nome: 'barra laterale bloccata aperta', valore: sino('bloccata', 'sopra la pagina'), livello: 1 },
+    'menuIcone.icona': { nome: 'grandezza delle icone del tasto destro', valore: (v) => `${intero(Math.round(Number(v)))} px`, livello: 1 },
+    'menuIcone.colonne': { nome: 'icone per riga nel tasto destro', valore: numero, livello: 1 },
     'pannelloDestro.spinta': { nome: 'apertura del pannello degli strumenti dal bordo destro', valore: ATTIVA, livello: 1 },
     'pannelloDestro.striscia': { nome: 'striscia del pannello degli strumenti', valore: sino('visibile', 'nascosta'), livello: 1 },
     'pannelloDestro.attesaMs': { nome: 'attesa sul bordo prima che il pannello degli strumenti si apra', valore: millisecondi, livello: 1 },
