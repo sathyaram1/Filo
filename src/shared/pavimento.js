@@ -602,7 +602,9 @@
     for (const m of url.matchAll(/[?#&;]([^=&#;?\s]{1,40})=([^&#;\s]*)/g)) {
       let nome = m[1];
       try { nome = decodeURIComponent(nome); } catch (_) {}
-      if (NOME_SEGRETO.test(nome) && valoreSegreto(nome, m[2])) out.push({ valore: m[2], regola: 'token' });
+      // Un nome composto di password («?login_password=», «?password_login=») vale come nelle chiavi di configurazione.
+      const composto = !NOME_SEGRETO.test(nome) && tipoDiNome(nome) === 'password' && valoreDiChiave(m[2]);
+      if ((NOME_SEGRETO.test(nome) || composto) && valoreSegreto(composto ? 'password' : nome, m[2])) out.push({ valore: m[2], regola: 'token' });
     }
     // Un webhook porta il segreto nel percorso, e l'indirizzo dice che è un webhook (hooks.slack.com, /api/webhooks/):
     // dopo quel nome si toglie ogni pezzo lungo che non è un nome fatto di parole minuscole. Il segreto di Slack può
