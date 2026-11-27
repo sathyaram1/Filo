@@ -90,7 +90,8 @@ async function seed(page, id, { commander, cards = [] }) {
   await expect(page.locator('#screenBuilder')).toBeVisible();
 }
 
-const menu = (page) => page.locator('.dk-ctxmenu .sn-select-option');
+// Le voci del menu della carta, a icone (#2555): il nome di ognuna è il suo testo nascosto alla vista.
+const menu = (page) => menuDi(page).locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)');
 
 test('tasto destro su un risultato in chat: imposta come commander, aggiungi e rimuovi, apri su Scryfall', async ({ app, openTab }) => {
   test.setTimeout(60_000);
