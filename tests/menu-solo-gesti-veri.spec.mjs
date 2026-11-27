@@ -110,9 +110,9 @@ test('a menu aperto dall\'utente il sito non preme Incolla né la freccia; la cr
   expect(await statoCronologia(app, page), 'la freccia premuta dal sito non apre la cronologia').toBeNull();
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
 
-  // L'utente passa sulla freccia: la cronologia c'è, e il sito non la legge da nessuna parte.
-  if (!(await menuDi(page).locator('.sn-menu-paste-arrow').isVisible())) await page.locator('#campo').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
+  // L'utente apre il menu di Incolla col tasto destro: la cronologia c'è, e il sito non la legge da nessuna parte.
+  if (!(await menuDi(page).incolla.isVisible())) await page.locator('#campo').click({ button: 'right' });
+  await menuDi(page).incolla.click({ button: 'right' });
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
   expect(await page.evaluate(() => window.cosaVede())).not.toContain(SEGRETO);
   expect(await page.evaluate(() => [...document.querySelectorAll('[data-sn-ui]')].some((el) => el.shadowRoot))).toBe(false);
