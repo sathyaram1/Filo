@@ -565,12 +565,15 @@
     return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
   }
 
-  // Un PIN, un codice o un CVV trovato vale per i numeri della stessa forma che gli stanno accanto in elenco: «i pin
-  // sono 4829 e 1234», «il cvv è 123, 456» (#1403.79). Le regole qui e nel pavimento trovano il primo, questa gli altri.
-  const CONGIUNZIONE = '(?:e|ed|o|oppure|and|or|und|oder|et|ou|y|i|oraz|lub|albo|en|of)';
-  const ACCANTO_IN_ELENCO = new RegExp(`["'»”)]?(?:[ \\t]*[,/&][ \\t]*(?:${CONGIUNZIONE}[ \\t]+)?|[ \\t]+${CONGIUNZIONE}[ \\t]+)`
-    + '["\'«“(]?(\\d{3,8})(?![\\d\\p{L}]|[.,/:-]\\d)', 'uy');
-  const CIFRE_IN_ELENCO = { codice: [4, 8], cvv: [3, 4] };
+  // Un PIN, un codice o un CVV trovato vale per i numeri della stessa forma che lo seguono nella stessa frase: «i pin
+  // sono 4829 e 1234», «il cvv è 123, 456», «4829 e quello della SIM è 1234», «4829; 1234», a capo «e 1234» (#1403.79).
+  // Le parole in mezzo hanno un tetto e non passano un punto; un a capo vale solo con la congiunzione o il trattino d'elenco.
+  const CONGIUNZIONE = '(?:e|ed|o|oppure|ma|mentre|and|or|but|while|und|oder|aber|et|ou|mais|y|pero|i|oraz|lub|albo|en|of)';
+  const SEPARA = `(?:[ \\t]*[,;/&][ \\t]*|[ \\t]+[-–—][ \\t]+|[ \\t]*\\n[ \\t]*(?:[-–—•*][ \\t]+|(?=${CONGIUNZIONE}[ \\t]))`
+    + `|[ \\t]+(?=${CONGIUNZIONE}[ \\t]))`;
+  const PAROLE_IN_MEZZO = "(?:[\\p{L}'’]{1,24}(?:[ \\t]*[:=][ \\t]*|[ \\t]+)){0,6}";
+  const CIFRE_ACCANTO = `\\d{${Math.min(...Object.values(MISURE_CIFRE).map((x) => x[0]))},${Math.max(...Object.values(MISURE_CIFRE).map((x) => x[1]))}}`;
+  const ACCANTO_IN_ELENCO = new RegExp(`["'»”)*_]{0,4}${SEPARA}${PAROLE_IN_MEZZO}["'«“(*_]{0,4}(${CIFRE_ACCANTO})(?![\\d\\p{L}]|[.,/:-]\\d)`, 'uy');
   function codiciInElenco(s, valori) {
     const nuovi = [];
     const visti = new Set((valori || []).map((x) => `${x.regola}:${x.valore}`));
