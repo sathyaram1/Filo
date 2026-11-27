@@ -45,6 +45,8 @@
   // sopravvive anche se questa scheda muore a metà. Torna null quando la chat
   // si chiude (ritorno alla home, chat nuova), e il messaggio dopo ne apre una.
   let chatId = null;
+  // La conversazione riaperta apposta da qui (Cronologia, ?chat=): resta questa anche se altrove se ne scrive un'altra.
+  let chatScelta = null;
   let sending = false;
   // L'utente ha scritto in questa scheda: da qui in poi c'è una conversazione da non interrompere (l'accoglienza aspetta).
   let scrittoQui = false;
