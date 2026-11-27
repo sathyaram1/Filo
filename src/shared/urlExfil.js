@@ -64,14 +64,44 @@
   // forma alfanumerica minuscola, così "Mario_Rossi", "mario.rossi" e
   // "MarioRossi" collassano sulla stessa chiave e i separatori non aiutano a
   // evadere il match.
-  // Ogni sequenza «%xx» si decodifica per conto suo: un solo «%» spaiato non deve spegnere la
-  // decodifica dell'intero indirizzo (#810).
-  function decodificaPercento(s) {
-    return s.replace(/(?:%[0-9A-Fa-f]{2})+/g, (pezzo) => {
-      try { return decodeURIComponent(pezzo); } catch (_) {
-        return pezzo.replace(/%([0-9A-Fa-f]{2})/g, (m, h) => (parseInt(h, 16) < 128 ? String.fromCharCode(parseInt(h, 16)) : m));
+  // Ogni carattere «%xx» (o i due, tre, quattro di una lettera UTF-8) si decodifica per conto suo: un «%» spaiato o una
+  // sequenza rotta restano come sono e non spengono la decodifica del resto (#810). Un posto solo per qui e per il
+  // pavimento, che con `posti` sa dove sta nel testo codificato ogni carattere decodificato (`da`, `a` esclusa) e
+  // toglie dall'indirizzo il pezzo codificato di quello che legge decodificato (#1403.74). `piu`: il «+» è uno spazio.
+  const HEX2 = /^%[0-9A-Fa-f]{2}$/;
+  const SEQUENZA = /^(?:%[0-9A-Fa-f]{2})+$/;
+  function decodificaConPosti(s, { piu = false, posti = true } = {}) {
+    const t = String(s == null ? '' : s);
+    let testo = '';
+    const da = posti ? [] : null;
+    const a = posti ? [] : null;
+    const metti = (c, i, j) => {
+      if (posti) for (let k = 0; k < c.length; k++) { da.push(i); a.push(j); }
+      testo += c;
+    };
+    for (let i = 0; i < t.length;) {
+      if (t[i] === '%' && HEX2.test(t.substr(i, 3))) {
+        const b = parseInt(t.substr(i + 1, 2), 16);
+        const n = b < 0x80 ? 1 : b >= 0xC2 && b < 0xE0 ? 2 : b >= 0xE0 && b < 0xF0 ? 3 : b >= 0xF0 && b < 0xF5 ? 4 : 0;
+        const pezzo = n ? t.substr(i, 3 * n) : '';
+        let c = null;
+        if (n && pezzo.length === 3 * n && SEQUENZA.test(pezzo)) {
+          try { c = decodeURIComponent(pezzo); } catch (_) { c = null; }
+        }
+        if (c) { metti(c, i, i + 3 * n); i += 3 * n; continue; }
       }
-    });
+      metti(piu && t[i] === '+' ? ' ' : t[i], i, i + 1);
+      i++;
+    }
+    return { testo, da, a };
+  }
+  function decodificaPercento(s) {
+    return s.includes('%') ? decodificaConPosti(s, { posti: false }).testo : s;
+  }
+  // Come si legge un indirizzo, qui e nel pavimento: fino a tre giri, e a ogni giro ogni «+» è uno spazio (#1403.74).
+  const GIRI_DI_DECODIFICA = 3;
+  function giroDiDecodifica(s, { posti = true } = {}) {
+    return decodificaConPosti(s, { piu: true, posti });
   }
 
   // Cifre e lettere di altri alfabeti nella forma base: chi riceve le riporta all'ASCII, quindi una scrittura nuova non è
@@ -95,8 +125,8 @@
     const raw = String(url || '');
     const pieces = [raw];
     let cur = raw;
-    for (let i = 0; i < 3; i++) {
-      const dec = decodificaPercento(cur.replace(/\+/g, ' '));
+    for (let i = 0; i < GIRI_DI_DECODIFICA; i++) {
+      const dec = giroDiDecodifica(cur, { posti: false }).testo;
       if (dec === cur) break;
       pieces.push(dec);
       cur = dec;
@@ -1039,7 +1069,7 @@
     FONTI_DI_PAGINA, fonteDallaPagina, fonteDiPagina,
     assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
     DAI_SITI, testoDeiSitiComeAzione, indirizziDelComando, comandoInRete,
-    taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
+    taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti, GIRI_DI_DECODIFICA, giroDiDecodifica,
     // Le parole che presentano una password o un codice, come testo: una regex /g condivisa porterebbe con sé lastIndex.
     PRESENTA: Object.freeze({ password: PRESENTA_PASSWORD.source, get codice() { return PRESENTA_CODICE().source; }, altreLingue: NOMI_PASSWORD }),
     VIRGOLETTE: Object.freeze({ caratteri: VIRGOLETTE, fra: FRA_VIRGOLETTE.source }),

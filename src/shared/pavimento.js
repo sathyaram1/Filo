@@ -443,6 +443,8 @@
   const NOME_SEGRETO = /^(?:access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|api[_-]?key|apikey|key|secret|client[_-]?secret|password|passwd|pwd|pass|otp|sig|signature|x-amz-signature|x-amz-credential|x-amz-security-token|session[_-]?id|sessionid|sid|auth|ticket|code)$/i;
   const NOME_CORTO = /^(?:password|passwd|pwd|pass|otp)$/i;
   const INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`)\]]+/gi;
+  // Un pezzo d'indirizzo senza lo schema («?q=password%3A%20…», «www.x.it/la%20password…»); con lo schema è un INDIRIZZO.
+  const CODIFICATO = /[^\s<>"'`()[\]«»]*%[0-9A-Fa-f]{2}[^\s<>"'`()[\]«»]*/g;
   // Le password accanto a un'etichetta. La regola generale è il posto del valore (alPostoDelValore): dopo il separatore o
   // il verbo che chiude l'etichetta, subito dopo di lei, sulla riga sotto. Mai il resto della riga: «la password di
   // Office365», un nome utente, un indirizzo di campo o una riga di codice vicini all'etichetta non sono il valore.
@@ -540,6 +542,64 @@
         if (pezzo.length >= 20 && /^[A-Za-z0-9_-]+$/.test(pezzo) && /[A-Za-z]/.test(pezzo) && !/^[a-z]+(?:[-_][a-z]+)*$/.test(pezzo)) out.push({ valore: pezzo, regola: 'token' });
       }
     }
+  }
+
+  // Un indirizzo con la codifica percentuale («?q=la%20password%20%C3%A8%20Mela!Verde77») dice al modello quello che dice
+  // decodificato, con le regole del controllo in uscita (urlExfil.js: giri e «+»): ogni pezzo fra «/ ? # & ; =» si legge
+  // anche decodificato, ognuno per conto suo, e dal testo si toglie la sua forma codificata (#1403.74).
+  // Un pezzo alla volta: messi in fila, «q» e «password» di «?q=…&oq=password» farebbero un'etichetta col suo valore.
+  function codificatiNellIndirizzo(url, inizioUrl, out, giro) {
+    if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
+    const U = global.SN_URL_EXFIL;
+    if (!U || !U.giroDiDecodifica || giro >= U.GIRI_DI_DECODIFICA || !/%[0-9A-Fa-f]{2}|\+/.test(url)) return;
+    const host = (url.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i) || [''])[0].length;
+    for (const m of url.slice(host).matchAll(/[^/?#&;=]+/g)) {
+      const pezzo = host + m.index;
+      let t = m[0];
+      let inizi = Array.from({ length: t.length }, (_, i) => i);
+      let fini = inizi.map((i) => i + 1);
+      for (let livello = 0; livello < U.GIRI_DI_DECODIFICA; livello++) {
+        const d = U.giroDiDecodifica(t);
+        if (d.testo === t) break;
+        const soloLettere = soloLettereAccentate(t, d);
+        inizi = d.da.map((i) => inizi[i]);
+        fini = d.a.map((j) => fini[j - 1]);
+        t = d.testo;
+        if (soloLettere) break;
+        for (const x of trova(t, { giro: giro + 1 })) {
+          const v = String(x.valore);
+          const posti = Number.isInteger(x.inizio) && t.startsWith(v, x.inizio) ? [{ k: x.inizio, n: v.length }] : [];
+          if (!posti.length) for (let k = t.indexOf(v); k >= 0; k = t.indexOf(v, k + 1)) posti.push({ k, n: v.length });
+          // Una carta trovata torna senza spazi né trattini: si cerca com'è scritta (formaDelValore).
+          if (!posti.length) for (const f of t.matchAll(new RegExp(formaDelValore(v), 'gu'))) posti.push({ k: f.index, n: f[0].length });
+          if (!posti.length) out.push({ valore: v, regola: x.regola });
+          for (const { k, n } of posti) {
+            const da = pezzo + inizi[k];
+            const a = pezzo + fini[k + n - 1];
+            out.push({ valore: url.slice(da, a), regola: x.regola, ...(Number.isInteger(x.inizio) ? { inizio: inizioUrl + da } : {}) });
+          }
+        }
+      }
+    }
+  }
+
+  // Un pezzo che decodificato è una parola sola e ha solo lettere latine accentate al posto dei «%xx» («Citt%C3%A0»)
+  // non dice niente di nuovo: senza separatori non c'è etichetta, e chiavi e carte sono ASCII (a parte una sequenza
+  // lunga con una cifra, che la lettera attaccata può staccare). Saltarlo tiene veloci le pagine piene di collegamenti.
+  function soloLettereAccentate(prima, d) {
+    const testo = d.testo;
+    if (!/^[\p{L}\p{M}\p{N}_.~'’-]+$/u.test(testo)) return false;
+    if ((testo.match(/[A-Za-z0-9]{12,}/g) || []).some((r) => /\d/.test(r))) return false;
+    for (let j = 0; j < testo.length; j++) {
+      if (d.a[j] - d.da[j] === 1 && prima[d.da[j]] !== '+') continue;
+      if (testo.charCodeAt(j) < 0x80 || !/\p{Script=Latin}/u.test(testo[j])) return false;
+    }
+    return true;
+  }
+
+  // Come si cerca un valore trovato: una carta, che torna di sole cifre, anche spezzata da spazi o trattini.
+  function formaDelValore(v) {
+    return /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
   }
 
   const TESTA_VALORE = new RegExp(`^[${APERTE}(]+`);
@@ -1090,7 +1150,8 @@
 
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
-  function trova(valore) {
+  // `giro`: quante codifiche di un indirizzo si sono già tolte (codificatiNellIndirizzo).
+  function trova(valore, { giro = 0 } = {}) {
     const vero = testo(valore);
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
     const R = global.SN_RISERVATI_TESTO;
@@ -1102,10 +1163,10 @@
     const G = global.SN_GUARDIANO_STATICO;
     const s = G.avverbiComeSpazi(virgoletteStrette(R ? R.senzaEnfasi(piano) : piano));
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return [];
-    const out = regole(s);
+    const out = regole(s, giro);
     // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
     const attaccate = R && R.cifreAttaccate(s);
-    if (attaccate) for (const x of comeScritti(regole(attaccate.piano), attaccate, s)) out.push(x);
+    if (attaccate) for (const x of comeScritti(regole(attaccate.piano, giro), attaccate, s)) out.push(x);
     return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano, s)))
       .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
       .filter((x) => String(x.valore).length >= 3);
@@ -1145,7 +1206,7 @@
     return out;
   }
 
-  function regole(s) {
+  function regole(s, giro) {
     const out = [];
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
@@ -1162,7 +1223,11 @@
     codiceDelMioApparecchio(s, out);
     codiciDiRecupero(s, out);
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
-    for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
+    for (const m of s.matchAll(INDIRIZZO)) {
+      segretiNellIndirizzo(m[0], out);
+      codificatiNellIndirizzo(m[0], m.index, out, giro);
+    }
+    for (const m of s.matchAll(CODIFICATO)) if (!m[0].includes('://')) codificatiNellIndirizzo(m[0], m.index, out, giro);
     scritteAMano(s, out);
     if (G && typeof G.codiciInElenco === 'function') out.push(...G.codiciInElenco(s, out));
     out.push(...interiFraVirgolette(s, out));
@@ -1215,10 +1280,11 @@
     const lungo = (v) => v.length - (v.match(/\r\n/g) || []).length;
     const valori = [...ovunque].sort((a, b) => lungo(b) - lungo(a));
     for (const v of valori) {
-      const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
+      const forma = formaDelValore(v);
       // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga». Una lettera cinese o
-      // giapponese attaccata non è della stessa parola (FINE_VALORE).
-      const confine = /^[\p{L}\p{N}]/u.test(v) ? `(?<!(?![${NON_LATINI.FINE_VALORE}])[\\p{L}\\p{N}])` : '';
+      // giapponese attaccata non è della stessa parola (FINE_VALORE), e nemmeno uno spazio codificato, anche due volte
+      // («%20Mela!Verde77», «%2520Mela»: codificatiNellIndirizzo).
+      const confine = /^[\p{L}\p{N}]/u.test(v) ? `(?:(?<=%(?:25){0,2}[0-9A-Fa-f]{2})|(?<!(?![${NON_LATINI.FINE_VALORE}])[\\p{L}\\p{N}]))` : '';
       const fine = /[\p{L}\p{N}]$/u.test(v) ? `(?![\\p{L}\\p{N}](?<![${NON_LATINI.FINE_VALORE}]))` : '';
       // Un valore lunghissimo non entra in un'espressione regolare: si toglie com'è, senza confini.
       try { t = t.replace(new RegExp(`${confine}${forma}${fine}`, 'gu'), SEGNAPOSTO); } catch (_) { t = t.split(v).join(SEGNAPOSTO); }
