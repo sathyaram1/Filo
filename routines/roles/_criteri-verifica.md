@@ -10,7 +10,8 @@
    interni nuovi, URL non validati.
 5. **Aspetto.** Ogni elemento grafico segue lo stile di Filo, si comporta bene
    con tutte le impostazioni (tema chiaro e scuro) e sta nella posizione
-   migliore. Va guardato davvero: in cloud `page.screenshot()` in
+   migliore, con meno elementi possibili: ogni elemento nuovo ha il suo
+   motivo. Va guardato davvero: in cloud `page.screenshot()` in
    `tests/.shots/`, in locale `npm run test:shoot`.
 6. **Completezza.** Nessuna invariante ovvia manca: ciò che si aggiunge si può
    togliere; se se ne salvano N si vedono tutte; una strada naturale per

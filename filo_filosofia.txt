@@ -7,8 +7,8 @@ Filo si basa sull’AI (soprattutto LLM).
 mindset per la creazione di Filo:
 -il software deve poter essere usato male: come un telefono è pensato per essere bagnato e cadere senza rompersi il softwere deve reggere abusi analoghi. non salvare mai, non ordinare mai nulla, non dare nomi appropriati ai file e non sapere come navigare un sito e fare un typo ogni 3 parole non devono essere problemi.
 -abbiamo già L’AGI: se ci fosse un umano dentro al pc che decide cosa l'utente vorrebbe in questo istante dopo questa sua azione (avendo tutto il tempo necessario a disposizione per pensarci) cosa gli consiglierebbe? in altre parole bisogna assumere di avere sempre un'intelligenza adeguata. prima di dichiarare una feature impossibile occorre provare. 
--l’attrito è negativo: un qualsiasi attrito se teoricamente risolvibile deve essere risolto.
--nulla è troppo: se qualcosa può essere fatta meglio va fatta meglio, poi se realmente era troppo ambiziosa si scoprirà poi dopo i primi fallimenti.
+-l’attrito è negativo: un qualsiasi attrito se teoricamente risolvibile deve essere risolto. attrito è il numero e la complessità delle azioni che l'utente deve fare per arrivare al risultato: meno azioni, e più semplici.
+-nulla è troppo: se qualcosa può essere fatta meglio va fatta meglio, poi se realmente era troppo ambiziosa si scoprirà poi dopo i primi fallimenti. vale per cosa filo sa fare, non per quante cose mostra: sullo schermo vale il contrario, meno elementi possibili.
 
 decisioni di design ad alto livello:
 - tutto può essere fatto scrivendo cosa si vuole ottenere. la GUI è una shortcut rispetto a chiedere a filo (posso chiedere a filo di zoomare la pagina o farlo con un click, il click però è più veloce). 
