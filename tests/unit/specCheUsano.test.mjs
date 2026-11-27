@@ -55,8 +55,8 @@ test('sul repo vero: il caso di #2551 sceglie gli spec della prova da utente, la
   assert.deepEqual(fixture.specs, []);
   assert.equal(fixture.troppoLarghi.length, 1);
   assert.ok(fixture.troppoLarghi[0].spec > SOGLIA_SPEC_DI_UN_MODULO);
-  const menu = specDellaScelta({ changed: ['tests/helpers/menuContestuale.mjs'], base: vuoto, root: ROOT });
-  assert.ok(menu.specs.length > 50 && menu.specs.length <= SOGLIA_SPEC_DI_UN_MODULO, `il menu contestuale: ${menu.specs.length} spec`);
+  const riquadri = specDellaScelta({ changed: ['tests/helpers/riquadri.mjs'], base: vuoto, root: ROOT });
+  assert.ok(riquadri.specs.length > 50 && riquadri.specs.length <= SOGLIA_SPEC_DI_UN_MODULO, `i riquadri: ${riquadri.specs.length} spec`);
 });
 
 test('un ramo che cambia solo un aiuto dei test lancia gli spec che lo usano, e non dice «non li prova nessuno spec»', () => {
