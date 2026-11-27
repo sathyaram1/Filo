@@ -14,6 +14,7 @@ import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 const OWNER_EMAIL = 'owner@prova.test';
