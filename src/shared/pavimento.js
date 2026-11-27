@@ -917,6 +917,11 @@
   // Dopo la sola domanda («Ti ricordi la password? «…»») conta la forma della password, come senza verbo.
   const VIRGOLETTATO_DOMANDA = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*\\?+${FRA_VIRGOLETTE}`, 'gid');
   const RISPOSTA_NUDA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
+  // «e» senza accento è anche la congiunzione: vale «è» solo subito dopo il nome e di cosa è, e col valore che ha la
+  // forma di una password («la password e Mela!Verde77», non «la password e il nome utente», #2678.21).
+  const E_SENZA_ACCENTO = `${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]+e`;
+  const VIRGOLETTATO_E = new RegExp(`${E_SENZA_ACCENTO}${FRA_VIRGOLETTE}`, 'gid');
+  const E_NUDA = new RegExp(`${E_SENZA_ACCENTO}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
   // Dopo una password fra virgolette, nella stessa frase, la seconda che le si lega con un annuncio o una preposizione
   // («da «…» a «…»», «era «…», l'ho cambiata in «…»», «la vecchia era «…» e la nuova è «…»»). Un altro campo nominato
   // in mezzo («e il nome utente è «…»») non è la password.
