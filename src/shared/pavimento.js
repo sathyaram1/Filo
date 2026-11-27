@@ -672,12 +672,13 @@
       return true;
     };
     const fini = [];
-    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE, VIRGOLETTATO_PONTE, VIRGOLETTATO_DOMANDA]) {
+    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE, VIRGOLETTATO_MESSA, VIRGOLETTATO_RISPOSTA, VIRGOLETTATO_DOMANDA]) {
       for (const m of s.matchAll(re)) {
-        const separato = (re === VIRGOLETTATO_DOPO && !UNA_FRECCIA.test(m.groups.sep || '')) || re === VIRGOLETTATO_PONTE;
+        const separato = (re === VIRGOLETTATO_DOPO && !UNA_FRECCIA.test(m.groups.sep || '')) || re === VIRGOLETTATO_MESSA || re === VIRGOLETTATO_RISPOSTA;
         if (prendi(m, separato)) fini.push(m.index + m[0].length);
       }
     }
+    for (const m of s.matchAll(VIRGOLETTATO_DI)) fini.push(m.index + m[0].length);
     for (let fine of fini) {
       for (let giri = 0; giri < 8; giri++) {
         SEGUITO.lastIndex = fine;
