@@ -59,7 +59,7 @@ test('dalla chat: la ricetta salvata torna col suo bottone, che la apre e la tog
 
     // Tasto destro: si apre tenendola in lista, come dal menu di «Aperti per dopo».
     await bottone.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Apri e tienila in lista' }).click();
+    await menuDi(page).scegli('Apri e tienila in lista');
     await expect.poll(() => schedaAperta(shell, RICETTA), { timeout: 10_000 }).toBe(true);
     expect(await salvate(app)).toEqual(['p1', 'p2', 'p3']);
 
