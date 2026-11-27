@@ -333,6 +333,15 @@
     'vale', 'risulta', "c'est", 'c’est', 'est', 'était', 'etait', 'sera', 'ist', 'lautet', 'war', 'wird', 'es', 'será',
     'serà', 'serão', 'luidt', 'jest', 'brzmi', 'będzie', 'это', 'был', 'была', 'было', 'были', 'будет', 'является',
     'είναι', 'ήταν']);
+  // La password nuova dopo il suo nome («la password diventa …», «è rimasta …»), o dopo un participio di cambio e «in»,
+  // «a», «to» («ho cambiato la password in …»): per correttore e pavimento (#1403.67). Parole intere, come ANNUNCI.
+  const CAMBI = Object.freeze({
+    diventa: Object.freeze(['diventa', 'diventano', 'diventerà', 'diventata', 'diventato', 'resta', 'rimane', 'rimasta',
+      'rimasto', 'becomes', 'became', 'become', 'will be']),
+    participi: Object.freeze(['cambiata', 'cambiato', 'modificata', 'modificato', 'aggiornata', 'aggiornato', 'impostata',
+      'impostato', 'reimpostata', 'reimpostato', 'changed', 'updated', 'set', 'reset']),
+    verso: Object.freeze(['in', 'a', 'to', 'into']),
+  });
   // Un annuncio come parola intera, per le regex col flag `u`.
   const ANNUNCIO = `(?<![\\p{L}\\p{N}])(?:${ANNUNCI.join('|')})(?![\\p{L}\\p{N}])`;
   const ATTACCO = new RegExp(`(?:^|[:=]|(?:^|[\\s(])(?:${ANNUNCI.join('|')}|seguente|seguenti|following))$`, 'i');
