@@ -1392,7 +1392,17 @@
   function dettoNelNome(griglia, it) {
     const riga = griglia && griglia.querySelector('.sn-menu-nome');
     if (!riga) return;
-    if (it) { riga.textContent = testoDelNome(it); riga.classList.remove('sn-menu-nome-riposo'); }
+    if (it) {
+      riga.textContent = testoDelNome(it);
+      riga.classList.remove('sn-menu-nome-riposo');
+      // Quello che chi sceglie deve sapere prima (un avvertimento): sotto il nome, per intero.
+      if (it.nota) {
+        const n = document.createElement('div');
+        n.className = 'sn-menu-nome-nota';
+        n.textContent = String(it.nota);
+        riga.appendChild(n);
+      }
+    }
     else { riga.textContent = griglia.__snRiposo || ''; riga.classList.add('sn-menu-nome-riposo'); }
   }
 
