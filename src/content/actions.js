@@ -1695,6 +1695,7 @@
     const lettore = el.closest?.('.html5-video-player, #movie_player');
     const titolo = di(lettore && lettore.querySelector('a.ytp-title-link[href]'));
     if (titolo) return titolo;
+    if (el.staccato) return '';
     // Il post più piccolo che contiene il filmato e un solo permalink. Un contenitore con un altro filmato, o molto
     // più grande del filmato, è la pagina e non il post: il suo <time> può essere una data qualunque.
     const area = (x) => { const r = x.getBoundingClientRect(); return r.width * r.height; };
