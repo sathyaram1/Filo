@@ -178,7 +178,7 @@ test('il tasto destro sul titolo espone "Rigenera riassunto" e rigenerarlo aggio
     doc.innerHTML = '<p>una breve nota di prova sul progetto di ricerca</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await menu.getByText('Rigenera riassunto', { exact: true }).click();
+  await menu.variante(rigenera, 'Rigenera riassunto');
 
   await page.waitForFunction((key) => {
     try {
