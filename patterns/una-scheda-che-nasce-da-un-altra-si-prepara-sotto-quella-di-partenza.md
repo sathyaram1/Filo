@@ -1,4 +1,4 @@
-# Una scheda che nasce da un'altra si prepara sotto
+# Una scheda che nasce da un'altra si prepara sotto quella di partenza
 
 [← Tutti i pattern](../PATTERNS.md)
 
