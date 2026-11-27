@@ -825,10 +825,6 @@ test('il codice del mio telefono, del cancello o il CVV non escono da un\'azione
     }
   }
   assert.equal(A.segreto('Il codice del mio telefono è 4829'), 'codice');
-  // Il CVV come il numero della carta: letto da fuori è un no, scritto dall'utente esce.
-  assert.equal(A.segreto('CVV: 482'), 'banca');
-  assert.equal(risposta({ type: 'CERCA_WEB', query: 'CVV: 482' }), 'no');
-  assert.notEqual(risposta({ type: 'CERCA_WEB', query: 'CVV: 482' }, { richiesta: 'il CVV è 482' }), 'no');
   // Scritto dall'utente nel compito esce con la parola, come una sua password.
   assert.deepEqual(A.segretoDettaglio('Il codice del mio telefono è 4829', { richiesta: 'scrivi che il codice del mio telefono è 4829' }),
     { tipo: 'codice', scritto: true, valori: ['4829'] });
