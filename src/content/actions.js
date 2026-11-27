@@ -1843,7 +1843,7 @@
       if (T && blob.size > T.MAX_BYTE) { Popup.showToast(T.troppoGrande(blob.size).message, { duration: 9000 }); return; }
       try { richiesta = { base64: await base64DelBlob(blob) }; } catch (_) { richiesta = null; }
     } else if (/^https?:/i.test(src)) {
-      richiesta = { url: src, politiche: el.staccato ? [] : politicheReferrer(el) };
+      richiesta = { url: src, politiche: politicheReferrer(el) };
     }
     if (!richiesta) { Popup.toastErrore('toast_media_transcribe_failed'); return; }
     let res = null;
