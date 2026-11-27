@@ -14,6 +14,11 @@ const tm = (app, fn, arg) => app.evaluate(({ BrowserWindow }, { fn, arg }) => {
   return new Function('tm', 'arg', `return (${fn})(tm, arg)`)(t, arg);
 }, { fn: fn.toString(), arg });
 const schedeFile = (app, fine) => tm(app, (t, fine) => t.tabs.filter((x) => { try { const u = x.view.webContents.getURL() || x.url; return /^file:/.test(u) && u.endsWith(fine); } catch (_) { return false; } }).map((x) => x.id), fine);
+async function paginaDi(app, id, fine) {
+  let p = null;
+  await expect.poll(async () => Boolean(p = await paginaDellaScheda(app, id, (x) => x.url().endsWith(fine))), { timeout: 15_000, message: `la pagina della scheda ${id} su ${fine}` }).toBe(true);
+  return p;
+}
 const execAction = (app, action, opts) => app.evaluate((_e, { action, opts }) => globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
 
 function cartella() {
