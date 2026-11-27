@@ -168,8 +168,8 @@ test('il video coperto dai comandi del player resta raggiungibile col tasto dest
   </body></html>`);
 
   const menu = await openMenuOn(page, '#overlay');
-  await expect(menu.getByText('Velocità 1×')).toBeVisible();
-  await menu.locator('button', { hasText: 'Ripeti in continuo' }).first().click();
+  await expect(menu.icona('speed')).toHaveAttribute('aria-label', 'Velocità 1×');
+  await menu.scegli('Ripeti in continuo');
   await expect.poll(() => page.evaluate(() => document.getElementById('v').loop)).toBe(true);
 });
 
