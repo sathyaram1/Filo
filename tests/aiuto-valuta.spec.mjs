@@ -92,7 +92,7 @@ async function valutaSu(page, selettore, foto = '') {
   const menu = menuDi(page);
   await expect(menu.voce('Valuta')).toHaveCount(1, { timeout: 5000 });
   if (foto) await menu.superficie.screenshot({ path: foto }).catch(() => {});
-  await menu.voce('Valuta').click();
+  await menu.scegli('Valuta');
 }
 
 test('«Valuta» apre l’Aiuto col testo del campo, col modello della chat, e la correzione si scrive nel campo e si toglie', async ({ app, openTab, testServer }) => {
