@@ -2270,7 +2270,7 @@
   // griglia per il loro verbo. Le icone delle azioni sulla pagina intera stanno nella barra laterale (#1246).
   function buildMenuItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
-    senzaValuta = false, sito = null,
+    senzaValuta = false, sito = null, mouse = null, minimoCorreggi = 1, scritte = [],
   }) {
     // Il contesto lo decide lo stesso ramo che sceglie le spiegazioni, qui sotto.
     const contesto = {};
@@ -2278,6 +2278,7 @@
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
       contesto,
     });
+    Object.assign(contesto, { mouse, minimoCorreggi });
     // Solo a chi ha un codice Red Team (#991), e in pausa (#896) solo se lo vede. Si richiede a ogni apertura: vale dalla successiva.
     refreshVoceAttacco();
     const fila = filaContestuale(contesto, { selInfo, target, clipboardHistory, sito, scritte: vociDellaPagina(target) });
