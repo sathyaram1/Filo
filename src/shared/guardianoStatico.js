@@ -648,8 +648,9 @@
   // diventa 4821») chiude; una parola che dice com'è il dato («è giusto») toglie l'annuncio. Prove: tests/unit/cambioDelValore.test.mjs.
   const NOME_DEL_VALORE = new RegExp('(?<![\\p{L}\\p{N}])(?:(pin)|(codic[ei]\\s+(?:del|della|dello|dell[\'’]\\s*)\\s*(?:cancello|portone|allarme|cassaforte|garage|box|lucchetto|porta|antifurto))'
     + '|(password|passwd|pwd|passphrase|parola\\s+d[\'’]ordine))(?![\\p{L}\\p{N}])', 'giu');
+  const UN_NOME_DEL_VALORE = new RegExp(NOME_DEL_VALORE.source, 'iu');
   const intere = (re) => new RegExp(`^(?:${re})$`, 'iu');
-  const PRESENTA_VALORE = intere(`${ANNUNCI.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}|${CAMBI}|${PARTICIPI}|${PASSATI}|ha|has|have|had`);
+  const PRESENTA_VALORE = intere(`${ANNUNCI.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}|${CAMBI}|${PARTICIPI}|${PASSATI}`);
   const UN_CAMBIO = intere(`${CAMBI}|${PARTICIPI}|${PASSATI}`);
   const CAMBIO_INGLESE = /^(?:changed|set|updated|reset|replaced|became|remained|stayed)$/i;
   const PONTE_DEL_CAMBIO = intere(VERSO);
