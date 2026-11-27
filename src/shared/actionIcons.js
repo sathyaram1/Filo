@@ -37,6 +37,7 @@
     LEGGI_FILE: 'readDocument',
     LEGGI_DOCUMENTO: 'readDocument',
     LEGGI_PAGINA: 'readPage',
+    TRASCRIVI_MEDIA: 'transcribe',
     CERCA_DOCUMENTI: 'search',
     LEGGI_TRASPARENZA: 'transparency',
     LEGGI_IMPOSTAZIONI: 'options',
