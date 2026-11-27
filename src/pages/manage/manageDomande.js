@@ -571,6 +571,11 @@
       && !d.soloOwner && !e.automatica && !e.smistata;
   }
 
+  // L'owner risponde anche mentre la smista un agente: la sua risposta chiude lo smistamento (#2702).
+  function daRispondere(d) {
+    return d.stato === 'aperta' || d.stato === 'in_smistamento';
+  }
+
   // Cosa fa al suo lavoro una domanda aperta o in smistamento (#1577): lo ferma, o lo lascia andare con la consigliata.
   function fermaIlLavoro(d) {
     if ((d.stato !== 'aperta' && d.stato !== 'in_smistamento') || !d.legata || d.attesa) return null;
