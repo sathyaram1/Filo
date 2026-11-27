@@ -11,6 +11,7 @@
     {
       version: '0.2.308', date: '2026-11-27',
       fixes: [
+        { testo: 'Col tasto destro su un audio o un video, anche un vocale di WhatsApp già ascoltato, «Trascrivi» ti scrive quello che si dice, pezzo dopo pezzo, e «Salva audio come…» lo scarica. E puoi chiedere a Filo di trascrivere un audio o un video da un indirizzo.', segnalazione: [519, 1660] },
         { testo: 'Una password detta nella frase dopo, senza nominarla di nuovo, come «la password scade, la nuova è …», «è sbagliata, prova …» o «the password expired, new one …», non arriva più ai modelli che correggono quello che scrivi; con numeri o simboli non arriva a nessun modello.', segnalazione: 2695 },
         { testo: 'Il codice del cancello, della porta o della cassaforte scritto come «è sempre 4829», «is now 4829» o «e 4829» senza accento non arriva più a nessun modello, come già quello del telefono. Lo stesso per il PIN: «il pin è sempre 4829».', segnalazione: 1403 },
         { testo: 'Se in una chat qualcuno ti chiede il PUK della SIM e tu lo scrivi nella risposta, il correttore non lo manda ai suoi modelli, come già succedeva per il PIN e la password.', segnalazione: 2692 },
