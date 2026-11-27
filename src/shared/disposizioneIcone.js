@@ -84,7 +84,7 @@
     leaveText: v('Lascia', 'typeText', 'l', 'lasciare il testo', ['lascia']),
     later: v('Rimanda', 'alarm', 'd', 'rimandare', ['rimanda', 'riprendi dopo']),
     gift: v('Regala', 'gift', 'g', 'regalare', ['regala']),
-    more: v('Altro', 'list', 'w', 'fare altro'),
+    ignore: v('Ignora', 'blocked', 'i', 'ignorare', ['ignora']),
   });
 
   // Come si dice l'oggetto su cui agisce un'azione, nella riga del nome («Copia · il collegamento · C»).
