@@ -1310,8 +1310,8 @@
     try { campo.focus({ preventScroll: true }); campo.select(); } catch (_) {}
   }
 
-  // L'etichetta di un'icona la disegna il fumetto condiviso (patterns/un-etichetta-si-scrive-title-o-data-tip-e-la-mostra-filo.md).
-  // Toglierla serve quando a muoversi è il menu: resterebbe sotto un bottone che nel frattempo è altrove.
+  // Dentro il menu un'icona non ha il fumetto vicino al puntatore, che coprirebbe le icone accanto: il nome sta nella
+  // riga del nome (#2555, filo_design.txt § hover). Il fumetto resta per chi lo chiede da fuori (la griglia «Altro…»).
   function dismissTooltip() {
     global.SN_SUGGERIMENTO?.nascondi?.();
   }
@@ -1324,9 +1324,10 @@
     el.addEventListener('mouseleave', () => lettura.via());
   }
 
-  // Chi apre un pannello sostando sopra durante un trascinamento: chiamato da qui, perché un clic fabbricato da codice
-  // non passerebbe da `soloGestiVeri`.
+  // Chi apre un pannello sostando sopra durante un trascinamento, e chi esegue l'icona del tasto singolo: chiamati da
+  // qui, perché un clic fabbricato da codice non passerebbe da `soloGestiVeri`.
   const apritori = new WeakMap();
+  const esecutori = new WeakMap();
 
   // Il suggerimento di un'icona nomina anche il suo tasto, se ne ha uno (`tasto`, chiesto a SN_TASTI).
   function conTasto(it) { return it.tasto ? `${it.label} (${it.tasto})` : it.label; }
@@ -1342,11 +1343,75 @@
     try { it.onClick && it.onClick(); } catch (er) { console.error(er); }
   }
 
-  // Un'icona che mette e toglie (Grassetto) dice se la selezione ce l'ha già: chi preme sa cosa farà.
+  // Un'icona che mette e toglie (Grassetto, l'audio, ripeti) dice com'è adesso: chi preme sa cosa farà.
   function segnaAcceso(b, it) {
     if (typeof it.acceso !== 'boolean') return;
     b.setAttribute('aria-pressed', String(it.acceso));
     b.classList.toggle('sn-menu-btn-acceso', it.acceso);
+  }
+
+  // ── La griglia del menu a icone (#2555) ─────────────────────────────────────────────────────────────────────────
+  // Una griglia sola: le azioni comuni, il «+» in fondo che apre le rare nello stesso menu, e la riga del nome che dice
+  // «nome · oggetto · tasto» dell'icona sotto il puntatore o col fuoco. Il contorno dell'oggetto su cui agirebbe
+  // l'icona si disegna sulla pagina mentre ci si passa sopra: è ciò che rende sicura un'icona sola per più oggetti.
+  const SEP_NOME = ' · ';
+  function testoDelNome(it) {
+    return [it.nome || it.label || '', it.oggetto || '', it.tasto ? String(it.tasto).toUpperCase() : ''].filter(Boolean).join(SEP_NOME);
+  }
+
+  let bersagli = [];
+  function nascondiBersaglio() {
+    for (const el of bersagli) { try { el.remove(); } catch (_) {} }
+    bersagli = [];
+  }
+  // `rect`: { x, y, w, h } in px della finestra dove sta il menu. Più rettangoli per una selezione su più righe.
+  function mostraBersaglio(rects) {
+    nascondiBersaglio();
+    const lista = Array.isArray(rects) ? rects.filter((r) => r && [r.x, r.y, r.w, r.h].every(Number.isFinite) && r.w > 0 && r.h > 0) : [];
+    for (const r of lista.slice(0, 40)) {
+      const el = document.createElement('div');
+      el.className = 'sn-menu-bersaglio';
+      global.SN_FILO_UI?.mark(el);
+      el.setAttribute('aria-hidden', 'true');
+      el.style.left = `${r.x - 2}px`;
+      el.style.top = `${r.y - 2}px`;
+      el.style.width = `${r.w + 4}px`;
+      el.style.height = `${r.h + 4}px`;
+      monta(el);
+      bersagli.push(el);
+    }
+    // Dietro il menu: il contorno non copre le icone.
+    if (activeMenu && activeMenu.root.isConnected && bersagli.length) monta(activeMenu.root);
+  }
+
+  function dettoNelNome(griglia, it) {
+    const riga = griglia && griglia.querySelector('.sn-menu-nome');
+    if (!riga) return;
+    if (it) { riga.textContent = testoDelNome(it); riga.classList.remove('sn-menu-nome-riposo'); }
+    else { riga.textContent = griglia.__snRiposo || ''; riga.classList.add('sn-menu-nome-riposo'); }
+  }
+
+  // Il menu dell'icona (#2555): le varianti dello stesso verbo su un altro oggetto, come testo. Non ha un livello sotto.
+  function apriVarianti(b, it) {
+    const voci = (Array.isArray(it.varianti) ? it.varianti : []).filter((x) => x && typeof x.onClick === 'function');
+    if (!voci.length) return false;
+    const griglia = b.closest('.sn-menu-griglia');
+    openGenericSubmenu(b, voci.map((x) => ({
+      label: x.label || testoDelNome(x),
+      onClick: x.onClick,
+      bersaglio: x.bersaglio,
+      disabled: !!x.disabled,
+    })), { griglia });
+    if (activeMenu) { activeMenu.subOwner = b; activeMenu.subLocked = true; }
+    return true;
+  }
+
+  function apriValori(b, it) {
+    const valori = it.valore && Array.isArray(it.valore.valori) ? it.valore.valori : [];
+    if (!valori.length) return false;
+    openGenericSubmenu(b, valori.map((x) => ({ label: `${x.scelto ? '✓ ' : ''}${x.label}`, onClick: x.onClick })));
+    if (activeMenu) { activeMenu.subOwner = b; activeMenu.subLocked = true; }
+    return true;
   }
 
   function makeRowButton(sub, opts = {}) {
@@ -1357,52 +1422,99 @@
     // Spenta con una classe: l'attributo `disabled` azzera i pointer event e l'icona non si trascinerebbe più.
     if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     segnaAcceso(b, sub);
-    // Il «+» apre la griglia passandoci sopra: il suo nome la coprirebbe.
-    if (sub.kind !== 'overflow' && sub.label) attachTooltip(b, conTasto(sub));
-    setIconContent(b, sub.icon || sub.label);
-    // Il bottone contiene solo un disegno: senza nome accessibile è muto per chi legge lo schermo.
-    if (sub.label) b.setAttribute('aria-label', sub.label);
+    const valore = sub.valore && typeof sub.valore === 'object' ? sub.valore : null;
+    if (valore) {
+      // Un'azione con un valore (velocità 1×, dimensione 119%) ha il valore come icona.
+      const t = document.createElement('span');
+      t.className = 'sn-menu-valore';
+      t.textContent = String(valore.testo || '');
+      b.appendChild(t);
+      b.dataset.snValore = '1';
+    } else if (typeof sub.iconaImg === 'string' && /^data:image\/(png|x-icon|vnd\.microsoft\.icon|gif|jpeg|webp|svg\+xml)[;,]/i.test(sub.iconaImg)) {
+      const img = document.createElement('img');
+      img.className = 'sn-menu-icona-img';
+      img.alt = '';
+      img.src = sub.iconaImg;
+      b.appendChild(img);
+    } else {
+      setIconContent(b, sub.icon || sub.label);
+    }
+    // Il nome resta nel bottone per chi legge lo schermo e per chi cerca la voce, senza farsi vedere.
+    if (sub.label) {
+      b.setAttribute('aria-label', sub.label);
+      const lbl = document.createElement('span');
+      lbl.className = 'sn-menu-label sn-menu-label-nascosta';
+      lbl.textContent = sub.label;
+      b.appendChild(lbl);
+    }
     if (sub.id) b.dataset.snIconId = sub.id;
+    if (sub.tasto) b.dataset.snTasto = String(sub.tasto).toLowerCase();
+    if (sub.azione) b.dataset.snAzione = String(sub.azione);
+    const varianti = Array.isArray(sub.varianti) && sub.varianti.length > 0;
+    if (varianti) { b.dataset.snVarianti = '1'; b.setAttribute('aria-haspopup', 'menu'); }
+    const griglia = () => b.closest('.sn-menu-griglia');
+    const mostra = () => {
+      dettoNelNome(griglia(), sub.kind === 'overflow' ? { nome: sub.label, tasto: '' } : sub);
+      if (sub.bersaglio) mostraBersaglio(sub.bersaglio);
+      else nascondiBersaglio();
+    };
+    const via = () => { dettoNelNome(griglia(), null); nascondiBersaglio(); };
+    b.addEventListener('mouseenter', mostra);
+    b.addEventListener('focus', mostra);
+    b.addEventListener('mouseleave', () => { if (document.activeElement !== b) via(); });
+    b.addEventListener('blur', via);
     if (sub.kind === 'overflow') {
       b.dataset.snDragHoverOpen = '1';
-      b.setAttribute('aria-haspopup', 'true');
-      const openOverflow = () => {
-        try { sub.onClick && sub.onClick(b); } catch (er) { console.error(er); }
-        if (activeMenu) activeMenu.subOwner = b;
-      };
-      b.addEventListener('mouseenter', () => {
-        clearSubCloseTimer();
-        if (activeMenu?.subRoot && activeMenu.subOwner !== b) {
-          if (activeMenu.subRoot.classList.contains('sn-menu-link')) return;
-          activeMenu.subLocked = false;
-          closeSubmenu();
-        }
-        if (!activeMenu?.subRoot) openOverflow();
-      });
-      b.addEventListener('mouseleave', () => {
-        if (activeMenu?.subLocked) return;
-        clearSubCloseTimer();
-        subCloseTimer = setTimeout(() => closeSubmenu(), 500);
-      });
+      b.setAttribute('aria-expanded', 'false');
       const apriFermo = () => {
-        clearSubCloseTimer();
-        if (activeMenu?.subRoot && activeMenu.subOwner === b) {
-          activeMenu.subLocked = true;
-        } else {
-          if (activeMenu?.subRoot) { activeMenu.subLocked = false; closeSubmenu(); }
-          openOverflow();
-          if (activeMenu) activeMenu.subLocked = true;
+        const g = griglia();
+        const altro = g && g.querySelector('.sn-menu-altro');
+        if (!altro) return;
+        const apri = altro.hidden;
+        altro.hidden = !apri;
+        b.setAttribute('aria-expanded', String(apri));
+        b.classList.toggle('sn-menu-row-overflow-aperto', apri);
+        setIconContent(b, global.SN_ICONS?.[apri ? 'minimize' : 'plus']?.(16) || (apri ? '−' : '+'));
+        if (sub.label) {
+          const lbl = document.createElement('span');
+          lbl.className = 'sn-menu-label sn-menu-label-nascosta';
+          lbl.textContent = sub.label;
+          b.appendChild(lbl);
         }
+        contaGesto('altro_del_menu', { aperto: apri });
+        try { sub.onClick && sub.onClick(apri); } catch (er) { console.error(er); }
       };
-      apritori.set(b, apriFermo);
+      apritori.set(b, () => { const g = griglia(); if (g && g.querySelector('.sn-menu-altro')?.hidden) apriFermo(); });
+      esecutori.set(b, apriFermo);
       b.addEventListener('click', (e) => {
         e.stopPropagation();
         apriFermo();
       });
     } else {
-      b.addEventListener('click', () => {
+      const esegui = () => {
         if (sub.disabled) return;
+        if (valore && apriValori(b, sub)) return;
         premi(b, sub);
+      };
+      esecutori.set(b, esegui);
+      b.addEventListener('click', (e) => {
+        if (valore) e.stopPropagation();
+        esegui();
+      });
+      if (valore && typeof valore.passo === 'function') {
+        // La rotella sopra l'icona cambia il valore senza aprire niente.
+        b.addEventListener('wheel', (e) => {
+          if (!e.isTrusted || !e.deltaY) return;
+          e.preventDefault();
+          e.stopPropagation();
+          try { valore.passo(e.deltaY < 0 ? 1 : -1); } catch (er) { console.error(er); }
+        }, { passive: false });
+      }
+      b.addEventListener('contextmenu', (e) => {
+        // Il tasto destro su un'icona è il suo menu: mai un menu nuovo sopra quello aperto.
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.isTrusted && varianti) apriVarianti(b, sub);
       });
     }
     if (sub.draggable && sub.id) attachDrag(b, { id: sub.id, source: opts.dropTarget || 'row' });
@@ -1414,6 +1526,52 @@
     row.__snRowOpts = opts;
     for (const sub of items) row.appendChild(makeRowButton(sub, opts));
     global.SN_FILO_UI?.soloGestiVeri(row);
+  }
+
+  // La griglia, il blocco del «+» (chiuso di partenza) e la riga del nome. `it.altro`: { items, dropTarget, onDrop }.
+  // `it.aspetto`: { icona, colonne } dalle Preferenze.
+  function costruisciGriglia(it) {
+    const g = document.createElement('div');
+    g.className = 'sn-menu-griglia';
+    const a = it.aspetto && typeof it.aspetto === 'object' ? it.aspetto : {};
+    if (Number.isFinite(a.icona)) g.style.setProperty('--sn-icona', `${a.icona}px`);
+    if (Number.isFinite(a.colonne)) g.style.setProperty('--sn-colonne', String(a.colonne));
+    g.__snRiposo = String(it.oggetto || '');
+    const row = document.createElement('div');
+    row.className = 'sn-menu-row';
+    row.setAttribute('role', 'group');
+    if (it.dropTarget) row.dataset.snDropTarget = it.dropTarget;
+    // Senza icone e senza «+» la griglia non si vede: si apre solo per chi porta un'icona dalla barra.
+    if (it.vuota) { row.dataset.snVuota = '1'; row.hidden = true; }
+    keepPageFocus(row);
+    g.appendChild(row);
+    const altro = document.createElement('div');
+    altro.className = 'sn-menu-row sn-menu-altro';
+    altro.setAttribute('role', 'group');
+    altro.hidden = true;
+    keepPageFocus(altro);
+    g.appendChild(altro);
+    const nome = document.createElement('div');
+    nome.className = 'sn-menu-nome sn-menu-nome-riposo';
+    nome.setAttribute('aria-live', 'polite');
+    nome.textContent = g.__snRiposo;
+    if (it.vuota) nome.hidden = true;
+    g.appendChild(nome);
+    riempiGriglia(g, it);
+    if (it.dropTarget) attachDropZone(row, { target: it.dropTarget, onDrop: it.onDrop });
+    if (it.altro && it.altro.dropTarget) attachDropZone(altro, { target: it.altro.dropTarget, onDrop: it.altro.onDrop });
+    return g;
+  }
+
+  function riempiGriglia(g, it) {
+    const row = g.querySelector('.sn-menu-row:not(.sn-menu-altro)');
+    const altro = g.querySelector('.sn-menu-altro');
+    populateRow(row, it.items || [], { dropTarget: it.dropTarget });
+    const rare = it.altro && Array.isArray(it.altro.items) ? it.altro.items : [];
+    populateRow(altro, rare, { dropTarget: it.altro && it.altro.dropTarget });
+    // Il «+» c'è se ha qualcosa dietro, o durante un trascinamento (posa un'icona fra le rare).
+    const piu = row.querySelector('.sn-menu-row-overflow');
+    if (piu && !rare.length && !esterno) piu.hidden = true;
   }
 
   function makeGridButton(it, opts = {}) {
