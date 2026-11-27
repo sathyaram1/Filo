@@ -258,7 +258,7 @@
     for (const m of s.matchAll(SBLOCCO_COL_NUMERO)) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
   }
   // `apre`: il codice di qualcosa che apre (il mio telefono, il cancello, la carta). Il controllo delle uscite prende
-  // questi e il CVV, che non legge da sé (guardianoStatico.js, segretiInUscita); il resto lo legge con le sue forme.
+  // solo questi, che non legge da sé (guardianoStatico.js, segretiInUscita); il resto lo legge con le sue forme.
   const conCheApre = (x, apre) => (apre ? Object.assign(x, { apre: true }) : x);
   // «The serial code of my phone»: un nome comune davanti a «code» ne fa un identificativo, come nell'etichetta inglese.
   const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
