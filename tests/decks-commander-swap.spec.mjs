@@ -4,6 +4,7 @@
 // Scryfall e provider finti nel main; i messaggi passano dal cammino IPC vero della pagina.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function mockScryfall(app) {
   await app.evaluate(() => {
