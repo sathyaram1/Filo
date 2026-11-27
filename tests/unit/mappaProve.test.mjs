@@ -184,10 +184,13 @@ test('finish:check: coi file che la mappa conosce sceglie lei dalle righe cambia
     // Una riga dentro a() e una del modulo, che gira a ogni caricamento.
     scrivi('src/main/x.js', `// uno\n// due\n${SORGENTE['src/main/x.js'].replace('return 1;', 'return 9;').replace('a();\n', 'a(); a();\n')}`);
     scrivi('src/main/y.js', 'module.exports = 1;\n');
+    scrivi('src/pages/dashboard/dashboard.css', 'a { color: blue; }\n');
     g('add', '-A'); g('commit', '-qm', 'lavoro');
     const m = { ...mappa(), commit: commitMappa };
-    const scelta = specDellaScelta({ changed: ['src/main/x.js', 'src/main/y.js'], base: 'main', root: dir, mappa: m });
-    assert.deepEqual(scelta.specs.sort(), ['tests/a', 'tests/y-cosa'], 'a passa da a(); y è nuovo e va per area; x-area non serve più');
+    // Un foglio di stile la mappa lo sa solo da chi lo carica: per lui resta la scelta per area.
+    m.file = { ...m.file, 'src/pages/dashboard/dashboard.css': { carico: 0, funzioni: [] } };
+    const scelta = specDellaScelta({ changed: ['src/main/x.js', 'src/main/y.js', 'src/pages/dashboard/dashboard.css'], base: 'main', root: dir, mappa: m });
+    assert.deepEqual(scelta.specs.sort(), ['tests/a', 'tests/dashboard-home', 'tests/y-cosa'], 'a passa da a(); y è nuovo e il CSS va per area; x-area non serve più');
     assert.deepEqual(scelta.mappa.soloCaricano, ['tests/b']);
     const testo = testoDellaMappa({ letta: { mappa: m, fonte: 'corsa 7' }, daMappa: scelta.mappa });
     assert.match(testo, /corsa 7.*1 spec passano dalle funzioni cambiate/);
