@@ -535,7 +535,9 @@
     + '(?:ключ(?:а|ом|у)?|klucz(?:a|em|u)?)\\s+(?:сети|безопасности(?:\\s+сети)?|шифрования|sieci(?:\\s+bezprzewodowej)?|zabezpiecze[ńn]|wi-?fi|wlan|wpa[23]?(?:-psk)?)'
     + '|сетевой\\s+ключ|(?:netwerk|beveiligings|wpa[23]?(?:-psk)?-?|wi-?fi-?|wlan-?)sleutel'
     + `)${FUORI}|密[钥鑰]|暗号化キー|セキュリティ\\s*キー|ネットワーク\\s*キー|事前共有キー|(?:네트워크\\s*)?보안\\s*키|(?:네트워크|무선|wpa[23]?(?:-psk)?|wi-?fi)\\s*키`;
-  const NON_ETICHETTA = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
+  // Le parole che dopo «password» ne dicono una proprietà, non il valore: nel testo e nei nomi delle chiavi (tipoDiNome).
+  const PROPRIETA_PASSWORD = 'managers?|policy|reset|recovery|generator|hint|strength';
+  const NON_ETICHETTA = `(?!\\s*(?:${PROPRIETA_PASSWORD})\\b)`;
   const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   // Cinese, giapponese e thai non staccano le parole: dove finisce il valore e le parole che lo annunciano senza i due
