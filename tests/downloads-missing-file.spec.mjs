@@ -14,6 +14,7 @@
 // identica a una scaricata un attimo fa → tutti e tre rossi.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 import { createServer } from 'node:http';
 import { existsSync, unlinkSync } from 'node:fs';
 
