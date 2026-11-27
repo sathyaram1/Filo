@@ -150,7 +150,8 @@
     }
     // Il menu dell'icona col fuoco, dalla tastiera: il tasto Menu o Maiusc+F10.
     if (!inSub && dentro && (k === 'ContextMenu' || (k === 'F10' && e.shiftKey)) && attivo.dataset.snVarianti === '1') {
-      attivo.dispatchEvent(new CustomEvent('sn-varianti'));
+      // Per chiamata diretta, mai con un evento: uno script del sito ne fabbricherebbe uno uguale.
+      menuDellIcona.get(attivo)?.();
       return true;
     }
     if (!inSub && k.length === 1) {
