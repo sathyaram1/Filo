@@ -2769,22 +2769,44 @@
     return (ultima && U.collegamentoScritto(ultima.text)) || '';
   }
 
-  // Un'immagine o un filmato dentro un collegamento: nella fila anche apri e copia il collegamento, come nelle voci.
-  function azioniDellAnteprima(link) {
-    if (!link) return {};
-    const a = azioniDelLink(link);
-    return { openTab: { onClick: a.openTab }, linkCopy: { onClick: a.copy } };
-  }
-
-  // La fila in cima al menu (#1434): per il contesto scelto da buildContextualItems, chi esegue le sue azioni.
-  // Le azioni che qui non hanno senso (una selezione segreta non si cerca) mancano, e la fila non le mostra.
-  function filaContestuale(contesto, { selInfo, target, clipboardHistory }) {
+  // Le azioni della griglia (#2555) per il contesto scelto da buildContextualItems, con chi le esegue e su quali
+  // oggetti. Le azioni che qui non hanno senso (una selezione segreta non si cerca) mancano, e la griglia non le mostra.
+  function azioniDelContesto(contesto, { selInfo, target, clipboardHistory, sito }) {
     const nome = contesto && contesto.nome;
-    if (!nome || !MenuIcons?.fila) return null;
     const testo = selInfo ? selInfo.selection : '';
     const sel = azioniDellaSelezione(selInfo, target);
-    const daSel = (k) => (sel[k] ? { onClick: sel[k] } : null);
     const azioni = {};
+    const daSel = (verbo, k, spec = {}) => { if (sel[k]) suOggetto(azioni, verbo, 'selezione', { onClick: sel[k], ...spec }); };
+    const scrittura = nome === 'scrivibile' || nome === 'campo' || nome === 'cursore';
+    if (scrittura) {
+      if (nome !== 'cursore') {
+        daSel('cut', 'cut', { label: I18n.t('menu_cut'), misura: 'copy-cut' });
+        daSel('copy', 'copy', { label: I18n.t('menu_copy'), misura: 'copy-cut' });
+      }
+      const incolla = Actions.buildPasteItem(clipboardHistory);
+      azioni.paste = {
+        label: incolla.label, onClick: incolla.onClick, misura: incolla.azione,
+        cronologia: { history: incolla.history, onPick: incolla.onPickHistory, onRemove: incolla.onRemoveHistory, onClear: incolla.onClearHistory },
+      };
+      const detta = TTS.buildDictateItem(target);
+      if (detta && typeof detta.onClick === 'function') azioni.dictate = { label: detta.label, onClick: detta.onClick, disabled: !!detta.disabled };
+      if (contesto.valutaQui) { const v = buildValutaItem(contesto.valutaQui); azioni.valuta = { label: v.label, onClick: v.onClick }; }
+      const campoDiFilo = SpellCheck?.findSupportedEditable?.(target) || null;
+      if (campoDiFilo) {
+        const tutti = voceCorreggiTutti(campoDiFilo, 1);
+        if (tutti) azioni.correggiTutti = { label: tutti.label, onClick: tutti.onClick };
+        const controlla = voceControlla(campoDiFilo);
+        if (controlla) azioni.controlla = { label: controlla.label, onClick: controlla.onClick };
+        const annulla = contesto.mouse ? voceAnnullaCorrezione(campoDiFilo, contesto.mouse) : null;
+        if (annulla) azioni.annullaCorrezione = { label: annulla.label, onClick: annulla.onClick };
+      }
+      if (nome !== 'cursore' && !contesto.segreto) {
+        daSel('search', 'search', { label: I18n.t('menu_search_text'), misura: 'search-web' });
+        const leggi = TTS.buildReadAloudItem(testo);
+        if (leggi) suOggetto(azioni, 'readAloud', 'selezione', { label: leggi.label, onClick: leggi.onClick, misura: leggi.azione });
+        suOggetto(azioni, 'edit', 'selezione', { label: I18n.t('menu_edit_selection'), onClick: () => EditBox.openEditBox(selInfo.selection) });
+      }
+    }
     if (nome === 'scrivibile') {
       Object.assign(azioni, {
         bold: { onClick: () => formatta('bold') },
@@ -2797,44 +2819,91 @@
           tieneAperto: true,
           onClick: (ancora) => Menu.openLinkSubmenu(ancora, { valore: collegamentoProposto(selInfo, clipboardHistory), onApplica: (v) => collega(v) }),
         },
-        cut: daSel('cut'),
-        copy: daSel('copy'),
-        search: daSel('search'),
       });
       const stato = statoFormattazione();
       for (const k of Object.keys(stato)) azioni[k].acceso = stato[k];
-    } else if (nome === 'campo') {
-      Object.assign(azioni, {
-        cut: daSel('cut'),
-        copy: daSel('copy'),
-        paste: { onClick: () => Actions.pasteFromClipboard() },
-        search: daSel('search'),
-      });
     } else if (nome === 'testo') {
-      Object.assign(azioni, { copy: daSel('copy') });
+      daSel('copy', 'copy', { label: I18n.t('menu_copy'), misura: 'copy-cut' });
       if (!contesto.segreto) {
-        azioni.search = daSel('search');
-        azioni.translate = { onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) };
+        daSel('search', 'search', { label: I18n.t('menu_search_text'), misura: 'search-web' });
+        suOggetto(azioni, 'translate', 'selezione', { label: I18n.t('fila_translate'), onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) });
         const leggi = TTS.buildReadAloudItem(testo);
-        if (leggi) azioni.readAloud = { onClick: leggi.onClick };
+        if (leggi) suOggetto(azioni, 'readAloud', 'selezione', { label: leggi.label, onClick: leggi.onClick, misura: leggi.azione });
       }
     } else if (nome === 'immagine' && contesto.img) {
-      Object.assign(azioni, azioniDellImmagine(contesto.img));
-      for (const k of Object.keys(azioni)) azioni[k] = { onClick: azioni[k] };
-      if (!aiutoAcceso()) delete azioni.ask;
-      Object.assign(azioni, azioniDellAnteprima(contesto.link));
+      azioniPerImmagine(contesto.img, azioni);
+      if (contesto.link) azioniPerLink(contesto.link, azioni);
     } else if (nome === 'link' && contesto.link) {
-      const a = azioniDelLink(contesto.link);
-      for (const k of ['openTab', 'copy', 'saveForLater', 'share']) azioni[k] = { onClick: a[k] };
+      azioniPerLink(contesto.link, azioni);
     } else if (nome === 'media' && contesto.media) {
-      Object.assign(azioni, Actions.azioniDelMedia(contesto.media, contesto.link || null), azioniDellAnteprima(contesto.link));
-    } else if (nome === 'cursore') {
-      azioni.paste = { onClick: () => Actions.pasteFromClipboard() };
-      const detta = TTS.buildDictateItem(target);
-      if (detta && typeof detta.onClick === 'function') azioni.dictate = { onClick: detta.onClick, disabled: !!detta.disabled };
+      const m = Actions.azioniDelMedia(contesto.media, contesto.link || null);
+      const misura = 'video-audio-controls';
+      azioni.playPause = { label: m.playPause.label, nome: m.playPause.label, icona: m.playPause.icona, onClick: m.playPause.onClick, misura };
+      azioni.mute = { label: m.mute.label, icona: m.mute.icona, acceso: !contesto.media.muted, onClick: m.mute.onClick, misura };
+      if (m.speed) azioni.speed = { label: m.speed.label, valore: m.speed.valore, onClick: m.speed.onClick, misura };
+      azioni.loop = { label: m.loop.label, acceso: !!contesto.media.loop, onClick: m.loop.onClick, misura };
+      if (m.pip) azioni.pip = { label: m.pip.label, acceso: !!m.pip.acceso, onClick: m.pip.onClick, misura: 'video-pip' };
+      azioni.controls = { label: m.controls.label, acceso: !!contesto.media.controls, onClick: m.controls.onClick, misura };
+      suOggetto(azioni, 'save', 'media', { label: m.save.label, onClick: m.save.onClick, misura: 'copy-download-video' });
+      suOggetto(azioni, 'copy', 'indirizzoMedia', { label: m.copyLink.label, onClick: m.copyLink.onClick, misura: 'copy-download-video' });
+      if (contesto.link) azioniPerLink(contesto.link, azioni);
     }
-    for (const k of Object.keys(azioni)) if (!azioni[k]) delete azioni[k];
-    return MenuIcons.fila(nome, azioni);
+    Object.assign(azioni, azioniComuni(sito));
+    return azioni;
+  }
+
+  // Dove sta, nella pagina, ogni oggetto su cui il menu può agire: il contorno che si vede passando su un'icona.
+  function bersagliDel(contesto, selInfo, target) {
+    const rett = (el) => {
+      try {
+        const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+        return r && r.width > 0 && r.height > 0 ? [{ x: r.left, y: r.top, w: r.width, h: r.height }] : null;
+      } catch (_) { return null; }
+    };
+    const out = {};
+    if (selInfo) {
+      const campo = target && target.closest ? target.closest('input, textarea') : null;
+      let righe = null;
+      if (!campo) {
+        try {
+          const g = window.getSelection();
+          if (g && g.rangeCount) righe = [...g.getRangeAt(0).getClientRects()].filter((r) => r.width > 1 && r.height > 1)
+            .map((r) => ({ x: r.left, y: r.top, w: r.width, h: r.height }));
+        } catch (_) {}
+      }
+      out.selezione = (righe && righe.length ? righe : null) || rett(campo);
+    }
+    if (contesto.img) { out.immagine = rett(contesto.img); out.indirizzoImmagine = out.immagine; }
+    if (contesto.link) { out.link = rett(contesto.link); out.file = out.link; }
+    if (contesto.media) { out.media = rett(contesto.media); out.indirizzoMedia = out.media; }
+    if (contesto.editable) out.campo = rett(campoRicco(target) || (target && target.closest && target.closest('input, textarea, [contenteditable]')));
+    for (const k of Object.keys(out)) if (!out[k]) delete out[k];
+    return out;
+  }
+
+  // Come si dice l'oggetto principale del menu, nella riga del nome a riposo, e quello di un audio.
+  function oggettiDel(contesto) {
+    const audio = contesto.media && contesto.media.tagName === 'AUDIO';
+    return audio ? { media: 'l\'audio', indirizzoMedia: 'l\'indirizzo dell\'audio' } : {};
+  }
+  const RIPOSO = Object.freeze({
+    scrivibile: 'la selezione', campo: 'la selezione', testo: 'la selezione', immagine: 'l\'immagine', link: 'il collegamento',
+    media: 'il filmato', cursore: 'il campo', pagina: '',
+  });
+
+  // La griglia in cima al menu (#1434, #2555). `scritte`: le voci che una pagina di Filo dà al suo elemento.
+  let rifaiAzioni = null;
+  function aggiornaFila() { if (rifaiAzioni) MenuIcons?.aggiorna?.(rifaiAzioni()); }
+  function filaContestuale(contesto, { selInfo, target, clipboardHistory, sito = null, scritte = [] }) {
+    const nome = contesto && contesto.nome;
+    if (!nome || !MenuIcons?.fila) return null;
+    rifaiAzioni = () => azioniDelContesto(contesto, { selInfo, target, clipboardHistory, sito });
+    const oggetti = oggettiDel(contesto);
+    const aspetto = Disp?.aspettoMenu ? Disp.aspettoMenu(settings && settings.menuIcone) : {};
+    return MenuIcons.fila(nome, rifaiAzioni(), {
+      bersagli: bersagliDel(contesto, selInfo, target), oggetti, scritte, aspetto,
+      oggetto: oggetti.media && nome === 'media' ? oggetti.media : RIPOSO[nome],
+    });
   }
 
 
