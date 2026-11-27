@@ -46,7 +46,6 @@ test('r3 un tasto sbagliato in «era», «was» e «diventata»', () => {
     'the password wsa Mela!Verde77',
     'the password eas Mela!Verde77',
     'la password è diventaya Mela!Verde77',
-    'la password è divenata Mela!Verde77',
   ]);
 });
 
