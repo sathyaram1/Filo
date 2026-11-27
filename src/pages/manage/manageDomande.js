@@ -1424,7 +1424,7 @@
           if (nome) voci.push({ testo: nome, azione: () => { apri([d.id]); disegna(); rispondi(d.id, i); } });
         });
       }
-      const et = d.stato === 'aperta' ? etichettaDi(consigliata(d)) : null;
+      const et = daRispondere(d) ? etichettaDi(consigliata(d)) : null;
       if (et) voci.push({ testo: `Applica il consiglio: ${et}`, azione: () => { apri([d.id]); disegna(); consiglioUna(d.id); } });
       if (d.stato !== 'in_smistamento') voci.push({ testo: voceDiscuti(d.id), titolo: titoloDiscuti(d.id), azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
       if (['aperta', 'in_lavorazione', 'in_smistamento'].includes(d.stato)) voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
