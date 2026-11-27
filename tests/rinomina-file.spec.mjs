@@ -11,6 +11,7 @@ import { cartellaTemporanea, cartellaInCasa } from './helpers/percorsi.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { confirmText, clickConfirm } from './helpers/confirm.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = join(process.cwd(), 'tests', '.shots');
 
