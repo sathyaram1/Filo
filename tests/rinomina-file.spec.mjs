@@ -177,7 +177,7 @@ test('il nome si può correggere prima di confermare, non sovrascrive e non camb
     const chip = page.locator('.dash-file-btn', { hasText: 'La scansione' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(page).scegli('Dai un nome sensato');
     const campo = page.locator('.sn-rinomina-campo');
     await expect(campo).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
 
@@ -196,7 +196,7 @@ test('il nome si può correggere prima di confermare, non sovrascrive e non camb
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-rinomina')).toHaveCount(0);
     await chip.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(page).scegli('Dai un nome sensato');
     await expect(campo).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
     await campo.fill('   ');
     await page.locator('.sn-rinomina-ok').click();
@@ -410,7 +410,7 @@ test('un file trascinato dove si scrive: entra col percorso, e dal tasto destro 
     const chip = page.locator('.dash-file-chip');
     await expect(chip).toHaveText(/scan_00231\.pdf/);
     await chip.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(page).scegli('Dai un nome sensato');
     await expect(page.locator('.sn-rinomina-campo')).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
     await page.locator('.sn-rinomina-ok').click();
     await expect(chip).toHaveText(/Bolletta luce Enel Marzo 2026\.pdf/);
@@ -493,7 +493,7 @@ test('col nome automatico acceso, il PDF che non prende un nome lo dice con «Da
 
 // Clic altrove dopo «Rinomina»: il riquadro con «Annulla» se ne va, il nome di prima resta al tasto destro.
 async function rinominaEChiudi(page) {
-  await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+  await menuDi(page).scegli('Dai un nome sensato');
   await expect(page.locator('.sn-rinomina-campo')).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
   await page.locator('.sn-rinomina-ok').click();
   await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText(`Rinominato: ${NOME_NUOVO}`);
@@ -566,7 +566,7 @@ test('Invio mentre Filo legge ancora il file: rinomina col nome che arriva, non 
     const chip = page.locator('.dash-file-btn', { hasText: 'scan_00231.pdf' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(page).scegli('Dai un nome sensato');
     await expect(page.locator('.sn-rinomina-stato')).toContainText('Leggo');
     await page.locator('.sn-rinomina-campo').press('Enter');
     await expect(page.locator('.sn-rinomina-stato')).toContainText('Rinomino appena ho il nome');
@@ -707,7 +707,7 @@ test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tas
     const chip = page.locator('.dash-file-btn', { hasText: 'scan_00901.pdf' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(page).scegli('Dai un nome sensato');
     await expect(page.locator('.sn-rinomina-campo')).toHaveValue('Bolletta acqua aprile 2026', { timeout: 20000 });
     await page.keyboard.press('Escape');
 
