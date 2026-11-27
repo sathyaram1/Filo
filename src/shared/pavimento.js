@@ -190,7 +190,6 @@
   const COSE_CHE_SI_APRONO = 'cancell(?:o|i|etto)|portone|ingresso|entrata|citofono|cassaforte|casseforti|cassett[ae]\\s+(?:delle\\s+)?chiavi|keybox|lockbox|key\\s?safe|lucchett[oi]|serratur[ae]|allarm[ei]|antifurto|ritir(?:o|are)|preliev(?:o|i|are)|armadiett[oi]|locker|wi-?fi|wlan|dispositiv[oi]|device|garage|gate|door|safe|alarm|pick-?up|withdrawal|keypad|appartament[oi]|apartment|serrand[ae]|ascensor[ei]|elevator|bancomat|building|entry|lock|apertur[ae]|disattivazion[ei]|disinseriment[oi]|opening';
   const APRE = new RegExp(`\\b(?:${COSE_CHE_SI_APRONO})\\b`, 'i');
   const NOME_CHE_APRE = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae]|apri(?:re)?|apre|entra(?:re)?)\\b`, 'i');
-  const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])\\s*(?:[:=#]|è|\\bis\\b)?\\s*$`, 'i');
   const LEGAMI = /^(?:\s+|(?:d|l|dell|all|dall|nell)['’]|(?:di|del|della|dello|dei|degli|delle|per|da|a|al|alla|allo|il|la|lo|i|gli|le|tuo|tua|of|for|to|the|your)\b)+/i;
   const PER_APRIRE = /\b(?:apri(?:re)?|apre|aprono|open(?:s|ing)?|entra(?:re)?|disattiva(?:re)?|disinseri(?:re|sci)|disarm(?:a|are)?)\b/i;
   // Il codice del proprio telefono o computer lo sblocca, in ogni lingua (#1403.44): col possessivo e l'apparecchio a
@@ -218,6 +217,19 @@
   const CHIUDE_VERO = `(?:\\s*[:=#,]|\\s*,?${AVV}\\s+(?:${VERBO_SBLOCCO}(?![\\p{L}])(?:${AVV}\\s+${PARTICIPIO})?|${AUSILIARE}${AVV}\\s+${PARTICIPIO})`
     + `(?![\\p{L}])(?:\\s*[:=])?${AVV}(?:\\s+(?:il|el|le|o|the))?)`;
   const CHIUDE_CORPO = `${CHIUDE_VERO}?`;
+  // Il codice di quello che si apre e il PIN chiudono l'etichetta come il proprio apparecchio (#1403.93): «Il codice del
+  // cancello è sempre 4829», «The gate code is now 4829», «Il codice del cancello e 4829».
+  // La virgola, la «e» senza accento e il «to» polacco sono anche congiunzioni o preposizioni: valgono il verbo solo
+  // subito dopo la cosa che si apre («del cancello e 4829», non «del cancello non funziona e 4829 volte», «the PIN to 4829 people»).
+  const CHIUDE_CHI_ENTRA = new RegExp(`${CHIUDE_VERO}\\s*$`, 'iu');
+  const CHIUSURA_DEBOLE = /^\s*,|^(?:\s*,)?(?:\s+\p{L}+)?\s+(?:e|to)(?![\p{L}'’])/iu;
+  const DOPO_CHE_SI_APRE = new RegExp(`(?:^|\\s)(?:${COSE_CHE_SI_APRONO}|port[ae])(?:\\s+[\\p{L}-]+)?$`, 'iu');
+  const chiudeChiEntra = (fra) => {
+    const m = CHIUDE_CHI_ENTRA.exec(fra);
+    return !!m && (!CHIUSURA_DEBOLE.test(m[0]) || DOPO_CHE_SI_APRE.test(fra.slice(0, m.index)));
+  };
+  const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])(?:${CHIUDE_VERO})?\\s*$`, 'iu');
+  const SOLO_DOPO_IL_NOME = new RegExp(`^(?:${CHIUDE_VERO})?\\s*$`, 'iu');
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
   // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung», «13»): elencate, perché dopo
   // «phone» può venire «number»; e solo col verbo dopo: «codice del mio telefono nuovo serie 71034» è un altro dato.
@@ -295,7 +307,7 @@
     const it = [...prima.matchAll(/\b(?:codic[ei]|pin)\b/gi)].pop();
     const en = [...prima.matchAll(/\b([A-Za-z-]+)\s+(?:codes?|pin)\b/g)].pop();
     if (en && (!it || en.index > it.index)) {
-      const solo = /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length));
+      const solo = SOLO_DOPO_IL_NOME.test(prima.slice(en.index + en[0].length));
       if (NOME_CHE_APRE.test(en[1])) return { apre: true, solo };
       if (solo && SI_SBLOCCA_SOLO.test(en[1])) return { apre: true, solo };
     }
@@ -350,7 +362,7 @@
   const DOPO_VIRGOLETTA = new RegExp(`^(?:[ \\t]*${INTORNO_CHIUSE})+`);
   // `risposta`: la riga sotto, dopo chi scrive (`testa`). Sotto chi chiede il codice vale ogni punto del messaggio,
   // come per la password («Luc: è sempre 4821», #2692); sotto una riga che lo nomina e basta, solo la testa.
-  function alPostoDelCodice(z, m, inTesta, forte, risposta) {
+  function alPostoDelCodice(z, m, inTesta, forte, risposta, entra) {
     const prima = z.slice(0, m.index).replace(SENZA_VIRGOLETTA, '');
     if (inTesta) {
       if (!risposta) return !prima.trim();
@@ -366,6 +378,7 @@
     if (!fra.trim()) return true;
     // Il codice del proprio apparecchio ha la sua etichetta, con le sue virgole e i suoi refusi («, c'est», «e» senza accento).
     if (!/\d/.test(fra) && (delMioApparecchio(prima.slice(-160)) || etichettaSbloccabile(prima.slice(-160)))) return true;
+    if (entra && !/\d/.test(fra) && fra.length <= 60 && !/[;!?]/.test(fra) && chiudeChiEntra(fra)) return true;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
     if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
     if (CHIUDE_ETICHETTA.test(fra) || (nomePolacco(n[0], prima.slice(Math.max(da, n.index - 60), n.index)) && CHIUDE_KOD.test(fra))) return true;
@@ -431,7 +444,7 @@
               const entra = forte || pin || chiave.apre;
               if (nonApre && !(nome && entra)) continue;
               if (predefinito && chiave.pin && !forte) continue;
-              if (nome ? !(alPostoDelCodice(z, m, inTesta, forte || pin, risposta) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
+              if (nome ? !(alPostoDelCodice(z, m, inTesta, forte || pin, risposta, entra) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
                 : !(m[1] || m[3] || INTRODOTTO.test(prima))) continue;
               // Un anno resta, tranne subito dopo il nome di quello che apre: «Il codice del cancello è 1990».
               if (!lettere && !m[2] && ANNO.test(v) && !chiave.solo) continue;
