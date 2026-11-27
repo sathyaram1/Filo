@@ -118,7 +118,7 @@ test('#869.2 due schede home continuano una conversazione sola, da tutte e due l
   await expect(prima.locator('.dash-bubble-filo', { hasText: 'Le orche cacciano' })).toBeVisible({ timeout: 10_000 });
   await expect(prima.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
-  await shell.locator('.tab').nth(1).click();
+  await davanti(shell, seconda, 1);
   await expect(seconda.locator('#bubbles .dash-bubble-filo', { hasText: 'Le orche cacciano' })).toBeVisible({ timeout: 10_000 });
   await chiedi(seconda, 'e le balene?');
   await expect(seconda.locator('.dash-bubble-filo', { hasText: 'Le balene filtrano' })).toBeVisible({ timeout: 10_000 });
