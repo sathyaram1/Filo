@@ -14,6 +14,7 @@
         { testo: 'Il codice che sblocca il tuo telefono o il tuo computer, scritto come «il codice del mio telefono è 4829» o «my phone code is 4829», non arriva più a nessun modello, in italiano come in francese, spagnolo, inglese e nelle altre lingue.', segnalazione: 1403 },
         { testo: 'Una password, un PIN o un CVV dopo un\'etichetta in grassetto o in corsivo, come «**Password:** …» negli appunti scritti in Markdown o in una risposta copiata da un modello, non arrivano più a nessun modello, come quando l\'etichetta è scritta senza formattazione.', segnalazione: 2673 },
         { testo: 'Una password sotto «Password:» in un file di testo creato su Windows non arriva più ai modelli, come in qualunque altro testo.', segnalazione: 2673 },
+        { testo: 'Una password in una tabella, come «| Password: | … |», non arriva più ai modelli, e il correttore non riceve più il CVV della carta. Una frase sulla password, come «va cambiata ogni 90 giorni», arriva intera al correttore.', segnalazione: 2695 },
       ],
     },
     {

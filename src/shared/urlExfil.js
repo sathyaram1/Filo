@@ -387,15 +387,19 @@
     const k = fuori.search(/\n|[.,;!?](?=\s|$)/);
     return k < 0 ? coda : coda.slice(0, k);
   };
-  function segretiDetti(testo) {
+  // `spiega(parole, k)`: la parola k della frase spiega la password («va cambiata ogni 90 giorni») e, di sole lettere, non
+  // è il valore. Chi toglie il testo (correttoreRiservati.js) la passa; chi lo confronta con un URL no.
+  function segretiDetti(testo, { spiega = null } = {}) {
     const out = [];
     const prendi = (re, soloCifre) => {
       for (const m of testo.matchAll(re)) {
         const coda = fineFrase(testo.slice(m.index + m[0].length, m.index + m[0].length + 200));
-        for (const w of coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO)) {
+        const parole = coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO);
+        for (const [k, w] of parole.entries()) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
           const cifre = /\d/.test(t);
-          if (cifre ? soloAlnum(t).length < 4 : (soloCifre || t.length < MIN_TOKEN || RIEMPITIVI.has(t))) continue;
+          const spiegata = !cifre && !!spiega && !!spiega(parole, k);
+          if (cifre ? soloAlnum(t).length < 4 : (soloCifre || spiegata || t.length < MIN_TOKEN || RIEMPITIVI.has(t))) continue;
           out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
         }
       }

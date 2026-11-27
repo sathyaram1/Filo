@@ -427,7 +427,8 @@
   // `password" id="pwd1"` quello che segue è di un altro campo.
   const ACCANTO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:：|=\\t?!.,;\\[\\]«»"<>{}$]){0,40}?';
   const ACCANTO_LUNGO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:：|=\\t?!.,;\\[\\]«»"<>{}$]){0,90}?';
-  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
+  // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra.
+  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
   // Il «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
   const VERBO_PASSWORD = `(?:${VERBO}|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)`;
   const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+${VERBO_PASSWORD}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
@@ -757,6 +758,17 @@
       out.push(k >= 0 ? { ...x, valore: s.slice(k, k + v.length) } : x);
     }
   }
+  // Una cella che descrive la password non è il valore, come la stessa riga fuori dalla tabella: lo dice l'etichetta, una
+  // sua proprietà («| Scadenza password: | 90 giorni |»), o la cella che comincia come una spiegazione («vedi sotto»).
+  const PROPRIETA = /(?:^|[^\p{L}])(?:scadenza|lunghezza|recupero|requisit[io]|reimpostazione|cambio|robustezza|complessit[aà]|durata|validit[aà]|formato|regol[ae]|politica|criteri|suggeriment[oi]|expiry|expiration|length|requirements?|rules?|dimenticat[ao]|smarrit[ao]|scadut[ao]|forgotten|expired)(?![\p{L}])/iu;
+  function cellaCheSpiega(etichetta, cella) {
+    if (PROPRIETA.test(etichetta)) return true;
+    const parole = testo(cella).trim().split(/\s+/).filter(Boolean).map((x) => x.replace(/[.,;:]+$/, ''));
+    if (parole.length && DESCRIVE.test(parole[0])) return true;
+    if (parole.length < 2) return false;
+    return INIZIO_SPIEGAZIONE.test(parole[0]) || /^(?:(?:cambiat|modificat|aggiornat|scadut|reimpostat|resettat)[aoie]|scad(?:e|ono)|clicca|premi|click)$/i.test(parole[0])
+      || (parole.some((x) => /\d/.test(x)) && parole.some((x) => MISURA.test(x) || TEMPO.test(x)));
+  }
   function etichette(s, out) {
     alPostoDelValore(s, out);
     fraseDopo(s, out);
@@ -772,7 +784,7 @@
         const pezzi = m[2].trim().split(/\s+/);
         v = MISURA.test(pezzi[1] || '') ? '' : valorePassword(pezzi[0], { forma: pezzi.length > 1 });
       } else if (/^[-–—→]$/.test(m[1])) v = valorePassword(m[2].trim().split(/\s+/)[0], { forma: true });
-      else v = valorePassword(m[2]);
+      else if (!cellaCheSpiega(m[0].slice(0, m.indices[1][0] - m.index), m[2])) v = valorePassword(m[2]);
       if (v) out.push(alPosto(v, m.indices[2][0], m[2]));
     }
     for (const re of [ACCANTO_DEBOLE, SOTTO]) {
@@ -1067,7 +1079,9 @@
   }
 
   // ETICHETTE: il testo della regola dei nomi della password, per i campi dei moduli (campiSegreti.js); NOMI_DEL_PIN per
-  // i segreti detti dall'utente che non devono uscire in un indirizzo (urlExfil.js).
-  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, ETICHETTE: ETICHETTA_NUDA, NOMI_DEL_PIN };
+  // i segreti detti dall'utente che non devono uscire in un indirizzo (urlExfil.js); SPIEGA, le parole che spiegano la
+  // password, per il correttore.
+  const SPIEGA = { inizio: INIZIO_SPIEGAZIONE, misura: MISURA, tempo: TEMPO, descrive: DESCRIVE, nonValore: NON_VALORE };
+  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, SPIEGA, ETICHETTE: ETICHETTA_NUDA, NOMI_DEL_PIN };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAVIMENTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

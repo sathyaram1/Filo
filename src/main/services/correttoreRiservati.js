@@ -13,6 +13,71 @@ const SOPRA_MAX = 1500;
 const RT = () => globalThis.SN_RISERVATI_TESTO || require('../../shared/riservatiNelTesto.js');
 const PAV = () => globalThis.SN_PAVIMENTO || require('../../shared/pavimento.js');
 
+// Com'è la password, non qual è: «scade», «è sbagliata», «deve contenere», «resta segreta». Con NON_VALORE del pavimento.
+const STATO = /^(?:scad(?:e|ono|rà|ut[aoie])|sbagliat[aoie]|errat[aoie]|corrett[aoie]|debol[ei]|fort[ei]|sicur[aoie]|valid[aoie]|bloccat[aoie]|dimenticat[aoie]|smarrit[aoie]|pers[aoie]|rinnovat[aoie]|resettat[aoie]|reimpostat[aoie]|modificat[aoie]|cambi(?:a|ano|erà|are|at[aoie])|stat[aoie]|funzion(?:a|ano|erà)|dett[aoie]|lung(?:a|o|he|hi)|cort[aoie]|troppo|spesso|essere|ricord(?:o|a|i|iamo|are)|trov(?:i|a|ate|ano)|recuper(?:a|ano|i)|prima|dopo|precedente|non|mai|va|vanno|obbligatori[aoie]|richiest[aoie]|facoltativ[aoie]|temporane[aoie]|provvisori[aoie]|segret[aoie]|divers[aoie]|salvat[aoie]|inserit[aoie]|scritt[aoie]|personal[ei]|unic[aoie]|privat[aoie]|nascost[aoie]|blocc(?:a|ano)|serv(?:e|ono|irà)|contien[ei]|conten(?:ere|gono)|avere|hanno|devono|possono|viene|vengono|rest(?:a|ano)|riman(?:e|gono)|divent(?:a|ano|erà)|entrare|accedere|inserir(?:e|la)|scriver(?:e|la)|usar(?:e|la)|sceglier(?:e|la)|digitar(?:e|la)|cambiarla|dirl[ao]|convien[ei]|tentativ[oi]|clicca|premi|tocca|click|tutto|tuttora|case|sensitive|expire[sd]?|wrong|incorrect|invalid|weak|strong|changed|forgotten|lost|works?|too|short|long|often|not|never|before|previous|required|must|contain)$/;
+// Quando e quanto, oltre a quelle del pavimento: «domani», «due volte», «una maiuscola», «un numero».
+const QUANDO = /^(?:domani|dopodomani|stamattina|stasera|stanotte|luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica|volt[ae]|tomorrow|times?|maiuscol[aei]|minuscol[aei]|numer[oi]|simbol[oi]|spazi[o]?|uppercase|lowercase|numbers?)$/;
+// Dove sta («sul retro del router», «nel portachiavi») e di chi è («del conto», «dell'email»): una parola sola dopo,
+// così «sul retro gattonero» lascia fuori il valore. «in», «a», «con» no: «cambiata in gattonero» lo presenta.
+const LUOGO = /^(?:sul|sullo|sulla|sui|sugli|sulle|su|nel|nello|nella|nei|negli|nelle|dal|dallo|dalla|dai|dagli|dalle|sotto|sopra|dietro|dentro|presso|per|ogni|on|under|behind|inside|near|every)$/;
+const DI = /^(?:del|dello|della|dei|degli|delle|di|of)$/;
+const DETERMINA = /^(?:il|lo|la|i|gli|le|un|uno|una|ogni|tutti|tutte|mio|mia|tuo|tua|suo|sua|the|an?|my|your|each)$/;
+const APOSTROFATA = /^(?:dell|nell|sull|dall|all|l)['’]\p{L}+$/u;
+const pulita = (w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+
+// Una parola che spiega copre solo sé stessa, non il valore accanto («è gattonero ma scade a giugno»); le vicine le
+// copre solo un luogo o il nome di chi è la password, per una parola. Una data da sola dopo l'annuncio è il valore.
+const coperteDi = new WeakMap();
+function coperte(parole) {
+  if (coperteDi.has(parole)) return coperteDi.get(parole);
+  const S = PAV().SPIEGA;
+  const presenta = RT().PRESENTA_DATO;
+  const p = parole.map((w) => pulita(w).toLowerCase());
+  const annuncio = (i) => presenta.has(p[i]) || (i > 0 && /[:=：]$/.test(parole[i - 1]));
+  const out = p.map(() => false);
+  // Dopo `i`, saltati gli articoli, una parola: con «di …» dietro, anche quella («sul retro del router»).
+  const copriFrase = (i) => {
+    let j = i + 1;
+    for (;;) {
+      while (j < p.length && DETERMINA.test(p[j])) out[j++] = true;
+      if (j >= p.length || annuncio(j)) return j;
+      out[j++] = true;
+      if (j < p.length && DI.test(p[j]) && !annuncio(j)) { out[j++] = true; continue; }
+      return j;
+    }
+  };
+  const pezzoDi = [];
+  const lunghezza = new Map();
+  for (let i = 0, da = null; i < p.length; i++) {
+    if (presenta.has(p[i])) { da = i + 1; continue; }
+    if (annuncio(i)) da = i;
+    pezzoDi[i] = da;
+    if (da !== null) lunghezza.set(da, (lunghezza.get(da) || 0) + 1);
+  }
+  let catena = 0;
+  for (let i = 0; i < p.length; i++) {
+    if (presenta.has(p[i])) { out[i] = true; catena = -1; continue; }
+    if (annuncio(i)) catena = -1;
+    const w = p[i];
+    const sola = pezzoDi[i] !== null && lunghezza.get(pezzoDi[i]) === 1;
+    if (STATO.test(w) || (S && (S.descrive.test(w) || S.nonValore.test(w)))
+      || (!sola && (QUANDO.test(w) || (S && (S.tempo.test(w) || S.misura.test(w)))))) out[i] = true;
+    if (APOSTROFATA.test(w) && (i === catena || !/^l['’]/.test(w))) { out[i] = true; if (i === catena) catena = i + 1; continue; }
+    if (LUOGO.test(w) || (DI.test(w) && (i === catena || (i > 0 && S && S.descrive.test(p[i - 1]))))) {
+      out[i] = true;
+      const fine = copriFrase(i);
+      if (i === catena) catena = fine;
+      i = fine - 1;
+    }
+  }
+  coperteDi.set(parole, out);
+  return out;
+}
+function spiega(parole, k) {
+  if (!PAV().SPIEGA || !RT().PRESENTA_DATO) return false;
+  return coperte(parole)[k];
+}
+
 function riservati(grezzo) {
   // L'enfasi del Markdown fra etichetta e valore («__Password:__ …») si legge come spazi, come nel pavimento.
   const testo = RT().senzaEnfasi(grezzo);
@@ -21,18 +86,22 @@ function riservati(grezzo) {
   const out = [];
   const l = testo.toLowerCase();
   try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
-  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l)); } catch (_) {}
+  try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l, { spiega })); } catch (_) {}
   // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   const valori = [...RT().lunghi(out), ...RT().trova(testo)];
+  // Quello che il pavimento toglie al cancello dei modelli (un CVV di tre cifre, «login_password: …») qui non parte.
+  try { valori.push(...PAV().trova(testo).map((x) => String(x.valore))); } catch (_) {}
   // Una password con gli spazi fra virgolette vale intera, come nel pavimento.
   try { valori.push(...RT().lunghi(PAV().interiFraVirgolette(testo, valori))); } catch (_) {}
   return valori;
 }
 
 // Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
-// Una parola di sole lettere vale intera: il «camera» di una risposta non tocca «cameraman».
+// Una parola di sole lettere vale intera: il «camera» di una risposta non tocca «cameraman». Così un numero corto (CVV,
+// PIN): «123» non tocca l'ordine «81234». Uno lungo no, perché nei pezzi incollati due carte stanno attaccate.
 function formaDi(valore) {
+  if (/^\d{1,7}$/.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore.split('').join('[\\s-]?')}(?![\\p{L}\\p{N}])`, 'giu');
   if (/^\d+$/.test(valore)) return new RegExp(valore.split('').join('[\\s-]?'), 'gi');
   if (/^\p{L}+$/u.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore}(?![\\p{L}\\p{N}])`, 'giu');
   return new RegExp(esc(valore), 'gi');
