@@ -132,7 +132,7 @@ test('cambio vista (per costo) e override di gruppo dal tasto destro', async ({ 
 
   // Vista per costo di mana: gruppi 0 / 1 / 6.
   await page.click('#groupBy');
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'per costo di mana' }).click();
+  await menuDi(page).scegli('per costo di mana');
   await expect(page.locator('.dk-group-head').nth(0)).toContainText('0');
   await expect(page.locator('#groupBy')).toContainText('per costo');
 
