@@ -1139,7 +1139,8 @@
 
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
-  function trova(valore) {
+  // `giro`: quante codifiche di un indirizzo si sono già tolte (codificatiNellIndirizzo).
+  function trova(valore, { giro = 0 } = {}) {
     const vero = testo(valore);
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
     const R = global.SN_RISERVATI_TESTO;
