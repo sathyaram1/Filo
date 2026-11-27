@@ -82,8 +82,8 @@ test('collegamento a un sito da una pagina del computer, poi duplica', async ({ 
   const sito = testServer.html('<!doctype html><title>Sito</title><p>web</p>', { pubblico: true });
   writeFileSync(join(dir, 'link.html'), `<!doctype html><title>Link</title><a id="l" href="${sito}">sito</a>`);
   const { id, pagina } = await apri(app, join(dir, 'link.html'));
-  await pagina.click('#l');
-  await pagina.waitForTimeout(2500);
+  await pagina.evaluate(() => document.getElementById('l').click()).catch(() => {});
+  await new Promise((r) => setTimeout(r, 2500));
   console.log('DOPO CLIC', JSON.stringify(await schede(app)));
   const c = await tm(app, (t, i) => t.duplicateTab(i), id);
   await pagina.waitForTimeout(2500);
