@@ -81,7 +81,7 @@ test('l\'override di gruppo non inquina le altre viste (per costo di mana)', asy
 
   // Cambio vista: per costo di mana.
   await page.click('#groupBy');
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'per costo di mana' }).click();
+  await menuDi(page).scegli('per costo di mana');
   await expect(page.locator('#groupBy')).toContainText('per costo');
 
   await page.screenshot({ path: 'tests/.shots/audit-decks-override-cmc-view.png' });
