@@ -71,7 +71,7 @@
   // L'elenco degli apparecchi il cui codice li sblocca è uno solo (#1403.44): la frase col possessivo, l'etichetta senza
   // e il nome attaccato a «code» («Handycode», «Gerätecode») lo leggono da qui.
   const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
-    + '|t[ée]l|celus?|compus?|gsms?|smartphones?'
+    + '|t[ée]l|celus?|cell|compus?|gsms?|smartphones?'
     + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
     + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
     + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
