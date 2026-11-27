@@ -367,8 +367,13 @@
     }
     return [
       { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', azione: 'chat-archive', onClick: () => { usa(r).catch(() => {}); } },
-      { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
+      { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { copiaIntero(r); } },
     ];
+  }
+
+  // L'estratto coi puntini è l'anteprima della riga: negli appunti va il messaggio intero (#869.2).
+  function copiaIntero(r) {
+    navigator.clipboard.writeText(typeof r.intero === 'string' && r.intero ? r.intero : r.testo).catch(() => {});
   }
 
   function init(deps) {
