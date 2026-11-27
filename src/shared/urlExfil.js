@@ -428,12 +428,15 @@
   // Dopo il rimando l'annuncio, i due punti e gli avverbi si saltano, e il valore è la parola dopo. Di sole lettere senza
   // annuncio solo se chiude la frase: «prova gattonero» sì, «adesso vado a cambiarla» no.
   const CONGIUNZIONE = /^(?:e|ed|ma|o|poi|and|but|or|then)$/u;
+  // Quello che dopo «prova», «adesso», «the new one is» è il resto del discorso: «prova con calma», «adesso entro»,
+  // «ora rinnovala», «try again», «is ready».
+  const SEGUITO_DEL_DISCORSO = /^(?:meglio|peggio|calma|basta|dopo|subito|pure|così|cosi|tardi|presto|pront[ao]|fatt[ao]|entr[aoi]|entrate|esc[oie]|arriv[aoi]|torn[aoi]|funzion[aoi]|aspetta|attendi|riavvia|grazie|later|soon|ready|done|works?|fine|thanks|please|\p{L}{3,}[aei]rl[aoie]|(?:rinnov|cambi|scriv|mett|prov|us|inserisc|ripet|digit|controll|salv|cancell)[aie](?:l[aoie]|mel[ao]|tel[ao]))$/u;
   let avverbio = null;
   function dopoIlRinvio(resto, { soloCifre, spiega }) {
     const r = RINVIO.exec(resto);
     if (!r) return null;
     const G = global.SN_GUARDIANO_STATICO;
-    if (!avverbio && G) avverbio = new RegExp(`^${G.AVVERBIO}$`, 'u');
+    if (!avverbio && G) avverbio = new RegExp(`^(?:${G.AVVERBIO}|${G.AVVERBI})$`, 'u');
     const parole = fineFrase(resto.slice(r[0].length).replace(/^\s+/, '')).split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
     let annunciato = false;
     for (const [k, w] of parole.entries()) {
