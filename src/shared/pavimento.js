@@ -154,7 +154,6 @@
   const COSE_CHE_SI_APRONO = 'cancell(?:o|i|etto)|portone|ingresso|entrata|citofono|cassaforte|casseforti|cassett[ae]\\s+(?:delle\\s+)?chiavi|keybox|lockbox|key\\s?safe|lucchett[oi]|serratur[ae]|allarm[ei]|antifurto|ritir(?:o|are)|preliev(?:o|i|are)|armadiett[oi]|locker|wi-?fi|wlan|dispositiv[oi]|device|garage|gate|door|safe|alarm|pick-?up|withdrawal|keypad|appartament[oi]|apartment|serrand[ae]|ascensor[ei]|elevator|bancomat|building|entry|lock|apertur[ae]|disattivazion[ei]|disinseriment[oi]|opening';
   const APRE = new RegExp(`\\b(?:${COSE_CHE_SI_APRONO})\\b`, 'i');
   const NOME_CHE_APRE = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae]|apri(?:re)?|apre|entra(?:re)?)\\b`, 'i');
-  const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])\\s*(?:[:=#]|è|\\bis\\b)?\\s*$`, 'i');
   const LEGAMI = /^(?:\s+|(?:d|l|dell|all|dall|nell)['’]|(?:di|del|della|dello|dei|degli|delle|per|da|a|al|alla|allo|il|la|lo|i|gli|le|tuo|tua|of|for|to|the|your)\b)+/i;
   const PER_APRIRE = /\b(?:apri(?:re)?|apre|aprono|open(?:s|ing)?|entra(?:re)?|disattiva(?:re)?|disinseri(?:re|sci)|disarm(?:a|are)?)\b/i;
   // Il codice del proprio telefono o computer lo sblocca, in ogni lingua (#1403.44): col possessivo e l'apparecchio a
