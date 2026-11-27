@@ -637,7 +637,7 @@ test('il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regal
   await expect(riga).toBeVisible({ timeout: 15_000 });
 
   await riga.click({ button: 'right' });
-  const menu = page.locator('.sn-wallet-ctxmenu');
+  const menu = menuDi(page).principale;
   await expect(menu).toBeVisible();
   await expect(menu).toContainText('Apri la scheda');
   await expect(menu).toContainText('Copia lo pseudonimo');
@@ -654,9 +654,9 @@ test('il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regal
 
   // Esc lo chiude, e il menu non resta appeso.
   await riga.click({ button: 'right' });
-  await expect(page.locator('.sn-wallet-ctxmenu')).toBeVisible();
+  await expect(menuDi(page).principale).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.sn-wallet-ctxmenu')).toHaveCount(0);
+  await expect(menuDi(page).principale).toHaveCount(0);
 });
 
 // #1087.4 — la vista si rilegge a ogni movimento di crediti, anche di un'altra scheda, e rifaceva da capo la tabella:
@@ -670,7 +670,7 @@ test('una rilettura della vista lascia aperti il menu e la scheda di una persona
   const righe = page.locator('#ownerUsers tr.sn-wallet-user');
   const lei = righe.filter({ hasText: PSEUDONIMO });
   const scheda = page.locator('#ownerUsers .sn-wallet-scheda');
-  const menu = page.locator('.sn-wallet-ctxmenu');
+  const menu = menuDi(page).principale;
   const fuocoSu = () => page.evaluate(() => {
     const a = document.activeElement;
     return a && a.classList.contains('sn-wallet-user') ? a.cells[0].textContent : null;
