@@ -708,6 +708,7 @@
     if (trovata || riprendi) goThread();
     if (chat.app) {
       if (!trovata) await Righe.mostraSola(chat);
+      chatAppInVista = chat.id;
       inputEl.focus();
       return true;
     }
