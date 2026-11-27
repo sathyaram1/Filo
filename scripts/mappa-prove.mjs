@@ -188,7 +188,7 @@ export function testoScelta({ prove, senzaProve, nuovi, mappa, fonte, nota = '',
   }
   if (!prove.length) righe.push('', 'Nessuno spec della mappa passa dalle righe cambiate.');
   const fuori = [...new Set([...senzaProve, ...nuovi])];
-  if (fuori.length) righe.push('', `Nessuna prova li fa eseguire (nuovi, o mai toccati dalla suite): ${fuori.join(', ')}`);
+  if (fuori.length) righe.push('', `Nessuna prova li carica (nuovi, o mai toccati dalla suite): ${fuori.join(', ')}`);
   righe.push('', `In tutto ${prove.length} spec, circa ${secondi(somma(prove))} in fila. Si lanciano quelli del comportamento cambiato; il resto lo corre la suite su main.`);
   return righe.join('\n');
 }
