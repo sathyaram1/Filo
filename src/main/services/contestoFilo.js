@@ -487,6 +487,7 @@ async function componi({ chatId = null, inVista = null, userMessage = '', storia
     fissi: tetti.fissi || 0,
     ancora: ancore[lato],
     chatCorrente: chatId,
+    inVista,
     esiti: (m) => {
       const k = FC().chiave(m);
       const s = dallaScheda.get(k);
