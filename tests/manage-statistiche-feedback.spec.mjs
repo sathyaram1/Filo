@@ -1270,7 +1270,7 @@ test('la pasticca «Tutti» porta il suo numero e ha il suo menu', async ({ open
   });
   await expect(page.locator('[data-fs-creator="__tutti"] .mg-chip-n')).toHaveText('2');
   await page.locator('[data-fs-creator="__tutti"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toBeVisible();
+  await expect(primaDelMenu(page)).toBeVisible();
 });
 
 // La porta gemella, sull'altra sorgente: la lettura delle segnalazioni è
