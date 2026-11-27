@@ -117,10 +117,12 @@ const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repea
   })
   .replace(SPAZIO_HTML, (e) => ' '.repeat(e.length))
   .replace(DUE_PUNTI_HTML, (e) => ':' + ' '.repeat(e.length - 1));
+// Enfasi prima e dopo i tag: «**<b>CVV:</b>**» (#2695.7) la vuole prima, «&lt;b&gt;**PIN:**&lt;/b&gt;» dopo.
+const togliEnfasi = (s) => (/[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s);
 const senzaEnfasi = (t) => {
-  let s = String(t == null ? '' : t);
-  if (s.includes('<') || s.includes('&')) s = senzaTag(s);
-  return /[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s;
+  const s = String(t == null ? '' : t);
+  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(s);
+  return togliEnfasi(senzaTag(togliEnfasi(s)));
 };
 const vistePerLeRegole = (t) => {
   const s = String(t == null ? '' : t);
