@@ -386,7 +386,8 @@
 
   // Il menu proprio di una pagina di Filo, a icone come quello del tasto destro (#2555): `voci` [{ label, onClick,
   // verbo?, icona?, disabled?, bersaglio? }], `elemento` quello su cui agisce, contornato passando sulle icone.
-  function apriVoci({ x, y, voci, elemento = null, oggetto = '', spiegazione = '', alChiudere } = {}) {
+  // `sopra`: aperto da dentro un riquadro di Filo che sta già in cima (la spiegazione di una parola), il menu va sopra.
+  function apriVoci({ x, y, voci, elemento = null, oggetto = '', spiegazione = '', alChiudere, sopra = false } = {}) {
     let bersaglio = null;
     try {
       const r = elemento && elemento.getBoundingClientRect ? elemento.getBoundingClientRect() : null;
