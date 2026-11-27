@@ -12,6 +12,7 @@
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const RT_URL = 'filo://redteam/redteam.html';
