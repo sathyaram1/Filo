@@ -215,8 +215,8 @@
   const APPARECCHIO_SI_SBLOCCA = new RegExp(`(?<![\\p{L}])(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}(?:\\s+(?:si|se|sich|zich|się))?\\s+${SBLOCCA}`
     + `${COL_NUMERO}\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
   // Le cifre staccate dopo l'etichetta del proprio apparecchio («Il codice del mio telefono è 48 29»): da quattro a otto.
-  const CIFRE_STACCATE = new RegExp(`(?<![\\p{L}])(?:${NUCLEO_COL_NOME}${DOPO_APPARECCHIO}?${CHIUDE_VERO}|${NUCLEO}${CHIUDE_VERO})`
-    + '\\s*["«“]?(\\d{1,4}(?:[ .-]\\d{1,4}){1,7})(?![\\d\\p{L}])', 'giu');
+  // Si parte dalle cifre e si guarda l'etichetta prima, come per il codice intero: un testo lungo resta lineare.
+  const CIFRE_STACCATE = /(?<![\d\p{L}])\d{1,4}(?:[ .-]\d{1,4}){1,7}(?![\d\p{L}])/gu;
   // Le regole lunghe partono solo dove c'è un apparecchio: su una riga di 120.000 caratteri senza, costerebbero secondi.
   const UN_APPARECCHIO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${APPARECCHIO}`, 'iu');
   function codiceDelMioApparecchio(s, out) {
