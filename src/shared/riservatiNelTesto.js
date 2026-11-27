@@ -204,7 +204,7 @@ function presenta() {
 // ovunque; due solo se la parola comincia per p e finisce per d («passport» no, «paswd» sì).
 const NOVITA = () => globalThis.SN_NOVITA || (require('./novita.js'), globalThis.SN_NOVITA);
 function refusoDiPassword(w) {
-  if (w === 'password' || w.length < 5 || w.length > 10) return false;
+  if (w === 'password' || w === 'passwords' || w.length < 5 || w.length > 10) return false;
   if (w.length >= 7 && NOVITA().distanza(w, 'password', 1) <= 1) return true;
   if (w[0] !== 'p' || !w.endsWith('d')) return false;
   return w.length < 6 ? NOVITA().distanza(w, 'passwd', 1) <= 1 : NOVITA().distanza(w, 'password', 2) <= 2;
