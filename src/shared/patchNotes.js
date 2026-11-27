@@ -25,6 +25,7 @@
         { testo: 'Il CVV della carta scritto col suo nome in un\'altra lingua, come «Code de sécurité : 123», «Sicherheitscode: 123» o «Código de seguridad: 123», non arriva più a nessun modello, come già «Codice di sicurezza: 123», e un campo con quel nome in un modulo resta coperto.', segnalazione: 1403 },
         { testo: 'Un PIN, un CVV o un codice scritto con le cifre separate, come «4-8-2-1» o «4 8 2 1», non arriva più a nessun modello, né nella frase né come risposta a chi te lo chiede in chat, come quando lo scrivi tutto attaccato.', segnalazione: 2692 },
         { testo: 'Due o più PIN o codici detti nella stessa frase, come «i pin sono 4829 e 1234» o «il pin del bancomat è 4829 e quello della SIM è 1234», non arrivano più a nessun modello: prima si toglieva solo il primo.', segnalazione: 1403 },
+        { testo: 'Un PIN o una password con una parola prima del valore, come «il pin è ancora 4821» o «the pin is still 4821», non arriva più a nessun modello, e un\'azione di Filo non li manda a un sito senza la tua conferma.', segnalazione: 2678 },
       ],
     },
     {
