@@ -60,20 +60,19 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   await riquadro(home, 'Da vedere').click();
   await expect(home.locator('#grid .sn-card')).toHaveCount(3);
 
+  // Il menu della scheda ha le voci della scheda, non quelle del menu generale di Filo.
   await scheda(home, 'a').click({ button: 'right' });
-  await expect(home.locator('.home-ctxmenu')).toBeVisible();
-  expect(await vociMenu(home)).toEqual(['Apri', 'Apri e tienila in lista', 'Copia link', 'Sposta in…', 'Rimuovi']);
-  await expect(menuDi(home).locator('.sn-menu:visible')).toHaveCount(0);
+  expect(await vociScheda(home)).toEqual(['Apri', 'Apri e tienila in lista', 'Copia link', 'Sposta in…', 'Rimuovi']);
   await home.screenshot({ path: 'tests/.shots/home-menu-scheda.png' }).catch(() => {});
 
   // Copia link → negli appunti c'è l'indirizzo.
-  await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Copia link' }).click();
+  await menuDi(home).scegli('Copia link');
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe(url.a);
-  await expect(home.locator('.home-ctxmenu')).toHaveCount(0);
+  await expect(menuDi(home).pannelli).toHaveCount(0);
 
   // Sposta in… → le categorie che ci sono, più «Nuova categoria…»; la pagina passa nel riquadro nuovo.
   await scheda(home, 'a').click({ button: 'right' });
-  await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Sposta in…' }).click();
+  await menuDi(home).scegli('Sposta in…');
   expect(await vociMenu(home)).toEqual(['Ricette', 'Video da guardare', 'Nuova categoria…']);
   await home.screenshot({ path: 'tests/.shots/home-menu-sposta.png' }).catch(() => {});
   await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Video da guardare' }).click();
