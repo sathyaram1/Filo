@@ -185,10 +185,12 @@ test('lavoro locale fidato: il tasto della fiducia è premuto e dice da dove vie
     await expect(page.locator(via)).toHaveCount(0);
   }
   await page.locator('.mg-item[data-id="loc-1"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toBeVisible();
-  await expect(page.locator('.mg-ctxmenu')).not.toContainText(/Segna fidato|È mio|senza chiedere/);
-  await expect(page.locator('.mg-ctxmenu')).toContainText('Togli fiducia');
-  await page.keyboard.press('Escape');
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  const voci = (await menu.vociScritte()).join('\n');
+  expect(voci).not.toMatch(/Segna fidato|È mio|senza chiedere/);
+  expect(voci).toContain('Togli fiducia');
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
   expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
 
