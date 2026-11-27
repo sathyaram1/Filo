@@ -155,7 +155,7 @@ test('imposta come commander dal tasto destro: header, identity check e rimozion
 
   // Il drago diventa commander: esce dall'elenco, entra nell'header.
   await page.locator('.dk-row', { hasText: 'Shivan Dragon' }).click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Imposta come commander' }).click();
+  await menuDi(page).scegli('Imposta come commander');
   await expect(page.locator('#commanderLine')).toHaveText(/Shivan Dragon/);
   await expect(page.locator('.dk-row', { hasText: 'Shivan Dragon' })).toHaveCount(0);
 
