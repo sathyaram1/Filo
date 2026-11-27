@@ -1265,6 +1265,7 @@
   // Senza due punti né verbo le parole fra virgolette sono spesso una voce («password «Gestisci account»», #2678).
   const PRIMA_DELLE_VIRGOLETTE_NUDA = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}(?:[ \\t]*${FRECCIA})?[ \\t]*$`, 'i');
   const PRIMA_DELLE_VIRGOLETTE_CORTA = new RegExp(`${ETICHETTA_CORTA}[ \\t]*[:=]?[ \\t]*$`, 'i');
+  // Ogni a capo: quello di Windows, il solo \r, quelli di Unicode e il salto di pagina (aCapo).
   const RIGHE = /\r\n?|[\n\v\f\x85\u{2028}\u{2029}]/u;
   function interiFraVirgolette(vero, valori) {
     const s = testo(vero);
