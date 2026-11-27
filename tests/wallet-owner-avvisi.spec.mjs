@@ -236,7 +236,7 @@ test('i quattro casi insieme: una carta ciascuno col numero, «Apri Inviti e ute
 
   // Il tasto destro apre la stessa pagina del pulsante.
   await carte(home).filter({ hasText: 'del tetto' }).click({ button: 'right', position: { x: 30, y: 12 } });
-  await voci.filter({ hasText: 'Apri Inviti e utenti' }).click();
+  await voci.scegli('Apri Inviti e utenti');
   const owner = await aspettaFinestra(app, (w) => w.url().startsWith(GESTIONE), 'il tasto destro non apre Gestione');
   await expect(owner.locator('.mg-tab--active[data-tab="utenti"]')).toBeVisible({ timeout: 15_000 });
 });
