@@ -2267,73 +2267,75 @@
     } catch (_) {}
   }
 
-  // Ordine: Aiuto, zona contestuale, Feedback. Le icone delle azioni sulla pagina stanno nella barra laterale (#1246).
+  // Il menu a icone (#2555): in cima la griglia delle azioni (dell'elemento, poi quelle comuni, le rare dietro il «+»),
+  // sotto come testo solo quello che è un dato o una spiegazione. Le azioni le dà l'elenco unico
+  // (src/shared/disposizioneIcone.js), chi le esegue sta qui; le voci scritte delle pagine di Filo entrano nella
+  // griglia per il loro verbo. Le icone delle azioni sulla pagina intera stanno nella barra laterale (#1246).
   function buildMenuItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
-    senzaValuta = false,
+    senzaValuta = false, sito = null,
   }) {
-    const items = [];
-    // La fila in cima (#1434): il contesto lo decide lo stesso ramo che sceglie le voci, qui sotto.
+    // Il contesto lo decide lo stesso ramo che sceglie le spiegazioni, qui sotto.
     const contesto = {};
-    // Il separatore sta solo fra due sezioni che hanno qualcosa: mai in cima al menu.
-    const sezione = (voci) => {
-      if (!voci.length) return;
-      if (items.length) items.push({ type: 'separator' });
-      items.push(...voci);
-    };
-
-    // 1. Aiuto, se è acceso, e le voci di stato qui sotto.
-    const sezioneAiuto = [];
-    if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
-
-    // «Interrompi lettura» c'è in QUALSIASI menu mentre si legge, anche senza selezione: se
-    // a leggere è un'altra scheda, lo stop passa dal main che lo inoltra a quella giusta.
-    if (TTS.isAnyReading()) {
-      sezioneAiuto.push(TTS.buildStopReadingItem());
-    }
-
-    // «Mostra originale» solo quando alla traduzione manca ancora qualcosa: lì l'icona serve
-    // a CONTINUARE, quindi il ritorno all'originale deve restare raggiungibile (#407, #408).
-    const iconIsRestore = TranslatePage && typeof TranslatePage.showsRestore === 'function'
-      && TranslatePage.showsRestore();
-    if (TranslatePage && typeof TranslatePage.canContinue === 'function'
-        && TranslatePage.canContinue() && !iconIsRestore) {
-      sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
-    }
-
-    // Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
-    // lo stato meno visibile che il tasto destro può raccontare: una pagina
-    // rimasta zoomata da un'altra visita spiega da sé perché è così, e la voce
-    // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
-    // con un evento, la risposta arriva nel dataset nello stesso dispatch.
-    const zoomItem = buildZoomItem();
-    if (zoomItem) sezioneAiuto.push(zoomItem);
-    sezione(sezioneAiuto);
-
-    // 2. Zona contestuale — assente se non c'è contesto utile.
-    // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
-    const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
-    const contextItems = [
-      ...vociDellaPagina(target),
-      ...buildContextualItems({
-        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
-        contesto,
-      }),
-      ...vociRiquadro,
-    ];
-    // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
-    const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
-    sezione(contextItems.map((it, i) => (i === prima ? { ...it, primaDaTastiera: true } : it)));
-
-    const spegni = buildSpegniFiloItem();
-    sezione([buildFeedbackItem(), ...(spegni ? [spegni] : [])]);
+    const items = buildContextualItems({
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
+      contesto,
+    });
     // Solo a chi ha un codice Red Team (#991), e in pausa (#896) solo se lo vede. Si richiede a ogni apertura: vale dalla successiva.
     refreshVoceAttacco();
-    if (voceAttacco) items.push(buildRedteamAttackItem());
-
-    const fila = filaContestuale(contesto, { selInfo, target, clipboardHistory });
+    const fila = filaContestuale(contesto, { selInfo, target, clipboardHistory, sito, scritte: vociDellaPagina(target) });
     if (fila) items.unshift(fila);
     return items;
+  }
+
+  // Le azioni comuni a ogni elemento, quando possono servire (#2555): Aiuto, la lettura in corso, l'originale di una
+  // traduzione a metà, la dimensione della pagina, il menu del sito, i cookie di un riquadro, Feedback, Spegni Filo,
+  // Red-team.
+  function azioniComuni(sito) {
+    const a = {};
+    if (aiutoAcceso()) {
+      a.help = {
+        label: I18n.t('menu_help'), tastiFilo: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
+        onClick: () => { Popup.conta({ misura: 'strada', id: 'help', via: 'tasto_destro_altro' }); openSurface('help', () => openHelpSidebar()); },
+      };
+    }
+    // «Ferma lettura» c'è in QUALSIASI menu mentre si legge: se a leggere è un'altra scheda, lo stop passa dal main.
+    if (TTS.isAnyReading()) { const v = TTS.buildStopReadingItem(); a.stopReading = { label: v.label, onClick: v.onClick }; }
+    // «Mostra originale» solo quando alla traduzione manca ancora qualcosa: lì l'icona della barra serve a CONTINUARE,
+    // quindi il ritorno all'originale deve restare raggiungibile (#407, #408).
+    const iconIsRestore = TranslatePage && typeof TranslatePage.showsRestore === 'function' && TranslatePage.showsRestore();
+    if (TranslatePage && typeof TranslatePage.canContinue === 'function' && TranslatePage.canContinue() && !iconIsRestore) {
+      const v = TranslatePage.buildRestoreOriginalItem();
+      a.showOriginal = { label: v.label, onClick: v.onClick };
+    }
+    const zoom = azioneZoom();
+    if (zoom) a.zoom = zoom;
+    if (sito) {
+      a.siteMenu = {
+        label: I18n.t('menu_del_sito').replace('%s', () => sito.nome), fraseOggetto: sito.nome, iconaImg: iconaDelSito || '',
+        onClick: () => apriMenuDelSito(sito),
+        varianti: [sito.prima
+          ? { label: I18n.t('menu_del_sito_torna_filo'), onClick: () => impostaMenuDelSito(false) }
+          : { label: I18n.t('menu_del_sito_sempre'), onClick: () => impostaMenuDelSito(true) }],
+      };
+    }
+    // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
+    const riquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
+    if (riquadro[0]) a.cookie = { label: riquadro[0].label, onClick: riquadro[0].onClick, acceso: !!riquadro[0].acceso };
+    a.feedback = { label: 'Invia feedback', onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()) };
+    const spegni = buildSpegniFiloItem();
+    if (spegni) a.filoOff = { label: spegni.label, onClick: spegni.onClick, misura: spegni.azione };
+    if (voceAttacco) a.redteam = { label: 'Invia attacco (Red-team)', onClick: () => openSurface('redteam', () => self.SN_REDTEAM_ATTACK_UI?.open()) };
+    return a;
+  }
+
+  // L'icona del sito per «Menu di <sito>»: quella della fila delle schede, chiesta al main prima di aprire il menu.
+  let iconaDelSito = '';
+  function chiediIconaDelSito(sito) {
+    iconaDelSito = '';
+    if (!sito || IS_SUBFRAME) return Promise.resolve();
+    return Promise.resolve(chrome.runtime.sendMessage({ type: MSG.ICONA_DEL_SITO }))
+      .then((r) => { iconaDelSito = r && r.ok && typeof r.icona === 'string' ? r.icona : ''; }, () => {});
   }
 
   // Il Copia del tasto destro non passa dall'evento «copy»: a una pagina di Filo lo dice «filo-copia», sull'elemento
