@@ -2255,7 +2255,7 @@
       openCtx(r.left, r.bottom + 2, PROB_GAMES.map((g) => ({
         label: `Partita ${g.label}`,
         run: () => { setProbGame(g.id); scheduleProb(); },
-      })));
+      })), { valori: true });
     });
 
     $('carouselPrev').addEventListener('click', () => carouselNav(-1));
