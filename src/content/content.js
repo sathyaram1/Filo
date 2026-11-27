@@ -2379,21 +2379,6 @@
     refreshVoceAttacco(true).then((si) => { if (si) self.SN_REDTEAM_ATTACK_UI?.open(); });
   }
 
-  // Red-team — "Invia attacco" (spec §8.1): apre un pannello dedicato (mirrors
-  // il flusso feedback) con due campi separati (testo attacco + descrizione) e
-  // un bottone d'invio che mostra il costo (50 cr). Vive in
-  // src/content/redteamAttack.js (SN_REDTEAM_ATTACK_UI).
-  function buildRedteamAttackItem() {
-    const ricon = (self.SN_ICONS && typeof self.SN_ICONS.redteam === 'function')
-      ? self.SN_ICONS.redteam(16) : undefined;
-    return {
-      type: 'item',
-      icon: ricon,
-      label: 'Invia attacco (Red-team)',
-      onClick: () => openSurface('redteam', () => self.SN_REDTEAM_ATTACK_UI?.open()),
-    };
-  }
-
   // Livello di zoom della pagina, o null se è alla dimensione reale. Il numero
   // lo tiene il preload, che gira nello stesso mondo isolato di questo file:
   // passare dal documento lo metterebbe a portata del sito, che lo userebbe per
