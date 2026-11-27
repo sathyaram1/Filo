@@ -414,11 +414,11 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
 async function indirizzoScritto(tipo, web, v, { sender, azioni, provenienza, testoParole, memoria }) {
   const schede = schedeLeggibili(sender);
   // Una pagina che la lettura trova aperta in una scheda si legge da lì: niente esce.
-  if (tipo === 'LEGGI_PAGINA' && PageRead.trovaScheda(web, schede)) return { ...v, exfil: false, reason: '' };
+  if (comeLettura(tipo) && PageRead.trovaScheda(web, schede)) return { ...v, exfil: false, reason: '' };
   if (!provenienza.cronologia) provenienza.cronologia = PageRead.chiaviCronologia(await indirizziDellaCronologia());
   const ver = PageRead.verificaIndirizzo(provenienza, web, {
     schede: schede.flatMap((x) => [x.url, urlDellaScheda(x)]), cronologia: provenienza.cronologia, parole: testoParole,
-    scaricata: tipo === 'LEGGI_PAGINA',
+    scaricata: comeLettura(tipo),
   });
   if (ver.compare) return { ...v, exfil: false, reason: '' };
   if (ver.sito) {
