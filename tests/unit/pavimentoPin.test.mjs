@@ -302,8 +302,10 @@ test('il pin di una scheda e la sigla di un modello restano, se la frase non par
   assert.equal(P.oscura('Il codice di sblocco è PB13'), `Il codice di sblocco è ${S}`);
 });
 
-test('la forma del codice con le lettere resta lineare su una riga lunga di simboli', () => {
-  const riga = `Il codice di sblocco è ${'a!'.repeat(30000)}`;
-  const c = costoInUnita(() => P.oscura(riga), { tetto: 60 });
-  assert.ok(c.entro, c.come);
+test('la forma del codice con le lettere resta lineare su una riga lunga di simboli', async () => {
+  // Contro la stessa riga senza il nome del codice: il resto del pavimento su una parola lunga costa già da sé, e
+  // diverso per macchina. Con gli sguardi avanti senza misura la riga col nome costa sei volte tanto.
+  const simboli = 'a!'.repeat(5000);
+  const r = await rapportoFraCosti(() => P.oscura(`Una riga qualunque ${simboli}`), () => P.oscura(`Il codice di sblocco è ${simboli}`), { tetto: 3 });
+  assert.ok(r.entro, r.come);
 });
