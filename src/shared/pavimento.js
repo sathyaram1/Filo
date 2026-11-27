@@ -13,6 +13,9 @@
   // del controllo delle uscite (#1403.33). Il «to» polacco sta accanto al nome che lo regge.
   if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
   const VERBO = `(?:${global.SN_GUARDIANO_STATICO.ANNUNCI.join('|')})`;
+  // Le lunghezze di PIN e CVV sono quelle del guardiano, che le usa anche per i numeri accanto in elenco.
+  const CIFRE_PIN = global.SN_GUARDIANO_STATICO.cifre('codice');
+  const CIFRE_DEL_CVV = global.SN_GUARDIANO_STATICO.cifre('cvv');
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
