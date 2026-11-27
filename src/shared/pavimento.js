@@ -627,7 +627,7 @@
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
-  // circondati da spazi; il valore sotto l'etichetta anche dopo una riga vuota (due paragrafi), ma da solo sulla riga,
+  // circondati da spazi; il valore sotto l'etichetta anche dopo righe vuote (VUOTE_SOTTO), ma da solo sulla riga,
   // coi due punti o senza: «Wi-Fi password:» a capo vale quanto «Password:» a capo (#2673.3).
   const PRIMA = '(?:^|[\\n|\\t])[^\\n|\\t:：=.!?;,]{0,30}?';
   // Le righe vuote che il valore sotto l'etichetta sola può avere sopra, un conto solo per la parola, la frase e la
