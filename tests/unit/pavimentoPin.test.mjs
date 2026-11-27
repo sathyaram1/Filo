@@ -43,6 +43,32 @@ test('una frase sul PIN senza il suo valore resta com\'è', () => {
   ])assert.equal(P.oscura(frase), frase, frase);
 });
 
+// #2678.10 — detto «codice», il PIN del telefono o della carta vale quello del bancomat, anche senza possessivo.
+test('il codice del telefono o della carta diventa il segnaposto, come quello del bancomat', () => {
+  for (const [frase, atteso] of [
+    ['il codice del telefono è 4821', `il codice del telefono è ${S}`],
+    ['il codice della carta è 4821', `il codice della carta è ${S}`],
+    ['Il codice della carta è «4821»', `Il codice della carta è «${S}»`],
+    ['Il codice del telefono è 1990', `Il codice del telefono è ${S}`],
+    ['codice del telefono: 4821', `codice del telefono: ${S}`],
+    ['codice del telefono | 4821', `codice del telefono | ${S}`],
+    ['il codice del telefono era 4821', `il codice del telefono era ${S}`],
+    ['il codice della sim è 4821', `il codice della sim è ${S}`],
+    ['the phone code is 4821', `the phone code is ${S}`],
+    ['The card code: 4821', `The card code: ${S}`],
+    ['le code du téléphone est 4821', `le code du téléphone est ${S}`],
+    ['el código del teléfono es 4821', `el código del teléfono es ${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+  for (const frase of [
+    'il codice del telefono del cliente è 4821',
+    'Il codice IMEI del telefono è 35123456',
+    'Il codice predefinito del telefono è 0000',
+    'il codice del telefono è cambiato 2 volte',
+    'Il codice del telefono è sbagliato, chiama il 3331234567',
+    'the phone code for Italy is 0039',
+  ]) assert.equal(P.oscura(frase), frase, frase);
+});
+
 test('in uscita il PIN col complemento si riconosce, e il primo verbo chiude il complemento', () => {
   const codici = (t) => G.segretiInUscita(t).filter((x) => x.regola === 'codice').map((x) => x.valore);
   for (const frase of ['il pin del telefono è 4821', 'il pin del telefono è «4821»', 'the pin for my phone is 4821',
