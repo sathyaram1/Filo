@@ -223,7 +223,7 @@ test('una rinomina lasciata a metà si salva prima che il banco di lavoro rilegg
   const ids = await seedLibrary(app, page);
 
   await scheda(page, 'Fulmini').click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Rinomina…' }).click();
+  await menuDi(page).scegli('Rinomina…');
   await page.locator('#deckGrid .dk-card-rename').fill('Burn');
   // Con il campo ancora aperto si va al mazzo da un'altra strada (link, cronologia).
   await page.evaluate((id) => { location.hash = `#/deck/${encodeURIComponent(id)}`; }, ids.Fulmini);
