@@ -109,7 +109,7 @@ test('su un\'immagine la fila ha le sue azioni, e il «+» le altre; sul testo d
   expect(await iconeDellaFila(menu)).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask']);
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:save"]')).toHaveAttribute('aria-label', /Salva immagine/);
   await menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow').click();
-  const griglia = menu.locator('.sn-menu-icon-grid');
+  const griglia = menu.locator('.sn-menu-altro');
   await expect(griglia).toBeVisible();
   expect(await griglia.locator('[data-sn-icon-id]').evaluateAll((els) => els.map((e) => e.dataset.snIconId))).toEqual(['immagine:copyLink', 'immagine:search', 'immagine:transcribe']);
   await page.keyboard.press('Escape');
@@ -233,7 +233,7 @@ test('un\'icona portata dal «+» alla fila resta dopo il riavvio, e «rimetti c
     await destroSulTesto(page);
     const menu = menuDi(page);
     await menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow').click();
-    const leggi = menu.locator('.sn-menu-icon-grid [data-sn-icon-id="testo:readAloud"]');
+    const leggi = menu.locator('.sn-menu-altro [data-sn-icon-id="testo:readAloud"]');
     await expect(leggi).toBeVisible();
     // Trascinata col mouse vero davanti a «Copia», nella fila.
     const da = await fermo(leggi);
@@ -357,7 +357,7 @@ test.describe('col menu nello strato sopra la scheda', () => {
     await page.locator('#vai').click({ button: 'right' });
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
     await menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow').click();
-    const condividi = menu.locator('.sn-menu-icon-grid [data-sn-icon-id="link:share"]');
+    const condividi = menu.locator('.sn-menu-altro [data-sn-icon-id="link:share"]');
     await expect(condividi).toBeVisible();
     // Il menu cresce quando arriva la sezione del collegamento, e la griglia segue il «+»: si misura a menu fermo.
     const da = await fermo(condividi);
