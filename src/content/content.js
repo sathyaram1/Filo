@@ -2561,39 +2561,6 @@
     try { await Sidebar.allega([new File([blob], nome || `immagine.${estensione}`, { type: blob.type })]); } catch (_) {}
   }
 
-  function buildLinkActionItems(linkEl) {
-    const a = azioniDelLink(linkEl);
-    const indirizzo = a.indirizzo;
-    const out = [];
-    // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
-    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(indirizzo)) {
-      out.push({
-        type: 'item',
-        label: I18n.t('menu_redeem_invite'),
-        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: indirizzo }).catch(() => {}); },
-      });
-    }
-    out.push({ type: 'item', label: I18n.t('menu_open_in_new_tab'), onClick: a.openTab });
-    // "Salva file" — gemello di "Salva immagine come" per i link a un file
-    // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
-    // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
-    // l'HTML non avrebbe senso.
-    if (Actions.isDownloadableLink(linkEl)) {
-      out.push({
-        type: 'item',
-        azione: 'download-progress',
-        label: I18n.t('menu_save_file'),
-        onClick: a.download,
-      });
-    }
-    out.push(
-      { type: 'item', azione: 'share-copy-link', label: I18n.t('menu_copy_link'), onClick: a.copy },
-      { type: 'item', azione: 'save-link', label: I18n.t('menu_save_link_for_later'), onClick: a.saveForLater },
-      { type: 'item', azione: 'share-copy-link', label: I18n.t('menu_share_link'), onClick: a.share },
-    );
-    return out;
-  }
-
   // L'immagine su cui è disegnata la zona di una mappa: fra quelle che usano la mappa, quella sotto il cursore.
   function immagineDellaZona(area, view) {
     if (!area || area.tagName !== 'AREA') return null;
