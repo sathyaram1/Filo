@@ -314,6 +314,7 @@
     }
 
     // ── menu proprio (patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md) ──
+    let menuIcone = false;
     function chiudiMenu() {
       if (!menuEl) return;
       menuEl.remove();
