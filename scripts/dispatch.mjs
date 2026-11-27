@@ -2787,6 +2787,7 @@ async function finalizeBucket(bucket, fromServer) {
     if (!diff.ok) return emitHalt('transient', `il diff del ramo ${bucket.branch} non si calcola: ${diff.motivo}`);
   }
   const ctx = serverCtx(bucket, fromServer, diff);
+  if (statoVero && ctx.ripresa) ctx.ripresa = { ...ctx.ripresa, statoDelFeedback: statoVero };
   segnaRamoVuoto(bucket, ctx);
 
   emit(bucket, ctx);
