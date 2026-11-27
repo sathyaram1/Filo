@@ -257,6 +257,7 @@ test('un\'etichetta in un pezzo di pagina HTML copre il valore intero, e i tag r
     ['<li><b>CVV:</b> 123</li>', `<li><b>CVV:</b> ${S}</li>`],
     ['<b>Codice di verifica:</b> 482193', `<b>Codice di verifica:</b> ${S}`],
     ['Password:&nbsp;Nyckel!2024', `Password:&nbsp;${S}`],
+    ['&lt;b&gt;Password:&lt;/b&gt; Nyckel!2024', `&lt;b&gt;Password:&lt;/b&gt; ${S}`],
     ['<ul><li><b>Utente:</b> mario</li><li><b>Password:</b> Faro#Blu55</li></ul>',
       `<ul><li><b>Utente:</b> mario</li><li><b>Password:</b> ${S}</li></ul>`],
     ['<table><thead><tr><th>Utente</th><th>Password</th></tr></thead><tbody><tr><td>mario</td><td>Nyckel!2024</td></tr></tbody></table>',
