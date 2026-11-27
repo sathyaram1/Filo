@@ -21,8 +21,6 @@ const RITENTA_429 = 3;
 // Il riquadro chiede la sorgente subito dopo il clic: un'ora basta anche a uno strato freddo, e libera la memoria.
 const SCADENZA_MS = 60 * 60 * 1000;
 const IN_ATTESA_MAX = 4;
-// Il testo che torna al modello per volta, come una pagina letta (pageRead); il seguito con `da`.
-const TESTO_MAX = 30000;
 const RICORDATE_MAX = 5;
 const PARTE_BYTE = 4 * 1024 * 1024;
 const HTML_MAX = 2 * 1024 * 1024;
