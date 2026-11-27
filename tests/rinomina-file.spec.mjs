@@ -239,7 +239,7 @@ test('negli Scaricamenti: «Dai un nome sensato», la voce segue il file, e «Ri
     // Chiuso il riquadro, il nome di prima resta a un tasto destro di distanza.
     await dl.keyboard.press('Escape');
     await rinominata.click({ button: 'right' });
-    await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Rimetti il nome di prima' }).click();
+    await menuDi(dl).scegli('Rimetti il nome di prima');
     await expect(dl.locator('.dl-item .dl-name', { hasText: 'scan_00231.pdf' })).toBeVisible({ timeout: 10000 });
     expect(existsSync(rec.savePath)).toBe(true);
     expect(existsSync(nuovo)).toBe(false);
