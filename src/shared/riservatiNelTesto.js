@@ -106,7 +106,7 @@ const VERSO_CELLA = /(?<![ \t\r\n])[ \t]*[\r\n][ \t\r\n]*(?=(?:<|&lt;)t[dh](?:[\
 const DEL_VALORE = /[^\s<>:：|&]/u;
 // I commenti si leggono in due modi: coi soli segni come spazi (una password scritta dentro si vede) e interi come
 // spazi (non separano più l'etichetta dal suo valore). Le regole girano su tutte e due le letture (vistePerLeRegole).
-const COMMENTO = /(<|&lt;)!--([\s\S]*?)--(>|&gt;)/g;
+const COMMENTO = /(<|&lt;)!--((?:(?!(?:<|&lt;)!--)[\s\S])*?)--(>|&gt;)/g;
 const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repeat(apre.length + 3) + dentro + ' '.repeat(fine.length + 2))
   .replace(VERSO_CELLA, ' ')
   .replace(TAG_HTML, (tag, apre, chiude, nome, attributi, fine, k, tutto) => {
