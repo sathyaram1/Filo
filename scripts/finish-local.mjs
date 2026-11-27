@@ -1074,7 +1074,8 @@ async function main() {
     } else if (specRemoti.length) {
       console.log(`\n▸ Spec delle aree toccate che il ramo non cambia (${specRemoti.length}): sul tuo PC non li giro, li prova GitHub quando chiudi il lavoro.`);
     }
-    console.log(`\n${stimaDurataControlli(qui.length).testo}`);
+    const tempiDellaMappa = new Map((letta?.mappa?.prove || []).map((p) => [p.spec, p.ms]));
+    console.log(`\n${stimaDurataControlli(qui.length, { ms: qui.map((s) => tempiDellaMappa.get(`${s}.spec.mjs`) || 0) }).testo}`);
     if (qui.length) {
       const schermo = preparaLancioElectron('npx', []);
       if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
