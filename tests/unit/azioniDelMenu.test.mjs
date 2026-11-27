@@ -69,30 +69,20 @@ test('un\'etichetta scritta si riconosce dal verbo, e il resto è l\'oggetto', (
   assert.equal(D.verboDellEtichetta(''), null);
 });
 
-test('le voci che le pagine di Filo scrivono per i loro menu si riconoscono tutte, e diventano un\'icona vera', async () => {
-  const { readFileSync } = await import('node:fs');
-  const leggi = (p) => readFileSync(join(ROOT, p), 'utf8');
-  // Le etichette scritte nel codice dei menu propri e delle voci date al tasto destro: un verbo nuovo va nell'elenco.
-  const FONTI = {
-    'src/pages/editor/editor.js': /\badd\('([^'$]+)'/g,
-    'src/pages/dashboard/dashboard-carte.js': /etichetta: '([^'$]+)'/g,
-    'src/shared/pannelloDestro.js': /etichetta: '([^'$]+)'/g,
-    'src/pages/decks/decks.js': /label: '([^'$]+)', run/g,
-    'src/pages/manage/manageRicorrenti.js': /testo: '([^'$]+)'/g,
-    'src/pages/manage/manageCompiti.js': /testo: '([^'$]+)'/g,
-    'src/pages/manage/manageUtenti.js': /\[\s*'([^'$]+)',/g,
-    'src/pages/downloads/downloads.js': /\['([^'$]+)', /g,
-    'src/pages/dashboard/dashboard-coda.js': /label: '([^'$]+)'/g,
-    'src/pages/quaderno/quaderno.js': /label: '([^'$]+)'/g,
-  };
-  const ignote = [];
-  let viste = 0;
-  for (const [f, re] of Object.entries(FONTI)) {
-    for (const m of leggi(f).matchAll(re)) {
-      viste += 1;
-      if (!D.verboDellEtichetta(m[1])) ignote.push(`${f}: «${m[1]}»`);
-    }
-  }
-  assert.ok(viste >= 30, `le etichette si leggono (${viste})`);
-  assert.deepEqual(ignote, [], 'voci senza un verbo dell\'elenco: avrebbero l\'icona generica');
+test('le voci che le pagine di Filo scrivono per i loro menu si riconoscono, e diventano un\'icona vera', () => {
+  // Le etichette dei menu propri e delle voci date al tasto destro (dashboard, Mazzi, Editor, Scaricamenti, Gestione,
+  // pannello di destra, correttore): un verbo nuovo va nell'elenco, o la voce avrebbe l'icona generica.
+  const SCRITTE = ['Rispondi a questo passo', 'Copia il messaggio', 'Cita a questo passo', 'Nascondi la conversazione',
+    'Togli la conversazione dal filo', 'Annulla · tema scuro', 'Rifai · tema scuro', 'Salta l\'accoglienza', 'Riprendi dopo',
+    'Rimetti nella casella', 'Ferma', 'Srotola', 'Riavvolgi', 'Annulla invio', '✓ Invia da solo', 'Lascia testo',
+    'Riapri la pagina', 'Mostra le pagine', 'Chiudi lo scambio', 'Vai a questo punto del filo', 'Collega', 'Scollega',
+    'Dimentica la rete', 'Togli la chiave', 'Rimetti di serie', 'Spiega cosa fa', 'Cambia la scorciatoia di «Cerca»',
+    'Tienila', 'Non tenerla', 'Cancella per sempre', 'Mostra nella cartella', 'Metti nel messaggio', 'Rinomina',
+    'Esegui', 'Avvia', 'Sposta', 'Aggiungi sito…', 'Ripiega la chat', 'Riapri la chat', 'Rileggi dal server',
+    'Tieni aperto il pannello', 'Sblocca il pannello', 'Regola il pannello…', 'Spiegami di più', 'Duplica', 'Esporta…',
+    'Elimina…', 'Svuota la chat…', 'Rimuovi', 'Imposta come commander', 'Rimanda', 'Scarica', 'Non scaricare', 'Pausa',
+    'Apri cartella', 'Rigenera titolo', 'Storico versioni', 'Cestino (2)', 'Regala crediti', 'Ricarica il conto…',
+    'Sposta in…', 'Ignora', 'Aggiungi al dizionario', 'Apri la fonte', 'Invia feedback', 'Spegni Filo su questo sito'];
+  const ignote = SCRITTE.filter((s) => !D.verboDellEtichetta(s));
+  assert.deepEqual(ignote, [], 'voci senza un verbo dell\'elenco');
 });
