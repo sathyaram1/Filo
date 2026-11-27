@@ -258,6 +258,7 @@
     };
     applicaTema(d.tema, d.tokens);
     const cronologia = Array.isArray(d.cronologia) ? d.cronologia.filter((e) => e && typeof e === 'object') : [];
+    m.cronologia = cronologia;
     const questo = m;
     const disegna = () => {
       if (m !== questo) return;
