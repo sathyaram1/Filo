@@ -96,7 +96,7 @@ const TAG_A_CAPO = 'br|hr|p|div|li|dt|dd|tr|table|caption|h[1-6]|pre|blockquote|
 // Anche scritti come entità («&lt;b&gt;Password:&lt;/b&gt;», il sorgente mostrato in una pagina). Il tag non scavalca
 // l'inizio di un altro: un testo lungo resta lineare.
 const E = '&(?!gt;|lt;)';
-const TAG_HTML = new RegExp(`(<|&lt;)(/?)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|dl|thead|tbody|tfoot|td|th)(?=[\\s/>]|&gt;)`
+const TAG_HTML = new RegExp(`(<|&lt;)(/\\s*|)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|dl|thead|tbody|tfoot|td|th)(?=[\\s/>]|&gt;)`
   + `((?:[^<>"'&]|${E}|"(?:[^"<>&]|${E})*"|'(?:[^'<>&]|${E})*')*)(>|&gt;)`, 'giu');
 const DI_TESTO = new RegExp(`^(?:${TAG_TESTO})$`, 'i');
 const A_CAPO = new RegExp(`^(?:${TAG_A_CAPO})$`, 'i');
