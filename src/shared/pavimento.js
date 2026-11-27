@@ -438,7 +438,8 @@
   const LETTERA_LATINA = 'A-Za-zÀ-ÿ';
   const unaDi = (xs) => `(?<![${LETTERA_LATINA}])(?:${xs.map((w) => w.replace(/ /g, '[ \\t]+')).join('|')})(?![${LETTERA_LATINA}])`;
   const DIVENTA = `(?:(?:${VERBO}|ha|has)[ \\t]+)?${unaDi(CAMBI.diventa)}`;
-  const VERSO_IL_NUOVO = `(?<=${unaDi(CAMBI.participi)}[^\\n.!?:;,]{0,80})${unaDi(CAMBI.verso)}`;
+  // Il participio si cerca all'indietro solo dopo la preposizione: un testo lungo non lo rilegge a ogni posizione.
+  const VERSO_IL_NUOVO = `${unaDi(CAMBI.verso)}(?<=${unaDi(CAMBI.participi)}[^\\n.!?:;,]{0,80})`;
   const AL_VALORE = `(?:[ \\t]+(?:${DIVENTA}|${VERSO_IL_NUOVO}|${VERBO_PASSWORD})|[ \\t]*\\?[ \\t]+${VERBO}(?![${LETTERA_LATINA}]))`;
   const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}${AL_VALORE}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
   const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*:?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
