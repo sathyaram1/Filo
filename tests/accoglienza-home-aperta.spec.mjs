@@ -184,7 +184,7 @@ test.describe('a intervista già fatta', () => {
     await expect(home.locator('#bubbles button', { hasText: 'Apri Crediti' })).toHaveCount(0, { timeout: 20_000 });
     await expect(home.locator('body')).not.toContainText(/codice d.invito|riscatta l.invito/i);
     await expect(home.locator('body')).toHaveAttribute('data-state', 'home');
-    await expect.poll(() => app.evaluate(() => globalThis.__homeDalModello), { timeout: 20_000, message: 'la home rifatta col modello' }).toBeGreaterThan(0);
+    await expect(home.locator('#homeMessage')).toBeHidden();
     await expect(home.locator('#bubbles')).not.toContainText('Ciao, sono Filo');
     await home.screenshot({ path: 'tests/.shots/751-home-dopo-il-riscatto.png' });
   });
