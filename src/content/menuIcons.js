@@ -312,10 +312,10 @@
     return {
       type: 'row',
       contesto,
-      dropTarget: Disp.zonaFila(contesto),
+      dropTarget: aperta.soloScritte ? '' : Disp.zonaFila(contesto),
       onDrop: (e) => applyIconDrop(e),
       items: c.items,
-      altro: { items: c.inAltro, dropTarget: Disp.zonaAltro(contesto), onDrop: (e) => applyIconDrop(e) },
+      altro: { items: c.inAltro, dropTarget: aperta.soloScritte ? '' : Disp.zonaAltro(contesto), onDrop: (e) => applyIconDrop(e) },
       aspetto: aperta.aspetto,
       oggetto: String(o.oggetto || ''),
       vuota: c.vuota,
