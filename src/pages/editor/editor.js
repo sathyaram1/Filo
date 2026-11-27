@@ -636,21 +636,37 @@
     // Riaperta (sessione, ricarica) la scheda mostra il documento, e la bozza non si chiede di nuovo.
     try { history.replaceState(null, '', doc ? `?file=${encodeURIComponent(doc.id)}` : location.pathname); } catch (_) {}
     if (!testo) return;
-    const html = document.documentElement;
-    html.classList.add('ed-dal-campo');
-    const davanti = () => {
-      if (!html.classList.contains('ed-dal-campo')) return;
-      html.classList.add('ed-dal-campo-entra');
-      html.classList.remove('ed-dal-campo');
-      setTimeout(() => html.classList.remove('ed-dal-campo-entra'), 600);
-    };
-    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === MSG.EDITOR_ARRIVO && m.id === id && m.davanti) davanti(); });
-    setTimeout(davanti, 8000);
+    document.documentElement.classList.add('ed-dal-campo');
+    setTimeout(entraDalCampo, 8000);
+    docWrap.scrollTop = 0;
     await aiutoAccanto();
     cursoreInFondo();
-    await new Promise((ok) => setTimeout(ok, 260));
-    sendMessage({ type: MSG.EDITOR_BOZZA_PRONTA, id, geometria: geometriaArrivo() });
+    // Si misura a disposizione ferma: l'Aiuto che si apre sposta il foglio, con la sua transizione.
+    const pausa = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    await pausa(120);
+    let g = geometriaArrivo();
+    for (let i = 0; i < 20; i++) {
+      await pausa(50);
+      const ora = geometriaArrivo();
+      const ferma = JSON.stringify(ora) === JSON.stringify(g);
+      g = ora;
+      if (ferma) break;
+    }
+    sendMessage({ type: MSG.EDITOR_BOZZA_PRONTA, id, geometria: g });
   }
+  function entraDalCampo() {
+    const html = document.documentElement;
+    if (!html.classList.contains('ed-dal-campo')) return;
+    html.classList.add('ed-dal-campo-entra');
+    html.classList.remove('ed-dal-campo');
+    setTimeout(() => html.classList.remove('ed-dal-campo-entra'), 600);
+  }
+  // Un editor già aperto riceve la bozza senza ricaricarsi; venuto davanti, mostra il resto.
+  chrome.runtime.onMessage.addListener((m) => {
+    if (!m) return;
+    if (m.type === MSG.EDITOR_BOZZA && typeof m.id === 'string' && m.id) nasceDalCampo(m.id);
+    else if (m.type === MSG.EDITOR_ARRIVO && m.davanti) entraDalCampo();
+  });
   // L'Aiuto è la chat del documento: chi arriva dalla chat della home la ritrova di lato. È un content script, che può
   // arrivare dopo la pagina.
   async function aiutoAccanto() {
