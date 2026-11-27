@@ -1370,8 +1370,10 @@ class TabManager {
       // Si torna alla PENULTIMA scheda guardata, non a quella a sinistra: è quella che l'utente
       // si aspetta. Se nessuna è mai stata attivata vale l'adiacente.
       const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
+      this._chiusaOra = tab;
       if (next) this.activate(next.id);
       else this.openTab('filo://newtab/'); // niente tab → nuovo newtab
+      this._chiusaOra = null;
     }
     this._broadcast();
   }
