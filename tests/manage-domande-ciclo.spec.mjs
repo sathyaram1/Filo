@@ -84,7 +84,7 @@ test('le schede del nuovo ciclo: conteggi, sola lettura in smistamento, automati
   })) await expect(tab(page, t)).toHaveText(testo);
   await expect(page.locator('.mg-sezione[data-sezione="domande"] .mg-sezione-count')).toHaveText('(1)');
 
-  // In smistamento: titolo, da quando, lavoro fermo; nel dettaglio nessuna casella, solo «Archivia».
+  // In smistamento: titolo, da quando, lavoro fermo; nel dettaglio si risponde come a un'aperta (#2702), senza «Discutiamone».
   await tab(page, 'domande-smistamento').click();
   await expect(page.locator('#mgDomandeTitolo')).toHaveText('In smistamento');
   await expect(riga(page, 'D-51')).toContainText('Testo come l’ha scritto chi chiede');
@@ -92,10 +92,11 @@ test('le schede del nuovo ciclo: conteggi, sola lettura in smistamento, automati
   await expect(riga(page, 'D-51').locator('.mg-domanda-data')).toHaveText(/^da /);
   const s = dq(page, 'D-51');
   await expect(s.locator('.mg-dq-esito')).toContainText('La sta smistando un agente');
+  await expect(s.locator('.mg-dq-esito')).toContainText('Se rispondi adesso, vale la tua risposta.');
   await expect(s.locator('.mg-dq-ferma')).toHaveText('ferma #813');
-  await expect(s.locator('.mg-dq-testo')).toHaveCount(0);
-  await expect(s.locator('.mg-dq-azione, .mg-dq-applica')).toHaveCount(0);
-  await expect(s.locator('.mg-dq-tasti button')).toHaveText(['Archivia']);
+  await expect(s.locator('.mg-dq-testo')).toHaveCount(1);
+  await expect(s.locator('.mg-dq-azione')).toHaveCount(1);
+  await expect(s.locator('.mg-dq-tasti button')).toHaveText(['Rispondi', 'Archivia']);
   await riga(page, 'D-51').click({ button: 'right' });
   await expect(page.locator('.mg-ctxmenu, .sn-select-pop').last()).toContainText('Archivia senza azioni');
   await expect(page.locator('.mg-ctxmenu, .sn-select-pop').last()).not.toContainText('Discutiamo');
