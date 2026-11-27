@@ -114,7 +114,7 @@ export function leggiMappa({ file = '', corsa = '', root = ROOT } = {}) {
     if (existsSync(senza)) continue;
     let lavori = [];
     try { lavori = JSON.parse(gh(['api', `repos/${repo}/actions/runs/${id}/jobs?per_page=100`, '--jq', '[.jobs[] | {id, name, status}]'])); } catch (_) { continue; }
-    const verdetto = lavori.find((j) => j.name === 'verdetto' && j.status === 'completed');
+    const verdetto = lavori.find((j) => j.name === LAVORO_DELLA_MAPPA && j.status === 'completed');
     if (!verdetto) continue;
     let registro = '';
     try { registro = gh(['api', `repos/${repo}/actions/jobs/${verdetto.id}/logs`]); } catch (_) { continue; }
