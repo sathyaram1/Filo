@@ -238,7 +238,7 @@ test('dal tasto destro di un tasto gli do una lettera premendola, e due volte qu
   await page.keyboard.press('f');
   await expect.poll(() => lettere(app)).toEqual([{ lettera: 'f', tasto: 'cerca' }]);
   await page.locator('#altro .dash-altro-app[data-id="cerca"]').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli la lettera' }).click();
+  await menuDi(page).scegli('Togli la lettera');
   await expect.poll(() => lettere(app)).toEqual([]);
 });
 
