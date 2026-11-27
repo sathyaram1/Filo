@@ -187,12 +187,12 @@ test('da tastiera: Maiusc+F10 e il tasto Menu aprono il menu, le frecce scelgono
   expect((await salvate(home)).map((p) => p.id)).toEqual(['a']);
   await expect.poll(async () => shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.some((t) => t.url === u), url.b)).toBe(false);
 
-  // «Apri» dal menu: come il clic, la apre e la toglie dalla lista. La lettera A porta alla prima voce con la A.
+  // «Apri» dal menu: come il clic, la apre e la toglie dalla lista. La lettera A è il tasto singolo di Apri, e lo
+  // esegue (#2555).
   await scheda(home, 'a').focus();
   await home.keyboard.press('Shift+F10');
+  await expect(menuDi(home).principale).toBeVisible();
   await home.keyboard.press('a');
-  await expect(home.locator('.home-ctxmenu .sn-select-option', { hasText: /^Apri$/ })).toBeFocused();
-  await home.keyboard.press('Enter');
   await expect.poll(async () => shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.some((t) => t.url === u), url.a), { timeout: 8_000 }).toBe(true);
   await expect.poll(async () => (await salvate(home)).length).toBe(0);
 });
