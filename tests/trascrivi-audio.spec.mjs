@@ -69,7 +69,7 @@ test('tasto destro su un <audio>: «Trascrivi» scrive il parlato pezzo dopo pez
   expect(pezzi.length).toBe(3);
   expect(pezzi.every((p) => p.format === 'wav' && p.secondi <= 32)).toBe(true);
   expect(Math.abs(pezzi.reduce((s, p) => s + p.secondi, 0) - 70)).toBeLessThan(0.1);
-  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-meta'))?.testo || '', { timeout: 10_000 }).toMatch(/durata 1:10/);
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-meta'))?.testo || '', { timeout: 10_000 }).toMatch(/Durata 1:10/);
   const strato = await paginaDelloStrato(app, page);
   await expect(strato.locator('.sn-popup .sn-msg-copia')).toBeVisible();
   await strato.screenshot({ path: join('tests', '.shots', 'trascrivi-audio-riquadro.png') });
