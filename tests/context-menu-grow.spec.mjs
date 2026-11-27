@@ -260,7 +260,7 @@ async function apriSottomenu(page, menu) {
 async function ancoraEPannello(page) {
   return menuDi(page).valuta(() => {
     const menu = document.querySelector('.sn-menu:not(.sn-menu-sub)');
-    const freccetta = menu && menu.querySelector('.sn-menu-split-arrow');
+    const freccetta = menu && menu.querySelector('.sn-menu-griglia [data-sn-verbo="siteMenu"]');
     const sub = document.querySelector('.sn-menu-sub');
     return {
       menuTop: menu ? Math.round(menu.getBoundingClientRect().top) : null,
