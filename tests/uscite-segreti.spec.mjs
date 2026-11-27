@@ -488,7 +488,7 @@ for (const [come, campo, scrivi, valore] of [
   ['la password incollata dal tasto destro di Filo', '<label for="p">Password:</label><input id="p" type="password">', async (app, page) => {
     await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), PASSWORD_UTENTE);
     await page.locator('#p').click({ button: 'right' });
-    await menuDi(page).locator('.sn-menu-paste-main').click();
+    await menuDi(page).incolla.click();
     await expect(page.locator('#p')).toHaveValue(PASSWORD_UTENTE);
   }, PASSWORD_UTENTE],
   ['l’IBAN scritto dopo il prefisso che il sito ha messo nel campo', '<label for="i">IBAN</label><input id="i" value="IT">', async (_app, page) => {
