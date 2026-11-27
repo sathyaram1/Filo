@@ -151,7 +151,7 @@ test('rinomina confermata a vuoto dalla docbar: il titolo automatico arriva lo s
 
   // Tasto destro sul titolo → "Rinomina" (cammino equivalente alla matita).
   await page.click('#docSwitch', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  await menuDi(page).scegli('Rinomina');
   const barInput = page.locator('.ed-doc-title-input');
   await expect(barInput).toBeVisible();
 
@@ -264,7 +264,7 @@ test('un titolo scritto a mano non cambia quando il testo cambia', async ({ open
   test.setTimeout(60_000);
   const page = await nuovaPagina(openTab);
   await page.click('#docSwitch', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  await menuDi(page).scegli('Rinomina');
   await page.locator('.ed-doc-title-input').fill('Appunti di viaggio');
   await page.locator('.ed-doc-title-input').press('Enter');
 
@@ -373,7 +373,7 @@ test('la copia di un documento col titolo scritto a mano lo tiene, e il riassunt
   test.setTimeout(90_000);
   const page = await nuovaPagina(openTab);
   await page.click('#docSwitch', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  await menuDi(page).scegli('Rinomina');
   await page.locator('.ed-doc-title-input').fill('Appunti');
   await page.locator('.ed-doc-title-input').press('Enter');
   await scrivi(page, giardino(150));
@@ -420,7 +420,7 @@ test('un nome scritto a mano mentre il titolo automatico è in volo resta, anche
   const page = await nuovaPagina(openTab);
   const rinomina = async (nome) => {
     await page.click('#docSwitch', { button: 'right' });
-    await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+    await menuDi(page).scegli('Rinomina');
     await page.locator('.ed-doc-title-input').fill(nome);
     await page.locator('.ed-doc-title-input').press('Enter');
   };
@@ -456,7 +456,7 @@ test('un nome dato davvero blocca il titolo automatico', async ({ openTab }) => 
   await stubAI(page, 'Il giardino in primavera');
 
   await page.click('#docSwitch', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  await menuDi(page).scegli('Rinomina');
   const barInput = page.locator('.ed-doc-title-input');
   await barInput.fill('Appunti di viaggio');
   await barInput.press('Enter');
