@@ -162,7 +162,7 @@ test('su un sito che annulla il tasto destro il menu aperto da tastiera con Shif
   await page.locator('#ta').click();
   await page.keyboard.press('Shift+F10');
   await expect(menuDi(page).locator('.sn-menu[role=menu]')).toBeVisible();
-  await menuDi(page).locator('.sn-menu-paste-arrow').click();
+  await menuDi(page).incolla.click({ button: 'right' });
   await expect.poll(() => testiCronologia(app, page)).toContain(PASSWORD);
 });
 
