@@ -73,10 +73,10 @@ test('la copia con le cifre attaccate riporta ogni carattere al suo posto nel te
   assert.deepEqual(c.tratti, [[4, 11], [18, 23]]);
 });
 
-test('un testo lungo pieno di cifre scandite resta lineare', () => {
-  const t = 'il pin è 4 8 2 1. '.repeat(3000);
-  const t0 = Date.now();
-  const o = P.oscura(t);
-  assert.ok(Date.now() - t0 < 5000);
-  assert.ok(!o.includes('4 8 2 1'));
+test('un testo lungo pieno di cifre scandite resta lineare', async () => {
+  const testo = (n) => 'il pin è 4 8 2 1. '.repeat(n);
+  assert.ok(!P.oscura(testo(2000)).includes('4 8 2 1'));
+  // Dieci volte il testo costa dieci volte, non cento: il tetto lascia margine al carico, non a un costo quadratico.
+  const r = await rapportoFraCosti(() => P.oscura(testo(200)), () => P.oscura(testo(2000)), { tetto: 30, campioni: 3 });
+  assert.ok(r.entro, `dieci volte il testo costa ${r.come}`);
 });
