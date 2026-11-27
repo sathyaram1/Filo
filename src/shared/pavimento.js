@@ -629,11 +629,16 @@
   const VIRGOLETTATO_IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]${FRA_VIRGOLETTE}`, 'gid');
   // Gli altri ponti fra il nome e il valore (#1403.67): chi l'ha messa («come password ho messo «…»»), e la risposta
   // dopo la domanda o dopo il cambio, staccata da un segno («Ti ricordi la password? Era «…»», «l'ho cambiata, ora è
-  // «…»»): dopo il segno solo parole che non aprono un altro discorso, poi l'annuncio.
-  const RIEMPI = "(?:ora|adesso|invece|now|mi[ \\t]+pare|mi[ \\t]+sembra|credo|penso|forse|i[ \\t]+think|maybe|it|that|this)";
+  // «…»»): dopo il segno solo parole che non aprono un altro discorso, poi l'annuncio, e dopo il valore la frase finisce
+  // («It's "easy" to reset» resta).
+  const RIEMPI = "(?:ora|adesso|invece|now|mi[ \\t]+pare|mi[ \\t]+sembra|credo|penso|forse|i[ \\t]+think|maybe|it|that|this|s[iì],?|yes,?|beh,?|well,?|allora)";
   const RISPOSTA = `[ \\t]*(?:\\?+|[:.,;!])[ \\t]*(?:${RIEMPI}[ \\t]+){0,2}(?:it['’]s|${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO})(?:[ \\t]*:)?`;
+  const FINE_RISPOSTA = `(?=[ \\t]*(?:$|[\\n.,;:!?)]|(?:e|ed|ma|and|but|or|o)[ \\t]))`;
   const MESSA = "[ \\t]+(?:ho|hai|ha|abbiamo|avete|hanno|l['’](?:ho|hai|ha|abbiamo)|i(?:['’]ve)?|we)[ \\t]+(?:mess[ao]|scelt[ao]|usat[ao]|set|chose|picked|used|put)";
-  const VIRGOLETTATO_PONTE = new RegExp(`${ETICHETTA}${ACCANTO}(?:${MESSA}|${RISPOSTA})${FRA_VIRGOLETTE}`, 'gid');
+  const VIRGOLETTATO_MESSA = new RegExp(`${ETICHETTA}${ACCANTO}${MESSA}${FRA_VIRGOLETTE}`, 'gid');
+  const VIRGOLETTATO_RISPOSTA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}${FRA_VIRGOLETTE}${FINE_RISPOSTA}`, 'gid');
+  // Il nome fra virgolette di cosa protegge («la password di «Netflix» è «…»») non è il valore: il valore è quello dopo.
+  const VIRGOLETTATO_DI = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]+(?:di|del|della|dello|dell['’]|per|for|of|on|su|sul)${FRA_VIRGOLETTE}`, 'gid');
   // Dopo la sola domanda («Ti ricordi la password? «…»») conta la forma della password, come senza verbo.
   const VIRGOLETTATO_DOMANDA = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*\\?+${FRA_VIRGOLETTE}`, 'gid');
   const RISPOSTA_NUDA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
