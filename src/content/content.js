@@ -2583,88 +2583,51 @@
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
     senzaValuta = false, contesto = {},
   }) {
+    // Sotto la griglia restano solo le spiegazioni: le azioni le scrive filaContestuale per il contesto scelto qui.
     const items = [];
-    const di = (nome, campi = {}) => Object.assign(contesto, { nome, ...campi });
+    const di = (nome, campi = {}) => Object.assign(contesto, { nome, editable, valutaQui, clipboardHistory, ...campi });
     const valutaQui = editable && !senzaValuta ? campoDaValutare(target) : null;
-    const sel = azioniDellaSelezione(selInfo, target);
+    const spiega = (it) => { items.push(it); };
 
     if (selInfo && editable) {
       di(contestoDelCampo(selInfo, target), { segreto: !!selInfo.segreto });
-      if (sel.cut) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: sel.cut });
-      if (sel.copy) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: sel.copy });
-      items.push(Actions.buildPasteItem(clipboardHistory));
-      items.push(TTS.buildDictateItem(target));
-      if (selInfo.segreto) return items;
-      { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
-      items.push({ type: 'separator' });
-      items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_edit_selection'),
-        onClick: () => EditBox.openEditBox(selInfo.selection),
-      });
-      if (valutaQui) items.push(buildValutaItem(valutaQui));
+      if (!selInfo.segreto) spiega(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
       return items;
     }
 
     if (selInfo) {
       di('testo', { segreto: !!selInfo.segreto });
-      if (sel.copy) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: sel.copy });
-      if (selInfo.segreto) return items;
-      items.push({ type: 'item', azione: 'search-web', label: I18n.t('menu_search_text'), onClick: sel.search });
-      { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
-      items.push({ type: 'separator' });
-      items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
+      if (!selInfo.segreto) spiega(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
       return items;
     }
 
-    // Video/audio cliccato direttamente: le sue azioni vengono prima (un filmato
-    // dentro una scheda-link resta soprattutto un filmato)…
+    // Video/audio cliccato direttamente: un filmato dentro una scheda-link resta soprattutto un filmato, ed è ANCHE il
+    // collegamento (#434), a volte steso sopra invece che antenato (#444). La spiegazione è quella del collegamento:
+    // una sola, nessuna seconda chiamata AI.
     if (mediaEl) {
-      // Un media dentro un <a> è ANCHE un collegamento e spesso è il link che si vuole (#434).
-      // Non è sempre un antenato: nelle home l'anteprima si stende sopra il link (#444).
       const link = linkEl || linkUnder;
       di('media', { media: mediaEl, link });
-      for (const it of Actions.buildMediaItems(mediaEl, link)) items.push(it);
-      if (link) {
-        items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(link)) items.push(it);
-        items.push({ type: 'separator' });
-        // Il media non ha una sezione «Spiega»: quella del collegamento è l'unica, quindi
-        // nessuna seconda chiamata AI e il menu del link resta completo.
-        items.push(Actions.buildInlineExplainLink(link));
-      }
+      if (link) spiega(Actions.buildInlineExplainLink(link));
       return items;
     }
 
     if (imgEl) {
-      for (const it of buildImageActionItems(imgEl)) items.push(it);
-      // Un'immagine dentro un <a> è ANCHE un collegamento e le due famiglie di voci vanno
-      // insieme (#401). La copertina può essere STESA SOPRA il link invece che dentro (#444).
+      // Un'immagine dentro un <a> è ANCHE un collegamento (#401), o la copertina STESA SOPRA il link (#444). Una sola
+      // spiegazione, quella dell'immagine, l'elemento cliccato.
       const linkOfImg = linkEl || linkUnder;
       di('immagine', { img: imgEl, link: linkOfImg });
-      if (linkOfImg) {
-        items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkOfImg)) items.push(it);
-      }
-      items.push({ type: 'separator' });
-      // Una sola sezione "Spiega" (quella dell'immagine, l'elemento cliccato):
-      // aggiungerne una seconda firerebbe una seconda chiamata AI a ogni apertura.
-      items.push(Actions.buildInlineExplainImage(imgEl, linkOfImg));
+      spiega(Actions.buildInlineExplainImage(imgEl, linkOfImg));
       return items;
     }
 
     if (linkEl) {
-      // La zona di una mappa d'immagine è il collegamento cliccato, disegnato su un'immagine (#725.6): prima le sue voci,
-      // poi quelle dell'immagine, e la sezione parla del collegamento, col suo avviso.
+      // La zona di una mappa d'immagine è il collegamento cliccato, disegnato su un'immagine (#725.6): le azioni dei
+      // due, e la spiegazione parla del collegamento, col suo avviso.
       const immagineZona = immagineDellaZona(linkEl, layers);
       di('link', { link: linkEl });
       if (immagineZona) {
-        for (const it of buildLinkActionItems(linkEl)) items.push(it);
-        items.push({ type: 'separator' });
-        for (const it of buildImageActionItems(immagineZona)) items.push(it);
-        items.push({ type: 'separator' });
-        items.push(Actions.buildInlineExplainLink(linkEl));
+        di('immagine', { img: immagineZona, link: linkEl });
+        spiega(Actions.buildInlineExplainLink(linkEl));
         return items;
       }
       // Copertina di un video dentro un link con il player che copre il filmato
