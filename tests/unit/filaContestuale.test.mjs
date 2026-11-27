@@ -35,7 +35,7 @@ test('di partenza: le azioni dell\'elemento nella fila, nessuna azione della pag
       assert.ok(fila.includes(id) || altro.includes(id), `${id} manca da fila e «Altro…»: senza, non si raggiunge`);
     }
   }
-  assert.deepEqual(D.filaDi(l, 'pagina'), { fila: [], altro: [] });
+  assert.deepEqual(D.filaDi(l, 'pagina').fila, D.COMUNI.fila.map((a) => `pagina:${a}`), 'sulla pagina solo le azioni comuni');
   // La barra non cambia: le stesse icone di prima.
   assert.ok(l.bar.includes('translate') && l.bar.includes('newTab'));
 });
