@@ -19,6 +19,8 @@ for (const t of [
   'la password scade, la metto gattonero',
   'the password is wrong, it should be gattonero',
   "the password is outdated, it's gattonero now",
+  'la password è cambiata, ecco la nuova: gattonero',
+  'la password è cambiata, diventa gattonero',
   'la password scade, la nuova e gattonero',
   'la password è sbagliata, quella giusta e gattonero',
 ]) {
