@@ -40,6 +40,24 @@ test('ogni parola dell\'elenco annuncia la password e il codice a tutti e tre i 
   }
 });
 
+// #1403.83 — anche col complemento fra il nome e il verbo, prima riconosciuto in uscita solo con «è», «e'», «is», «era», «was».
+test('il PIN col complemento è annunciato da ogni parola dell\'elenco in uscita come verso i modelli', () => {
+  const codici = (t) => G.segretiInUscita(t).filter((x) => x.regola === 'codice').map((x) => x.valore);
+  for (const w of G.ANNUNCI) {
+    const frase = `il pin del telefono ${w} 4821`;
+    assert.deepEqual(codici(frase), ['4821'], `uscite: ${frase}`);
+    assert.ok(!P.oscura(frase).includes('4821'), `pavimento: ${frase}`);
+  }
+  for (const frase of ['il pin del telefono è ancora 4821', 'il pin del telefono dovrebbe essere 4821',
+    'the pin to be used is 4821', 'the pin here is 4821', 'pin%20del%20telefono%20%C3%A9%204821']) {
+    assert.deepEqual(codici(frase), ['4821'], frase);
+  }
+  for (const frase of ['se il pin é giusto la pagina è 2048', 'se il pin era giusto la pagina era 2048',
+    'se il pin sarà giusto la pagina sarà 2048', 'il pin del telefono é cambiato 2 volte']) {
+    assert.deepEqual(codici(frase), [], frase);
+  }
+});
+
 test('una parola dell\'elenco attaccata a cifre non annuncia niente', () => {
   assert.deepEqual(G.segretiInUscita('The password war2023 is not valid'), []);
 });
