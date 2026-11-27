@@ -810,6 +810,30 @@ test('segreti: controlli deterministici, che non gridano al lupo', () => {
   assert.deepEqual(A.segretoDettaglio('La mia password è Gatto!2024 e non entra.', { richiesta: 'la mia password è Gatto!2024' }).valori, ['Gatto!2024']);
 });
 
+// #1403.89 — il codice di ciò che si apre, che il pavimento toglie ai modelli, non esce nemmeno da un'azione.
+test('il codice del mio telefono, del cancello o il CVV in uscita chiedono la parola', () => {
+  for (const frase of ['Il codice del mio telefono è 4829', '4829 è il codice del mio telefono', 'my phone code is 4829',
+    'Le code de mon téléphone est 4829', 'Per sbloccare il mio telefono uso 4829', 'Il codice del cancello è 4829',
+    'Il codice del mio telefono è 1111. Quello del pc è 4829', 'CVV: 482']) {
+    for (const action of [{ type: 'CERCA_WEB', query: frase }, { type: 'NAVIGA', url: `https://modulo.example/invia?t=${encodeURIComponent(frase)}` }]) {
+      const ing = AL.ingressi(action, {});
+      assert.equal(ing.costo, A.COSTO_MAX, `${action.type}: ${frase}`);
+      assert.equal(ing.chiesta, false, `${action.type}: ${frase}`);
+      assert.equal(risposta(action), 'conferma', `${action.type}: ${frase}`);
+    }
+  }
+  assert.equal(A.segreto('Il codice del mio telefono è 4829'), 'codice');
+  assert.equal(A.segreto('CVV: 482'), 'banca');
+  // Scritto dall'utente nel compito esce con la parola, come una sua password.
+  assert.deepEqual(A.segretoDettaglio('Il codice del mio telefono è 4829', { richiesta: 'scrivi che il codice del mio telefono è 4829' }),
+    { tipo: 'codice', scritto: true, valori: ['4829'] });
+  for (const frase of ['il codice del telefono del cliente è 4829', 'my phone number is 3331234567', 'codice prodotto 4829',
+    'il pin del telefono è cambiato 2 volte', 'se il pin è giusto la pagina è 2048']) {
+    assert.equal(A.segreto(frase), '', frase);
+    assert.notEqual(risposta({ type: 'CERCA_WEB', query: frase }), 'conferma', frase);
+  }
+});
+
 // ── nessuna superficie decide da sé ──────────────────────────────────────────
 
 function sorgenti(dir) {
