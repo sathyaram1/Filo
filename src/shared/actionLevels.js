@@ -1833,7 +1833,7 @@
   // Sola lettura: non cambiano niente e nessuna aspetta l'esito di un'altra, quindi il giro della chat le lancia insieme
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
-    'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+    'CERCA_WEB', 'LEGGI_PAGINA', 'TRASCRIVI_MEDIA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
     'LEGGI_MEMORIA', 'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE', 'ESPANDI_FILO', 'IMMAGINI_WEB',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
