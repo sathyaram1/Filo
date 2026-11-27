@@ -370,7 +370,7 @@ test.describe('il menu nello strato', () => {
       <textarea id="campo" style="position:absolute;left:40px;top:40px;width:320px;height:60px"></textarea></body>`);
     await page.locator('#campo').click({ button: 'right' });
     await apertoNelloStrato(app, page);
-    await menuDi(page).locator('.sn-menu-split-main', { hasText: 'Detta' }).click();
+    await menuDi(page).icona('dictate').click();
     await chiusoLoStrato(app);
     await expect.poll(() => shell.evaluate(() => !!window.__tono), { timeout: 10_000 }).toBe(true);
     await pausa(1800);
