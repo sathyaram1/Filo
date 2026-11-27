@@ -2,6 +2,7 @@
 // Le prove li aprono, li aggiungono e li regolano da qui; dal main si semina solo quello che c'era prima della prova.
 
 import { expect } from '@playwright/test';
+import { menuDi } from './menuContestuale.mjs';
 
 export const EDITOR = 'filo://editor/editor.html';
 
