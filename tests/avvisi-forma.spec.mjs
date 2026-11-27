@@ -4,6 +4,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function homePage(app) {
   let page = null;
