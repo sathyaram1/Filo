@@ -2843,8 +2843,8 @@
       azioni.loop = { label: m.loop.label, acceso: !!contesto.media.loop, onClick: m.loop.onClick, ...comandi };
       if (m.pip) azioni.pip = { label: m.pip.label, acceso: !!m.pip.acceso, onClick: m.pip.onClick, azione: 'video-pip' };
       azioni.controls = { label: m.controls.label, acceso: !!contesto.media.controls, onClick: m.controls.onClick, ...comandi };
-      suOggetto(azioni, 'save', 'media', { label: m.save.label, onClick: m.save.onClick, misura: 'copy-download-video' });
-      suOggetto(azioni, 'copy', 'indirizzoMedia', { label: m.copyLink.label, onClick: m.copyLink.onClick, misura: 'copy-download-video' });
+      suOggetto(azioni, 'save', 'media', { label: m.save.label, onClick: m.save.onClick, azione: 'copy-download-video' });
+      suOggetto(azioni, 'copy', 'indirizzoMedia', { label: m.copyLink.label, onClick: m.copyLink.onClick, azione: 'copy-download-video' });
       if (contesto.link) azioniPerLink(contesto.link, azioni);
     }
     Object.assign(azioni, azioniComuni(sito));
