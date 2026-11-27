@@ -44,6 +44,24 @@ test('quello che il pavimento toglie non parte nemmeno verso il modello del corr
   assert.equal(alCorrettore('Ordine 81234, CVV: 123'), `Ordine 81234, CVV: ${S}`);
 });
 
+test('la chiave col nome della password davanti a un\'altra parola non lascia passare il valore da nessuno dei due cancelli', () => {
+  for (const testo of ['password_login: Nyckel!2024', 'pwd_login: Nyckel!2024', 'PASSWORD_DB=Nyckel!2024', 'passwordLogin: Nyckel!2024',
+    '{"password_admin": "Nyckel!2024"}', '<pwd_login>Nyckel!2024</pwd_login>', 'pwd_login: hunter',
+    'https://x.example/login?password_login=Nyckel2024', 'https://x.example/login?login_password=Nyckel2024']) {
+    const v = testo.includes('hunter') ? 'hunter' : testo.includes('Nyckel2024') ? 'Nyckel2024' : 'Nyckel!2024';
+    assert.ok(!P.oscura(testo).includes(v), `pavimento: ${testo}`);
+    const fuori = alCorrettore(testo);
+    assert.ok(!fuori.includes(v) && fuori.includes(S), `correttore: ${testo} -> ${fuori}`);
+  }
+  // Quello che una parola dopo descrive della password resta; «pass» davanti a un'altra parola non è la password.
+  for (const testo of ['password_hint: usa il nome del cane', 'password_min_length: 8', 'PASSWORD_MAX_AGE_DAYS=90',
+    'password_policy: strict', 'password_manager: Bitwarden', 'passwordResetTimeout: 3600', 'pass_rate: 0.95x',
+    'https://x.example/a?show_password=true&forgot_password=1']) {
+    assert.equal(P.oscura(testo), testo, testo);
+    assert.equal(alCorrettore(testo), testo, testo);
+  }
+});
+
 test('la frase che spiega la password arriva intera al correttore; la password detta no', () => {
   for (const frase of ['la password va cambiata ogni 90 giorni', 'la password deve avere almeno otto caratteri',
     'Ricorda: la password va cambiata ogni 3 mesi']) {

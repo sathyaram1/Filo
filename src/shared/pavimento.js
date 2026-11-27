@@ -535,7 +535,9 @@
     + '(?:ключ(?:а|ом|у)?|klucz(?:a|em|u)?)\\s+(?:сети|безопасности(?:\\s+сети)?|шифрования|sieci(?:\\s+bezprzewodowej)?|zabezpiecze[ńn]|wi-?fi|wlan|wpa[23]?(?:-psk)?)'
     + '|сетевой\\s+ключ|(?:netwerk|beveiligings|wpa[23]?(?:-psk)?-?|wi-?fi-?|wlan-?)sleutel'
     + `)${FUORI}|密[钥鑰]|暗号化キー|セキュリティ\\s*キー|ネットワーク\\s*キー|事前共有キー|(?:네트워크\\s*)?보안\\s*키|(?:네트워크|무선|wpa[23]?(?:-psk)?|wi-?fi)\\s*키`;
-  const NON_ETICHETTA = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
+  // Le parole che dopo «password» ne dicono una proprietà, non il valore: nel testo e nei nomi delle chiavi (tipoDiNome).
+  const PROPRIETA_PASSWORD = 'managers?|policy|reset|recovery|generator|hint|strength';
+  const NON_ETICHETTA = `(?!\\s*(?:${PROPRIETA_PASSWORD})\\b)`;
   const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   // Cinese, giapponese e thai non staccano le parole: dove finisce il valore e le parole che lo annunciano senza i due
@@ -600,7 +602,9 @@
     for (const m of url.matchAll(/[?#&;]([^=&#;?\s]{1,40})=([^&#;\s]*)/g)) {
       let nome = m[1];
       try { nome = decodeURIComponent(nome); } catch (_) {}
-      if (NOME_SEGRETO.test(nome) && valoreSegreto(nome, m[2])) out.push({ valore: m[2], regola: 'token' });
+      // Un nome composto di password («?login_password=», «?password_login=») vale come nelle chiavi di configurazione.
+      const composto = !NOME_SEGRETO.test(nome) && tipoDiNome(nome) === 'password' && valoreDiChiave(m[2]);
+      if ((NOME_SEGRETO.test(nome) || composto) && valoreSegreto(composto ? 'password' : nome, m[2])) out.push({ valore: m[2], regola: 'token' });
     }
     // Un webhook porta il segreto nel percorso, e l'indirizzo dice che è un webhook (hooks.slack.com, /api/webhooks/):
     // dopo quel nome si toglie ogni pezzo lungo che non è un nome fatto di parole minuscole. Il segreto di Slack può
@@ -887,13 +891,21 @@
   const ADD_KEY = /<add\b[^>\n]*?\bkey\s*=\s*"([^"\n]{1,60})"[^>\n]*?\bvalue\s*=\s*"([^"\n]{1,256})"/gid;
   const SEGNAPOSTO_DI_TIPO = /^(?:string|text|null|none|nil|undefined|true|false|required|optional|secret|changeit|\*+|x+|\.+|<[^>]*>)$/i;
   const QUALIFICA_CHIAVE = /^(?:api|secret|private|access|auth|client|app|master|signing|encryption|license|licence|account|service|subscription|webhook|session)$/;
-  // Dopo la parola password il nome dice di che password si tratta solo con una conferma o un indice
-  // («password_confirmation», «password2»); altrimenti ne descrive una proprietà («password_label», «password_reset_timeout»).
-  const DOPO_PASSWORD = /^(?:\d+|confirm\w*|again|repeat|new|old|current|plain\w*|clear|raw|value)$/;
+  // Dopo la parola password il nome dice di quale si tratta («password_login», «PASSWORD_DB», «password2»), a meno che
+  // una parola dopo ne descriva una proprietà («password_label», «password_reset_timeout», «password_min_length», #2695.2).
+  // «pass» è anche altro («pass_rate», «pass_count»): dopo di lui solo una conferma o un indice dicono la password.
+  const DESCRIVE_PASSWORD = new RegExp(`^(?:${PROPRIETA_PASSWORD}|label|rules?|policies|score|complexity|requirements?|length|len`
+    + '|min|max|minimum|maximum|chars|characters|expir\\w*|age|lifetime|ttl|timeouts?|interval|rotation|history|changed'
+    + '|updated|created|last|attempts|retries|lock\\w*|hash\\w*|salt|algorithm|algo|rounds|cost|iterations|encoder'
+    + '|validat\\w*|check|regexp?|pattern|format|field|input|column|selector|id|placeholder|text|title|prompt|message|msg'
+    + '|help|tooltip|description|desc|errors?|invalid|mismatch|required|enabled|disabled|visible|hidden|show|hide|toggle'
+    + '|protected|file|path|env|var|url|uri|link|page|form|button|icon|style|mode|type|authentication)$');
+  const DOPO_PASS = /^(?:\d+|confirm\w*|again|repeat|new|old|current|plain\w*|clear|raw|value)$/;
   function tipoDiNome(nome) {
     const parti = nome.split(/[_.:\s-]+|(?<=[a-z0-9])(?=[A-Z])/).filter(Boolean).map((p) => p.toLowerCase());
     const pw = parti.findIndex((p) => PAROLA_CHIAVE.test(p.replace(/\d+$/, '')) || /(?:password|passwd|passphrase)\d*$/.test(p));
-    if (pw >= 0 && parti.slice(pw + 1).every((p) => DOPO_PASSWORD.test(p))) return 'password';
+    const dopo = parti.slice(pw + 1);
+    if (pw >= 0 && (/^pass\d*$/.test(parti[pw]) ? dopo.every((p) => DOPO_PASS.test(p)) : !dopo.some((p) => DESCRIVE_PASSWORD.test(p)))) return 'password';
     if (parti.some((p, i) => /^(?:secrets?|tokens?|credentials?)$/.test(p) || /(?:secret|token|apikey)$/.test(p)
       || (/^keys?$/.test(p) && i > 0 && QUALIFICA_CHIAVE.test(parti[i - 1])))) return 'segreto';
     return '';
