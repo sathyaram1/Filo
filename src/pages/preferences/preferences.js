@@ -994,6 +994,8 @@
       case 'barraLaterale.schede': return opzioniBarraLaterale(s.barraLaterale).schede;
       case 'barraLaterale.bloccata': return opzioniBarraLaterale(s.barraLaterale).bloccata;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
+      case 'menuIcone.icona': return opzioniMenuIcone(s.menuIcone).icona;
+      case 'menuIcone.colonne': return opzioniMenuIcone(s.menuIcone).colonne;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
       case 'pannelloDestro.spinta': return opzioniPannelloDestro(s.pannelloDestro).spinta;
       case 'pannelloDestro.striscia': return opzioniPannelloDestro(s.pannelloDestro).striscia;
