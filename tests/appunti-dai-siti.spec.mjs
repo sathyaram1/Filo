@@ -27,8 +27,8 @@ async function copiaPassword(shell) {
 
 async function cronologiaDelMenu(dove) {
   await dove.locator('#ta').click({ button: 'right' });
-  await expect(menuDi(dove).locator('.sn-menu')).toBeVisible();
-  await menuDi(dove).locator('.sn-menu-paste-arrow').click();
+  await expect(menuDi(dove).principale).toBeVisible();
+  await menuDi(dove).incolla.click({ button: 'right' });
 }
 
 // La cronologia sta in uno shadow root chiuso e i suoi testi non sono nodi di testo (#589.8): in un riquadro di un
