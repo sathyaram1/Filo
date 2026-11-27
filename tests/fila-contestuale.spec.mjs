@@ -31,7 +31,7 @@ const SITO = (img) => `<!doctype html><html><head><title>Fila</title></head>
 
 // La disposizione salvata, letta dalla porta del main.
 const salvata = (app) => app.evaluate(async () => globalThis.SN_LAYOUT_ICONE.leggi());
-const iconeDellaFila = (menu) => menu.locator('.sn-menu-row .sn-menu-row-btn[data-sn-icon-id]')
+const iconeDellaFila = (menu) => menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-btn[data-sn-icon-id]')
   .evaluateAll((els) => els.map((e) => e.dataset.snIconId));
 // Il registro dei cambi dalla sua porta (#1561).
 const registro = (app) => app.evaluate(async () => {
@@ -108,7 +108,7 @@ test('su un\'immagine la fila ha le sue azioni, e il «+» le altre; sul testo d
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   expect(await iconeDellaFila(menu)).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask']);
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:save"]')).toHaveAttribute('aria-label', /Salva immagine/);
-  await menu.locator('.sn-menu-row .sn-menu-row-overflow').click();
+  await menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow').click();
   const griglia = menu.locator('.sn-menu-icon-grid');
   await expect(griglia).toBeVisible();
   expect(await griglia.locator('[data-sn-icon-id]').evaluateAll((els) => els.map((e) => e.dataset.snIconId))).toEqual(['immagine:copyLink', 'immagine:search', 'immagine:transcribe']);
@@ -232,7 +232,7 @@ test('un\'icona portata dal «+» alla fila resta dopo il riavvio, e «rimetti c
     let page = await apriSito(app, shell, 1);
     await destroSulTesto(page);
     const menu = menuDi(page);
-    await menu.locator('.sn-menu-row .sn-menu-row-overflow').click();
+    await menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow').click();
     const leggi = menu.locator('.sn-menu-icon-grid [data-sn-icon-id="testo:readAloud"]');
     await expect(leggi).toBeVisible();
     // Trascinata col mouse vero davanti a «Copia», nella fila.
@@ -356,7 +356,7 @@ test.describe('col menu nello strato sopra la scheda', () => {
 
     await page.locator('#vai').click({ button: 'right' });
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
-    await menu.locator('.sn-menu-row .sn-menu-row-overflow').click();
+    await menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow').click();
     const condividi = menu.locator('.sn-menu-icon-grid [data-sn-icon-id="link:share"]');
     await expect(condividi).toBeVisible();
     // Il menu cresce quando arriva la sezione del collegamento, e la griglia segue il «+»: si misura a menu fermo.
@@ -416,7 +416,7 @@ test('su un filmato e su un audio la fila ha le loro azioni, e in un campo col s
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
     expect(await iconeDellaFila(menu)).toEqual(['media:playPause', 'media:mute', 'media:save']);
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="media:playPause"]')).toHaveAttribute('aria-label', /Riproduci/);
-    await expect(menu.locator('.sn-menu-row .sn-menu-row-overflow')).toBeVisible();
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(menu.pannelli).toHaveCount(0);
   }
@@ -469,7 +469,7 @@ test('con tante icone portate nella stessa fila, vanno a capo dentro il menu', a
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   const fuori = await menu.principale.evaluate((m) => {
     const box = m.getBoundingClientRect();
-    return [...m.querySelectorAll('.sn-menu-row .sn-menu-row-btn')]
+    return [...m.querySelectorAll('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-btn')]
       .filter((e) => { const q = e.getBoundingClientRect(); return q.right > box.right + 0.5 || q.left < box.left - 0.5; })
       .map((e) => e.dataset.snIconId || e.getAttribute('aria-label'));
   });
