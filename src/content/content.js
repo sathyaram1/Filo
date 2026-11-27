@@ -2303,7 +2303,7 @@
     if (sito) {
       a.siteMenu = {
         label: I18n.t('menu_del_sito').replace('%s', () => sito.nome), fraseOggetto: sito.nome, iconaImg: iconaDelSito || '',
-        misura: 'site-own-menu',
+        azione: 'site-own-menu',
         onClick: () => apriMenuDelSito(sito),
         varianti: [sito.prima
           ? { label: I18n.t('menu_del_sito_torna_filo'), onClick: () => impostaMenuDelSito(false) }
