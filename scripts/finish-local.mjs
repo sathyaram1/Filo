@@ -654,12 +654,20 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
 export const SECONDI_PER_SPEC = [20, 30];
 export const MINUTI_UNIT = [4, 8];
 
-/** La durata prevista dei controlli, da quanti spec lanceranno: la si stampa prima di partire. PURA. */
-export function stimaDurataControlli(nSpec) {
+/**
+ * La durata prevista dei controlli, da quanti spec lanceranno: la si stampa prima di partire. `ms`: i tempi che la
+ * mappa prova → file ha misurato nella suite (0 se non li sa), gli stessi che stampa scripts/mappa-prove.mjs. PURA.
+ */
+export function stimaDurataControlli(nSpec, { ms = [] } = {}) {
   const n = Math.max(0, Math.floor(Number(nSpec) || 0));
-  const da = MINUTI_UNIT[0] + Math.floor((n * SECONDI_PER_SPEC[0]) / 60);
-  const a = MINUTI_UNIT[1] + Math.ceil((n * SECONDI_PER_SPEC[1]) / 60);
-  const cosa = n ? `unit più ${n} spec, circa mezzo minuto l'uno con un worker` : 'solo unit, nessuno spec scelto';
+  const noti = ms.map(Number).filter((x) => x > 0).slice(0, n);
+  const ignoti = n - noti.length;
+  const minutiNoti = noti.reduce((s, x) => s + x, 0) / 60_000;
+  const da = MINUTI_UNIT[0] + Math.floor(minutiNoti + (ignoti * SECONDI_PER_SPEC[0]) / 60);
+  const a = MINUTI_UNIT[1] + Math.ceil(minutiNoti + (ignoti * SECONDI_PER_SPEC[1]) / 60);
+  const cosa = !n ? 'solo unit, nessuno spec scelto'
+    : noti.length ? `unit più ${n} spec, ${noti.length} coi tempi misurati dalla suite${ignoti ? `, gli altri a circa mezzo minuto l'uno` : ''}`
+      : `unit più ${n} spec, circa mezzo minuto l'uno con un worker`;
   return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (${cosa}).` };
 }
 
