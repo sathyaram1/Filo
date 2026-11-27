@@ -145,7 +145,8 @@ test('nel riquadro di «Spiega» la parola spiegata si apre, e «Spiegami di pi�
   await expect(riquadri(page)).toHaveCount(1);
   await expect(riquadri(page)).toContainText('Un\'assemblea di vescovi');
   await termine.click({ button: 'right' });
-  await menuDi(page).scegli('Spiegami di più');
+  // Fuori dal documento della pagina (il riquadro ha il suo) il menu della parola resta quello scritto.
+  await page.locator('.filo-spiega-menu [data-voce="piu"]').click();
   await expect(page.locator('.sn-popup-body .sn-msg-user .sn-msg-text').last()).toHaveText('Spiegami di più su «sinodo».');
   await expect(page.locator('.sn-popup-body')).toContainText('convocato dal Papa', { timeout: 15_000 });
   const richieste = await app.evaluate(() => globalThis.__spiegaRichieste);
