@@ -1280,7 +1280,7 @@
     const lungo = (v) => v.length - (v.match(/\r\n/g) || []).length;
     const valori = [...ovunque].sort((a, b) => lungo(b) - lungo(a));
     for (const v of valori) {
-      const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
+      const forma = formaDelValore(v);
       // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga». Una lettera cinese o
       // giapponese attaccata non è della stessa parola (FINE_VALORE), e nemmeno uno spazio codificato, anche due volte
       // («%20Mela!Verde77», «%2520Mela»: codificatiNellIndirizzo).
