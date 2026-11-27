@@ -361,6 +361,8 @@ function lettiDallAiuto(sender) {
 const controllaUscita = ContatoriSicurezza.contaUscite(VerdettiUscite.chiudiAGuasto(giudicaUscita, {
   avvisa: (e) => console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e),
 }));
+// Trascrivere un indirizzo lo scarica come leggerlo (#519): stessa regola d'uscita.
+const comeLettura = (tipo) => tipo === 'LEGGI_PAGINA' || tipo === 'TRASCRIVI_MEDIA';
 async function giudicaUscita(action, { sender = null, contesto = null, provenienza = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
