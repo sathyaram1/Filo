@@ -943,6 +943,12 @@
   let menuDi = null;
 
   function chiudiMenuPersona() {
+    // Il menu a icone (#2555) se ne va con la sua riga come quello di prima.
+    if (menuAIcone) {
+      menuAIcone = false;
+      menuDi = null;
+      try { window.SN_MENU?.close?.(); } catch (_) {}
+    }
     if (!menuAperto) return;
     menuAperto.remove();
     menuAperto = null;
