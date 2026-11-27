@@ -61,6 +61,7 @@ function davanti(id) {
   const editor = tabs.tabs.find((t) => t.id === a.tabId);
   if (!editor) return;
   if (tabs.activeId === a.homeTabId) tabs.activate(a.tabId);
+  manda(editor.view && editor.view.webContents, { type: globalThis.SN_MSG.MSG.EDITOR_ARRIVO, id, davanti: true });
 }
 
 function consegna({ tabs, homeTab, homeWc, testo, sfondo, velo }) {
