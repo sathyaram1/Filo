@@ -2190,7 +2190,7 @@
   // chiesto adesso, che quando dice che è un errore mette la sua correzione in cima. Se non è un errore la riga resta
   // nascosta, o la proposta del dizionario se il dizionario non la conosce.
   async function openSpellWordMenu(editableEl, wordCtx, mouseEvent, sito = null) {
-    const items = await buildBaseItemsAt(mouseEvent);
+    const items = await buildBaseItemsAt(mouseEvent, { sito });
     let native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
     if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word)) native = SpellCheck.proposteDelBrowser(wordCtx.word);
     let updateCorrection = null;
