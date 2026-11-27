@@ -1,5 +1,6 @@
 // Verifica #2692.4, giro 1: il PIN scritto a cifre separate non arriva al modello in nessuna delle forme comuni di
-// separazione (a coppie, trattini con spazi, spazio unificatore, barre e virgole), né dal pavimento né dal correttore.
+// separazione con spazi o trattini (a coppie, trattino fra spazi, spazio unificatore, lineetta lunga), né dal pavimento
+// né dal correttore.
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
 
