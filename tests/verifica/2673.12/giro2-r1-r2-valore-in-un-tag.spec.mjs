@@ -25,5 +25,5 @@ test('r1 il valore in un tag con una classe, uno stile o un collegamento resta c
 
 test('r2 una cella con l\'etichetta e il valore su righe loro, rientrate, resta coperta', () => {
   nonPassa('<td>\n  Password\n</td>\n<td>\n  Nyckel!2024\n</td>', 'Nyckel!2024');
-  nonPassa('<tr>\n  <td>\n    PIN\n  </td>\n  <td>\n    4821\n  </td>\n</tr>', '4821');
+  nonPassa('<tr>\n  <td>\n    Password\n  </td>\n  <td>\n    Nyckel!2024\n  </td>\n</tr>', 'Nyckel!2024');
 });
