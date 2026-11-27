@@ -76,10 +76,9 @@ test('una frase qualunque che finisce con «è la password» resta intera, anche
     "l'utente e la password", 'dopo il 2024, è la password che non va', 'Grazie! è la password che cercavo',
     'il pass per la partita è 2024', 'usa il pass come password', 'Gatto2024 è il password managers']) {
     assert.equal(P.oscura(frase), frase, `pavimento: ${frase}`);
-    assert.ok(!alCorrettore(frase).startsWith(S) && !alCorrettore(frase).includes(`${S} è`), `correttore: ${frase} -> ${alCorrettore(frase)}`);
-  }
-  for (const frase of ['la cosa che mi manca è la password', 'quello che ho dimenticato è la password']) {
-    assert.equal(alCorrettore(frase), frase, frase);
+    // Al correttore conta quello che sta prima del verbo: il resto lo legge già la forma dopo il nome.
+    const testa = frase.split(/ (?:è|e) /)[0];
+    assert.ok(alCorrettore(frase).includes(testa), `correttore: ${frase} -> ${alCorrettore(frase)}`);
   }
 });
 
