@@ -352,12 +352,14 @@ test.describe('col menu nello strato sopra la scheda', () => {
   test.use({ stratoDelMenu: true });
 
   test('la fila c\'è anche lì: un\'icona fa la sua azione, e una portata dal «+» alla fila resta', async ({ app, openTab, testServer }) => {
+    // Condividi sta nella fila di partenza (#2555): a parole lo si porta nel «+», da cui il gesto lo riprende.
+    expect((await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), { type: 'SPOSTA_ICONA', icona: 'link:share', dove: 'altro_fila' })).executed).toBe(true);
     const page = await testServer.openReady(openTab, SITO(testServer.asset(PNG, 'image/png')));
     await page.locator('#vai').click({ button: 'right' });
     const menu = menuDi(page);
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
     expect(menu.superficie.url()).toMatch(/^filo:\/\/menu\//);
-    expect(await iconeDellaFila(menu)).toEqual(['link:openTab', 'link:copy']);
+    expect(await iconeDellaFila(menu)).toEqual(['link:openTab', 'link:copy', 'link:saveForLater', 'link:help']);
     await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
     await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="link:copy"]').click();
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 10_000 }).toBe('https://esempio.it/pagina');
