@@ -72,8 +72,12 @@ function consegna({ tabs, homeTab, homeWc, testo, sfondo, velo }) {
   const id = randomUUID();
   const url = `${URL_EDITOR}?bozza=${id}`;
   let editor = tabs.tabs.find((x) => eEditor(x.url));
-  if (editor) tabs.navigate(editor.id, url);
-  else {
+  // Un editor già caricato prende la bozza dove sta: ricaricarlo costerebbe tempo, e una pagina con un salvataggio in
+  // sospeso può trattenere la navigazione.
+  const wcEditor = editor && editor.view && editor.view.webContents;
+  const caricato = !!(wcEditor && vivo(wcEditor) && !editor._rinviata && !wcEditor.isLoading?.() && eEditor(wcEditor.getURL?.()));
+  if (editor && !caricato) tabs.navigate(editor.id, url);
+  else if (!editor) {
     const tabId = tabs.openTab(url, { activate: false });
     editor = tabs.tabs.find((x) => x.id === tabId);
   }
