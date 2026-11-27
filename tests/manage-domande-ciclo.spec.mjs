@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
 import { nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64').toString('base64');
 const tab = (page, t) => page.locator(`.mg-tab[data-tab="${t}"]`);
