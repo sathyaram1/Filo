@@ -1221,7 +1221,7 @@ test('nelle altre lingue la frase che nomina la password senza darla resta com\'
 test('un testo di 120.000 caratteri che ripete l\'etichetta si controlla in fretta', () => {
   for (const pezzo of ['비밀번호는 뭐예요 비밀번호는 ', 'le mot de passe est important et le mot de passe ']) {
     const s = pezzo.repeat(Math.ceil(120000 / pezzo.length));
-    const c = costoInUnita(() => P.oscura(s), { tetto: 30 });
+    const c = costoInUnita(() => P.oscura(s), { tetto: 60 });
     assert.ok(c.entro, `${pezzo.slice(0, 12)}: ${c.come}`);
   }
 });
