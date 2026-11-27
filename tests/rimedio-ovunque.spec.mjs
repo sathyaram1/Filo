@@ -487,7 +487,7 @@ test('«Parere di Filo» che non arriva: una richiesta, non una raffica; il moti
   await riga.hover();
   await expect(page.locator('#statePreview')).toBeVisible();
   await page.locator('#previewModule').click({ button: 'right' });
-  await page.locator('.sn-select-pop .sn-select-option', { hasText: 'Parere di Filo' }).click();
+  await menuDi(page).scegli('Parere di Filo');
   await riga.hover();
   const modulo = page.locator('#previewModule');
   // Il modello risponde senza il parere di quella carta: si dice, e non si richiede da solo.
