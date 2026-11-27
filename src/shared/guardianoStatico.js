@@ -687,7 +687,7 @@
         if (!nucleo) { /* solo punteggiatura */ } else if (/^\d+$/.test(nucleo)) {
           const misura = MISURE_CIFRE.codice;
           const dopo = toks[k + 1] ? toks[k + 1][0].replace(/[.,;:!?)»”"']+$/, '') : '';
-          if (password || !presentato || nucleo.length < misura[0] || nucleo.length > misura[1] || UNITA.test(dopo) || /[%€$]/.test(coda)) break;
+          if (password || !presentato || DI_CHI.test(prec) || nucleo.length < misura[0] || nucleo.length > misura[1] || UNITA.test(dopo) || /[%€$]/.test(coda)) break;
           if (ANNO_VALORE.test(nucleo) && (/^(?:nel|dal|since)$/i.test(prec) || (inglese && /^in$/i.test(prec)))) break;
           out.push({ valore: nucleo, regola: 'codice' });
           presentato = true;
