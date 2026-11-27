@@ -2517,6 +2517,9 @@
   // docEl.textContent concatena i blocchi SENZA separatore: l'ultima parola di un blocco e la
   // prima del successivo si fondono e i conteggi calano. Si ricostruisce il testo a mano.
   function docPlainText() {
+    return testoDi(docEl);
+  }
+  function testoDi(radice) {
     const BLOCK = /^(P|DIV|LI|H[1-6]|BLOCKQUOTE|PRE|UL|OL|SECTION|ARTICLE|FIGURE|FIGCAPTION|TABLE|TR|HR)$/;
     let out = '';
     const walk = (node) => {
