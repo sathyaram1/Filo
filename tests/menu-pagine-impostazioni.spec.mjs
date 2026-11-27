@@ -24,7 +24,9 @@ test('Preferenze: «Rimetti di serie» rimette il valore, e la voce si spiega o 
 
   await page.locator('label', { has: casella }).click({ button: 'right' });
   const voci = await etichette(page);
-  for (const v of ['Rimetti di serie', 'Spiega cosa fa', 'Chiedi a Filo']) expect(voci).toContain(v);
+  for (const v of ['Rimetti di serie', 'Spiega cosa fa']) expect(voci).toContain(v);
+  // Spiega e Chiedi sono lo stesso verbo (#2555): «Chiedi a Filo» sta nel menu dell'icona.
+  expect(await variantiDiChiedi(page)).toContain('Chiedi a Filo');
   await page.screenshot({ path: 'tests/.shots/2096-preferenze-menu.png' });
   await menuDi(page).voce('Rimetti di serie').first().click();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).tabPreview.enabled)).toBe(true);
