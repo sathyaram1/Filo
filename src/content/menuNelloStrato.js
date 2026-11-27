@@ -45,6 +45,11 @@
   let corrente = null;
   let contatore = 0;
 
+  // Nella griglia a icone (#2555) Incolla e la sua cronologia li fa il main con lo strato: l'icona arriva senza le
+  // funzioni della pagina, col segno che lo strato riconosce.
+  const perLoStrato = (lista) => (Array.isArray(lista) ? lista : []).map((x) => (x && x.cronologia
+    ? { ...x, onClick: null, cronologia: null, $incolla: true } : x));
+
   function nuovoId() {
     contatore += 1;
     return `${Date.now().toString(36)}-${contatore}-${Math.random().toString(36).slice(2, 8)}`;
