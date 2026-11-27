@@ -241,6 +241,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_RIGHE_APP: 'app-chats-in-filo',
     // #869 — la home è la coda del filo: a pezzi, la ricerca nel campo, le pagine tolte dal tasto destro.
     FILO_CODA: 'home-filo',
+    // #869.2 — la conversazione che ogni home continua, una sola fra le schede.
+    FILO_CHAT_CORRENTE: 'home-filo',
     FILO_CERCA: 'home-filo',
     FILO_CODA_TOGLI_PAGINE: 'home-filo',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
