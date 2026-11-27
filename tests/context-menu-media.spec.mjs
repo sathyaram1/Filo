@@ -105,22 +105,25 @@ test('Pausa e Riproduci agiscono davvero sulla riproduzione', async ({ openTab, 
   }
 });
 
-test('la velocità si cambia davvero (clic accelera, il sotto-menu sceglie il valore esatto)', async ({ openTab, testServer }) => {
+test('la velocità si cambia davvero (la rotella accelera, il clic sceglie il valore esatto)', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, pageHtml('/nonexistent.mp4'));
 
-  // Un clic sul corpo della voce accelera di uno scatto: 1× → 1,25×.
+  // La rotella in su sull'icona accelera di uno scatto: 1× → 1,25× (#2555: il clic apre i valori).
   let menu = await openMenuOn(page, '#v');
-  await expect(menu.getByText('Velocità 1×')).toBeVisible();
-  await menu.locator('button', { hasText: 'Velocità' }).first().click();
+  const velocita = menu.icona('speed');
+  await expect(velocita).toHaveAttribute('aria-label', 'Velocità 1×');
+  await velocita.hover();
+  await page.mouse.wheel(0, -100);
   await expect.poll(() => page.evaluate(() => document.getElementById('v').playbackRate)).toBe(1.25);
+  await page.keyboard.press('Escape');
 
-  // La freccetta apre l'elenco completo, rallentamenti inclusi: 0,5× si applica.
+  // Il clic apre l'elenco completo, rallentamenti inclusi: 0,5× si applica.
   menu = await openMenuOn(page, '#v');
-  await expect(menu.getByText('Velocità 1,25×')).toBeVisible();
-  await menu.locator('.sn-menu-split-arrow').first().hover();
+  await expect(velocita).toHaveAttribute('aria-label', 'Velocità 1,25×');
+  await velocita.click();
   const sub = menuDi(page).locator('.sn-menu-sub');
   await expect(sub).toBeVisible();
-  await sub.locator('button', { hasText: '0,5×' }).first().click();
+  await sub.locator('.sn-menu-item', { hasText: '0,5×' }).first().click();
   await expect.poll(() => page.evaluate(() => document.getElementById('v').playbackRate)).toBe(0.5);
 });
 
