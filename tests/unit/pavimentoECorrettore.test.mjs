@@ -13,8 +13,8 @@ require('../../src/shared/urlExfil.js');
 const P = require('../../src/shared/pavimento.js');
 const R = require('../../src/main/services/correttoreRiservati.js');
 const S = P.SEGNAPOSTO;
-// In unità di riferimento: la lettura giusta ne costa circa 10, quella che rilegge all'indietro le file di spazi
-// circa 80 volte tanto.
+// In unità di riferimento: la lettura giusta ne costa al più una decina, quella che rilegge all'indietro le file di
+// spazi da 30 a 300 volte tanto.
 const TETTO_VOCI_VUOTE = 200;
 const alCorrettore = (campo) => R.richiestaSenzaRiservati({ prima: '', nuovo: campo, dopo: '', campo, campoDa: 0 }).nuovo;
 
