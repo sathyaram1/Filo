@@ -9,7 +9,6 @@
 // la probabilità è un caso deterministico al 100%.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CARDS = {
   'c-bolt': {
@@ -399,7 +398,7 @@ test('il riquadro fa scegliere partita, mulligan e pescate extra, e il numero ca
 
   // A due iniziando si salta la pescata: 7 carte, una in meno.
   await page.click('#probGame');
-  await menuDi(page).scegli('Partita a due, inizio io');
+  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizio io' }).click();
   await expect(page.locator('#probGame')).toHaveText(/a due, inizio io/);
   const play = await settledPct(page);
   expect(Math.abs(play - hyperAtLeast(99, 40, 7, 3) * 100)).toBeLessThan(0.5);
@@ -407,7 +406,7 @@ test('il riquadro fa scegliere partita, mulligan e pescate extra, e il numero ca
 
   // Se inizia l'altro si pesca, come a più giocatori.
   await page.click('#probGame');
-  await menuDi(page).scegli('Partita a due, inizia l\'altro');
+  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizia l\'altro' }).click();
   expect(Math.abs((await settledPct(page)) - multi)).toBeLessThan(0.5);
 
   // Mulligan: compare la colonna «per tenere», già con 2 terre, e la probabilità sale.
@@ -446,7 +445,7 @@ test('chat e riquadro danno lo stesso numero alle stesse condizioni (#791)', asy
   await page.fill('#probTurn', '3');
   await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
   await page.click('#probGame');
-  await menuDi(page).scegli('Partita a due, inizia l\'altro');
+  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizia l\'altro' }).click();
   await page.fill('#probMull', '1');
   await expect(page.locator('#probNeeds input[data-keep="terre"]')).toHaveValue('2');
   const riquadro = await settledPct(page);
@@ -588,7 +587,7 @@ test('il riquadro resta compatto: senza mulligan nessuna colonna in più, con il
     { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
     { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await page.click('#probGame');
-  await expect(menuDi(page).voce('Partita').first()).toBeVisible();
+  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveCount(3);
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'tests/.shots/decks-prob-791-scuro.png' });
 });

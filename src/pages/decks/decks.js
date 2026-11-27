@@ -823,7 +823,7 @@
         run: () => saveDeck(Decks.setGroupOverride(current, cardId, null, view)),
       });
     }
-    openCtx(x, y, items);
+    openCtx(x, y, items, { valori: true });
   }
 
   // Nella vista «per tag» la categoria È un tag: scelta aggiungi-vs-sostituisci; altrove il
