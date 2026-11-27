@@ -633,6 +633,28 @@
   const FRA_VIRGOLETTE = `[ \\t]*(?:[${DOPPIE}](?<d>[^\\n|\\t${DOPPIE}]{1,2000})[${DOPPIE}]|[${SINGOLE}](?<s>[^\\n|\\t${SINGOLE}]{1,2000})[${SINGOLE}])`;
   const VIRGOLETTATO_DOPO = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]*(?<sep>${FRECCIA}|[:=])|[ \\t]+${VERBO_PASSWORD})${FRA_VIRGOLETTE}`, 'gid');
   const VIRGOLETTATO_IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]${FRA_VIRGOLETTE}`, 'gid');
+  // Gli altri ponti fra il nome e il valore (#1403.67): chi l'ha messa («come password ho messo «…»»), e la risposta
+  // dopo la domanda o dopo il cambio, staccata da un segno («Ti ricordi la password? Era «…»», «l'ho cambiata, ora è
+  // «…»»): dopo il segno solo parole che non aprono un altro discorso, poi l'annuncio, e dopo il valore la frase finisce
+  // («It's "easy" to reset» resta).
+  const RIEMPI = "(?:ora|adesso|invece|now|mi[ \\t]+pare|mi[ \\t]+sembra|credo|penso|forse|i[ \\t]+think|maybe|it|that|this|s[iì],?|yes,?|beh,?|well,?|allora)";
+  const RISPOSTA = `[ \\t]*(?:\\?+|[:.,;!])[ \\t]*(?:${RIEMPI}[ \\t]+){0,2}(?:it['’]s|${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO})(?:[ \\t]*:)?`;
+  const FINE_RISPOSTA = `(?=[ \\t]*(?:$|[\\n.,;:!?)]|(?:e|ed|ma|and|but|or|o)[ \\t]))`;
+  const MESSA = "[ \\t]+(?:ho|hai|ha|abbiamo|avete|hanno|l['’](?:ho|hai|ha|abbiamo)|i(?:['’]ve)?|we)[ \\t]+(?:mess[ao]|scelt[ao]|usat[ao]|set|chose|picked|used|put)";
+  const VIRGOLETTATO_MESSA = new RegExp(`${ETICHETTA}${ACCANTO}${MESSA}${FRA_VIRGOLETTE}`, 'gid');
+  const VIRGOLETTATO_RISPOSTA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}${FRA_VIRGOLETTE}${FINE_RISPOSTA}`, 'gid');
+  // Il nome fra virgolette di cosa protegge («la password di «Netflix» è «…»») non è il valore: il valore è quello dopo.
+  const VIRGOLETTATO_DI = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]+(?:di|del|della|dello|per|for|of|on|su|sul)|[ \\t]+dell['’][A-Za-zÀ-ÿ]*)(?:[ \\t]+[A-Za-zÀ-ÿ]+)?${FRA_VIRGOLETTE}`, 'gid');
+  // Dopo la sola domanda («Ti ricordi la password? «…»») conta la forma della password, come senza verbo.
+  const VIRGOLETTATO_DOMANDA = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*\\?+${FRA_VIRGOLETTE}`, 'gid');
+  const RISPOSTA_NUDA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
+  // Dopo una password fra virgolette, nella stessa frase, la seconda che le si lega con un annuncio o una preposizione
+  // («da «…» a «…»», «era «…», l'ho cambiata in «…»», «la vecchia era «…» e la nuova è «…»»). Un altro campo nominato
+  // in mezzo («e il nome utente è «…»») non è la password.
+  const LEGAME = `(?:[^\\n.!?:;${DOPPIE}'‘’]|(?<=[A-Za-zÀ-ÿ])['’](?=[A-Za-zÀ-ÿ]))`;
+  const SEGUITO = new RegExp(`[ \\t]*,?(?<gap>${LEGAME}{0,50}?[ \\t])?(?:${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO}|(?<prep>in|a|to|into|con|with))${FRA_VIRGOLETTE}`, 'yid');
+  const SEGUITO_NUDO = /[ \t]+(?:a|to|in|into|con|with)[ \t]+([^\s|[]{6,64})/y;
+  const ALTRO_CAMPO = /(?<![A-Za-zÀ-ÿ])(?:utente|username|user|nome|name|e-?mail|mail|login|account|indirizzo|address|server|ssid|rete|network|telefono|phone|numero|number)(?![A-Za-zÀ-ÿ])/i;
   const DESCRIVE = /^(?:stess[aoie]|quell[aoie]|ugual[ei]|identic[aoie]|vedi|vedere|guarda|same|see|disponibil[ei]|available|scritt[ao]|indicat[ao]|riportat[ao]|fornit[ao]|inviat[ao]|stampat[ao]|vuot[ao]|nessun[ao]?|deve|devono|può|must|should|almeno|minimo|min|massimo|max)$/i;
   const descrive = (parole) => {
     const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
@@ -640,20 +662,42 @@
     return DESCRIVE.test(p[i]) || misuraODate(p);
   };
   function fraVirgolette(s, out) {
-    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE]) {
-      for (const m of s.matchAll(re)) {
-        const k = m.groups.d !== undefined ? 'd' : 's';
-        const v = m.groups[k].trim();
-        if (!v || v.startsWith('[') || v.includes(SEGNAPOSTO)) continue;
-        const parole = v.split(/\s+/);
-        const separato = re === VIRGOLETTATO_DOPO && !UNA_FRECCIA.test(m.groups.sep || '');
-        if (parole.length > 1) {
-          if (separato ? !descrive(parole) : FORMA_FORTE(v)) out.push({ valore: v, regola: 'password' });
-          continue;
-        }
-        const p = valorePassword(v);
-        if (p && (separato || FORMA_FORTE(p))) out.push(alPosto(p, m.indices.groups[k][0], m.groups[k]));
+    const prendi = (m, separato) => {
+      const k = m.groups.d !== undefined ? 'd' : 's';
+      const v = m.groups[k].trim();
+      if (!v || v.startsWith('[') || v.includes(SEGNAPOSTO)) return false;
+      const parole = v.split(/\s+/);
+      if (parole.length > 1) {
+        if (!(separato ? !descrive(parole) : FORMA_FORTE(v))) return false;
+        out.push({ valore: v, regola: 'password' });
+        return true;
       }
+      const p = valorePassword(v);
+      if (!p || !(separato || FORMA_FORTE(p))) return false;
+      out.push(alPosto(p, m.indices.groups[k][0], m.groups[k]));
+      return true;
+    };
+    const fini = [];
+    for (const re of [VIRGOLETTATO_DOPO, VIRGOLETTATO_IN_FRASE, VIRGOLETTATO_MESSA, VIRGOLETTATO_RISPOSTA, VIRGOLETTATO_DOMANDA]) {
+      for (const m of s.matchAll(re)) {
+        const separato = (re === VIRGOLETTATO_DOPO && !UNA_FRECCIA.test(m.groups.sep || '')) || re === VIRGOLETTATO_MESSA || re === VIRGOLETTATO_RISPOSTA;
+        if (prendi(m, separato)) fini.push(m.index + m[0].length);
+      }
+    }
+    for (const m of s.matchAll(VIRGOLETTATO_DI)) fini.push(m.index + m[0].length);
+    for (let fine of fini) {
+      for (let giri = 0; giri < 8; giri++) {
+        SEGUITO.lastIndex = fine;
+        const m = SEGUITO.exec(s);
+        // Una preposizione da sola lega solo attaccata («da «…» a «…»»): «a «Netflix» e a «Spotify»» sono due siti.
+        const gap = m && (m.groups.gap || '').trim();
+        if (!m || (gap && (m.groups.prep || ALTRO_CAMPO.test(gap))) || !prendi(m, true)) break;
+        fine = m.index + m[0].length;
+      }
+    }
+    for (const m of s.matchAll(RISPOSTA_NUDA)) {
+      const v = formaVicina(m[1]);
+      if (v) out.push({ valore: v, regola: 'password' });
     }
   }
 
@@ -821,7 +865,13 @@
     for (const re of [ACCANTO_DEBOLE, SOTTO]) {
       for (const m of s.matchAll(re)) {
         const v = valorePassword(m[1], { forma: true });
-        if (v && !INDIRIZZO_O_EMAIL(v)) out.push({ valore: v, regola: 'password' });
+        if (!v || INDIRIZZO_O_EMAIL(v)) continue;
+        out.push({ valore: v, regola: 'password' });
+        // «da Gatto1 a Mela!Verde77»: la nuova subito dopo la vecchia, con la sua forma.
+        SEGUITO_NUDO.lastIndex = m.index + m[0].length;
+        const dopo = re === ACCANTO_DEBOLE && SEGUITO_NUDO.exec(s);
+        const n = dopo && formaVicina(dopo[1]);
+        if (n) out.push({ valore: n, regola: 'password' });
       }
     }
     for (const m of s.matchAll(IN_FRASE)) {

@@ -346,10 +346,16 @@
   const AUSILIARI = "è|e'|e’|é|era|sarà|sarebbe|fosse|sia|ha|aveva|avrà|has|had|have|was|is|will";
   const PARTICIPI = 'stat[ao]|diventat[ao]|divenut[ao]|rimast[ao]|restat[ao]|been|become';
   const PASSATI = 'diventò|divenne|rimase|restò|became|become|remained|stayed';
-  const CAMBI = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|messa|messo|changed|set|updated|reset';
+  // Un elenco solo dei verbi di cambio, anche per il correttore (#1403.67): «sostituita con», «changé en», «cambiada a».
+  const CAMBI = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|sostituit[ao]|rimpiazzat[ao]|messa|messo'
+    + '|changed|set|updated|reset|replaced|chang[ée]e?|modifi[ée]e?|cambiad[ao]|modificad[ao]|actualizad[ao]|mudad[ao]';
+  // Dopo chi l'ha cambiata la preposizione porta al valore nuovo, anche «da … a …» e «con …»; in tedesco il verbo
+  // viene dopo il valore («das Passwort in «…» geändert»).
+  const VERSO = 'in|a|to|into|con|with|da|from|en|à|por';
   const CAMBIO = `(?:${CAMBI})${SP}(?:in|a|to)`;
   const AUSILIARE = `(?:${AUSILIARI})${SP}(?:(?:${AVVERBI})${SP})?`;
-  const CAMBIO_PRIMA = `(?:in|a|to)(?<=(?<![A-Za-z])(?:ho|abbiamo|hai|have|has|had|i|we|ve)${SP}(?:${CAMBI})${SP}[^\\n]{1,40}(?:in|a|to))`;
+  const CAMBIO_PRIMA = `(?:(?:${VERSO})(?<=(?<![A-Za-zÀ-ÿ])(?:${CAMBI})${SP}[^\\n.!?«»"“”„]{1,40}(?:${VERSO}))`
+    + `|(?:in|auf|zu)(?=[^\\n]{1,82}?${SP}(?:geändert|gesetzt|aktualisiert)(?![A-Za-zÀ-ÿ])))`;
   const VERBO_LARGO = `(?:(?:${AUSILIARE})?(?:(?:${PARTICIPI})${SP})?${CAMBIO}|${AUSILIARE}(?:${PARTICIPI})|${PASSATI}|${ANNUNCI.join('|')})`;
   const ANNUNCIO_LARGO = `(?:${CAMBIO_PRIMA}|(?:(?:${AVVERBI})${SP})?(?:dev['’]|(?:${MODALI})${SP})?${VERBO_LARGO}(?:${SP}(?:${AVVERBI})){0,2})`;
   // Di cosa è la password, fra il nome e il valore («la password del wifi», «la pass per il router»): lo stesso per il
@@ -782,6 +788,6 @@
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
     segretiNelTesto, segretiInUscita, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
-    sembraPassword, indirizzoOEmail, ANNUNCI, ANNUNCIO_LARGO, AVVERBI, MODALI, COMPLEMENTO,
+    sembraPassword, indirizzoOEmail, ANNUNCI, ANNUNCIO_LARGO, AVVERBI, MODALI, COMPLEMENTO, CAMBI, PARTICIPI, PASSATI,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
