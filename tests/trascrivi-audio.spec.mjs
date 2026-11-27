@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { statoDi, paginaDelloStrato } from './helpers/riquadri.mjs';
+import { statoDi, paginaDelloStrato, conta } from './helpers/riquadri.mjs';
 
 // WAV vero (8 kHz, 16 bit): `secondi` di tono, che Chromium decodifica come un file qualunque.
 function wav(secondi) {
