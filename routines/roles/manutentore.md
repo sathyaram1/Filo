@@ -39,7 +39,7 @@ La priorità dice quanto una cosa conta oggi, non il suo posto in coda.
 
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
-| **3** | urgentissimo a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito | owner, giudici, tu (crearne sì, **toglierne mai**) | parte subito, sempre in parallelo, fuori da ogni ordine |
+| **3** | urgentissimo a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito | owner, giudici (solo alle segnalazioni degli utenti: a un feedback nato da una routine il giudice dà al più 2, #2710), tu (crearne sì, **toglierne mai**) | parte subito, sempre in parallelo, fuori da ogni ordine |
 | **2** | importante: da mettere presto nell'ordine | tu e l'owner | nell'ordine parte come le altre; senza un ordine pronto la coda per urgenza la dà anche a basse chiuse |
 | **1** | da fare | tu, l'owner, i giudici | parte quando la metti nell'ordine |
 | **0** | da fare idealmente, rimandato a lungo: difetti minori che oggi non valgono lo sforzo | tu e l'owner | non lo metti nell'ordine |
