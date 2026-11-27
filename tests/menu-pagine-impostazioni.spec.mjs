@@ -308,10 +308,12 @@ test('Editor: il tasto destro su un documento dell’elenco è di quel documento
 
   const primo = page.locator('.ed-doc-item', { hasText: 'primo' });
   await primo.click({ button: 'right' });
-  const menu = page.locator('.ed-title-ctxmenu .sn-select-option');
-  await expect(menu).toHaveText(['Apri', 'Rinomina', 'Duplica', 'Elimina']);
+  // A icone (#2555): i nomi delle icone, nello stesso ordine.
+  const menu = menuDi(page);
+  const icone = menu.locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)');
+  await expect.poll(() => icone.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Apri', 'Rinomina', 'Duplica', 'Elimina']);
   await page.screenshot({ path: 'tests/.shots/2096-editor-menu-documento.png' });
-  await menu.filter({ hasText: 'Duplica' }).click();
+  await menu.scegli('Duplica');
   // La copia è di «primo», non del documento aperto.
   if (await page.locator('#docPop').isHidden()) await page.click('#docSwitch');
   await expect(page.locator('.ed-doc-item', { hasText: 'primo (copia)' })).toHaveCount(1);
