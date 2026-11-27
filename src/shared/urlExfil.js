@@ -98,6 +98,11 @@
   function decodificaPercento(s) {
     return s.includes('%') ? decodificaConPosti(s, { posti: false }).testo : s;
   }
+  // Come si legge un indirizzo, qui e nel pavimento: fino a tre giri, e a ogni giro ogni «+» è uno spazio (#1403.74).
+  const GIRI_DI_DECODIFICA = 3;
+  function giroDiDecodifica(s, { posti = true } = {}) {
+    return decodificaConPosti(s, { piu: true, posti });
+  }
 
   // Cifre e lettere di altri alfabeti nella forma base: chi riceve le riporta all'ASCII, quindi una scrittura nuova non è
   // una porta nuova (#810). Le cifre Unicode stanno in serie contigue da 0 a 9: il valore è la distanza dall'inizio.
