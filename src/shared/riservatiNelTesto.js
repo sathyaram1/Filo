@@ -86,7 +86,7 @@ const FINE_FRASE = new RegExp(`[${PUNTI}]+(?=\\s|$)|[${PUNTI_CJK}]+|\\n`, 'gu');
 const ENFASI = /(?<![^\s|>(\[«"'“‘-])(\*{1,3}|_{1,3})(?=[^\s*_])((?:(?!\1)[^\n]){1,120}?)(?<=[^\s*_])\1(?![\p{L}\p{N}*_])/gu;
 // Lo stesso per i tag di un pezzo di pagina incollato («<b>Password:</b> …», «<strong>PIN:</strong> 4821», #2673.12):
 // il tag si legge come spazi, l'apertura di una riga come a capo (la chiusura no: le righe di una tabella restano
-// attaccate), la cella come «|», e l'a capo che porta a una cella è rientro del sorgente, non una riga. Gli attributi
+// attaccate), la cella come «|», e l'a capo che porta a un tag della tabella è rientro del sorgente, non una riga. Gli attributi
 // restano testo (un token in un href si vede ancora); un tag stretto fra due segni di un valore («Ab<i>9x», «Pa$$<br>w»)
 // resta com'è: spezzarlo farebbe uscire metà password.
 const TAG_TESTO = 'b|strong|i|em|u|s|strike|del|ins|mark|small|big|sub|sup|span|font|code|kbd|samp|tt|var|a|abbr|cite|q'
