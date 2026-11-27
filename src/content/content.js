@@ -2785,8 +2785,14 @@
         label: incolla.label, onClick: incolla.onClick, azione: incolla.azione,
         cronologia: { history: incolla.history, onPick: incolla.onPickHistory, onRemove: incolla.onRemoveHistory, onClear: incolla.onClearHistory },
       };
+      // Il modello della dettatura si sceglie dal menu dell'icona: i modelli sono le sue varianti.
       const detta = TTS.buildDictateItem(target);
-      if (detta && typeof detta.onClick === 'function') azioni.dictate = { label: detta.label, onClick: detta.onClick, disabled: !!detta.disabled };
+      if (detta && typeof detta.onClick === 'function') {
+        azioni.dictate = {
+          label: detta.disabled ? I18n.t('menu_dictate_not_supported') : detta.label, onClick: detta.onClick, disabled: !!detta.disabled,
+          varianti: (detta.subItems || []).filter((x) => x && typeof x.onClick === 'function').map((x) => ({ label: x.label, onClick: x.onClick })),
+        };
+      }
       if (contesto.valutaQui) { const v = buildValutaItem(contesto.valutaQui); azioni.valuta = { label: v.label, onClick: v.onClick }; }
       const campoDiFilo = SpellCheck?.findSupportedEditable?.(target) || null;
       if (campoDiFilo) {
