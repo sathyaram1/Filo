@@ -95,15 +95,18 @@ test('dal tasto destro: «Segna fidata…» apre la domanda con le note, «Togli
   await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [NON_FIDATA, FIDATA] });
   await fiduciaComeIlServer(app);
   const page = await apriArchivio(app, openTab);
-  const menu = page.locator('.mg-ctxmenu, .sn-select-pop').last();
+  // A icone (#2555): le voci sono icone o varianti nel menu di un'icona.
+  const menu = menuDi(page);
 
   await riga(page, 'D-81').click({ button: 'right' });
-  await expect(menu).not.toContainText('fidata');
-  await expect(menu).not.toContainText('fiducia');
-  await page.keyboard.press('Escape');
+  await expect(menu.principale).toBeVisible();
+  const voci = (await menu.vociScritte()).join('\n');
+  expect(voci).not.toContain('fidata');
+  expect(voci).not.toContain('fiducia');
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
 
   await riga(page, 'D-80').click({ button: 'right' });
-  await menu.getByText('Segna fidata…').click();
+  await menu.scegli('Segna fidata…');
   const k = dq(page, 'D-80');
   await expect(k.locator('details.mg-dq-note')).toHaveAttribute('open', '');
   expect(await app.evaluate(() => globalThis.__mandati.length), 'dal menu la fiducia non si dà senza leggere').toBe(0);
