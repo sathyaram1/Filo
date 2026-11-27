@@ -1240,7 +1240,16 @@
     if (action === ACTIONS.EXPLAIN) return PROMPTS.explain({ selection: sel, sentence: sent });
     if (action === ACTIONS.EXPLAIN_DEEP) return PROMPTS.explainDeep({ selection: sel, sentence: sent });
     if (action === ACTIONS.TRANSLATE_SELECTION) return PROMPTS.translateSelection({ selection: sel });
+    if (action === ACTIONS.TRANSCRIBE_AUDIO) return I18n.t('popup_transcribe_prompt', global.SN_PAGINA_SOTTO?.url || location.href);
     return sel || '';
+  }
+
+  function durataLeggibile(secondi) {
+    const t = Math.round(Number(secondi) || 0);
+    const h = Math.floor(t / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const s = String(t % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
   }
 
   // Stack degli avvisi in pagina (#409): tutto ciò che Filo ancora in basso a destra vive in
