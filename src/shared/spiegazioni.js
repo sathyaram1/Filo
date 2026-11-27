@@ -210,7 +210,7 @@
       if (!voci.length) return;
       // Nel documento della pagina il menu è quello a icone di Filo (#2555), con la parola contornata.
       const I = doc === global.document ? global.SN_MENU_ICONS : null;
-      if (I && I.apriVoci && I.apriVoci({ x, y, elemento: parola, voci: voci.map(([label, , fa]) => ({ label, onClick: () => { try { fa(); } catch (_) {} } })) })) return;
+      if (I && I.apriVoci && I.apriVoci({ x, y, elemento: parola, sopra: true, voci: voci.map(([label, , fa]) => ({ label, onClick: () => { try { fa(); } catch (_) {} } })) })) return;
       menuScorso =(doc === global.document && global.SN_MENU?.fotoDelloScorrimento?.(x, y)) || (() => true);
       menu = doc.createElement('div');
       menu.className = 'filo-spiega-menu';
