@@ -630,6 +630,10 @@
   // circondati da spazi; il valore sotto l'etichetta anche dopo una riga vuota (due paragrafi), ma da solo sulla riga,
   // coi due punti o senza: «Wi-Fi password:» a capo vale quanto «Password:» a capo (#2673.3).
   const PRIMA = '(?:^|[\\n|\\t])[^\\n|\\t:：=.!?;,]{0,30}?';
+  // Le righe vuote che il valore sotto l'etichetta sola può avere sopra, un conto solo per la parola, la frase e la
+  // riga sotto (rigaSotto): fra due paragrafi del Markdown se ne trovano anche tre (#2673.10).
+  const VUOTE_SOTTO = 3;
+  const A_CAPO_SOTTO = `\\n(?:[ \\t]*\\n){0,${VUOTE_SOTTO}}`;
   // Fra etichetta e separatore niente virgolette, uguali o parentesi di codice: in `"Password" :: #c` o in
   // `password" id="pwd1"` quello che segue è di un altro campo.
   const ACCANTO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:：|=\\t?!.,;\\[\\]«»"<>{}$]){0,40}?';
