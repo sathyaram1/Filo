@@ -64,41 +64,39 @@
   // forma alfanumerica minuscola, così "Mario_Rossi", "mario.rossi" e
   // "MarioRossi" collassano sulla stessa chiave e i separatori non aiutano a
   // evadere il match.
-  // Ogni sequenza «%xx» si decodifica per conto suo: un solo «%» spaiato non deve spegnere la
-  // decodifica dell'intero indirizzo (#810).
-  function decodificaPercento(s) {
-    return s.replace(/(?:%[0-9A-Fa-f]{2})+/g, (pezzo) => {
-      try { return decodeURIComponent(pezzo); } catch (_) {
-        return pezzo.replace(/%([0-9A-Fa-f]{2})/g, (m, h) => (parseInt(h, 16) < 128 ? String.fromCharCode(parseInt(h, 16)) : m));
-      }
-    });
-  }
-
-  // La stessa decodifica, carattere per carattere, con dove sta nel testo codificato ogni carattere decodificato
-  // (`da`, `a` esclusa): il pavimento toglie dall'indirizzo il pezzo codificato di quello che legge decodificato.
-  // `piu`: il «+» di una query è uno spazio. Una sequenza UTF-8 rotta resta com'è, come sopra.
+  // Ogni carattere «%xx» (o i due, tre, quattro di una lettera UTF-8) si decodifica per conto suo: un «%» spaiato o una
+  // sequenza rotta restano come sono e non spengono la decodifica del resto (#810). Un posto solo per qui e per il
+  // pavimento, che con `posti` sa dove sta nel testo codificato ogni carattere decodificato (`da`, `a` esclusa) e
+  // toglie dall'indirizzo il pezzo codificato di quello che legge decodificato (#1403.74). `piu`: il «+» è uno spazio.
   const HEX2 = /^%[0-9A-Fa-f]{2}$/;
-  function decodificaConPosti(s, { piu = false } = {}) {
-    const t = String(s || '');
+  const SEQUENZA = /^(?:%[0-9A-Fa-f]{2})+$/;
+  function decodificaConPosti(s, { piu = false, posti = true } = {}) {
+    const t = String(s == null ? '' : s);
     let testo = '';
-    const da = [];
-    const a = [];
-    const metti = (c, i, j) => { for (let k = 0; k < c.length; k++) { da.push(i); a.push(j); } testo += c; };
+    const da = posti ? [] : null;
+    const a = posti ? [] : null;
+    const metti = (c, i, j) => {
+      if (posti) for (let k = 0; k < c.length; k++) { da.push(i); a.push(j); }
+      testo += c;
+    };
     for (let i = 0; i < t.length;) {
       if (t[i] === '%' && HEX2.test(t.substr(i, 3))) {
         const b = parseInt(t.substr(i + 1, 2), 16);
-        const n = b < 0x80 ? 1 : b >= 0xF0 && b < 0xF8 ? 4 : b >= 0xE0 ? 3 : b >= 0xC2 && b < 0xE0 ? 2 : 0;
+        const n = b < 0x80 ? 1 : b >= 0xC2 && b < 0xE0 ? 2 : b >= 0xE0 && b < 0xF0 ? 3 : b >= 0xF0 && b < 0xF5 ? 4 : 0;
         const pezzo = n ? t.substr(i, 3 * n) : '';
-        if (n && /^(?:%[0-9A-Fa-f]{2})+$/.test(pezzo) && pezzo.length === 3 * n) {
-          let c = null;
+        let c = null;
+        if (n && pezzo.length === 3 * n && SEQUENZA.test(pezzo)) {
           try { c = decodeURIComponent(pezzo); } catch (_) { c = null; }
-          if (c) { metti(c, i, i + 3 * n); i += 3 * n; continue; }
         }
+        if (c) { metti(c, i, i + 3 * n); i += 3 * n; continue; }
       }
       metti(piu && t[i] === '+' ? ' ' : t[i], i, i + 1);
       i++;
     }
     return { testo, da, a };
+  }
+  function decodificaPercento(s) {
+    return s.includes('%') ? decodificaConPosti(s, { posti: false }).testo : s;
   }
 
   // Cifre e lettere di altri alfabeti nella forma base: chi riceve le riporta all'ASCII, quindi una scrittura nuova non è
