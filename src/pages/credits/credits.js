@@ -410,6 +410,13 @@
   function apriMenuPseudonimo(x, y) {
     chiudiMenu();
     if (!$('pseudonym').dataset.pseudonym) return;
+    // A icone come il tasto destro di Filo (#2555), con la riga che spiega a cosa serve sotto.
+    const I = window.SN_MENU_ICONS;
+    if (I && I.apriVoci && I.apriVoci({
+      x, y, elemento: $('pseudonym'),
+      spiegazione: 'Basta questo per ricevere un regalo di crediti. Email e nome restano tuoi.',
+      voci: [{ label: 'Copia lo pseudonimo', onClick: () => { copiaPseudonimo().catch(() => {}); } }],
+    })) return;
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop sn-wallet-ctx sn-wallet-me-menu';
     menu.setAttribute('role', 'menu');
