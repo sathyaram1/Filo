@@ -72,7 +72,7 @@ export function menuDi(scheda) {
     /** L'icona Incolla: il tasto destro su di lei apre la cronologia degli appunti. */
     incolla: locator('.sn-menu-griglia [data-sn-verbo="paste"]'),
     /** Il «+» che apre le azioni rare nello stesso menu. */
-    piu: locator('.sn-menu-griglia .sn-menu-row-overflow'),
+    piu,
     nome: locator('.sn-menu-nome'),
     sottomenu: locator('.sn-menu-sub'),
   };
