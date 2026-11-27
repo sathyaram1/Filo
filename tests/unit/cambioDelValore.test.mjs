@@ -133,7 +133,8 @@ test('il valore detto dopo il cambio con «ora», in una frase a parte o col pro
 });
 
 test('dopo il PIN o un codice, un numero di un\'altra frase o un anno restano', () => {
-  for (const t of ['il pin non funziona e il prezzo diventa 4821', 'se sbagli il pin, la multa diventa 2000',
+  for (const t of ['il pin non funziona e il prezzo diventa 4821', 'il pin non funziona e il prezzo resterà 4821',
+    'se sbagli il pin, la multa diventa 2000',
     'il codice del cancello è rotto, il preventivo diventa 4821', 'il pin è giusto e la pagina diventa 2048',
     'I changed my PIN in 2024', 'the pin was set in 2023']) {
     assert.equal(P.oscura(t), t, t);
