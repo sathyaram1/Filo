@@ -183,8 +183,8 @@ test('#2296 — Gestione col server dei tetti giù: i campi restano, spenti, col
   expect(scritture).toHaveLength(0);
   // Il menu non offre i tetti di fabbrica: non sapendo i numeri, non c'è niente da rimettere.
   await mg.locator('#mgRtRoot').click({ button: 'right', position: { x: 8, y: 8 } });
-  await expect(mg.locator('.mg-ctxmenu')).toBeVisible();
-  await expect(mg.locator('.mg-ctxmenu')).not.toContainText('Rimetti i tetti di fabbrica');
+  await expect(menuDi(mg).principale).toBeVisible();
+  expect(await menuDi(mg).vociScritte()).not.toContain('Rimetti i tetti di fabbrica');
 });
 
 test('#2296 — il rifiuto del server arriva col suo numero; il testo resta e parte intero', async ({ app, openTab }) => {
