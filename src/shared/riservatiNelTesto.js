@@ -124,7 +124,9 @@ const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repea
 const SEGNO_BLOCCO = '(?:>[ \\t]*|(?:[-*+•](?:[ \\t]+|$)|\\d{1,9}[.)][ \\t]+)(?:\\[[ xX]\\][ \\t]+)?|#{1,6}(?:[ \\t]+|$)|:[ \\t]+)';
 const LINGUAGGIO = '(?:[a-z][a-z+#-]{0,19}|[A-Z][A-Z+#-]{0,19})\\d?(?:[ \\t][^\\n]*)?|\\{[^\\n]*';
 const STRUTTURA = `(?:(?:\`{3,}|~{3,})[ \\t]*(?:${LINGUAGGIO})?|(?:-[ \\t]*){3,}|(?:\\*[ \\t]*){3,}|(?:_[ \\t]*){3,}|=+)[ \\t]*`;
-const RIGA_DI_STRUTTURA = new RegExp(`(\\n?)^([ \\t]*${SEGNO_BLOCCO}*${STRUTTURA})$`, 'gmu');
+// I segni in testa presi tutti e una volta sola (il gruppo atomico): «- - - … x» si dividerebbe fra voci e riga di
+// separazione in tutti i modi, e una riga lunga fermerebbe Filo.
+const RIGA_DI_STRUTTURA = new RegExp(`(\\n?)^((?=([ \\t]*${SEGNO_BLOCCO}*))\\3${STRUTTURA})$`, 'gmu');
 const BLOCCO = new RegExp(`^([ \\t]*)(${SEGNO_BLOCCO}+)`, 'gmu');
 const spazi = (s) => ' '.repeat(s.length);
 const senzaBlocchi = (s) => (/[-*+•>#`~.):=_]/.test(s)
