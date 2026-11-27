@@ -252,6 +252,9 @@
     m = {
       id: d.menu.id, ancore: new Map(), segni: new WeakMap(), inline: new Map(), correzioni: new Map(),
       attese: new Map(), inVolo: new Map(), restaAperto: !!d.menu.keepOnScroll,
+      punto: { x: d.x, y: d.y }, cronologia: [],
+      origine: d.menu.origine && [d.menu.origine.x, d.menu.origine.y].every(Number.isFinite)
+        ? { x: d.menu.origine.x, y: d.menu.origine.y, zoom: Number(d.menu.origine.zoom) > 0 ? Number(d.menu.origine.zoom) : 1 } : null,
     };
     applicaTema(d.tema, d.tokens);
     const cronologia = Array.isArray(d.cronologia) ? d.cronologia.filter((e) => e && typeof e === 'object') : [];
