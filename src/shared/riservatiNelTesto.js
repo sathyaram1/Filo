@@ -117,16 +117,24 @@ const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repea
   })
   .replace(SPAZIO_HTML, (e) => ' '.repeat(e.length))
   .replace(DUE_PUNTI_HTML, (e) => ':' + ' '.repeat(e.length - 1));
+// Così i segni di blocco in testa alla riga (voce d'elenco, citazione, titolo) e le righe che aprono o chiudono un blocco
+// di codice: «Password:» e sotto «- Nyckel!2024» o «```» è la riga sotto l'etichetta (#2673.10). Un segno senza niente
+// dopo resta: le etichette rileggono all'indietro le file lunghe di spazi, e mille voci vuote le farebbero lente. Il
+// blocco di codice dentro una citazione o una voce («> ```») è una riga di segni sola, come senza.
+const SEGNO_BLOCCO = '(?:>[ \\t]*|(?:[-*+]|\\d{1,9}[.)])[ \\t]+(?:\\[[ xX]\\][ \\t]+)?|#{1,6}[ \\t]+)';
+const BLOCCO = new RegExp(`^([ \\t]*)(${SEGNO_BLOCCO}*(?:\`{3,}|~{3,})[^\`\\n]*$|${SEGNO_BLOCCO}+(?=\\S))`, 'gmu');
+const spazi = (s) => ' '.repeat(s.length);
+const senzaBlocchi = (s) => (/[-*+>#`~.)]/.test(s) ? s.replace(BLOCCO, (_, rientro, segno) => rientro + spazi(segno)) : s);
 // Enfasi prima e dopo i tag: «**<b>CVV:</b>**» (#2695.7) la vuole prima, «&lt;b&gt;**PIN:**&lt;/b&gt;» dopo.
-const togliEnfasi = (s) => (/[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s);
+const togliEnfasi = (s) => (/[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => spazi(segno) + dentro + spazi(segno)) : s);
 // Così i segni in testa alla riga, la citazione e il punto d'elenco: «Password:» a capo «- x», «> x», «1. x» vale
 // «Password:» a capo «x», con ogni a capo (#2673.14).
 const SEGNI_DI_RIGA = /^[ \t]*(?:>[ \t]*)*(?:(?:[-*+•]|\d{1,3}[.)])(?=[ \t]))?/gm;
 const togliSegni = (s) => (/[>*+•\-.)]/.test(s) ? s.replace(SEGNI_DI_RIGA, (segni) => segni.replace(/[^ \t]/g, ' ')) : s);
 const senzaEnfasi = (t) => {
   const s = String(t == null ? '' : t);
-  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(togliSegni(s));
-  return togliEnfasi(togliSegni(senzaTag(togliEnfasi(s))));
+  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(togliSegni(senzaBlocchi(s)));
+  return togliEnfasi(togliSegni(senzaBlocchi(senzaTag(togliEnfasi(s)))));
 };
 const vistePerLeRegole = (t) => {
   const s = String(t == null ? '' : t);
