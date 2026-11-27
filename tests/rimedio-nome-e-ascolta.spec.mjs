@@ -90,7 +90,7 @@ test('pagina Download, coi crediti finiti: «Dai un nome sensato» dice perché 
     const dl = await openTab('filo://downloads/downloads.html');
     const riga = dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'scan_00412.pdf' }) });
     await riga.click({ button: 'right' });
-    await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(dl).scegli('Dai un nome sensato');
     const stato = dl.locator('.sn-rinomina .sn-rinomina-stato');
     await expect(stato).toContainText('crediti', { timeout: 15000 });
     const tasto = stato.locator('.sn-rinomina-rimedio');
