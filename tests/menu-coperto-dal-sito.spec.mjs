@@ -65,7 +65,7 @@ test('sotto il velo del sito la voce della cronologia scelta senza vederla non i
   const freccia = await centro(menuDi(page).incolla);
   await page.mouse.move(freccia.x, freccia.y, { steps: 4 });
   await page.mouse.click(freccia.x, freccia.y, { button: 'right' });
-  await page.waitForTimeout(700);
+  await expect(avvisoCoperto(page)).toBeVisible();
   expect(await statoCronologia(app, page), 'la cronologia non si apre sotto il velo').toBeNull();
   await page.keyboard.press('Escape');
   await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
