@@ -182,7 +182,8 @@ describe('le etichette non latine della password', () => {
   test('l\'elenco sta solo in campiSegreti.js: la pagina che chiede la password, le uscite e gli indirizzi lo prendono da lì', () => {
     for (const f of ['content/safebrowseHints.js', 'shared/guardianoStatico.js', 'shared/urlExfil.js', 'shared/pavimento.js']) {
       const src = readFileSync(join(__dirname, '..', '..', 'src', ...f.split('/')), 'utf8');
-      assert.doesNotMatch(src, /парол|κωδικ|密[码碼]|パスワード|비밀번호/, f);
+      // «κωδικός ασφαλείας» è il nome greco del CVV (#2681), non un'etichetta della password.
+      assert.doesNotMatch(src, /парол|κωδικ(?![^\n]{0,12}?ασφαλ)|密[码碼]|パスワード|비밀번호/, f);
       assert.match(src, /ETICHETTE_NON_LATINE/, f);
     }
   });
