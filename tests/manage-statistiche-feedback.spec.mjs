@@ -1138,9 +1138,10 @@ test('#496 anche una colonna vuota del grafico si può scegliere col tasto destr
   const vuota = page.locator('.mg-fs-trend-col--zero').first();
   await expect(vuota).toHaveAttribute('data-fs-punto', /.+/);
   await vuota.click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Restringi' })).toBeVisible();
+  const testo = await testoDelMenu(page);
+  expect(testo).toContain('Restringi');
   // Dietro non c'è niente da aprire, e la voce che lo prometterebbe non c'è.
-  await expect(page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Mostra' })).toHaveCount(0);
+  expect(testo).not.toContain('Mostra');
 });
 
 // ══ Un titolo fatto di soli spazi non è un titolo ══════════════════════════
