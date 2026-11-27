@@ -1728,24 +1728,6 @@
     Popup.toastErrore('streaming_non_riuscito', { duration: 9000 }, frase);
   }
 
-  // Il corpo accelera di uno scatto, la freccetta apre l'elenco completo. L'etichetta
-  // porta la velocità corrente, così il menu dice anche in che stato è il filmato.
-  function buildMediaSpeedItem(el) {
-    const rate = Number(el.playbackRate) || 1;
-    return {
-      type: 'split',
-      azione: 'video-audio-controls',
-      label: `${I18n.t('menu_media_speed')} ${formatSpeed(rate)}`,
-      arrowTitle: I18n.t('menu_media_speed_pick'),
-      onClick: () => setMediaSpeed(el, nextMediaSpeed(rate)),
-      subItems: MEDIA_SPEEDS.map((s) => ({
-        azione: 'video-audio-controls',
-        label: `${Math.abs(s - rate) < 0.001 ? '✓ ' : ''}${formatSpeed(s)}${s === 1 ? ` (${I18n.t('menu_media_speed_normal')})` : ''}`,
-        onClick: () => setMediaSpeed(el, s),
-      })),
-    };
-  }
-
   // La velocità come valore dell'icona nel tasto destro a icone (#2555): il clic apre l'elenco, la rotella cambia di
   // uno scatto e il menu si ridisegna col valore nuovo.
   function velocitaDelMedia(el) {
