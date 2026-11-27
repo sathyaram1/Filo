@@ -159,6 +159,20 @@
   transition: background calc(80ms * var(--sn-motion, 1)) ease-out, transform calc(80ms * var(--sn-motion, 1)) ease-out;
 }
 .sn-menu-row-btn[hidden] { display: none; }
+/* Un'icona è anche una .sn-menu-item (e nei menu delle pagine la loro voce): qui vale la cella, non la riga. */
+.sn-menu .sn-menu-griglia .sn-menu-row-btn {
+  width: var(--sn-cella, 34px);
+  min-width: 0;
+  height: var(--sn-cella, 34px);
+  padding: 0;
+  margin: 0;
+  gap: 0;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sn-menu .sn-menu-griglia .sn-menu-row-btn[hidden] { display: none; }
 .sn-menu-row-btn svg { width: var(--sn-icona, 20px); height: var(--sn-icona, 20px); }
 /* Il segno piccolo di chi ha varianti nel suo tasto destro. */
 .sn-menu-row-btn[data-sn-varianti="1"]::after {
