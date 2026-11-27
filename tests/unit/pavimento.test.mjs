@@ -639,6 +639,23 @@ test('#2678.5: senza virgolette la frase-password si toglie anche con un articol
     `Password: ${'parola '.repeat(40).trim()}`]) assert.equal(P.oscura(riga), riga, riga);
 });
 
+test('#2678.13: una nota fra parentesi o un\'emoji in fondo alla riga non salva la password, di una parola o di più', () => {
+  for (const [riga, atteso] of [
+    ['Password: casa mia al mare (tutto minuscolo)', `Password: ${S} (tutto minuscolo)`],
+    ['Password: casa mia al mare 😊', `Password: ${S} 😊`],
+    ['Password: casa mia al mare 👍🏽', `Password: ${S} 👍🏽`],
+    ['Password: casa mia al mare ❤️ (minuscolo)', `Password: ${S} ❤️ (minuscolo)`],
+    ['Password: casa mia al mare :)', `Password: ${S} :)`],
+    ['Password: tramonto (minuscolo)', `Password: ${S} (minuscolo)`],
+    ['Password: tramonto 😊', `Password: ${S} 😊`],
+    ['Utente: mario\nPassword: la casa al mare (tutto minuscolo)\nServer: imap.esempio.it',
+      `Utente: mario\nPassword: ${S} (tutto minuscolo)\nServer: imap.esempio.it`],
+  ]) assert.equal(P.oscura(riga), atteso, riga);
+  for (const riga of ['Password: disponibile alla reception (piano terra)', 'Password: la stessa di prima 😊',
+    'Password: deve avere almeno otto caratteri (una maiuscola)', 'Password: (vedi email)', 'Password: dimenticata 😢',
+    'Password: vedi email 😊 (oggetto «accesso»)']) assert.equal(P.oscura(riga), riga, riga);
+});
+
 test('una chiave o una password per nome, in un file di configurazione o sulla pagina di un servizio, non esce', () => {
   const segreti = {
     'PGPASSWORD=Girasole2024': 'Girasole2024',
