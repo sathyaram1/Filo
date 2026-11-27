@@ -228,8 +228,10 @@
       for (const m of s.matchAll(re)) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
     }
     for (const m of s.matchAll(CIFRE_STACCATE)) {
-      const n = m[1].replace(/\D/g, '').length;
-      if (n >= 4 && n <= 8) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
+      const n = m[0].replace(/\D/g, '').length;
+      if (n < 4 || n > 8) continue;
+      const prima = s.slice(Math.max(0, m.index - 160), m.index).replace(/["«“]\s*$/, '');
+      if (delMioApparecchio(prima) || etichettaSbloccabile(prima)) out.push(conCheApre({ valore: m[0], regola: 'codice' }, true));
     }
   }
   // `apre`: il codice di qualcosa che apre (il mio telefono, il cancello, la carta). Il controllo delle uscite prende
