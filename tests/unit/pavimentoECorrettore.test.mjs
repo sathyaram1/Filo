@@ -14,8 +14,8 @@ const P = require('../../src/shared/pavimento.js');
 const R = require('../../src/main/services/correttoreRiservati.js');
 const S = P.SEGNAPOSTO;
 // In unità di riferimento: la lettura giusta ne costa al più una decina, quella che rilegge all'indietro le file di
-// spazi da 30 a 300 volte tanto.
-const TETTO_VOCI_VUOTE = 200;
+// spazi da 200 a 1.800.
+const TETTO_FILE_DI_SPAZI = 60;
 const alCorrettore = (campo) => R.richiestaSenzaRiservati({ prima: '', nuovo: campo, dopo: '', campo, campoDa: 0 }).nuovo;
 
 test('nella riga di una tabella il valore nella cella dopo l\'etichetta coi due punti non arriva al modello', () => {
