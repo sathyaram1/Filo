@@ -1654,7 +1654,7 @@
     const aperto = !!blocco && !blocco.hidden;
     const fuoco = g.contains(document.activeElement) ? document.activeElement.dataset.snIconId : '';
     riempiGriglia(g, { items, dropTarget: row.dataset.snDropTarget, altro: { items: Array.isArray(altro) ? altro : [], dropTarget: blocco && blocco.dataset.snDropTarget } });
-    if (aperto) { const piu = row.querySelector('.sn-menu-row-overflow'); if (piu) esecutori.get(piu)?.(); }
+    if (aperto) { const piu = row.querySelector('.sn-menu-row-overflow'); if (piu) disegniDelPiu.get(piu)?.(true); }
     if (vuota) row.dataset.snVuota = '1';
     else delete row.dataset.snVuota;
     row.hidden = !!vuota && !esterno;
