@@ -161,8 +161,9 @@ test('il tasto destro su un «da fare» offre «Fatto» e «Non lo faccio», e m
 
   // Una volta segnato, il menu non lo offre più; una domanda vera tiene il suo consiglio.
   await page.locator('#mgDomandeLista .mg-domanda[data-id="D-20"]').click({ button: 'right' });
-  await expect(menu).toContainText('Applica il consiglio: Riprendi #1736');
-  await expect(menu).not.toContainText('Fatto');
+  t = await testo();
+  expect(t).toContain('Applica il consiglio: Riprendi #1736');
+  expect(t).not.toContain('Fatto');
 });
 
 test('col filtro delle sole non fidate, «Da rispondere» conta a parte i «da fare» che restano; la sezione conta tutto', async ({ openTab }) => {
