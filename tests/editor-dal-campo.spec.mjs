@@ -61,6 +61,13 @@ test('la bozza del campo diventa un documento nuovo, il campo si svuota e l\'Aiu
   const prima = await documenti(ed);
   await h.fill('#input', 'Seconda lettera\n\nCon due paragrafi');
   await h.locator('#tieni .dash-carta[data-tipo="editor"]').click({ position: { x: 150, y: 20 } });
+  await h.waitForTimeout(3000);
+  console.log('DEBUG', await h.evaluate(() => ({ v: document.getElementById('input').value, s: window.SN_DASH_EDITOR_CAMPO._stato() })),
+    await ed.evaluate(() => ({ u: location.href, p: [...document.querySelectorAll('#doc p')].map((x) => x.textContent) })),
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
+      return { inArrivo: win._filoTabs._inArrivo, tabs: win._filoTabs.tabs.map((t) => [t.id, t.url, t.view.webContents.getURL(), t.view.webContents.isLoading()]) };
+    }));
   await expect.poll(() => davanti(app), { timeout: 10_000 }).toMatch(/^filo:\/\/editor\//);
   const ed2 = await finestraCon(app, (u) => u.startsWith('filo://editor/'));
   await expect(ed2.locator('#doc p')).toHaveText(['Seconda lettera', '', 'Con due paragrafi']);
