@@ -346,7 +346,7 @@ async function handleFiloChat(richiesta) {
   }
 }
 
-async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, dopoOk = null, daModello = false, daFuori = false, chatId = null, rispostaA = null, schede = null, sender = null }, volo) {
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, dopoOk = null, daModello = false, daFuori = false, chatId = null, inVista = null, rispostaA = null, schede = null, sender = null }, volo) {
   const inizioTurno = Date.now();
   // #2085 — le schede lasciate nel campo: valgono solo quelle il cui gettone è ancora nel testo.
   const gettoni = internal || !globalThis.SN_SCHEDE_IN_CHAT ? []
