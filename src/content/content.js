@@ -1437,14 +1437,10 @@
     // spento, niente slot e niente suggerimenti.
     // Nei campi dove i segni li disegna Filo (#1446) decide il correttore: una parola che sa giusta (un cognome scartato
     // dal modello, una parola ignorata) non riprende dal browser la sua «correzione».
+    // «Correggi tutto», «Controlla» e «Annulla correzione» sono icone della griglia (azioniDelContesto).
     const campoDiFilo = SpellCheck?.findSupportedEditable?.(target) || null;
     const wantCorrection = !!SpellCheck && SpellCheck.erroriAttivi();
     let updateCorrection = null;
-    const tutti = campoDiFilo ? voceCorreggiTutti(campoDiFilo, 1) : null;
-    const controlla = campoDiFilo ? voceControlla(campoDiFilo) : null;
-    if (tutti || controlla) items.unshift(...[controlla, tutti].filter(Boolean), { type: 'separator' });
-    const annulla = campoDiFilo ? voceAnnullaCorrezione(campoDiFilo, e) : null;
-    if (annulla) items.unshift(annulla, { type: 'separator' });
     if (wantCorrection) {
       items.unshift(
         {
