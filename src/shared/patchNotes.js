@@ -24,6 +24,7 @@
         { testo: 'In una tabella, il CVV, una password come «login_password» o una chiave scritti nella cella accanto al loro nome, come «| CVV: | 123 |», non arrivano più ai modelli, come già succedeva per «| Password: | … |».', segnalazione: 2695 },
         { testo: 'Una password di più parole dopo «Password:» con dentro un numero e una parola di tempo, come «ci vediamo tra due giorni» o «il mio cane ha tre anni», non arriva più a nessun modello.', segnalazione: 2678 },
         { testo: 'Una password scritta in francese, tedesco, spagnolo, portoghese, polacco, russo, greco, cinese, giapponese o coreano, come «Das Passwort ist …» o «WiFi密码是…», non arriva più a nessun modello, come già in italiano e in inglese.', segnalazione: 1403 },
+        { testo: 'Una password, un PIN o un CVV in un pezzo di pagina incollato col suo HTML, come «<b>Password:</b> …» o una tabella copiata da un sito, non arrivano più a nessun modello, come già negli appunti in Markdown.', segnalazione: 2673 },
       ],
     },
     {
