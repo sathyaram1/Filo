@@ -86,10 +86,11 @@ for (const s of SISTEMI) test(`spenta: la versione nuova non parte da sola; «In
 
   // Il tasto destro offre le stesse azioni dei pulsanti, e la strada per la preferenza.
   await carta.click({ button: 'right', position: { x: 30, y: 12 } });
-  const menu = home.locator('.dash-menu');
-  await expect(menu).toBeVisible();
-  await expect(menu.locator('.dash-menu-voce', { hasText: 'Installa' })).toHaveCount(1);
-  await expect(menu.locator('.dash-menu-voce', { hasText: 'Preferenze sugli aggiornamenti' })).toHaveCount(1);
+  // A icone (#2555): ogni azione è un'icona col suo nome.
+  const menu = menuDi(home);
+  await expect(menu.principale).toBeVisible();
+  await expect(menu.voce('Installa')).toHaveCount(1);
+  await expect(menu.voce('Preferenze sugli aggiornamenti')).toHaveCount(1);
   mkdirSync(SHOTS, { recursive: true });
   const foto = (nome) => `${SHOTS}/aggiornamenti-carta-${nome}-${s.piattaforma}.png`;
   await home.screenshot({ path: foto('menu') });
