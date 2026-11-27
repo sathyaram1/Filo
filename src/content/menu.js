@@ -1653,6 +1653,10 @@
     // Il «+» c'è se ha qualcosa dietro, o durante un trascinamento (posa un'icona fra le rare).
     const piu = row.querySelector('.sn-menu-row-overflow');
     if (piu && !rare.length && !esterno) piu.hidden = true;
+    // Righe piene alla pari: sette icone con sei colonne sono quattro e tre, non sei e una sola.
+    const max = Math.max(1, Number(g.__snColonne) || 6);
+    const n = Math.max(1, [...row.children].filter((b) => !b.hidden).length);
+    g.style.setProperty('--sn-colonne', String(Math.min(max, Math.ceil(n / Math.ceil(n / max)))));
   }
 
   function makeGridButton(it, opts = {}) {
