@@ -627,7 +627,7 @@ test('una finestra incognito mostra le carte di destra come le ha disposte l’u
   test.setTimeout(60_000);
   const normale = await home(app);
   await normale.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
-  await normale.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await menuDi(normale).scegli('Togli dalla home');
   await expect(normale.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
   const disposta = await ordineDestra(normale);
 
