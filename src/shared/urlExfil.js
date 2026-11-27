@@ -698,6 +698,12 @@
         nonFidato = true;
         if (out.url) linkNoti.add(chiaveLink(out.url));
         daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, fonteDallaPagina(out.url ? hostDi(out.url) : '', FONTI_DI_PAGINA.letta));
+      } else if (type === 'TRASCRIVI_MEDIA') {
+        // Il parlato di un audio del web è testo di sconosciuti come una pagina letta (#519).
+        if (!out.trascrizione) continue;
+        nonFidato = true;
+        if (out.trascritto) linkNoti.add(chiaveLink(out.trascritto));
+        daFuori(testo(out.trascrizione), fonteDallaPagina(out.trascritto ? hostDi(out.trascritto) : '', FONTI_DI_PAGINA.letta));
       } else if (type === 'SCHEDE_CHIUSE' || type === 'RIAPRI_SCHEDA') {
         // #884 — titoli e riassunti delle schede chiuse li hanno scritti i siti (o un modello leggendoli): testo di fuori.
         const schede = type === 'RIAPRI_SCHEDA' ? (out.titolo || out.riassunto ? [out] : [])
