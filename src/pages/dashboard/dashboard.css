@@ -1429,7 +1429,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   color: var(--dash-paper);
 }
 .dash-action-btn-primary:hover { opacity: 0.85; }
-.dash-action-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.dash-action-btn[disabled], .dash-action-btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 /* §5 — bottone distruttivo (cancellazione definitiva dall'archivio). */
 .dash-action-btn-danger {
   border-color: #c0392b;
