@@ -284,20 +284,25 @@ export function proveDelCambio(mappa, cambi, { soglia = SOGLIA_SPEC_DI_UN_MODULO
     const f = mappa.file[rel];
     if (!f) { senzaProve.push(rel); continue; }
     const intero = f.funzioni.reduce((m, x) => Math.max(m, x[1]), 1);
-    const prese = new Set();
-    if (!righe) dai(f.carico, 'file', rel);
-    for (const r of righe || []) {
+    const funzioneDi = (r) => {
       let meglio = null;
       for (const x of f.funzioni) {
         if (x[0] > r) break;
         if (x[1] >= r && (!meglio || x[1] - x[0] < meglio[1] - meglio[0])) meglio = x;
       }
+      // Il modulo intero, o l'IIFE che lo avvolge, gira a ogni caricamento: vale come il file, non come una funzione.
+      return { meglio, vera: Boolean(meglio) && (meglio[1] - meglio[0] + 1) < 0.9 * intero };
+    };
+    const prese = new Set();
+    if (!righe) dai(f.carico, 'file', rel);
+    const testo = righe && sorgente ? sorgente(rel) : null;
+    const tutte = testo == null ? righe || [] : [...righe, ...righeDeiNomi(testo, righe, (r) => funzioneDi(r).vera)];
+    for (const r of tutte) {
+      const { meglio, vera } = funzioneDi(r);
       const chiave = meglio ? `${meglio[0]}:${meglio[1]}` : 'carico';
       if (prese.has(chiave)) continue;
       prese.add(chiave);
       const insieme = meglio ? meglio[2] : f.carico;
-      // Il modulo intero, o l'IIFE che lo avvolge, gira a ogni caricamento: vale come il file, non come una funzione.
-      const vera = Boolean(meglio) && (meglio[1] - meglio[0] + 1) < 0.9 * intero;
       const livello = !vera ? 'file' : mappa.insiemi[insieme].length > soglia ? 'larga' : 'funzione';
       dai(insieme, livello, rel);
     }
