@@ -72,7 +72,38 @@ async function ancheLeAzioni(app) {
   });
 }
 
-test('le schede del nuovo ciclo: conteggi, sola lettura in smistamento, automatiche con scelta, principio e «Riapri»', async ({ app, openTab }) => {
+// #2702: lo smistamento non fa aspettare l'owner. Un'opzione scelta su una domanda in smistamento parte come su un'aperta
+// e la domanda esce dalla scheda; il consiglio si applica anche dal tasto destro.
+test('una domanda in smistamento si risponde: l’opzione parte, la domanda esce dalla scheda, il consiglio sta nel tasto destro', async ({ app, openTab }) => {
+  const DUE = domanda(54, {
+    stato: 'in_smistamento', titolo: 'Soglia del giudice di priorità', legata: 'fb-813', blocca: true,
+    opzioni: [
+      { testo: 'Riprendi con la soglia a 2', pro: 'Riparte subito.', contro: 'Una soglia in più da tenere.', azione: { tipo: 'riprendi', feedbackId: 'fb-813' } },
+      { testo: 'Archivia il lavoro', pro: 'Niente altro lavoro.', contro: 'La soglia resta com’è.', azione: { tipo: 'archivia', feedbackId: 'fb-813' } },
+    ],
+  });
+  await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [IN_SMISTAMENTO, DUE, APERTA] });
+  await ancheLeAzioni(app);
+  const page = await openTab(MANAGE);
+  await apriDomande(page);
+  await tab(page, 'domande-smistamento').click();
+  await expect(tab(page, 'domande-smistamento')).toHaveText('In smistamento (2)');
+  await riga(page, 'D-54').click({ button: 'right' });
+  const menu = page.locator('.mg-ctxmenu, .sn-select-pop').last();
+  await expect(menu).toContainText('Applica il consiglio');
+  await expect(menu).not.toContainText('Discutiamo');
+  await page.keyboard.press('Escape');
+  await riga(page, 'D-54').click();
+  const s = dq(page, 'D-54');
+  await expect(s.locator('.mg-dq-applica')).toBeVisible();
+  await s.screenshot({ path: 'tests/.shots/manage-domande-smistamento-rispondibile.png' });
+  await s.locator('.mg-dq-opzione[data-indice="0"] .mg-dq-azione').click();
+  await expect.poll(() => app.evaluate(() => globalThis.__mandati.filter((m) => m.type === 'domanda_rispondi').map((m) => [m.id, m.scelta]))).toEqual([['D-54', 0]]);
+  await expect(tab(page, 'domande-smistamento')).toHaveText('In smistamento (1)');
+  await expect(riga(page, 'D-54')).toHaveCount(0);
+});
+
+test('le schede del nuovo ciclo: conteggi, smistamento con risposta, automatiche con scelta, principio e «Riapri»', async ({ app, openTab }) => {
   await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [FONTE, AUTOMATICA, IN_SMISTAMENTO, APERTA, IN_LAVORO] });
   await ancheLeAzioni(app);
   const page = await openTab(MANAGE);
