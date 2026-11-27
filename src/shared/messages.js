@@ -1163,6 +1163,15 @@
     LAVORI_CAMBIATI: 'lavori_cambiati',           // broadcast { lavori }
     // I documenti dell'Editor dal più recente, per la sua carta nella home. Solo pagine filo://.
     EDITOR_RECENTI: 'editor_recenti',             // {} → { ok, totale, file: [{ id, titolo, modificato }] }
+    // L'Editor che nasce dal campo della home (#2389): la bozza passa dal main, che prepara l'editor sotto la home e lo
+    // porta davanti quando ha disegnato. Regia: src/main/services/editorDalCampo.js.
+    EDITOR_DAL_CAMPO: 'editor_dal_campo',         // home → { testo, sfondo, velo } → { ok, id }
+    EDITOR_BOZZA: 'editor_bozza',                 // editor → { id } → { ok, testo } (una volta sola)
+    EDITOR_BOZZA_PRONTA: 'editor_bozza_pronta',   // editor → { id, geometria }: ha disegnato il documento
+    EDITOR_ARRIVO: 'editor_arrivo',               // main → home { id, geometria }: dove finisce il velo
+    EDITOR_VELO_PRONTO: 'editor_velo_pronto',     // home → { id }: il velo è arrivato, l'editor può venire davanti
+    EDITOR_BOZZA_RESA: 'editor_bozza_resa',       // main → home { id, testo }: l'editor non l'ha presa, torna nel campo
+    EDITOR_RIENTRO: 'editor_rientro',             // main → home { daEditor }: la home torna davanti
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
