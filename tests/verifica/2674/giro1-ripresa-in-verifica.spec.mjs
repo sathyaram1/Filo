@@ -96,13 +96,13 @@ async function conScena(stato, prova) {
 
 test('ripresa su un lavoro in verifica: il correttore riceve il lavoro e la sua consegna arriva al server', async () => {
   await conScena('revision_capability', async (casa, port, consegne) => {
-    const r = await dispatch(casa, port, ['--ticket', 'biglietto-v']);
+    const r = await dispatch(casa, port, ['--ticket', 'biglietto-di-verifica']);
     expect(r.json && r.json.role, r.se).toBe('fixer');
     expect(r.se).not.toMatch(/RIFIUTATA/);
     expect(r.json.payload.ripresa.statoDelFeedback).toBe('revision_capability');
     expect(git(casa, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(RAMO);
     commit(casa, 'lavoro.js', 'finito\n');
-    const f = await dispatch(casa, port, ['--record-fixed', ID, 'Ripreso sul ramo com\'è.', '--frase', 'Sistemato.', '--motivo', 'ripresa', '--ticket', 'biglietto-v']);
+    const f = await dispatch(casa, port, ['--record-fixed', ID, 'Ripreso il lavoro sul ramo com\'è, dopo lo sblocco del ramo vecchio: finito il pezzo che mancava e lasciato il resto.', '--frase', 'Sistemato.', '--motivo', 'ripresa', '--ticket', 'biglietto-di-verifica']);
     expect(consegne, `${f.code} ${f.se}`).toContain('fixed');
     expect(f.code, f.se).toBe(0);
   });
@@ -110,7 +110,7 @@ test('ripresa su un lavoro in verifica: il correttore riceve il lavoro e la sua 
 
 test('ripresa su un feedback fermo per una domanda: nessun correttore, il motivo del server nel guasto', async () => {
   await conScena('design', async (casa, port, consegne) => {
-    const r = await dispatch(casa, port, ['--ticket', 'biglietto-v']);
+    const r = await dispatch(casa, port, ['--ticket', 'biglietto-di-verifica']);
     expect(r.json && r.json.role, r.so.slice(0, 300)).toBe('halt');
     expect(r.json.payload.message).toMatch(/design → working/);
     expect(consegne).toEqual(['status:working']);
