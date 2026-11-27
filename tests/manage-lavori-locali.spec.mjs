@@ -265,5 +265,11 @@ test('«Copia» sui feedback degli utenti non parla di finish', async ({ openTab
   const utente = fb({ _id: 'u-1', seq: 911, clientId: 'abc', senderProof: undefined, fiducia: undefined });
   await apri(page, [utente], { tab: 'queue' });
   await page.locator('.mg-item[data-id="u-1"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Copia #911' })).toHaveAttribute('title', 'Il numero con cui parlarne');
+  // A icone (#2555) la voce non ha più il fumetto che la spiegava: qui conta che non parli di finish.
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  const copia = (await menu.vociScritte()).filter((v) => v.includes('Copia #911'));
+  expect(copia).toHaveLength(1);
+  expect(copia[0]).not.toMatch(/finish/);
+  await expect(menu.principale).not.toContainText(/finish/);
 });
