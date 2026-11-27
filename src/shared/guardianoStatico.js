@@ -433,14 +433,15 @@
   const COMPLEMENTO_NOME = `(?:[ \\t]+(?:del|della|dello|dei|degli|delle|dell['’]|di|da|per|for|of|on)(?:[ \\t]*[^\\s\\d:=.,;!?|"'«“]{1,24}){1,3}?)`;
   const SOLO_COMPLEMENTO = new RegExp(`^${COMPLEMENTO_NOME}?$`, 'i');
   // Il verbo di cambio chiude `fra`, il testo fra il nome del dato e il valore; `prima` finisce col nome, e lì può stare
-  // il participio. `solo`: in `fra` c'è solo il verbo; senza, anche un complemento del nome prima.
-  function cambioFra(prima, fra, { solo = true } = {}) {
+  // il participio. `solo`: in `fra` c'è solo il verbo; senza, anche un complemento del nome prima, o quello che `testa`
+  // accetta (per il pavimento la cosa che si apre: «il codice che apre il cancello diventa …»).
+  function cambioFra(prima, fra, { solo = true, testa = null } = {}) {
     const m = CAMBIO_IN_CODA.exec(prima + fra);
     if (!m || m.index < prima.length) return false;
-    return solo ? m.index === prima.length : SOLO_COMPLEMENTO.test(fra.slice(0, m.index - prima.length));
+    if (solo) return m.index === prima.length;
+    const davanti = fra.slice(0, m.index - prima.length);
+    return SOLO_COMPLEMENTO.test(davanti) || (!!testa && testa(davanti));
   }
-  // `fra` finisce con un verbo come «diventa»: presenta il valore del nome solo se cambioFra lo dice (#2714).
-  const finisceColCambio = (fra) => DIVENTA_IN_CODA.test(fra);
   // Le etichette fuori dall'alfabeto latino, e i verbi attaccati del cinese, giapponese, coreano e thai, sono quelli dei
   // campi segreti (#1403.8); i verbi che sono una parola stanno in ANNUNCI qui sopra.
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
