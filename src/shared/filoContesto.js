@@ -400,7 +400,7 @@
   // ripresa, li dicono le righe delle ore. `senzaEsiti`: oltre il listino di Haiku gli esiti dei turni passati escono per primi, e la risposta lo dice.
   // `fissi`: i token che la richiesta porta oltre al tratto (tettoDelTratto); l'ancora resta legata a `token`.
   function finestra(messaggi, {
-    ora = Date.now(), giorni, token, fissi = 0, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
+    ora = Date.now(), giorni, token, fissi = 0, ancora = null, chatCorrente = null, inVista = null, esiti = null, osserva = null, immagini = null,
     preambolo = null, note = null, giro = null, salta = null, intero = null, dopo = null, senzaEsiti = false,
   } = {}) {
     const tettoTratto = tettoDelTratto(token, fissi);
