@@ -132,6 +132,42 @@ test('il valore detto dopo il cambio con «ora», in una frase a parte o col pro
   }
 });
 
+test('il PIN detto con ogni verbo o preposizione di cambio, col secondo oggetto o dopo la domanda non arriva al modello', () => {
+  for (const [t, v] of [
+    ['ho cambiato il pin da 1234 a 4821', '4821'], ['ho cambiato il pin da 1234 a 4821', '1234'],
+    ['il pin è passato da 1234 a 4821', '4821'], ['ho cambiato il pin con 4821', '4821'], ['ho settato il pin a 4821', '4821'],
+    ["il pin l'ho messo a 4821", '4821'], ['il pin è stato messo a 4821', '4821'], ['il pin diventò 4821', '4821'],
+    ['il pin è divenuto 4821', '4821'], ['il pin rimase 4821', '4821'], ['ho sostituito il pin con 4821', '4821'],
+    ['il pin è diventato il 4821', '4821'], ['ho cambiato la password in Mela!Verde77 e il pin in 4821', '4821'],
+    ['ho cambiato il pin del telefono in 4821 e quello della carta in 7733', '7733'],
+    ['Ti ricordi il pin? Era 4821', '4821'], ['Hai cambiato il pin? Sì, ora è 4821', '4821'],
+    ['Ti ricordi il codice del cancello? Era 4821', '4821'], ['Do you remember the pin? It was 4821', '4821'],
+    ['il pin non è più 1234, ora è 4821', '4821'],
+    ['la password non è più Vecchia1!, ora è Mela!Verde77', 'Mela!Verde77'],
+    ['la password è stata sostituita con Mela!Verde77', 'Mela!Verde77'],
+  ]) assert.ok(!P.oscura(t).includes(v), `${t} → ${P.oscura(t)}`);
+  for (const t of ['Hai cambiato la password? Era ora! Ora te la dico, ora!', 'Ti ricordi il pin? No, ma la stanza è 4821',
+    'ho cambiato il pin. Il tavolo è 4821', 'il pin è sbagliato, ho speso 2048 euro', 'il pin è stato cambiato nel 2023',
+    'ho cambiato la password del conto con quella di Gmail2024']) {
+    assert.equal(P.oscura(t), t, t);
+  }
+});
+
+test('la password o il PIN detti dopo la domanda, coi due punti o con ogni verbo di cambio sono un segreto in uscita', () => {
+  for (const [t, v] of [
+    ['Ti ricordi la password? Era Mela!Verde77', 'Mela!Verde77'], ['Ti ricordi la password? È diventata Mela!Verde77', 'Mela!Verde77'],
+    ['Ti ricordi la password? Ora è Mela!Verde77', 'Mela!Verde77'], ['Do you remember the password? It was Mela!Verde77', 'Mela!Verde77'],
+    ['Ti ricordi il pin? Era 4821', '4821'], ['la password diventa: Mela!Verde77', 'Mela!Verde77'],
+    ['la password è diventata: Mela!Verde77', 'Mela!Verde77'], ['ho sostituito la password con Mela!Verde77', 'Mela!Verde77'],
+    ['la password è divenuta Mela!Verde77', 'Mela!Verde77'], ['the password remained Mela!Verde77', 'Mela!Verde77'],
+    ['ho cambiato il pin da 1234 a 4821', '4821'],
+  ]) assert.ok(valori(G.segretiInUscita(t)).includes(v), t);
+  for (const t of ['Hai cambiato la password? Era ora!', 'ho cambiato la password in PayPal', 'ho cambiato la password in iCloud',
+    'ho cambiato la password in WhatsApp', 'Ti ricordi la password? Era scritta sul foglio']) {
+    assert.deepEqual(valori(G.segretiInUscita(t)), [], t);
+  }
+});
+
 test('dopo il PIN o un codice, un numero di un\'altra frase o un anno restano', () => {
   for (const t of ['il pin non funziona e il prezzo diventa 4821', 'il pin non funziona e il prezzo resterà 4821',
     'se sbagli il pin, la multa diventa 2000',
