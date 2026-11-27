@@ -41,7 +41,7 @@ async function apri(app, file) {
   const nome = file.split(/[\\/]/).pop();
   await expect.poll(async () => (ids = await schedeFile(app, nome)).length, { timeout: 10_000 }).toBeGreaterThan(0);
   await tm(app, (t, i) => t.activate(i), ids[0]);
-  return { id: ids[0], pagina: await paginaDellaScheda(app, ids[0], (p) => p.url().startsWith('file:')) };
+  return { id: ids[0], pagina: await paginaDi(app, ids[0], nome) };
 }
 
 test('tela, WebGL, bitmap, fotogrammi e immagini svg non leggono le foto accanto; gli errori e i nomi degli script restano chiusi', async ({ app }) => {
