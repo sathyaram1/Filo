@@ -262,7 +262,7 @@ test('nella home una parola spiegata dentro un riquadro chiede di più nella ste
   await parola(page, 'DNS').click();
   await expect(riquadri(page)).toHaveCount(1);
   await riquadri(page).first().locator('.filo-spiega', { hasText: 'indirizzo IP' }).click({ button: 'right' });
-  await expect(page.locator('.filo-spiega-menu .filo-spiega-voce')).toHaveText(['Spiegami di più', 'Copia la spiegazione']);
+  expect(await vociSpiega(page)).toEqual(['Spiegami di più', 'Copia la spiegazione']);
   await menuDi(page).scegli('Spiegami di più');
   await expect(page.locator('.dash-bubble-user').last()).toHaveText('Spiegami di più su «indirizzo IP».');
   await ripristina(app);
