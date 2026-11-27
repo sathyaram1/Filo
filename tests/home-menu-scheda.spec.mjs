@@ -103,7 +103,7 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   const prima = (await salvate(home)).find((p) => p.id === 'a');
   await riquadro(home, 'Da leggere').click();
   await scheda(home, 'a').click({ button: 'right' });
-  await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Rimuovi' }).click();
+  await menuDi(home).scegli('Rimuovi');
   await expect(riquadro(home, 'Da leggere')).toHaveCount(0);
   expect((await salvate(home)).some((p) => p.id === 'a')).toBe(false);
   const annulla = home.locator('.home-annulla');
