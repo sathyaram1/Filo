@@ -125,7 +125,7 @@ test('Bacheca: il menu di una propria segnalazione', async ({ app, openTab }) =>
   const titolo = page.locator('#bdMie .bd-mia .bd-mia-titolo').first();
   await expect(titolo).toBeVisible();
   await scorriEApri(page, titolo);
-  await restaPoiSiChiude(page, page.locator('.bd-mia-menu'));
+  await restaPoiSiChiude(page, menuDi(page).principale);
 });
 
 test('Editor: il menu del titolo', async ({ openTab }) => {
