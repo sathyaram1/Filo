@@ -1050,6 +1050,8 @@
     // #869 — la home è la coda del filo. Solo filo://: è la cronologia dell'utente.
     // { prima?, fino?, dopo?, quanti? } → { ok, elementi, inizio, ultimo, chatCorrente? } (src/shared/filoCoda.js).
     FILO_CODA: 'filo_coda',
+    // La conversazione che la home continua adesso, la stessa per ogni scheda (#869.2): {} → { ok, id }. Solo filo://.
+    FILO_CHAT_CORRENTE: 'filo_chat_corrente',
     // Cercare nel filo senza passare dal modello: { q } → { ok, messaggi, pagine, termini, tanti }.
     FILO_CERCA: 'filo_cerca',
     // Togliere dal filo pagine visitate, per id: { ids } → { ok, tolte }. Con { url }: ogni visita di quell'indirizzo
