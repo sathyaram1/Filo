@@ -474,8 +474,17 @@
   async function maybeOpenOnboardingLater() {
     if (rimandata || onboardingActive || isSending() || !nienteDaInterrompere()) return;
     const state = await fetchOnboarding();
-    if (!state || onboardingActive || isSending() || !nienteDaInterrompere()) return;
+    if (!state) { tentativoSuperato(); return; }
+    if (onboardingActive || isSending() || !nienteDaInterrompere()) return;
     await openOnboarding(state);
+  }
+
+  // A intervista già fatta, uno schermo con solo «serve un codice d'invito» lascia il posto alla home rigenerata
+  // quando arriva il modello, come il benvenuto per chi l'intervista non l'ha ancora fatta (#751).
+  function tentativoSuperato() {
+    if (!modelloPronto || onboardingActive || isSending() || !soloRisposteSenzaCrediti || !soloRisposteSenzaCrediti()) return;
+    goHome();
+    loadDashboard().catch(() => {});
   }
 
   // Una chat in cui Filo ha solo risposto «servono i crediti» non è una conversazione in corso: chi ha scritto
