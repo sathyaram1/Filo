@@ -4127,6 +4127,8 @@
     if (fileChiesto && STORE.findFile(collection, fileChiesto) && (!doc || doc.id !== fileChiesto)) switchToFile(fileChiesto);
     else if (doc && STORE.findFile(collection, doc.id)) segnaAperto();
   });
+  const bozzaChiesta = (() => { try { return new URLSearchParams(location.search).get('bozza') || ''; } catch (_) { return ''; } })();
+  if (bozzaChiesta) archivioLetto.catch(() => {}).then(() => nasceDalCampo(bozzaChiesta));
   // Dopo la fusione con l'archivio: scrivere prima cancellerebbe gli appunti che Filo ci ha messo (vedi loadCollection).
   Promise.all([archivioLetto, leggiLayout()]).then(migraModuli).then(convertiPannello, () => {});
 })();
