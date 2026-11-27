@@ -86,7 +86,7 @@ test('collegamento a un sito da una pagina del computer, poi duplica', async ({ 
   await new Promise((r) => setTimeout(r, 2500));
   console.log('DOPO CLIC', JSON.stringify(await schede(app)));
   const c = await tm(app, (t, i) => t.duplicateTab(i), id);
-  await pagina.waitForTimeout(2500);
+  await new Promise((r) => setTimeout(r, 2500));
   console.log('DOPO DUPLICA', c, JSON.stringify(await schede(app)));
 });
 
