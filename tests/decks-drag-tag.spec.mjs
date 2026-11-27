@@ -109,10 +109,10 @@ test('vista tag, ambiguità reale → popup aggiungi/sostituisci; "sostituisci" 
   // Sol Ring ha già il tag "ramp" e viene rilasciata su "terre": add e replace
   // divergono → deve comparire il popup con ENTRAMBE le opzioni.
   await dragCardOnto(page, 'c-solring', 'terre');
-  await expect(page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Aggiungi tag' })).toHaveCount(1);
-  await expect(page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Sostituisci con' })).toHaveCount(1);
+  await expect(menuDi(page).voce('Aggiungi tag')).toHaveCount(1);
+  await expect(menuDi(page).voce('Sostituisci con')).toHaveCount(1);
 
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Sostituisci con' }).click();
+  await menuDi(page).scegli('Sostituisci con');
   await expect.poll(() => tagsOf(page, deckId, 'c-solring')).toEqual(['terre']);
 });
 
