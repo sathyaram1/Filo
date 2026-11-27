@@ -123,7 +123,7 @@ test('vista tag, "aggiungi" accoda il tag senza toccare gli altri', async ({ app
   const deckId = await seedTagDeck(page);
 
   await dragCardOnto(page, 'c-solring', 'terre');
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Aggiungi tag' }).click();
+  await menuDi(page).scegli('Aggiungi tag');
   await expect.poll(() => tagsOf(page, deckId, 'c-solring')).toEqual(['ramp', 'terre']);
 });
 
