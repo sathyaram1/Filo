@@ -85,10 +85,15 @@ test('un indirizzo che porta la password detta così non esce', () => {
   assert.equal(X.taintScritto('https://esempio.it/?q=funziona', 'Ho cambiato la password ieri, adesso funziona'), null);
 });
 
-test('un testo lungo che ripete il nome e il rimando si legge in fretta', () => {
-  const lungo = 'la password è sbagliata, prova '.repeat(5000);
-  const t0 = Date.now();
-  P.oscura(lungo);
-  alCorrettore(lungo.slice(0, 20000));
-  assert.ok(Date.now() - t0 < 5000, `${Date.now() - t0} ms`);
+test('un testo lungo che ripete il nome e il rimando costa quanto la sua lunghezza, non il suo quadrato', () => {
+  let giro = 0;
+  const costo = (n) => costoInUnita(() => {
+    const t = `${giro++} ${'la password è sbagliata, prova '.repeat(n)}`;
+    P.oscura(t);
+    alCorrettore(t);
+  }, { giri: 3 });
+  const corto = costo(500);
+  const lungo = costo(2000, corto.unita * 8);
+  // Quattro volte il testo: circa quattro volte il costo; il quadrato sarebbe sedici.
+  assert.ok(lungo.unita < corto.unita * 10, `${corto.come} | ${lungo.come}`);
 });
