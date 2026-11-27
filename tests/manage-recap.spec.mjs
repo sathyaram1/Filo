@@ -68,8 +68,8 @@ test('l\'owner vede l\'ultimo recap, come testo, e sfoglia i giorni prima', asyn
   // Dal tasto destro: copia, e la rilettura resta sul giorno aperto.
   await page.locator('#mgRecapPrima').click();
   await testo.click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Copia il recap' })).toBeVisible();
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Rileggi dal server' }).click();
+  await expect(menuDi(page).voce('Copia il recap')).toBeVisible();
+  await menuDi(page).scegli('Rileggi dal server');
   await expect.poll(() => page.evaluate(() => window.__rc.letture)).toBeGreaterThan(1);
   await expect(page.locator('#mgRecapGiorno')).toHaveAttribute('title', '2026-10-30');
 });
