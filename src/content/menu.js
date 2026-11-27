@@ -1386,6 +1386,20 @@
   // qui, perché un clic fabbricato da codice non passerebbe da `soloGestiVeri`.
   const apritori = new WeakMap();
   const esecutori = new WeakMap();
+  const menuDellIcona = new WeakMap();
+
+  // Un tasto destro dentro il menu aperto (sui siti lo smista il ponte del preload prima che arrivi al bottone): su
+  // un'icona con varianti apre il suo menu, altrove non fa niente. Vero se il clic era nel menu.
+  function tastoDestroDentro(e) {
+    if (!activeMenu || !e || !e.isTrusted) return false;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const dentro = percorso.some((n) => n === activeMenu.root || (activeMenu.subRoot && n === activeMenu.subRoot));
+    if (!dentro) return false;
+    try { e.preventDefault(); } catch (_) {}
+    const b = percorso.find((n) => n && n.nodeType === 1 && menuDellIcona.has(n));
+    if (b) menuDellIcona.get(b)();
+    return true;
+  }
 
   // Il suggerimento di un'icona nomina anche il suo tasto, se ne ha uno (`tasto`, chiesto a SN_TASTI).
   function conTasto(it) { return it.tasto ? `${it.label} (${it.tasto})` : it.label; }
