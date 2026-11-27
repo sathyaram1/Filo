@@ -234,11 +234,12 @@
       const d = Disp.VERBI[verbo] || null;
       const [a, ...altre] = voci;
       const nome = d ? d.nome : a.label;
+      const misura = (x) => (typeof x.azione === 'string' && x.azione ? { azione: x.azione } : {});
       return {
-        id: '', azione: d ? verbo : '', icon: d ? I(a.icona && global.SN_ICONS[a.icona] ? a.icona : d.icona) : I('list'),
+        id: '', verbo: d ? verbo : '', icon: d ? I(a.icona && global.SN_ICONS[a.icona] ? a.icona : d.icona) : I('list'),
         nome, oggetto: d ? a.oggettoScritto : '', tasto: d ? d.tasto : '', label: a.label, onClick: a.onClick,
-        disabled: !!a.disabled, bersaglio: a.bersaglio || null, draggable: false,
-        ...(altre.length ? { varianti: altre.map((x) => ({ label: x.label, onClick: x.onClick, bersaglio: x.bersaglio || null, disabled: !!x.disabled })) } : {}),
+        disabled: !!a.disabled, bersaglio: a.bersaglio || null, draggable: false, ...misura(a),
+        ...(altre.length ? { varianti: altre.map((x) => ({ label: x.label, onClick: x.onClick, bersaglio: x.bersaglio || null, disabled: !!x.disabled, ...misura(x) })) } : {}),
       };
     });
   }
