@@ -1472,7 +1472,7 @@
         altro.hidden = !apri;
         b.setAttribute('aria-expanded', String(apri));
         b.classList.toggle('sn-menu-row-overflow-aperto', apri);
-        setIconContent(b, global.SN_ICONS?.[apri ? 'minimize' : 'plus']?.(16) || (apri ? '−' : '+'));
+        setIconContent(b, global.SN_ICONS?.[apri ? 'collapse' : 'plus']?.(16) || (apri ? '−' : '+'));
         if (sub.label) {
           const lbl = document.createElement('span');
           lbl.className = 'sn-menu-label sn-menu-label-nascosta';
