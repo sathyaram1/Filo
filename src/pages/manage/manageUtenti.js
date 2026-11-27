@@ -941,6 +941,7 @@
   // regalarle crediti.
   let menuAperto = null;
   let menuDi = null;
+  let menuAIcone = false;
 
   function chiudiMenuPersona() {
     // Il menu a icone (#2555) se ne va con la sua riga come quello di prima.
