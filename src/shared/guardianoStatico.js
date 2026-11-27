@@ -656,7 +656,7 @@
   const PONTE_DEL_CAMBIO = intere(VERSO);
   // Parole che non spostano il valore e non lo descrivono: ausiliari, avverbi, negazioni, il pronome, «il nuovo».
   const NEUTRA = intere(`${AVVERBIO}|${AVVERBI}|${MODALI}|non|più|piu|not|no|sì|si|yes|ok|okay|it|its|it's|that|lo|la|l|ho|hai|abbiamo|avete|hanno`
-    + '|ce|c|quello|quella|nuovo|nuova|new|one|vecchio|vecchia|old|prima|poi|before|after|era|il|the|mio|mia|my|e|ed|and|ma|but|invece');
+    + '|ce|c|s|ha|has|have|had|quello|quella|nuovo|nuova|new|one|vecchio|vecchia|old|prima|poi|before|after|il|the|mio|mia|my|e|ed|and|ma|but');
   const DETERMINANTE = /^(?:il|lo|la|l|i|gli|le|un|uno|una|the|a|an|my|your|his|her|our|their|mio|mia|tuo|tua|suo|sua)$/i;
   const PREPOSIZIONE = /^(?:di|del|della|dello|dei|degli|delle|dell|per|for|of|on|su|sul|sulla|nel|nella|in|da|dal|dalla|con|with|a|al|alla|to)$/i;
   const UNITA = /^(?:euro|eur|€|\$|usd|dollari|dollars?|km|kg|pagine|pagina|pages?|anni|giorni|ore|minuti|mesi|metri|persone|volte|cifre|caratteri|%)$/i;
