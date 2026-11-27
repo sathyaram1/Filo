@@ -110,9 +110,8 @@ test('il codice del telefono o della carta senza possessivo, in ogni forma di qu
 
 test('un\'etichetta lunga senza chiusura non rallenta il pavimento', () => {
   const t = `il codice ${'del nuovo vecchio di mia '.repeat(400)}telefono x 4821`;
-  const inizio = Date.now();
-  P.oscura(t);
-  assert.ok(Date.now() - inizio < 2000, `${Date.now() - inizio} ms`);
+  const c = costoInUnita(() => P.oscura(t), { tetto: 60 });
+  assert.ok(c.entro, c.come);
 });
 
 test('in uscita il PIN col complemento si riconosce, e il primo verbo chiude il complemento', () => {
