@@ -84,6 +84,8 @@ export function menuDi(scheda) {
     scegli,
     /** Tasto destro sull'icona (nome o locator) e clic sulla variante col testo dato. */
     variante,
+    /** Vero se `testo` è un'icona del menu o una variante nel menu di un'icona (che resta aperto). */
+    haVoce: async (testo) => (await voce(testo).count()) > 0 || !!(await fraLeVarianti(testo)),
     /** I nomi delle icone del menu principale, in ordine, anche quelle dietro il «+» (per `expect.poll`). */
     nomi: () => locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)')
       .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))),
