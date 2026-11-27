@@ -12,6 +12,7 @@
       version: '0.2.309', date: '2026-11-27',
       fixes: [
         { testo: 'Una password scritta con un errore di battitura, come «la pasword è …», «la password e …» senza accento o «la password, che era vecchia, è …», non arriva più a nessun modello.', segnalazione: 2678 },
+        { testo: 'Una password scritta sotto «Password:» come voce di un elenco, in una citazione o in un blocco di codice, come capita spesso negli appunti in Markdown, non arriva più a nessun modello, come quando sta da sola sulla riga.', segnalazione: 2673 },
       ],
     },
     {
