@@ -483,25 +483,36 @@ const APRE_FRASE = /^(?:se|if|ma|but|e|and|però|pero|quindi|poi|ok|sì|si|no|in
 const NON_UN_VALORE = /^(?:quest[aoie]|quell[aoie]|quale|qual|cosa|che|chi|dove|come|non|ecco|qui|qua|ciò|cio|lei|lui|ess[ao]|tutto|niente|nulla|sol[oa]|soltanto|anche|perché|perche|quando|forse|allora|dunque|quindi|this|that|what|which|here|there|it|nothing|everything|something|who|where|how|why|then|also|only|not|mine|yours|ours|mia|tua|sua|nostra|vostra|loro|davvero|sicuro|beh|però|pero|okay|really|maybe|perhaps|probably|actually|surely|well|\p{L}{4,}mente)$/u;
 const ARTICOLO = /^(?:il|lo|la|i|gli|le|un|uno|una|del|della|dello|dei|degli|delle|di|da|dal|dalla|al|alla|nel|nella|sul|sulla|con|per|tra|fra|ogni|quel|mio|mia|tuo|tua|suo|sua|nostro|nostra|vostro|vostra|the|an|of|my|your|his|her|our|their|these|those|every|each|any|some)$|^(?:dell|nell|sull|dall|all|un|l|quell)['’]/u;
 const RELATIVO = /^(?:che|chi|cui|which|that|what|who)$/u;
-const METTE = /^(?:us[aoi]|usare|usate|usiamo|usat[aoie]|mett[iao]|mettere|mettete|mess[aoie]|impost[aoi]|impostare|impostat[aoie]|scegl[iao]|scegliere|scelt[aoie]|scriv[iao]|scrivere|inserisc[ia]|inserire|inserit[aoie]|digit[aoi]|digitare|prov[aoi]|provare|use|using|used|set|put|try|choose|chose|chosen|pick|picked|type|enter|entered)$/u;
+const METTE = /^(?:us[aoi]|usare|usate|usiamo|usat[aoie]|mett[iao]|mettere|mettete|mess[aoie]|impost[aoi]|impostare|impostat[aoie]|scegl[iao]|scegliere|scelt[aoie]|scriv[iao]|scrivere|inserisc[ia]|inserire|inserit[aoie]|digit[aoi]|digitare|prov[aoi]|provare|use|using|used|set|put|try|choose|chose|chosen|pick|picked|type|enter|entered|benutze|benutzen|verwende|verwenden|nimm|nehmen|setze|setzen|utilise|utiliser|utilisez|mets|mettre|mettez|choisis|choisir|usar|utiliza|utilizar|pon|poner|elige|elegir)$/u;
 const APRE_VIRGOLETTA = /^[«“„‘"']/u;
 function primaDelNome(testo) {
   const l = minuscolo(testo);
   const out = [];
-  for (const n of menzioni(l)) {
-    if (n.tipo !== 'password' || /credenziali/u.test(l.slice(n.i, n.j)) || NOME_DI_ALTRO.test(l.slice(n.j, n.j + 40))) continue;
+  const nomi = menzioni(l).filter((n) => n.tipo === 'password');
+  const visti = new Set(nomi.map((n) => n.i));
+  for (const m of l.matchAll(NOME_CORTO)) if (!visti.has(m.index)) nomi.push({ i: m.index, j: m.index + m[0].length, corto: true });
+  for (const n of nomi) {
+    if (/credenziali/u.test(l.slice(n.i, n.j)) || NOME_DI_ALTRO.test(l.slice(n.j, n.j + 40))) continue;
     const prima = l.slice(Math.max(0, n.i - 200), n.i);
     const m = PRIMA_DEL_NOME.exec(prima);
-    if (!m || /[,;:.!?…]$/u.test(m[1])) continue;
-    const v = pulito(m[1]);
-    if (v.length < 4) continue;
+    if (!m) continue;
+    // Il «!» o il «?» in fondo sono spesso della password («Gatto2024!»): restano nel valore; virgola e punto no.
+    const v = m[1].replace(/^[«“„‘"'(\[]+/u, '').replace(/[.,;:…)\]»”"'’]+$/u, '');
+    const nudo = pulito(m[1]);
+    if (nudo.length < 4) continue;
     const virgolette = APRE_VIRGOLETTA.test(m[1]);
-    if (!virgolette && !/[^\p{L}'’]/u.test(v)) {
-      const davanti = prima.slice(0, m.index + m[0].indexOf(m[1])).split(/\s+/).filter(Boolean).slice(-2).map(pulito);
+    if (!virgolette && !/[^\p{L}'’]/u.test(nudo)) {
+      // Di sole lettere: una parola seguita da un segno chiude la frase («Grazie! è la password che cercavo»).
+      if (n.corto || m.groups.senzaAccento || nudo !== v || /[,;:.!?…]$/u.test(m[1])) continue;
+      const testa = prima.slice(0, m.index + m[0].indexOf(m[1]));
+      const grezze = testa.split(/\s+/).filter(Boolean).slice(-2);
+      const davanti = grezze.map(pulito);
       const w1 = davanti[davanti.length - 1] || '';
       if (NON_UN_VALORE.test(v) || PONTE.test(v) || AVVII.has(v) || PRESENTA_DATO.has(v) || nomeDiPassword(v)) continue;
       if (m.groups.come ? !(METTE.test(w1) || (PONTE.test(w1) && METTE.test(davanti[0] || ''))) : davanti.some((w) => ARTICOLO.test(w))) continue;
       if (m.groups.verbo && RELATIVO.test(w1) && !/^(?:sia|fosse)$/u.test(m.groups.verbo)) continue;
+      const inTesta = !grezze.length || /[:,;.!?…]$/u.test(grezze[grezze.length - 1]) || /\n[^\S\n]*$/u.test(testa);
+      if (m.groups.verbo && !inTesta && !APRE_FRASE.test(w1) && !RELATIVO.test(w1) && !AVVII.has(w1)) continue;
     }
     out.push({ valore: v, virgolette });
   }
