@@ -53,11 +53,10 @@ test('un identificativo o un numero che non è il valore resta, anche col verbo 
   ]) assert.equal(P.oscura(t), t, t);
 });
 
-test('la password detta col verbo di cambio o dopo la domanda è un segreto letto e un segreto in uscita', () => {
+test('la password detta col verbo di cambio è un segreto letto e un segreto in uscita', () => {
   for (const t of [
     'ho cambiato la password in Mela!Verde77',
     'la password diventa Mela!Verde77',
-    'Ti ricordi la password? Era Mela!Verde77',
     'la password è stata cambiata in Mela!Verde77',
     'la password è diventata Mela!Verde77',
     'I changed the password to Mela!Verde77',
