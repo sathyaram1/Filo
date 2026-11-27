@@ -200,21 +200,91 @@ function presenta() {
   return P ? [[new RegExp(P.password, 'gu'), 'password'], [new RegExp(CHIESTA_IN_CHAT, 'gu'), 'password'], [new RegExp(P.codice, 'gu'), 'codice']] : [];
 }
 
-// «pasword», «passowrd», «pssword»: chi chiede in chat sbaglia la parola e non la corregge. Al più due errori, e la
-// parola resta quella che comincia per p e finisce per d («passport» no).
+// «pasword», «passowrd», «pssword», «passwor», «oassword»: chi scrive sbaglia la parola e non la corregge. Un errore
+// ovunque; due solo se la parola comincia per p e finisce per d («passport» no, «paswd» sì).
 const NOVITA = () => globalThis.SN_NOVITA || (require('./novita.js'), globalThis.SN_NOVITA);
 function refusoDiPassword(w) {
-  if (w === 'password' || w.length < 6 || w.length > 10 || w[0] !== 'p' || !w.endsWith('d')) return false;
-  return NOVITA().distanza(w, 'password', 2) <= 2;
+  if (w === 'password' || w.length < 5 || w.length > 10) return false;
+  if (w.length >= 7 && NOVITA().distanza(w, 'password', 1) <= 1) return true;
+  if (w[0] !== 'p' || !w.endsWith('d')) return false;
+  return w.length < 6 ? NOVITA().distanza(w, 'passwd', 1) <= 1 : NOVITA().distanza(w, 'password', 2) <= 2;
 }
 
-// Il refuso letto come il nome, a parità di lunghezza: il pavimento ritrova i posti nel testo vero (#2678.21).
+// Il refuso letto come il nome, a parità di lunghezza: il pavimento ritrova i posti nel testo vero (#2678.21). Solo la
+// parola intera: «Pasword!77» è un valore, non il nome.
 function refusiComeNome(s) {
-  return s.replace(/(?<![\p{L}\p{N}])p\p{L}{5,9}(?![\p{L}\p{N}])/giu, (w) => {
+  return s.replace(/(?<=(?:^|\s)[^\p{L}\p{N}\s]*)\p{L}{5,10}(?=[^\p{L}\p{N}\s]*(?:\s|$))/gu, (w) => {
     if (!refusoDiPassword(w.toLowerCase())) return w;
-    const nome = w.length >= 8 ? 'password' : 'passwd';
+    const nome = w.length >= 8 ? 'password' : w.length >= 6 ? 'passwd' : 'pass';
     return nome + ' '.repeat(w.length - nome.length);
   });
+}
+
+// Un tasto sbagliato nel verbo dopo il nome («the password si …», «diventta», «è statta cambita in», «e stata»): letto
+// come il verbo, alla stessa lunghezza, solo nelle prime parole dopo il nome; il valore lo giudicano le regole (#2678.21).
+const NOME_IN_TESTO = /(?<![\p{L}\p{N}])(?:password|passwd|pwd|pass|psw|pw)(?![\p{L}\p{N}])/giu;
+const COPULE = ['diventa', 'rimane', 'sarebbe', 'risulta', 'becomes', 'remains'];
+const PARTICIPI_DEL_CAMBIO = ['stata', 'stato'];
+const CAMBI_DEL_VALORE = ['cambiata', 'cambiato', 'impostata', 'impostato', 'modificata', 'modificato', 'aggiornata',
+  'aggiornato', 'changed'];
+const AUSILIARE = /^(?:è|e|é|e['’]|is|was|has|ha)$/;
+const ACCENTO_SBAGLIATO = /^(?:è['’`]|é['’`]|e`)$/;
+const PRIMA_DEL_VERBO = /^(?:del|della|dello|di|per|for|of|il|la|lo|the|my|mio|mia|tuo|tua|nuova|new|attuale|current|wifi)$/;
+const INGLESE_PRIMA = /(?:^|\s)(?:the|my|your|our|his|her)\s+$/i;
+const tra = (w, lista) => lista.includes(w);
+const vicino = (w, lista) => w.length >= 4 && lista.some((x) => x !== w && NOVITA().distanza(w, x, 1) <= 1);
+function verbiDopoIlNome(s) {
+  if (!/p(?:ass|w|sw)/i.test(s)) return s;
+  const cambi = [];
+  const metti = (t, nuovo) => cambi.push([t.i, nuovo + ' '.repeat(t.w.length - nuovo.length)]);
+  for (const m of s.matchAll(NOME_IN_TESTO)) {
+    const da = m.index + m[0].length;
+    const riga = s.slice(da, da + 80).split('\n')[0];
+    const parole = [...riga.matchAll(/\S+/g)].slice(0, 6).map((x) => ({ i: da + x.index, w: x[0], l: x[0].toLowerCase() }));
+    for (let k = 0; k < parole.length; k++) {
+      const t = parole[k];
+      const dopo = parole[k + 1] ? parole[k + 1].l : '';
+      if (ACCENTO_SBAGLIATO.test(t.l)) { metti(t, 'è'); break; }
+      if (!/^[\p{L}'’]+$/u.test(t.l)) break;
+      if (t.l === 'e' && (tra(dopo, PARTICIPI_DEL_CAMBIO) || vicino(dopo, PARTICIPI_DEL_CAMBIO) || tra(dopo, CAMBI_DEL_VALORE) || vicino(dopo, CAMBI_DEL_VALORE))) { metti(t, 'è'); continue; }
+      if (k === 0 && (t.l === 'si' || t.l === 'iz') && INGLESE_PRIMA.test(s.slice(Math.max(0, m.index - 8), m.index))) { metti(t, 'is'); break; }
+      if (vicino(t.l, COPULE)) { metti(t, 'è'); break; }
+      if (k > 0 && AUSILIARE.test(parole[k - 1].l) && vicino(t.l, PARTICIPI_DEL_CAMBIO)) { metti(t, ''); continue; }
+      if (/^(?:in|a|to)$/.test(dopo) && vicino(t.l, CAMBI_DEL_VALORE)) { metti(t, 'messa'); break; }
+      if (AUSILIARE.test(t.l) || tra(t.l, PARTICIPI_DEL_CAMBIO) || tra(t.l, CAMBI_DEL_VALORE) || PRIMA_DEL_VERBO.test(t.l)) continue;
+      break;
+    }
+  }
+  if (!cambi.length) return s;
+  let out = s;
+  for (const [i, nuovo] of cambi.sort((a, b) => b[0] - a[0])) out = out.slice(0, i) + nuovo + out.slice(i + nuovo.length);
+  return out;
+}
+
+// Un inciso fra il nome e il verbo («la password, che era vecchia, e …», «(quella nuova)», «- te lo dico -», «ora e …»):
+// una lettura in più con l'inciso come spazi, accanto a quella del testo com'è (#2678.21). null se non ce n'è.
+let incisoDopoNome = null;
+function incisiComeSpazi(s) {
+  if (!/p(?:ass|w|sw)/i.test(s)) return null;
+  if (!incisoDopoNome) {
+    const C = guardiano() ? guardiano().COMPLEMENTO : '(?!)';
+    incisoDopoNome = new RegExp(`(?<![\\p{L}\\p{N}])(?:password|passwd|pwd|pass|psw|pw)(?:[ \\t]+${C})?`
+      + '((?:[ \\t]*,[^\\n.!?:;«»"“”,]{1,80},|[ \\t]*\\([^()\\n]{1,80}\\)|[ \\t]+[-–—][ \\t][^\\n.!?:;«»"“”\\-–—]{1,80}?[ \\t][-–—]'
+      + '|[ \\t]+(?:ora|adesso|comunque|insomma|quindi|dunque|invece|intanto|allora|per[ \\t]+ora|now|anyway|btw)(?=[ \\t])){1,3})', 'giu');
+  }
+  let cambiato = false;
+  const out = s.replace(incisoDopoNome, (tutto, inciso) => {
+    cambiato = true;
+    return tutto.slice(0, tutto.length - inciso.length) + ' '.repeat(inciso.length);
+  });
+  return cambiato ? out : null;
+}
+
+// Le letture del testo col nome e il verbo corretti e con l'inciso come spazi, per chi cerca la password dopo il nome
+// (il correttore, sulle password di sole parole). Stessa lunghezza del testo.
+function lettureDelNome(s) {
+  const a = verbiDopoIlNome(refusiComeNome(s));
+  return [...new Set([a, incisiComeSpazi(a)])].filter((x) => x && x !== s);
 }
 
 // I nomi della password: quelli che il filtro riconosce già (urlExfil), «pw», «pass» e i refusi di «password».
