@@ -287,7 +287,7 @@ test('svuotare la chat chiede conferma e resta vuota dopo la ricarica', async ({
   await expect(page.locator('.dk-msg')).toHaveCount(0);
   await ask(page, 'ancora');
   await page.locator('#chatHead').click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Svuota la chat' }).click();
+  await menuDi(page).scegli('Svuota la chat');
   await clickConfirm(page, 'ok');
   await expect(page.locator('.dk-msg')).toHaveCount(0);
   await reloadBuilder(page);
