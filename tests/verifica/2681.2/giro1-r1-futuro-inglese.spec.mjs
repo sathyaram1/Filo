@@ -7,6 +7,7 @@ const P = require('../../../src/shared/pavimento.js');
 
 test('r1 il CVV al futuro in inglese e in olandese non esce', () => {
   for (const riga of ['The CVV will be 123', 'Your security code will be 482', 'The CVV is going to be 123', 'De CVV wordt 123']) {
-    expect(P.oscura(riga), riga).not.toContain('123'.length && riga.match(/\d+/)[0]);
+    expect(P.oscura(riga), riga).toContain(P.SEGNAPOSTO);
+    expect(P.oscura(riga), riga).not.toContain(riga.match(/\d+/)[0]);
   }
 });
