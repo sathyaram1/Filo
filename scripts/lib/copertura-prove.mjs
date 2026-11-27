@@ -1,5 +1,5 @@
 // La metà della mappa prova → file che sta nelle pagine (#2502): ogni Electron aperto da una prova porta il nome della
-// prova al suo main e qui si registrano le funzioni eseguite dalle pagine, con la regola che passa chi accende.
+// prova al suo main e qui si registrano le funzioni eseguite dalle pagine, con la regola del main.
 // Acceso solo da FILO_COPERTURA (playwright.config.js); il formato lo legge scripts/lib/mappaProve.mjs.
 
 import { _electron, test } from '@playwright/test';
