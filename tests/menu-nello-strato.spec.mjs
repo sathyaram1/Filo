@@ -171,7 +171,7 @@ test.describe('il menu nello strato', () => {
     await page.locator('#campo').click({ button: 'right' });
     await apertoNelloStrato(app, page);
     const menu = menuDi(page);
-    await menu.locator('.sn-menu-paste-arrow').hover();
+    await menu.incolla.click({ button: 'right' });
     const stato = await cronologiaPronta(app, page);
     expect(stato.voci.map((v) => v.testo)).toContain('codice-banca-1054');
     await pausa(500);
@@ -194,7 +194,7 @@ test.describe('il menu nello strato', () => {
     // Tolta dalla × resta barrata finché il pannello è aperto, e alla riapertura non c'è più.
     await page.locator('#campo').click({ button: 'right' });
     await apertoNelloStrato(app, page);
-    await menu.locator('.sn-menu-paste-arrow').hover();
+    await menu.incolla.click({ button: 'right' });
     const s2 = await cronologiaPronta(app, page);
     const da = s2.voci.find((v) => v.testo === 'codice-banca-1054');
     await strato.mouse.click(da.rimuovi.x, da.rimuovi.y);
@@ -203,7 +203,7 @@ test.describe('il menu nello strato', () => {
     await chiusoLoStrato(app);
     await page.locator('#campo').click({ button: 'right' });
     await apertoNelloStrato(app, page);
-    await menu.locator('.sn-menu-paste-arrow').hover();
+    await menu.incolla.click({ button: 'right' });
     const s3 = await cronologiaPronta(app, page);
     expect(s3.voci.map((v) => v.testo)).not.toContain('codice-banca-1054');
     expect((await page.evaluate(() => window.__letti.join(' | ')))).not.toContain('codice-banca-1054');
