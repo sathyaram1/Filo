@@ -105,12 +105,13 @@ test('il segno non si mette né si toglie a mano: nessun tasto nel dettaglio, ne
     await expect(page.locator('#mgStarBtn')).toBeVisible();
     await expect(page.locator('#mgOwnerBar')).not.toContainText(/💻|[Ll]avoro server/);
     await riga.click({ button: 'right' });
-    const menu = page.locator('.mg-ctxmenu');
-    await expect(menu).toBeVisible();
-    await expect(menu).toContainText('Apri');
-    await expect(menu, p._id).not.toContainText(/💻|[Ll]avoro server/);
-    await page.keyboard.press('Escape');
-    await expect(menu).toHaveCount(0);
+    // A icone (#2555): le voci sono icone o varianti nel menu di un'icona.
+    const menu = menuDi(page);
+    await expect(menu.principale).toBeVisible();
+    const voci = (await menu.vociScritte()).join('\n');
+    expect(voci).toContain('Apri');
+    expect(voci, p._id).not.toMatch(/💻|[Ll]avoro server/);
+    await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
   }
   expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
