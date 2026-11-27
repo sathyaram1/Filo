@@ -1094,6 +1094,20 @@
       },
     },
     {
+      scrive: ['menuIcone.icona'],
+      costo: 1,
+      aiuto: 'pixel 14-32 (grandezza delle icone nel menu del tasto destro)',
+      keys: ['menu_icone_icona', 'grandezza icone tasto destro', 'icone del tasto destro', 'icone del menu', 'dimensione icone menu'],
+      build(v) { return numeroMenuIcone(v, 'icona', (n) => `Icone del tasto destro → ${n} px`); },
+    },
+    {
+      scrive: ['menuIcone.colonne'],
+      costo: 1,
+      aiuto: 'numero 3-10 (quante icone per riga nel menu del tasto destro)',
+      keys: ['menu_icone_colonne', 'icone per riga', 'colonne del tasto destro', 'colonne del menu', 'griglia del tasto destro'],
+      build(v) { return numeroMenuIcone(v, 'colonne', (n) => `Icone per riga nel tasto destro → ${n}`); },
+    },
+    {
       scrive: ['barraLaterale.attesaMs'],
       costo: 1,
       aiuto: 'millisecondi 100-3000 (attesa sul bordo prima che la barra laterale si apra)',
