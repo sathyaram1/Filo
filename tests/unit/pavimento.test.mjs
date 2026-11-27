@@ -291,7 +291,7 @@ test('una tabella rientrata, le entità, i commenti e un tag dentro la password 
 });
 
 test('un testo di 120.000 caratteri pieno di tag aperti e mai chiusi si controlla in fretta', () => {
-  for (const pezzo of ['&lt;b ', '<b &', '&lt;b title=&quot;x ', '<span title="x&', '<!-- ', '&lt;!--', '\n \n', '\n<x']) {
+  for (const pezzo of ['&lt;b ', '<b &', '&lt;b title=&quot;x ', '<span title="x&', '<!-- ', '<!-- <td>', '\n<td\n']) {
     const s = `${pezzo.repeat(Math.ceil(120000 / pezzo.length))}<b>Password:</b> Nyckel!2024`;
     let fuori = '';
     const c = costoInUnita(() => { fuori = P.oscura(s); }, { tetto: 60 });
