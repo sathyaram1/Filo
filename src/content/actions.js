@@ -1746,6 +1746,31 @@
     };
   }
 
+  // La velocità come valore dell'icona nel tasto destro a icone (#2555): il clic apre l'elenco, la rotella cambia di
+  // uno scatto e il menu si ridisegna col valore nuovo.
+  function velocitaDelMedia(el) {
+    const rate = Number(el.playbackRate) || 1;
+    const vicina = (verso) => (verso > 0 ? MEDIA_SPEEDS.find((s) => s > rate + 0.001) : [...MEDIA_SPEEDS].reverse().find((s) => s < rate - 0.001));
+    return {
+      label: `${I18n.t('menu_media_speed')} ${formatSpeed(rate)}`,
+      onClick: () => setMediaSpeed(el, nextMediaSpeed(rate)),
+      valore: {
+        testo: formatSpeed(rate),
+        valori: MEDIA_SPEEDS.map((s) => ({
+          label: `${formatSpeed(s)}${s === 1 ? ` (${I18n.t('menu_media_speed_normal')})` : ''}`,
+          scelto: Math.abs(s - rate) < 0.001,
+          onClick: () => setMediaSpeed(el, s),
+        })),
+        passo: (verso) => {
+          const s = vicina(verso);
+          if (s == null) return;
+          setMediaSpeed(el, s);
+          global.SN_MENU_ICONS?.aggiorna?.();
+        },
+      },
+    };
+  }
+
   // Le azioni di un filmato o di un audio, una volta sola: le voci del menu e le icone della fila (#1434) le prendono da
   // qui, coi nomi che dicono lo stato. `icona`: il disegno per la fila, quando lo stato lo cambia. Manca chi qui non c'è
   // (la finestra mobile dove il filmato non la permette).
