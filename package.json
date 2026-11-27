@@ -7,9 +7,9 @@
   "main": "src/main/main.js",
   "scripts": {
     "prestart": "node scripts/prestart.mjs",
-    "start": "electron .",
+    "start": "node scripts/avvia-electron.mjs",
     "predev": "node scripts/prestart.mjs",
-    "dev": "electron . --enable-logging",
+    "dev": "node scripts/avvia-electron.mjs --enable-logging",
     "test:smoke": "node tests/smoke.mjs",
     "test:unit": "node scripts/run-unit-tests.mjs",
     "test:importanti": "node scripts/test-importanti.mjs",
