@@ -308,20 +308,23 @@ test('tasto destro su una riga: copia il testo, rimanda quella non partita già 
   });
   const bacheca = await openTab(`${BACHECA}#segnalazioni`);
   await expect(righe(bacheca)).toHaveCount(2);
-  const menu = bacheca.locator('.bd-mia-menu');
+  // A icone (#2555): le azioni della riga, nel loro ordine, accanto a quelle di ogni menu.
+  const m = menuDi(bacheca);
+  const menu = m.principale;
+  const azioni = async () => (await m.nomi()).filter((n) => ['Copia il testo', 'Rimanda', 'Togli dall’elenco'].includes(n));
 
   await righe(bacheca).first().locator('.bd-mia-titolo').click({ button: 'right' });
   await expect(menu).toBeVisible();
-  await expect(menu.locator('.sn-select-option')).toHaveText(['Copia il testo', 'Togli dall’elenco']);
-  await menu.getByText('Copia il testo').click();
+  await expect.poll(azioni).toEqual(['Copia il testo', 'Togli dall’elenco']);
+  await m.scegli('Copia il testo');
   await expect(menu).toHaveCount(0);
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Il tasto Salva non salva');
 
   const ferma = righe(bacheca).filter({ hasText: 'Il video si blocca' });
   await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
-  await expect(menu.locator('.sn-select-option')).toHaveText(['Copia il testo', 'Rimanda', 'Togli dall’elenco']);
+  await expect.poll(azioni).toEqual(['Copia il testo', 'Rimanda', 'Togli dall’elenco']);
   await bacheca.screenshot({ path: 'tests/.shots/segnalazioni-mie-tasto-destro.png' });
-  await menu.getByText('Rimanda').click();
+  await m.scegli('Rimanda');
   await expect(bacheca.locator('.sn-fb-modal')).toBeVisible();
   await expect(bacheca.locator('.sn-fb-text')).toHaveValue('Il video si blocca a metà');
   await bacheca.locator('.sn-fb-cancel').click();
