@@ -896,6 +896,30 @@
         return url ? `Letta la pagina ${url}` : 'Letta una pagina';
       },
     },
+    TRASCRIVI_MEDIA: {
+      // Come LEGGI_PAGINA: scarica un indirizzo (o legge la scheda aperta) e il parlato è testo di uno sconosciuto (#519).
+      costo: (a) => costoIndirizzo(a, indirizzoDi(a) ? 1 : 0),
+      campo: 'web',
+      uscita: indirizzoCheEsce,
+      fonte: (a, out) => (out && out.trascrizione
+        ? { classe: 5, campo: 'web', chiave: 'web:pagina', motivo: 'ho trascritto un audio dal web' }
+        : null),
+      describe: (a) => {
+        const url = indirizzoDi(a);
+        if (!url && a && a.scheda) return ['Trascrivere l\'audio della scheda ', cit(a.scheda)];
+        if (a && a._nonCompare) return ['Trascrivere un indirizzo scritto a memoria da Filo:\n', cit(url, true), `\n\n${RISCHIO_INVENTATO}`];
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
+          return [`Filo sta per scaricare un audio il cui indirizzo${why}:\n`, cit(url, true),
+            '\n\nPotrebbe inviare tuoi dati a un sito esterno. Conferma solo se l\'hai chiesto tu.'];
+        }
+        return url ? ['Trascrivere l\'audio di ', cit(url, true)] : 'Trascrivere un audio';
+      },
+      describeDone: (a) => {
+        const url = indirizzoDi(a);
+        return url ? `Trascritto l'audio di ${url}` : 'Trascritto un audio';
+      },
+    },
     VEDI_SCHERMO: {
       // #778 — guardare una finestra non cambia niente: costo 0. Leggere fuori da Filo è un fatto di privacy, quindi
       // la prima lettura di ogni finestra esterna (o di una pagina delicata in Filo) in una richiesta sta fuori dal
