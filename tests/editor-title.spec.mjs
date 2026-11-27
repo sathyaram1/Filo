@@ -88,12 +88,12 @@ test('il tasto destro sul titolo apre il menu con "Rigenera titolo"', async ({ o
 
   // Tasto destro sul selettore documento → menu contestuale del titolo.
   await page.click('#docSwitch', { button: 'right' });
-  const menu = page.locator('.ed-title-ctxmenu');
-  await expect(menu).toBeVisible();
-  await expect(menu.getByText('Rigenera titolo', { exact: true })).toHaveCount(1);
-  await expect(menu.getByText('Rinomina', { exact: true })).toHaveCount(1);
-  await expect(menu.getByText('Duplica file', { exact: true })).toHaveCount(1);
-  await expect(menu.getByText('Elimina file', { exact: true })).toHaveCount(1);
+  // Il menu del titolo è a icone (#2555): ogni voce è un'icona col suo nome.
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  for (const nome of ['Rigenera titolo', 'Rinomina', 'Duplica file', 'Elimina file']) {
+    await expect(menu.locator(`.sn-menu-griglia [aria-label="${nome}"]`), nome).toHaveCount(1);
+  }
 
   // Scrive un po' di testo (sotto le 100 parole: niente auto-titolo) così il
   // documento non è vuoto, poi rigenera dal menu.
