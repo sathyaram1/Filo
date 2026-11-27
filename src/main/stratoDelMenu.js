@@ -408,11 +408,22 @@ class StratoDelMenu {
     if (sopra && suaPrima >= 0) cv.addChildView(sopra);
   }
 
-  // Esc chiude lo strato prima di ogni altro uso del tasto (schermo intero compreso), da qualunque vista arrivi.
+  // Esc chiude lo strato prima di ogni altro uso del tasto (schermo intero compreso), da qualunque vista arrivi. A menu
+  // aperto le frecce, Invio e il tasto singolo di un'icona sono del menu (#2555), come in un menu del sistema: lo strato
+  // prende la tastiera e riceve il tasto; alla chiusura la tastiera torna alla scheda.
   tasto(input) {
     if (!this.aperto || !input || input.type !== 'keyDown') return false;
-    if (input.key !== 'Escape' && input.code !== 'Escape') return false;
-    this.nascondi();
+    if (input.key === 'Escape' || input.code === 'Escape') { this.nascondi(); return true; }
+    if (input.control || input.meta || input.alt) return false;
+    const k = String(input.key || '');
+    if (!TASTI_DEL_MENU.has(k) && !/^[a-z0-9]$/i.test(k)) return false;
+    if (!this.vista || this.vista.webContents.isDestroyed() || this._haTastiera()) return false;
+    try {
+      const wc = this.vista.webContents;
+      wc.focus();
+      wc.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: input.shift ? ['shift'] : [] });
+      wc.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: input.shift ? ['shift'] : [] });
+    } catch (_) { return false; }
     return true;
   }
 
