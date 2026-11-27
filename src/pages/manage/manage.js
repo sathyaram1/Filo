@@ -8160,6 +8160,9 @@
   function fsApriMenu(x, y, voci) {
     fsChiudiMenu();
     if (!voci.length) return;
+    // A icone come il tasto destro di Filo (#2555).
+    const I = window.SN_MENU_ICONS;
+    if (I && I.apriVoci && I.apriVoci({ x, y, voci: voci.map((v) => ({ label: v.label, onClick: () => v.run() })) })) return;
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop mg-ctxmenu';
     menu.setAttribute('role', 'menu');
