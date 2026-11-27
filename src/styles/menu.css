@@ -99,34 +99,103 @@
   margin: 4px 0;
 }
 
-/* La fila contestuale in cima (#1434): le icone delle azioni più probabili sull'elemento, poi il «+» con le altre. */
-/* Tante icone portate nella fila vanno a capo: mai fuori dal bordo del menu. */
-.sn-menu-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 2px 6px 6px;
+/* Il menu a icone (#2555): una griglia sola, il «+» in fondo che apre le rare sotto, nello stesso menu, e la riga del
+   nome. Bersaglio di ogni icona almeno 32 px; dimensione e colonne da Preferenze (--sn-icona, --sn-colonne). */
+.sn-menu-griglia {
+  --sn-cella: max(32px, calc(var(--sn-icona, 20px) + 14px));
+  padding: 2px 6px 0;
   margin-bottom: 4px;
-  border-bottom: 1px solid var(--sn-border);
+}
+.sn-menu-griglia:last-child { margin-bottom: 0; }
+.sn-menu-row {
+  display: grid;
+  grid-template-columns: repeat(var(--sn-colonne, 6), var(--sn-cella, 34px));
+  gap: 2px;
+  justify-content: start;
 }
 .sn-menu-row[hidden] { display: none; }
+/* Le rare dietro il «+»: dopo una riga sottile, stessa griglia, stesse icone. */
+.sn-menu-altro {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--sn-border);
+}
+/* «Copia · il collegamento · C»: fissa, senza ritardo; a riposo dice di cosa parla il menu, più tenue. */
+.sn-menu-nome {
+  min-height: 1.3em;
+  padding: 5px 2px 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--sn-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--sn-border);
+}
+.sn-menu-griglia:last-child .sn-menu-nome { border-bottom: 0; }
+.sn-menu-nome.sn-menu-nome-riposo { color: var(--sn-muted); }
+.sn-menu-nome[hidden] { display: none; }
+.sn-menu-label-nascosta {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 .sn-menu-row-btn {
   all: unset;
+  position: relative;
   box-sizing: border-box;
-  flex: 1 1 0;
-  min-width: 30px;
+  width: var(--sn-cella, 34px);
+  height: var(--sn-cella, 34px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 0;
   border-radius: 6px;
   cursor: pointer;
   color: var(--sn-fg);
   font-family: var(--sn-font);
   font-size: 14px;
-  min-height: 30px;
   transition: background calc(80ms * var(--sn-motion, 1)) ease-out, transform calc(80ms * var(--sn-motion, 1)) ease-out;
+}
+.sn-menu-row-btn[hidden] { display: none; }
+.sn-menu-row-btn svg { width: var(--sn-icona, 20px); height: var(--sn-icona, 20px); }
+/* Il segno piccolo di chi ha varianti nel suo tasto destro. */
+.sn-menu-row-btn[data-sn-varianti="1"]::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+/* Il valore è l'icona: 1×, 119%. */
+.sn-menu-valore {
+  font-size: calc(var(--sn-icona, 20px) * 0.62);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.sn-menu-icona-img {
+  width: var(--sn-icona, 20px);
+  height: var(--sn-icona, 20px);
+  border-radius: 4px;
+  object-fit: contain;
+}
+/* Il contorno, sulla pagina, dell'oggetto su cui agirebbe l'icona sotto il puntatore. */
+.sn-menu-bersaglio {
+  position: fixed;
+  z-index: 2147483645;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 2px solid rgba(var(--sn-accent-rgb), 0.85);
+  border-radius: 6px;
+  background: rgba(var(--sn-accent-rgb), 0.08);
+  animation: sn-fade-in calc(80ms * var(--sn-motion, 1)) ease-out;
 }
 .sn-menu-row-btn svg,
 .sn-menu-icon-btn svg,
