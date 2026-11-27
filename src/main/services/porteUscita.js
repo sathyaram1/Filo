@@ -434,7 +434,7 @@ function testoDiSconosciuti(azioni) {
 }
 
 function indirizzoCaricato(tipo, indirizzo) {
-  if (tipo === 'LEGGI_PAGINA') return PageRead.normalizzaUrl(indirizzo).url || '';
+  if (comeLettura(tipo)) return PageRead.normalizzaUrl(indirizzo).url || '';
   if (/^[a-z][a-z0-9+.-]*:/i.test(indirizzo)) return indirizzo;
   return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.normalizeUrl && globalThis.SN_URL_NAV.normalizeUrl(indirizzo)) || '';
 }
