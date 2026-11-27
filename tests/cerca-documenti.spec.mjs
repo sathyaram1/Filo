@@ -77,16 +77,17 @@ test('la prova della segnalazione: la bolletta della luce di marzo è il primo r
 
     // Tasto destro: le azioni di un file.
     await file.click({ button: 'right' });
-    const menu = page.locator('.sn-rinomina-menu .sn-select-option');
-    await expect(menu.first()).toHaveText('Apri');
-    await expect(page.locator('.sn-rinomina-menu')).toContainText('Mostra nella cartella');
-    await expect(page.locator('.sn-rinomina-menu')).toContainText('Metti nel messaggio');
+    // A icone (#2555): la prima è Apri, le altre col loro nome.
+    const menu = menuDi(page);
+    await expect(menu.primaVoce).toHaveAttribute('aria-label', 'Apri');
+    await expect(menu.voce('Mostra nella cartella')).toHaveCount(1);
+    await expect(menu.voce('Metti nel messaggio')).toHaveCount(1);
     await page.screenshot({ path: 'tests/.shots/cerca-documenti-menu.png' });
-    await menu.filter({ hasText: 'Mostra nella cartella' }).click();
+    await menu.scegli('Mostra nella cartella');
     await expect.poll(() => app.evaluate(() => globalThis.__cartelle)).toEqual([bolletta]);
 
     await file.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Metti nel messaggio' }).click();
+    await menu.scegli('Metti nel messaggio');
     const allegato = page.locator('.dash-file-chip');
     await expect(allegato).toHaveText(new RegExp(BOLLETTA_MARZO.replace('.', '\\.')));
     await expect(allegato).toHaveAttribute('title', bolletta);
