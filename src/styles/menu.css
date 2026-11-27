@@ -805,34 +805,6 @@
   text-align: center;
 }
 
-.sn-menu-icon-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--sn-icon-cols, 4), 36px);
-  gap: 4px;
-  padding: 6px;
-  min-width: 0;
-  max-width: none;
-}
-.sn-menu-icon-grid .sn-menu-grid-vuota {
-  grid-column: 1 / -1;
-  white-space: nowrap;
-}
-.sn-menu-icon-btn {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--sn-fg);
-  font-size: 16px;
-  font-family: var(--sn-font);
-  transition: background calc(80ms * var(--sn-motion, 1)) ease-out, transform calc(80ms * var(--sn-motion, 1)) ease-out;
-}
-
 /* Il collegamento sul testo selezionato: un campo e la spunta, accanto all'icona. */
 .sn-menu-link {
   display: flex;
