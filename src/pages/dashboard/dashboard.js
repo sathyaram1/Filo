@@ -47,6 +47,8 @@
   let chatId = null;
   // La conversazione riaperta apposta da qui (Cronologia, ?chat=): resta questa anche se altrove se ne scrive un'altra.
   let chatScelta = null;
+  // La conversazione di un'altra app (Editor, Mazzi, Aiuto) riaperta qui dalla Cronologia o da «Apri nel filo».
+  let chatAppInVista = null;
   let sending = false;
   // L'utente ha scritto in questa scheda: da qui in poi c'è una conversazione da non interrompere (l'accoglienza aspetta).
   let scrittoQui = false;
