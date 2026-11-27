@@ -345,7 +345,7 @@ export function righeDeiNomi(testo, righe, dentro) {
   const visti = new Set();
   const out = new Set();
   const coda = (righe || []).filter((r) => !dentro(r));
-  while (coda.length && visti.size < TETTO_NOMI) {
+  while (coda.length) {
     const r = coda.pop();
     for (const nome of nomiDi(r)) {
       if (visti.has(nome)) continue;
