@@ -106,7 +106,8 @@
     const scritto = document.createElement('div');
     scritto.className = 'dash-velo-testo';
     scritto.style.fontFamily = da.font.famiglia || '';
-    for (const riga of String(testo || '').replace(/\r\n?/g, '\n').split('\n')) {
+    // Il velo mostra solo quello che sta in una finestra: una bozza enorme non si ridisegna a ogni fotogramma.
+    for (const riga of String(testo || '').slice(0, 6000).replace(/\r\n?/g, '\n').split('\n').slice(0, 120)) {
       const p = document.createElement('p');
       p.textContent = riga || '​';
       scritto.appendChild(p);
