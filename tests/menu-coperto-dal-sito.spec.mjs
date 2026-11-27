@@ -103,7 +103,7 @@ test('sotto il velo non partono nemmeno Incolla e Detta', async ({ app, openTab,
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  await menuDi(page).locator('.sn-menu-split-main', { hasText: 'Detta' }).click();
+  await menuDi(page).icona('dictate').click();
   await page.waitForTimeout(800);
   expect(await page.evaluate(() => document.documentElement.innerText), 'il microfono non si accende').not.toMatch(/Ti ascolto|Microfono/);
 
