@@ -112,6 +112,7 @@ export function costruisciMappa({ registrazioni, sorgente, root, durate = new Ma
   const prove = [];
   const indiceProva = new Map();
   const perFile = new Map();
+  const caricati = new Map();
   const inizi = new Map();
   let senzaProva = 0;
   const idProva = (p) => {
