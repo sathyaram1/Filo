@@ -119,10 +119,14 @@ const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repea
   .replace(DUE_PUNTI_HTML, (e) => ':' + ' '.repeat(e.length - 1));
 // Enfasi prima e dopo i tag: «**<b>CVV:</b>**» (#2695.7) la vuole prima, «&lt;b&gt;**PIN:**&lt;/b&gt;» dopo.
 const togliEnfasi = (s) => (/[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s);
+// Così i segni in testa alla riga, la citazione e il punto d'elenco: «Password:» a capo «- x», «> x», «1. x» vale
+// «Password:» a capo «x», con ogni a capo (#2673.14).
+const SEGNI_DI_RIGA = /^[ \t]*(?:>[ \t]*)*(?:(?:[-*+•]|\d{1,3}[.)])(?=[ \t]))?/gm;
+const togliSegni = (s) => (/[>*+•\-.)]/.test(s) ? s.replace(SEGNI_DI_RIGA, (segni) => segni.replace(/[^ \t]/g, ' ')) : s);
 const senzaEnfasi = (t) => {
   const s = String(t == null ? '' : t);
-  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(s);
-  return togliEnfasi(senzaTag(togliEnfasi(s)));
+  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(togliSegni(s));
+  return togliEnfasi(togliSegni(senzaTag(togliEnfasi(s))));
 };
 const vistePerLeRegole = (t) => {
   const s = String(t == null ? '' : t);
