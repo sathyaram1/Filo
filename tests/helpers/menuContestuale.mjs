@@ -62,7 +62,11 @@ export function menuDi(scheda) {
     primaVoce: locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia .sn-menu-row-btn:visible').first(),
     /** Le voci: le icone della griglia (il nome sta nell'icona, nascosto alla vista) e le voci scritte dei sottomenu. */
     voci: locator('.sn-menu-item, .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)'),
-    voce: (testo) => locator('.sn-menu-item, .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)', { hasText: testo }),
+    voce,
+    /** Clic su una voce per il suo nome, aprendo prima il «+» se sta fra le rare. */
+    scegli,
+    /** Tasto destro sull'icona (nome o locator) e clic sulla variante col testo dato. */
+    variante,
     /** Un'icona della griglia per il suo verbo dell'elenco unico (`copy`, `save`…). */
     icona: (verbo) => locator(`.sn-menu-griglia [data-sn-verbo="${verbo}"]`),
     /** L'icona Incolla: il tasto destro su di lei apre la cronologia degli appunti. */
