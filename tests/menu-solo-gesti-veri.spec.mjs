@@ -169,7 +169,7 @@ test('il sito non preme Incolla nemmeno nell\'istante in cui il menu entra nella
   // Un osservatore del sito creato prima di quelli di Filo viene avvisato per primo. menu-dal-sito
   await page.evaluate(() => {
     new MutationObserver(() => {
-      const b = document.querySelector('.sn-menu .sn-menu-paste-main');
+      const b = document.querySelector('.sn-menu .sn-menu-griglia [data-sn-verbo="paste"]');
       if (b) { document.body.appendChild(b); b.click(); }
     }).observe(document.documentElement, { childList: true, subtree: true });
   });
