@@ -125,8 +125,8 @@
     const raw = String(url || '');
     const pieces = [raw];
     let cur = raw;
-    for (let i = 0; i < 3; i++) {
-      const dec = decodificaPercento(cur.replace(/\+/g, ' '));
+    for (let i = 0; i < GIRI_DI_DECODIFICA; i++) {
+      const dec = giroDiDecodifica(cur, { posti: false }).testo;
       if (dec === cur) break;
       pieces.push(dec);
       cur = dec;
