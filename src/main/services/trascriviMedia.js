@@ -262,7 +262,7 @@ function suggerimentoStreaming(url) {
 const NON_MEDIA = (url) => ({
   errore: 'non_media',
   frase: `${url} non è un audio o un video, e la pagina non ne contiene uno che si possa scaricare.`,
-  alternativa: 'Se l\'utente intendeva il testo della pagina, LEGGI_PAGINA lo legge.',
+  alternativa: 'Se l\'utente intendeva il testo della pagina, web(leggi) lo legge.',
 });
 
 // Il primo audio o video diretto che una pagina dichiara (og:audio/og:video, <audio>, <video>, <source>).
