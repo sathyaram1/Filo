@@ -117,7 +117,7 @@ test('file trovato in chat nella home, coi crediti finiti: «Dai un nome sensato
     const chip = page.locator('.dash-file-btn');
     await expect(chip.locator('.dash-file-btn-nome')).toHaveText('scan_00512.pdf', { timeout: 15000 });
     await chip.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await menuDi(page).scegli('Dai un nome sensato');
     const stato = page.locator('.sn-rinomina .sn-rinomina-stato');
     await expect(stato).toContainText('crediti', { timeout: 15000 });
     await expect(stato.locator('.sn-rinomina-rimedio')).toHaveText('Apri Crediti');
