@@ -91,7 +91,7 @@ test('nel testo per il modello il CVV annunciato col nome straniero diventa il s
 });
 
 test('il CVV chiamato in un’altra lingua conta come dato di pagamento, anche dal sorgente', () => {
-  const daSorgente = new Function(`return (${pageHints.toString()})`)();
+  const daSorgente = new Function(`return ${PAGE_HINTS_JS}`)();
   for (const nome of NOMI) {
     assert.equal(pageHints(documento(['Nome', nome])).hasPayment, true, nome);
     assert.equal(daSorgente(documento([nome])).hasPayment, true, `dal sorgente: ${nome}`);
