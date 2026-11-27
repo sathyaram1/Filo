@@ -1277,7 +1277,10 @@
       const v = m[3];
       const parole = v.split(/\s+/);
       if (parole.length < 2 || parole.length > PAROLE_FRA_VIRGOLETTE || NOMINA_ETICHETTA.test(v) || NOMINA_CORTA.test(v)) continue;
-      const prima = s.slice(Math.max(0, m.index - 120), m.index).split('\n').pop();
+      const righe = s.slice(Math.max(0, m.index - 240), m.index).split(RIGHE);
+      let prima = righe.pop();
+      // Da solo sulla riga sotto l'etichetta, anche dopo una riga vuota, vale come accanto (#2673.14).
+      if (!prima.trim() && righe.length) prima = righe.pop().trim() || (righe.length ? righe.pop() : '');
       const alPostoDelValore = !spiegazione(parole)
         && (PRIMA_DELLE_VIRGOLETTE.test(prima) || (PRIMA_DELLE_VIRGOLETTE_NUDA.test(prima) && FORMA_FORTE(v))
           || (PRIMA_DELLE_VIRGOLETTE_CORTA.test(prima) && /[^\p{L}\s'’]/u.test(v)));
