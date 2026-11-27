@@ -81,7 +81,7 @@ test('avanzamento visibile e chiusura a metà ferma le chiamate', async ({ app, 
     <audio id="a" src="${src}" controls style="display:block;width:320px"></audio></body></html>`);
   const menu = await apriMenu(page, '#a');
   await menu.voce('Trascrivi').click();
-  await expect.poll(() => testo(app, page, '.sn-popup'), { timeout: 30_000 }).toMatch(/di 10/);
+  await expect.poll(() => testo(app, page, '.sn-popup'), { timeout: 30_000 }).toMatch(/Trascrivo: [1-3] di \d+/);
   console.log('POPUP MID:', await testo(app, page, '.sn-popup'));
   const strato = await paginaDelloStrato(app, page);
   await strato.screenshot({ path: join('tests', '.shots', 'v1815-avanzamento.png') });
