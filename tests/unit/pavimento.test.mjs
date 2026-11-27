@@ -689,6 +689,21 @@ test('#2678.13: una riga lunghissima di emoji o di parentesi dopo «Password:» 
   }
 });
 
+test('#2678.14: un numero e una parola di tempo dentro la frase-password non la fanno passare per la sua data', () => {
+  for (const frase of ['ci vediamo tra due giorni', 'casa mia al mare da tre anni', 'il mio cane si chiama Fido e ha tre anni',
+    'sei la mia vita da 2 anni', 'we met 3 years ago in Rome']) {
+    for (const riga of [`Password: ${frase}`, `Password: «${frase}»`, `La password è "${frase}"`]) {
+      assert.ok(P.oscura(riga).includes(S) && !P.oscura(riga).includes(frase.split(' ').slice(-2).join(' ')), riga);
+    }
+  }
+  assert.equal(P.oscura('Password: ci vediamo tra due giorni'), `Password: ${S}`);
+  for (const riga of ['Password: 8 o più caratteri', 'Password: valida per 90 giorni', 'Password: ultima modifica 3 mesi fa',
+    'Password: ultima modifica il 12 marzo 2024', 'Password: marzo 2024', 'Password: last changed 3 months ago',
+    'Password: at least 8 characters', 'Password: 90 giorni', 'Password: «almeno 8 caratteri»', 'Password: tre anni fa']) {
+    assert.equal(P.oscura(riga), riga, riga);
+  }
+});
+
 test('una chiave o una password per nome, in un file di configurazione o sulla pagina di un servizio, non esce', () => {
   const segreti = {
     'PGPASSWORD=Girasole2024': 'Girasole2024',
