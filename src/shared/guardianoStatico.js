@@ -390,11 +390,8 @@
   const VERBI_CAMBIO = Object.freeze({
     diventa: Object.freeze(['diventa', 'diventano', 'diventerà', 'diventata', 'diventato', 'resta', 'resterà', 'rimane',
       'rimarrà', 'rimasta', 'rimasto', 'becomes', 'became', 'become', 'remains', 'stays', 'will be']),
-    participi: Object.freeze(['cambiata', 'cambiato', 'modificata', 'modificato', 'aggiornata', 'aggiornato', 'impostata',
-      'impostato', 'reimpostata', 'reimpostato']),
+    // I participi sono quelli di CAMBI_IT; in inglese (CAMBI_EN) il valore nuovo lo porta «to»: «changed my PIN in 2024» dice quando.
     verso: Object.freeze(['in', 'a']),
-    // In inglese il valore nuovo lo porta «to»: «changed my PIN in 2024» dice quando (#2714).
-    participiInglesi: Object.freeze(['changed', 'updated', 'set', 'reset']),
     versoInglese: Object.freeze(['to', 'into']),
     // Il valore detto dopo il cambio, con «ora» o in una frase a parte: «il pin è ora …», «ho cambiato il pin, ora è …».
     ora: Object.freeze(['ora', 'adesso', 'now']),
