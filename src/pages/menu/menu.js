@@ -135,9 +135,49 @@
     return v;
   }
 
+  // I contorni degli oggetti (#2555) arrivano in px del documento della scheda: qui si portano nei px dello strato, dal
+  // punto del tasto destro visto dai due lati.
+  function contorni(v) {
+    const o = m && m.origine;
+    if (!o) return v;
+    const porta = (r) => (r && [r.x, r.y, r.w, r.h].every(Number.isFinite)
+      ? { x: m.punto.x + (r.x - o.x) * o.zoom, y: m.punto.y + (r.y - o.y) * o.zoom, w: r.w * o.zoom, h: r.h * o.zoom } : null);
+    const giro = (x) => {
+      if (Array.isArray(x)) { x.forEach(giro); return; }
+      if (!x || typeof x !== 'object') return;
+      for (const k of Object.keys(x)) {
+        if (k === 'bersaglio' && Array.isArray(x[k])) x[k] = x[k].map(porta).filter(Boolean);
+        else if (x[k] && typeof x[k] === 'object') giro(x[k]);
+      }
+    };
+    giro(v);
+    return v;
+  }
+
+  // L'icona Incolla della griglia: come la voce, la fa il main, e il suo menu è la cronologia che lo strato ha dal main.
+  function incollaNellaGriglia(lista, cronologia) {
+    const chiave = (e) => (Clip ? Clip.chiave(e) : '');
+    for (const x of Array.isArray(lista) ? lista : []) {
+      if (!x || !x.$incolla) continue;
+      x.onClick = () => chiedi('incolla');
+      x.cronologia = {
+        history: cronologia,
+        onPick: (e) => chiedi('scegli', { chiave: chiave(e) }),
+        onRemove: (e) => chiedi('togli', { chiave: chiave(e) }),
+        onClear: () => chiedi('svuota'),
+      };
+    }
+    return lista;
+  }
+
   function costruisci(lista, cronologia) {
-    const items = voce(D.ricostruisci(Array.isArray(lista) ? lista : [], { funzione: chiamata }));
+    const items = contorni(voce(D.ricostruisci(Array.isArray(lista) ? lista : [], { funzione: chiamata })));
     return items.filter((it) => it && typeof it === 'object').map((it) => {
+      if (it.type === 'row') {
+        incollaNellaGriglia(it.items, cronologia);
+        if (it.altro) incollaNellaGriglia(it.altro.items, cronologia);
+        return it;
+      }
       if (it.type === 'inline' && Number.isInteger(it.$inline)) {
         const n = it.$inline;
         return {
