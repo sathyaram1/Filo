@@ -579,7 +579,7 @@ test('«Leggi» senza invito: l’avviso dice perché e porta ai Crediti', async
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
   });
   await page.locator('#t').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-label', { hasText: 'Leggi' }).first().click();
+  await menuDi(page).scegli('Leggi');
   const avviso = page.locator('.sn-toast', { hasText: 'voce del browser' });
   await expect(avviso).toBeVisible({ timeout: 15_000 });
   await expect(avviso).toContainText('invito');
