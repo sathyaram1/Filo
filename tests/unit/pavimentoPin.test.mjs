@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
@@ -41,6 +42,76 @@ test('una frase sul PIN senza il suo valore resta com\'è', () => {
     'Il PIN predefinito del telefono è 0000',
     'PIN di fabbrica del telefono: 1234',
   ])assert.equal(P.oscura(frase), frase, frase);
+});
+
+// #2678.10 — detto «codice», il PIN del telefono o della carta vale quello del bancomat, anche senza possessivo.
+test('il codice del telefono o della carta diventa il segnaposto, come quello del bancomat', () => {
+  for (const [frase, atteso] of [
+    ['il codice del telefono è 4821', `il codice del telefono è ${S}`],
+    ['il codice della carta è 4821', `il codice della carta è ${S}`],
+    ['Il codice della carta è «4821»', `Il codice della carta è «${S}»`],
+    ['Il codice del telefono è 1990', `Il codice del telefono è ${S}`],
+    ['codice del telefono: 4821', `codice del telefono: ${S}`],
+    ['codice del telefono | 4821', `codice del telefono | ${S}`],
+    ['il codice del telefono era 4821', `il codice del telefono era ${S}`],
+    ['il codice della sim è 4821', `il codice della sim è ${S}`],
+    ['the phone code is 4821', `the phone code is ${S}`],
+    ['The card code: 4821', `The card code: ${S}`],
+    ['le code du téléphone est 4821', `le code du téléphone est ${S}`],
+    ['el código del teléfono es 4821', `el código del teléfono es ${S}`],
+  ]) assert.equal(P.oscura(frase), atteso, frase);
+  for (const frase of [
+    'il codice del telefono del cliente è 4821',
+    'Il codice IMEI del telefono è 35123456',
+    'Il codice predefinito del telefono è 0000',
+    'il codice del telefono è cambiato 2 volte',
+    'Il codice del telefono è sbagliato, chiama il 3331234567',
+    'the phone code for Italy is 0039',
+  ]) assert.equal(P.oscura(frase), frase, frase);
+});
+
+// Senza possessivo l'etichetta chiude come quella col possessivo: chi possiede il telefono, un aggettivo, l'articolo,
+// le maiuscole, un avverbio, la virgola; e i nomi comuni del cellulare e delle carte.
+test('il codice del telefono o della carta senza possessivo, in ogni forma di quello del cellulare', () => {
+  for (const frase of [
+    'il codice del telefono di mia madre è 4821',
+    'il codice del telefono di Marco è 4821',
+    'il codice del telefono di lavoro è 4821',
+    'il codice del telefono aziendale è 4821',
+    'il codice del telefono nuovo è 4821',
+    'il codice del vecchio telefono è 4821',
+    'il telefono ha il codice 4821',
+    'il codice del telefono è il 4821',
+    'il codice del telefono è: 4821',
+    'il codice del telefono È 4821',
+    'IL CODICE DEL TELEFONO È 4821',
+    'il codice del telefono è sempre 4821',
+    'il codice del telefono, 4821',
+    'il codice della carta è ancora 4821',
+    'il codice del cell è 4821',
+    'il codice della postepay è 4821',
+    'il codice della prepagata è 4821',
+    'il codice della mastercard è 4821',
+    'il codice della revolut è 4821',
+    'el código del teléfono de mi madre es 4821',
+    'le code du téléphone de ma mère est 4821',
+  ]) assert.equal(P.oscura(frase).includes('4821'), false, frase);
+  for (const frase of [
+    'il codice del telefono del cliente è 4821',
+    'il telefono del cliente ha il codice 4821',
+    'el código del teléfono del cliente es 4821',
+    'le code du téléphone du client est 4821',
+    'il codice prodotto del telefono è 4821',
+    'codice articolo telefono 4821',
+    'il codice del telefono è cambiato nel 4821',
+    'The serial code of my phone is 5200',
+  ]) assert.equal(P.oscura(frase), frase, frase);
+});
+
+test('un\'etichetta lunga senza chiusura non rallenta il pavimento', () => {
+  const t = `il codice ${'del nuovo vecchio di mia '.repeat(400)}telefono x 4821`;
+  const c = costoInUnita(() => P.oscura(t), { tetto: 60 });
+  assert.ok(c.entro, c.come);
 });
 
 test('in uscita il PIN col complemento si riconosce, e il primo verbo chiude il complemento', () => {

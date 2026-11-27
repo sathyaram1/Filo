@@ -77,7 +77,7 @@
   // L'elenco degli apparecchi il cui codice li sblocca è uno solo (#1403.44): la frase col possessivo, l'etichetta senza
   // e il nome attaccato a «code» («Handycode», «Gerätecode») lo leggono da qui.
   const APPARECCHIO = '(?:telefon(?:o|i|ino|ini|u|ie|em|s|e|es)?|t[ée]l[ée]phones?|tel[ée]fonos?|telefoons?|cellular[ei]|celular(?:es)?'
-    + '|t[ée]l|celus?|compus?|gsms?|smartphones?'
+    + '|t[ée]l|celus?|cell|compus?|gsms?|smartphones?'
     + '|m[óo]vil(?:es)?|mobiles?|mobiel|portables?|portatil[ei]|port[áa]til(?:es)?|telem[óo]ve(?:l|is)|handys?|(?:smart|cell|i-?)?phones?'
     + '|i-?pads?|tablet(?:s|a|u|em|y)?|tablettes?|tabletas?|computer(?:s|a)?|computador(?:es|a|as)?|komputer(?:a|ze|em|y)?|ordinateurs?'
     + '|ordis?|ordenador(?:es)?|rechners?|laptop(?:s|a|ie|em)?|notebooks?|mac(?:book)?s?|pcs?|sim|kom[óo]rk(?:a|i|ę|ą)?|dispositiv[oi]'
@@ -218,20 +218,41 @@
   const delMioApparecchio = (coda) => {
     if (!UN_APPARECCHIO_NEL_TESTO.test(coda)) return false;
     const m = DEL_MIO_APPARECCHIO.exec(coda);
-    if (!m || !INIZIA_COL_NOME.test(m[0])) return !!m;
+    return !!m && nomeSenzaUnAltroDavanti(coda, m);
+  };
+  const nomeSenzaUnAltroDavanti = (coda, m) => {
+    if (!INIZIA_COL_NOME.test(m[0])) return true;
     const w = /([A-Za-z][A-Za-z'-]{2,}|[A-Z]{2,})\s+$/.exec(coda.slice(0, m.index));
     return !w || DAVANTI_AL_NOME.test(w[1]) || RESTA_UN_CODICE.test(w[1]) || SEGNO_FORTE.test(w[1]) || UN_VERBO.test(w[1])
       || POSSESSIVO_SOLO.test(w[1]);
   };
   const POSSESSIVO_SOLO = new RegExp(`^${POSSESSIVO}$`, 'iu');
+  // Il codice del telefono o della carta li sblocca anche senza possessivo (#2678.10), con la stessa chiusura della frase
+  // col possessivo e chi lo possiede («di mia madre»); un identificativo nell'etichetta («del cliente») ne fa un altro dato.
+  const CARTA = '(?:cart[ae]|cards?|postepay|prepagat[ae]|mastercard|visa|amex|revolut|hype)';
+  const SBLOCCABILE = `(?:${APPARECCHIO}|${CARTA})`;
+  const SI_SBLOCCA_SOLO = new RegExp(`^${SBLOCCABILE}$`, 'iu');
+  const DI_QUALCUNO = `(?:\\s+(?:di|del|della|dello|de|du|da|of|von|vom|van|od)\\s+(?:${POSSESSIVO}\\s+)?[\\p{L}]+)?`;
+  const DOPO_SBLOCCABILE = `(?:${DOPO_APPARECCHIO})?${DI_QUALCUNO}`;
+  const PRIMA_DI_SBLOCCABILE = `(?:\\s+|\\s+(?:dell|all|nell|d|l)['’]\\s*)${AGGETTIVO}`;
+  const ETICHETTA_SBLOCCABILE = new RegExp(`(?<![\\p{L}])(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}${PRIMA_DI_SBLOCCABILE}${SBLOCCABILE}`
+    + `${DOPO_SBLOCCABILE}(?:${CHIUDE_VERO})?|${SBLOCCABILE}${DOPO_SBLOCCABILE}\\s+(?:ha|has|hat|heeft|tiene|tem)`
+    + `(?:\\s+(?:il|un|the|a|el|o|den|einen|de|le))?\\s+${NOME_SBLOCCO}(?:${CHIUDE_VERO})?)\\s*$`, 'iu');
+  const UN_SBLOCCABILE = new RegExp(`(?<![\\p{L}])${SBLOCCABILE}(?![\\p{L}])`, 'giu');
+  const etichettaSbloccabile = (coda) => {
+    const m = ETICHETTA_SBLOCCABILE.exec(coda);
+    return !!m && !NON_APRE.test(m[0].replace(UN_SBLOCCABILE, ' ')) && !PREDEFINITO.test(m[0]) && nomeSenzaUnAltroDavanti(coda, m);
+  };
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
-    if (delMioApparecchio(prima.slice(-160))) return { apre: true, solo: true };
+    if (delMioApparecchio(prima.slice(-160)) || etichettaSbloccabile(prima.slice(-160))) return { apre: true, solo: true };
     const it = [...prima.matchAll(/\b(?:codic[ei]|pin)\b/gi)].pop();
     const en = [...prima.matchAll(/\b([A-Za-z-]+)\s+(?:codes?|pin)\b/g)].pop();
-    if (en && (!it || en.index > it.index) && NOME_CHE_APRE.test(en[1])) {
-      return { apre: true, solo: /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length)) };
+    if (en && (!it || en.index > it.index)) {
+      const solo = /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length));
+      if (NOME_CHE_APRE.test(en[1])) return { apre: true, solo };
+      if (solo && SI_SBLOCCA_SOLO.test(en[1])) return { apre: true, solo };
     }
     const altro = [...prima.matchAll(NOME_ALTRE)].pop();
     if (altro && (!it || altro.index > it.index)) {
@@ -296,7 +317,7 @@
     const fra = prima.slice(n.index + n[0].length).replace(RELATIVA, ' ');
     if (!fra.trim()) return true;
     // Il codice del proprio apparecchio ha la sua etichetta, con le sue virgole e i suoi refusi («, c'est», «e» senza accento).
-    if (!/\d/.test(fra) && delMioApparecchio(prima.slice(-160))) return true;
+    if (!/\d/.test(fra) && (delMioApparecchio(prima.slice(-160)) || etichettaSbloccabile(prima.slice(-160)))) return true;
     // Una virgola chiude la frase del codice («In the code below, MAX_SIZE is 65536»), salvo dove parla di entrare.
     if (fra.length > 60 || /[;!?]|\d{4,}/.test(fra) || (!forte && fra.includes(','))) return false;
     if (CHIUDE_ETICHETTA.test(fra) || (/^kod/i.test(n[0]) && CHIUDE_KOD.test(fra))) return true;
