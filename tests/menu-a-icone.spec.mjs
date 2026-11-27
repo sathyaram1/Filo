@@ -243,6 +243,12 @@ test.describe('col menu nello strato sopra la scheda', () => {
     expect(await variantiDi(page, menu, 'copy')).toEqual(['Copia URL immagine', 'Copia URL']);
     await menu.locator('.sn-menu-sub .sn-menu-item', { hasText: 'Copia URL' }).last().click();
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://esempio.it/altra');
+    // Il tasto singolo, premuto sulla scheda: a menu aperto è del menu, anche nello strato.
+    await page.locator('#vai').click({ button: 'right' });
+    await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
+    await page.keyboard.press('c');
+    await expect(menu.pannelli).toHaveCount(0);
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://esempio.it/pagina');
   });
 });
 
