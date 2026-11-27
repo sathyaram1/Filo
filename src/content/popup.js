@@ -1244,14 +1244,6 @@
     return sel || '';
   }
 
-  function durataLeggibile(secondi) {
-    const t = Math.round(Number(secondi) || 0);
-    const h = Math.floor(t / 3600);
-    const m = Math.floor((t % 3600) / 60);
-    const s = String(t % 60).padStart(2, '0');
-    return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
-  }
-
   // Stack degli avvisi in pagina (#409): tutto ciò che Filo ancora in basso a destra vive in
   // UN contenitore che li impila, o due avvisi ravvicinati finiscono uno sopra l'altro.
   let toastHostEl = null;
