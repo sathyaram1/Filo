@@ -261,7 +261,7 @@ test('un\'icona portata dal «+» alla fila resta dopo il riavvio, e «rimetti c
     ({ app, shell } = await avvia());
     page = await apriSito(app, shell, 2);
     await destroSulTesto(page);
-    expect(await iconeDellaFila(menuDi(page))).toEqual(['testo:readAloud', 'testo:copy', 'testo:translate', 'testo:search']);
+    expect(await iconeDellaFila(menuDi(page))).toEqual(['testo:readAloud', 'testo:copy', 'testo:translate', 'testo:search', 'testo:help']);
     await page.keyboard.press('Escape');
 
     // «Rimetti come prima»: il modello finto fa quello che farebbe uno vero, annulla il cambio che il filo gli riporta.
