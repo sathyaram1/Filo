@@ -107,10 +107,10 @@ test('salvata in Automazioni, «Discutiamone» e il tasto destro copiano la paro
   // Il tasto destro della domanda fa lo stesso.
   await svuota(app);
   await riga(page, 'D-8').click({ button: 'right' });
-  const voce = menu.locator('.sn-select-option', { hasText: 'Discutiamo la domanda D-8' });
-  await expect(voce).toHaveText('Copia parola d’ordine e «Discutiamo la domanda D-8»');
-  await expect(voce).toHaveAttribute('title', /parola d’ordine «owner non fidato»/);
-  await voce.click();
+  // A icone (#2555): la voce col suo nome intero; il fumetto che spiegava la parola nel menu non c'è più.
+  await expect(menu.principale).toBeVisible();
+  expect(await menu.vociScritte()).toContain('Copia parola d’ordine e «Discutiamo la domanda D-8»');
+  await menu.scegli('Copia parola d’ordine e «Discutiamo la domanda D-8»');
   await expect.poll(() => appunti(app)).toBe(DUE_RIGHE);
 
   // Tolta, con la conferma sullo stesso tasto: torna la riga sola, anche nell'hover e nel tasto destro.
