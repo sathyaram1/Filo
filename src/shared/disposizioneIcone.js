@@ -9,74 +9,160 @@
   // nella barra.
   const ZONE = Object.freeze(['bar', 'secondary']);
 
-  // La fila del tasto destro cambia con l'elemento sotto il mouse (#1434): ogni contesto ha le sue azioni, di partenza
-  // in fila o nel suo «Altro…». Un'azione di un contesto resta nel suo contesto; un'icona della barra va ovunque, in un
-  // posto solo. `su`: come lo dice una frase («la fila del tasto destro sul testo selezionato»). L'ordine è fisso.
-  const CONTESTI = Object.freeze({
-    scrivibile: Object.freeze({
-      su: 'sul testo selezionato mentre scrivi',
-      fila: Object.freeze(['bold', 'italic', 'underline', 'link', 'highlight']),
-      altro: Object.freeze(['strike', 'clear', 'cut', 'copy', 'search']),
-    }),
-    campo: Object.freeze({
-      su: 'sul testo selezionato in una casella',
-      fila: Object.freeze(['cut', 'copy', 'paste']),
-      altro: Object.freeze(['search']),
-    }),
-    testo: Object.freeze({
-      su: 'sul testo selezionato',
-      fila: Object.freeze(['copy', 'translate', 'search']),
-      altro: Object.freeze(['readAloud']),
-    }),
-    immagine: Object.freeze({
-      su: 'su un\'immagine',
-      fila: Object.freeze(['save', 'copy', 'ask', 'openTab']),
-      altro: Object.freeze(['copyLink', 'search', 'transcribe', 'linkCopy']),
-    }),
-    link: Object.freeze({
-      su: 'su un collegamento',
-      fila: Object.freeze(['openTab', 'copy']),
-      altro: Object.freeze(['saveForLater', 'share']),
-    }),
-    media: Object.freeze({
-      su: 'su un filmato o un audio',
-      fila: Object.freeze(['playPause', 'mute', 'save', 'openTab']),
-      altro: Object.freeze(['loop', 'pip', 'copyLink', 'linkCopy']),
-    }),
-    cursore: Object.freeze({
-      su: 'in un campo dove scrivi, senza selezione',
-      fila: Object.freeze(['paste', 'dictate']),
-      altro: Object.freeze([]),
-    }),
-    pagina: Object.freeze({ su: 'sulla pagina', fila: Object.freeze([]), altro: Object.freeze([]) }),
+  // ── L'elenco unico delle azioni del tasto destro (#2555) ────────────────────────────────────────────────────────────
+  // Ogni azione è un verbo: nome breve (quello della riga del nome), icona, il verbo per le frasi, il tasto singolo a
+  // menu aperto e le parole con cui un'etichetta scritta lo nomina (le voci date come testo dalle pagine di Filo).
+  // Ogni menu si costruisce da qui. Un verbo nuovo del tasto destro entra qui con la sua icona: la sentinella
+  // (tests/unit/azioniDelMenu.test.mjs) vuole icona e nome, icone diverse e tasti diversi nello stesso menu.
+  const v = (nome, icona, tasto, verbo, parole = []) => Object.freeze({ nome, icona, tasto, verbo, parole: Object.freeze(parole) });
+  const VERBI = Object.freeze({
+    copy: v('Copia', 'copy', 'c', 'copiare', ['copia']),
+    cut: v('Taglia', 'cut', 'x', 'tagliare', ['taglia']),
+    paste: v('Incolla', 'clipboard', 'v', 'incollare', ['incolla']),
+    search: v('Cerca', 'search', 'f', 'cercare', ['cerca']),
+    translate: v('Traduci', 'translate', 't', 'tradurre', ['traduci']),
+    readAloud: v('Leggi', 'readAloud', 'l', 'leggere ad alta voce', ['leggi', 'ascolta']),
+    dictate: v('Detta', 'mic', 'd', 'dettare', ['detta', 'parla']),
+    edit: v('Modifica', 'pencil', 'e', 'modificare', ['modifica', 'correggi']),
+    valuta: v('Valuta', 'checklist', 'u', 'valutare', ['valuta']),
+    correggiTutti: v('Correggi tutto', 'check', 'a', 'correggere', []),
+    controlla: v('Controlla', 'readDocument', 'k', 'controllare', ['controlla']),
+    annullaCorrezione: v('Annulla', 'undo', 'z', 'annullare', ['annulla']),
+    bold: v('Grassetto', 'bold', 'b', 'mettere in grassetto'),
+    italic: v('Corsivo', 'italic', 'i', 'mettere in corsivo'),
+    underline: v('Sottolinea', 'underline', 'u', 'sottolineare', ['sottolinea']),
+    link: v('Collega', 'link', 'k', 'collegare', ['collega']),
+    highlight: v('Evidenzia', 'highlight', 'g', 'evidenziare', ['evidenzia']),
+    strike: v('Barrato', 'strike', 'w', 'barrare', ['barra']),
+    clear: v('Togli stile', 'eraser', 'y', 'togliere la formattazione'),
+    save: v('Salva', 'download', 's', 'salvare', ['salva', 'scarica']),
+    openTab: v('Apri', 'openTab', 'a', 'aprire', ['apri', 'vai', 'avvia']),
+    ask: v('Chiedi', 'sparkles', 'k', 'chiedere a Filo', ['chiedi', 'spiega', 'spiegami']),
+    transcribe: v('Trascrivi', 'transcribe', 'r', 'trascrivere', ['trascrivi']),
+    saveForLater: v('Per dopo', 'saveForLater', 'd', 'tenere per dopo'),
+    share: v('Condividi', 'share', 'p', 'condividere', ['condividi', 'invia']),
+    redeemInvite: v('Invito', 'gift', 'u', 'usare l\'invito', ['usa', 'regala']),
+    playPause: v('Riproduci', 'play', 'k', 'riprodurre', ['riproduci', 'riprendi']),
+    mute: v('Audio', 'volume', 'm', 'accendere o spegnere l\'audio'),
+    speed: v('Velocità', 'timer', 'e', 'cambiare la velocità'),
+    loop: v('Ripeti', 'repeat', 'r', 'ripetere in continuo', ['ripeti']),
+    pip: v('Finestra mobile', 'pip', 'i', 'staccare in una finestra mobile'),
+    controls: v('Controlli', 'sliders', 'o', 'mostrare i controlli'),
+    help: v('Aiuto', 'help', 'h', 'chiedere aiuto', ['aiuto']),
+    stopReading: v('Ferma lettura', 'stopReading', 'q', 'fermare la lettura'),
+    showOriginal: v('Originale', 'showOriginal', 'o', 'tornare al testo originale'),
+    zoom: v('Dimensione', 'zoomPagina', '0', 'cambiare la dimensione'),
+    siteMenu: v('Menu del sito', 'list', 'n', 'aprire il menu del sito'),
+    feedback: v('Feedback', 'feedback', 'j', 'mandare un feedback', ['segnala']),
+    filoOff: v('Spegni Filo', 'power', '8', 'spegnere Filo', ['spegni', 'accendi']),
+    redteam: v('Red-team', 'redteam', '7', 'inviare un attacco'),
+    cookie: v('Cookie', 'cookie', '6', 'decidere i cookie'),
+    // Le voci delle pagine di Filo e dei loro menu: si riconoscono dalla prima parola dell'etichetta.
+    reply: v('Rispondi', 'reply', 'r', 'rispondere', ['rispondi']),
+    quote: v('Cita', 'quote', 'q', 'citare', ['cita']),
+    undo: v('Annulla', 'undo', 'z', 'annullare', ['annulla']),
+    redo: v('Rifai', 'redo', 'y', 'rifare', ['rifai']),
+    hide: v('Nascondi', 'eyeOff', 'h', 'nascondere', ['nascondi', 'ripiega', 'chiudi lo', 'chiudi le']),
+    show: v('Mostra', 'eye', 'o', 'mostrare', ['mostra', 'srotola', 'riapri la chat']),
+    remove: v('Togli', 'remove', 't', 'togliere', ['togli', 'rimuovi', 'non tenerla', 'scollega', 'non scaricare']),
+    delete: v('Elimina', 'trash', 'x', 'eliminare', ['elimina', 'cancella', 'dimentica', 'svuota']),
+    putBack: v('Rimetti', 'putBack', 'b', 'rimettere', ['rimetti', 'riavvolgi']),
+    rename: v('Rinomina', 'rename', 'n', 'rinominare', ['rinomina']),
+    duplicate: v('Duplica', 'duplicate', 'u', 'duplicare', ['duplica']),
+    move: v('Sposta', 'move', 'm', 'spostare', ['sposta']),
+    export: v('Esporta', 'export', 'e', 'esportare', ['esporta']),
+    stop: v('Ferma', 'stop', 's', 'fermare', ['ferma', 'pausa', 'annulla invio', 'interrompi']),
+    run: v('Esegui', 'run', 'g', 'eseguire', ['esegui']),
+    reload: v('Rileggi', 'reload', 'l', 'rileggere', ['rileggi', 'ricarica', 'rigenera', 'aggiorna']),
+    keep: v('Tieni', 'pin', 'p', 'tenere', ['tieni', 'tienila', 'imposta come', 'metti']),
+    add: v('Aggiungi', 'plus', 'w', 'aggiungere', ['aggiungi', 'collega']),
+    close: v('Chiudi', 'close', 'c', 'chiudere', ['chiudi', 'salta']),
+    folder: v('Cartella', 'folder', 'f', 'aprire la cartella', ['mostra nella cartella', 'apri cartella', 'apri la cartella']),
+    settings: v('Regola', 'options', 'j', 'regolare', ['regola', 'impostazioni', 'impostazione']),
+    lock: v('Blocca', 'lock', 'k', 'tenere aperto', ['tieni aperto', 'blocca', 'sblocca']),
+    sendIt: v('Invia', 'mailSend', 'i', 'inviare da solo', ['✓ invia', 'invia da solo']),
+    leaveText: v('Lascia', 'typeText', 'l', 'lasciare il testo', ['lascia']),
+    later: v('Rimanda', 'alarm', 'd', 'rimandare', ['rimanda', 'riprendi dopo']),
+    gift: v('Regala', 'gift', 'g', 'regalare', ['regala']),
+    favorite: v('Preferito', 'pin', 'p', 'tenere fra i preferiti', ['preferit', 'tra i preferiti', 'fra i preferiti']),
+    more: v('Altro', 'list', 'w', 'fare altro'),
   });
 
-  // Un'immagine o un filmato dentro un collegamento (un'anteprima) è anche il collegamento: le sue azioni ci sono solo lì.
-  const DEL_COLLEGAMENTO = Object.freeze({ openTab: ['openTab', 'menu_open_in_new_tab'], linkCopy: ['copy', 'menu_copy_link'] });
-  // Disegno ed etichetta di ogni azione di contesto; chi le esegue sta nel content script (src/content/menuIcons.js).
-  const DISEGNI = Object.freeze({
-    scrivibile: { bold: ['bold', 'fila_bold'], italic: ['italic', 'fila_italic'], underline: ['underline', 'fila_underline'],
-      link: ['link', 'fila_link'], highlight: ['highlight', 'fila_highlight'], strike: ['strike', 'fila_strike'],
-      clear: ['eraser', 'fila_clear'], cut: ['cut', 'menu_cut'], copy: ['copy', 'menu_copy'], search: ['search', 'menu_search_text'] },
-    campo: { cut: ['cut', 'menu_cut'], copy: ['copy', 'menu_copy'], paste: ['clipboard', 'menu_paste'], search: ['search', 'menu_search_text'] },
-    testo: { copy: ['copy', 'menu_copy'], translate: ['translate', 'fila_translate'], search: ['search', 'menu_search_text'],
-      readAloud: ['readAloud', 'menu_read_aloud'] },
-    immagine: { save: ['download', 'menu_save_image_as'], copy: ['copy', 'menu_copy_image'], ask: ['sparkles', 'fila_ask_image'],
-      copyLink: ['link', 'menu_copy_image_link'], search: ['search', 'menu_search_image'], transcribe: ['transcribe', 'menu_transcribe'],
-      ...DEL_COLLEGAMENTO },
-    link: { openTab: ['openTab', 'menu_open_in_new_tab'], copy: ['copy', 'menu_copy_link'],
-      saveForLater: ['saveForLater', 'menu_save_link_for_later'], share: ['share', 'menu_share_link'] },
-    // Il disegno e il nome di qui valgono per trascinarle e per la chat; aperta sul filmato, l'icona dice il suo stato.
-    media: { playPause: ['play', 'fila_media_play'], mute: ['volumeMute', 'menu_media_mute'], save: ['download', 'fila_media_save'],
-      loop: ['repeat', 'menu_media_loop'], pip: ['pip', 'menu_media_pip'], copyLink: ['link', 'fila_media_copy_link'],
-      ...DEL_COLLEGAMENTO },
-    cursore: { paste: ['clipboard', 'menu_paste'], dictate: ['mic', 'menu_dictate'] },
-    pagina: {},
+  // Come si dice l'oggetto su cui agisce un'azione, nella riga del nome («Copia · il collegamento · C»).
+  const OGGETTI = Object.freeze({
+    selezione: 'la selezione', campo: 'il campo', immagine: 'l\'immagine', indirizzoImmagine: 'l\'indirizzo dell\'immagine',
+    link: 'il collegamento', file: 'il file del collegamento', media: 'il filmato', indirizzoMedia: 'l\'indirizzo del filmato',
+    pagina: 'la pagina', sito: 'il sito', lettura: 'la lettura', riquadro: 'il riquadro', elemento: 'l\'elemento',
+  });
+
+  // Su ogni elemento, quando possono servire: compaiono solo se qui si possono fare (Aiuto acceso, una lettura in corso…).
+  // Dietro il «+» per scelta dell'owner: la dimensione della pagina, i controlli del filmato, il red-team.
+  const COMUNI = Object.freeze({
+    fila: Object.freeze(['siteMenu', 'cookie', 'stopReading', 'showOriginal', 'help']),
+    altro: Object.freeze(['feedback', 'zoom', 'filoOff', 'redteam']),
+    oggetti: Object.freeze({ siteMenu: ['sito'], cookie: ['riquadro'], stopReading: ['lettura'], showOriginal: ['pagina'],
+      help: ['elemento'], feedback: ['pagina'], zoom: ['pagina'], filoOff: ['sito'], redteam: ['pagina'] }),
+  });
+
+  // Un contesto per ogni tipo di elemento sotto il mouse (#1434): `fila` la griglia di partenza, `altro` il suo «+».
+  // `oggetti`: per verbo, su cosa agisce in ordine di probabilità; il primo è il clic, gli altri le varianti nel menu
+  // dell'icona (quando l'elemento le ha). Un'azione di un contesto resta nel suo contesto; un'icona della barra va ovunque,
+  // in un posto solo. `su`: come lo dice una frase. L'ordine è fisso (quello dall'uso è il pacchetto 2).
+  const contesto = (su, fila, altro, oggetti) => Object.freeze({
+    su, fila: Object.freeze([...fila, ...COMUNI.fila]), altro: Object.freeze([...altro, ...COMUNI.altro]),
+    oggetti: Object.freeze({ ...COMUNI.oggetti, ...oggetti }),
+  });
+  const SEL = ['selezione'];
+  const SCRITTURA = { cut: SEL, copy: SEL, paste: ['campo'], search: SEL, readAloud: SEL, dictate: ['campo'], edit: SEL,
+    valuta: ['campo'], correggiTutti: ['campo'], controlla: ['campo'], annullaCorrezione: ['campo'] };
+  const DEL_LINK = { saveForLater: ['link'], share: ['link'], redeemInvite: ['link'] };
+  const CONTESTI = Object.freeze({
+    scrivibile: contesto('sul testo selezionato mentre scrivi',
+      ['bold', 'italic', 'underline', 'link', 'highlight', 'cut', 'copy', 'paste', 'annullaCorrezione', 'correggiTutti'],
+      ['strike', 'clear', 'search', 'readAloud', 'dictate', 'edit', 'valuta', 'controlla'],
+      { ...SCRITTURA, bold: SEL, italic: SEL, underline: SEL, link: SEL, highlight: SEL, strike: SEL, clear: SEL }),
+    campo: contesto('sul testo selezionato in una casella',
+      ['cut', 'copy', 'paste', 'dictate', 'edit', 'annullaCorrezione', 'correggiTutti'],
+      ['search', 'readAloud', 'valuta', 'controlla'], SCRITTURA),
+    testo: contesto('sul testo selezionato', ['copy', 'translate', 'search', 'readAloud'], [],
+      { copy: SEL, translate: SEL, search: SEL, readAloud: SEL }),
+    immagine: contesto('su un\'immagine', ['redeemInvite', 'save', 'copy', 'openTab', 'ask', 'search'], ['transcribe', 'saveForLater', 'share'],
+      { ...DEL_LINK, save: ['immagine', 'file'], copy: ['immagine', 'indirizzoImmagine', 'link'], openTab: ['link'], ask: ['immagine'],
+        search: ['immagine'], transcribe: ['immagine'] }),
+    link: contesto('su un collegamento', ['redeemInvite', 'openTab', 'copy', 'save', 'saveForLater', 'share'], [],
+      { ...DEL_LINK, openTab: ['link'], copy: ['link'], save: ['file'] }),
+    media: contesto('su un filmato o un audio', ['playPause', 'mute', 'speed', 'save', 'openTab', 'copy'],
+      ['loop', 'pip', 'controls', 'redeemInvite', 'saveForLater', 'share'],
+      { ...DEL_LINK, playPause: ['media'], mute: ['media'], speed: ['media'], loop: ['media'], pip: ['media'], controls: ['media'],
+        save: ['media', 'file'], openTab: ['link'], copy: ['indirizzoMedia', 'link'] }),
+    cursore: contesto('in un campo dove scrivi, senza selezione', ['paste', 'dictate', 'annullaCorrezione', 'correggiTutti'], ['valuta', 'controlla'],
+      SCRITTURA),
+    pagina: contesto('sulla pagina', [], [], {}),
   });
 
   // Le azioni di contesto per id `<contesto>:<azione>`: fuori da ICONE, che è il catalogo della barra (e dei contatori).
-  const AZIONI = Object.freeze(Object.fromEntries(Object.entries(DISEGNI).flatMap(([ctx, voci]) => Object.entries(voci)
-    .map(([azione, [icona, etichetta]]) => [`${ctx}:${azione}`, Object.freeze({ icona, etichetta, tipo: 'contesto', contesto: ctx, azione })]))));
+  const AZIONI = Object.freeze(Object.fromEntries(Object.entries(CONTESTI).flatMap(([ctx, c]) => [...c.fila, ...c.altro]
+    .map((azione) => [`${ctx}:${azione}`, Object.freeze({ icona: VERBI[azione].icona, nome: VERBI[azione].nome, etichetta: VERBI[azione].nome,
+      tipo: 'contesto', contesto: ctx, azione, oggetti: Object.freeze([...(c.oggetti[azione] || ['elemento'])]) })]))));
+
+  // Una voce scritta (le pagine di Filo danno etichette, non verbi): il verbo dalla sua prima parola, o dalle prime
+  // parole se il verbo ne ha più d'una; il resto è l'oggetto. `null` se nessun verbo la riconosce.
+  const PAROLE = Object.freeze(Object.entries(VERBI).flatMap(([id, d]) => d.parole.map((p) => [p, id]))
+    .sort((a, b) => b[0].length - a[0].length));
+  const pulita = (s) => String(s || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+  function verboDellEtichetta(etichetta) {
+    const t = pulita(etichetta);
+    const basso = t.toLowerCase();
+    for (const [p, id] of PAROLE) {
+      if (!basso.startsWith(p)) continue;
+      const dopo = basso.charAt(p.length);
+      // «Copia» sì, «Copiature» no; una parola di più parole («tieni aperto») vale intera, e le spezzate («preferit») no.
+      if (dopo && /[a-zà-ù]/i.test(dopo) && !p.endsWith('preferit')) continue;
+      const resto = t.slice(p.length).replace(/^[\s·:,–—-]+/, '').trim();
+      return { verbo: id, oggetto: resto };
+    }
+    return null;
+  }
 
   const zonaFila = (ctx) => `fila:${ctx}`;
   const zonaAltro = (ctx) => `altro:${ctx}`;
