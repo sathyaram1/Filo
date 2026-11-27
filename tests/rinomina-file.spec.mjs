@@ -519,7 +519,7 @@ test('in chat, chiuso il riquadro, «Rimetti il nome di prima» dal tasto destro
     await chip.click({ button: 'right' });
     await rinominaEChiudi(page);
     await chip.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Rimetti il nome di prima' }).click();
+    await menuDi(page).scegli('Rimetti il nome di prima');
     await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText('Nome di prima rimesso: scan_00231.pdf');
     expect(readdirSync(dir)).toEqual(['scan_00231.pdf']);
     await expect(chip).toHaveAttribute('data-percorso', trovato);
@@ -541,7 +541,7 @@ test('in chat, chiuso il riquadro, «Rimetti il nome di prima» dal tasto destro
     await rinominaEChiudi(page);
     await expect(trascinato).toHaveText(/Bolletta luce Enel Marzo 2026\.pdf/);
     await trascinato.click({ button: 'right' });
-    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Rimetti il nome di prima' }).click();
+    await menuDi(page).scegli('Rimetti il nome di prima');
     await expect(trascinato).toHaveText(/scan_00231\.pdf/);
     expect(readdirSync(dir)).toEqual(['scan_00231.pdf']);
   } finally {
