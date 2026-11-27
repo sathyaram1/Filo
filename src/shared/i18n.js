@@ -270,7 +270,7 @@
     popup_transcribe_video_title: 'Trascrizione del video',
     popup_transcribe_reading: 'Leggo l\'audio…',
     popup_transcribe_progress: 'Trascrivo: %s di %s',
-    popup_transcribe_duration: 'durata %s',
+    popup_transcribe_duration: 'Durata %s',
     popup_transcribe_empty: 'Nell\'audio non si sente parlato.',
     popup_transcribe_prompt: 'Questa è la trascrizione di un audio della pagina %s. Rispondi alle domande che seguono su di lei.',
     popup_close: 'Chiudi',
