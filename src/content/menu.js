@@ -629,48 +629,6 @@
         root.appendChild(wrap);
         continue;
       }
-      if (it.type === 'paste') {
-        const wrap = document.createElement('div');
-        wrap.className = 'sn-menu-paste';
-        if (it.disabled) wrap.classList.add('sn-disabled');
-
-        const main = document.createElement('button');
-        main.type = 'button';
-        main.className = 'sn-menu-paste-main';
-        main.disabled = !!it.disabled;
-        const lbl = document.createElement('span');
-        lbl.className = 'sn-menu-label';
-        lbl.textContent = it.label;
-        main.appendChild(lbl);
-        if (it.shortcut) {
-          const sc = document.createElement('span');
-          sc.className = 'sn-menu-shortcut';
-          sc.textContent = it.shortcut;
-          main.appendChild(sc);
-        }
-        if (!it.disabled) {
-          main.addEventListener('click', () => {
-            close();
-            try { it.onClick && it.onClick(); } catch (e) { console.error(e); }
-          });
-        }
-
-        const arrow = document.createElement('button');
-        arrow.type = 'button';
-        arrow.className = 'sn-menu-paste-arrow';
-        arrow.title = I18n.t('menu_paste_history');
-        arrow.textContent = '▾';
-        setupArrowSubmenu(arrow, () => openSubmenu(arrow, it.history || [], {
-          onPick: it.onPickHistory,
-          onRemove: it.onRemoveHistory,
-          onClear: it.onClearHistory,
-        }), cleanups);
-
-        wrap.appendChild(main);
-        wrap.appendChild(arrow);
-        root.appendChild(wrap);
-        continue;
-      }
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'sn-menu-item';
