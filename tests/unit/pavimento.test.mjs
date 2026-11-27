@@ -681,7 +681,8 @@ test('#2678.13: la riga può continuare dopo la nota, con un segno o dopo un\'em
 // La nota si cerca solo nella coda della riga: da ogni punto di una riga lunga piena di emoji o di parentesi la ricerca
 // costerebbe secondi (cresce col quadrato della lunghezza), su ogni chiamata a un modello.
 test('#2678.13: una riga lunghissima di emoji o di parentesi dopo «Password:» si controlla in fretta', () => {
-  for (const coda of [' 😊'.repeat(20000), ' 😊 (a)'.repeat(10000), ' (a)'.repeat(20000), ' [a]'.repeat(20000), ' ('.repeat(20000)]) {
+  // Le code che finiscono con una parola fanno fallire la ricerca da ogni punto: senza il limite costano secondi.
+  for (const coda of [' (a)'.repeat(20000) + ' x', ' [a]'.repeat(20000) + ' x', ' 😊'.repeat(20000), ' ('.repeat(20000)]) {
     const s = `Password: casa mia al mare${coda}`;
     const c = costoInUnita(() => P.oscura(s), { tetto: 60 });
     assert.ok(c.entro, `${coda.slice(0, 4)}: ${c.come}`);
