@@ -26,12 +26,10 @@ async function preparaModelli(app) {
       globalThis.__versoIlModello.push(...texts);
       return { vectors: texts.map((t) => (/referto/i.test(t) ? [1, 0] : [0, 1])) };
     };
-    const prima = globalThis.SN_PROVIDERS.completeWithFallback;
     globalThis.SN_PROVIDERS.completeWithFallback = async (...a) => {
       globalThis.__versoIlModello.push(JSON.stringify(a[0] && (a[0].messages || a[0].prompt || a[0])));
       return { text: '', provider: 'openrouter', model: 'stub', usage: {} };
     };
-    globalThis.__primaCompl = prima;
   });
 }
 
