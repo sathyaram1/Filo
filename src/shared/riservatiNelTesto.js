@@ -108,7 +108,7 @@ const DEL_VALORE = /[^\s<>:：|&]/u;
 // spazi (non separano più l'etichetta dal suo valore). Le regole girano su tutte e due le letture (vistePerLeRegole).
 const COMMENTO = /(<|&lt;)!--((?:(?!(?:<|&lt;)!--)[\s\S])*?)--(>|&gt;)/g;
 const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repeat(apre.length + 3) + dentro + ' '.repeat(fine.length + 2))
-  .replace(VERSO_CELLA, ' ')
+  .replace(VERSO_CELLA, (w) => w.replace(/[\r\n]/g, ' '))
   .replace(TAG_HTML, (tag, apre, chiude, nome, attributi, fine, k, tutto) => {
     if (DEL_VALORE.test(tutto[k - 1] || '') && DEL_VALORE.test(tutto[k + tag.length] || '')) return tag;
     const segno = chiude ? ' ' : A_CAPO.test(nome) ? '\n' : /^t[dh]$/i.test(nome) ? '|' : ' ';
