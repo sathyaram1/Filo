@@ -207,6 +207,7 @@ test.describe('il menu nello strato', () => {
     await page.locator('#campo').click({ button: 'right' });
     await apertoNelloStrato(app, page);
     await menu.incolla.click({ button: 'right' });
+    await expect.poll(async () => ((await statoCronologia(app, page))?.voci || []).length).toBeGreaterThan(0);
     const s3 = await cronologiaPronta(app, page);
     expect(s3.voci.map((v) => v.testo)).not.toContain('codice-banca-1054');
     expect((await page.evaluate(() => window.__letti.join(' | ')))).not.toContain('codice-banca-1054');
