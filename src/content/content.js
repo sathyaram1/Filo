@@ -2281,7 +2281,7 @@
     Object.assign(contesto, { mouse, minimoCorreggi });
     // Solo a chi ha un codice Red Team (#991), e in pausa (#896) solo se lo vede. Si richiede a ogni apertura: vale dalla successiva.
     refreshVoceAttacco();
-    const fila = filaContestuale(contesto, { selInfo, target, clipboardHistory, sito, scritte: vociDellaPagina(target) });
+    const fila = filaContestuale(contesto, { selInfo, target, clipboardHistory, sito, scritte: [...scritte, ...vociDellaPagina(target)] });
     if (fila) items.unshift(fila);
     return items;
   }
