@@ -6,6 +6,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Rinomina il mazzo aperto nel Builder passando dallo switcher (§8.2):
 // click sul nome → "Rinomina…" → campo di modifica → Invio.
