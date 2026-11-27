@@ -34,22 +34,16 @@ export function menuDi(scheda) {
   const voce = (testo) => locator('.sn-menu-item, .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)', { hasText: testo });
   const piu = locator('.sn-menu-griglia .sn-menu-row-overflow');
   // Il gesto dell'utente: un'azione rara sta dietro il «+», e prima di cliccarla si apre il «+» (#2555).
-  async function scegli(testo, opzioni) {
-    const v = voce(testo).first();
+  async function scegli(icona, opzioni) {
+    const v = typeof icona === 'string' ? voce(icona).first() : icona;
     await v.waitFor({ state: 'attached' });
     if (!(await v.isVisible()) && await v.evaluate((b) => !!b.closest('.sn-menu-altro'))) await piu.click();
     await v.click(opzioni);
   }
   // Una variante sta nel menu della sua icona, che si apre col tasto destro sull'icona.
   async function variante(icona, testo) {
-    await scegliIcona(icona, { button: 'right' });
+    await scegli(icona, { button: 'right' });
     await locator('.sn-menu-sub .sn-menu-item', { hasText: testo }).first().click();
-  }
-  async function scegliIcona(icona, opzioni) {
-    const v = typeof icona === 'string' ? voce(icona).first() : icona;
-    await v.waitFor({ state: 'attached' });
-    if (!(await v.isVisible()) && await v.evaluate((b) => !!b.closest('.sn-menu-altro'))) await piu.click();
-    await v.click(opzioni);
   }
   return {
     superficie,
