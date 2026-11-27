@@ -1,15 +1,12 @@
 // La metà della mappa prova → file che sta nelle pagine (#2502): ogni Electron aperto da una prova porta il nome della
-// prova al suo main (src/main/copertura.js, che ha la regola) e qui si registrano le funzioni eseguite dalle pagine.
+// prova al suo main e qui si registrano le funzioni eseguite dalle pagine, con la regola che passa chi accende.
 // Acceso solo da FILO_COPERTURA (playwright.config.js); il formato lo legge scripts/lib/mappaProve.mjs.
 
 import { _electron, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, dirname } from 'node:path';
-// Quando una funzione conta come eseguita lo dice il main, per tutti e due i lati della mappa.
-import regolaDelMain from '../../src/main/copertura.js';
 
 const OGNI_MS = 1000;
-const regola = () => regolaDelMain;
 
 /** Il nome della prova in corsa, relativo al repo (la cartella della config) e a barre normali; vuoto fuori da una prova. */
 function provaInCorsa() {
