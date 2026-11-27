@@ -320,8 +320,10 @@
   // Sul posto, senza chiudere il menu: chi riordina continua a riordinare. Serve anche quando cambia lo stato che
   // decide il NOME di un'icona mentre il menu è sotto gli occhi (lo schermo intero spento da un'altra strada, #514), o
   // il valore girato con la rotella. `azioni` nuove, se lo stato dell'elemento è cambiato.
+  let rifacitore = null;
   function ridisegna(azioni) {
     if (!aperta || !Menu.isOpen?.()) return;
+    if (!azioni && rifacitore) { try { azioni = rifacitore(); } catch (_) { azioni = null; } }
     if (azioni && typeof azioni === 'object') aperta.azioni = azioni;
     const c = costruisci();
     if (!c) return;
