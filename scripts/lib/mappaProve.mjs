@@ -124,6 +124,9 @@ export function costruisciMappa({ registrazioni, sorgente, root, durate = new Ma
     if (!righe) return;
     let funzioni = perFile.get(rel);
     if (!funzioni) perFile.set(rel, (funzioni = new Map()));
+    let chiCarica = caricati.get(rel);
+    if (!chiCarica) caricati.set(rel, (chiCarica = new Set()));
+    chiCarica.add(p);
     for (const [da, a] of intervalli || []) {
       const chiave = `${rigaDi(righe, da)}:${rigaDi(righe, Math.max(da, a - 1))}`;
       let chi = funzioni.get(chiave);
