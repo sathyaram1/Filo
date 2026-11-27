@@ -222,9 +222,8 @@
   color: var(--sn-muted);
   opacity: 0.4;
 }
-/* Il «+» non è un'azione: più sottile, e diviso dalle icone. */
+/* Il «+» non è un'azione: più tenue delle icone. */
 .sn-menu-row-btn.sn-menu-row-overflow {
-  flex: 0 0 30px;
   color: var(--sn-muted);
 }
 .sn-menu-row-btn.sn-menu-row-overflow:hover { color: var(--sn-fg); }
