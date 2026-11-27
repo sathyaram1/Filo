@@ -242,6 +242,9 @@
 
   function openCtxMenu(x, y, r) {
     closeCtxMenu();
+    // A icone come il tasto destro di Filo (#2555); il riquadro qui sotto dove il menu di Filo non c'è.
+    const I = window.SN_MENU_ICONS;
+    if (I && I.apriVoci && I.apriVoci({ x, y, voci: menuActionsFor(r).map(([label, fn]) => ({ label, onClick: fn })) })) return;
     scorsoDopo = window.SN_MENU?.fotoDelloScorrimento?.(x, y) || (() => true);
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop dl-ctxmenu';
