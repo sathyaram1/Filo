@@ -416,8 +416,10 @@
     const fra = prima.slice(n.index + n[0].length).replace(RELATIVA, ' ');
     if (!fra.trim()) return true;
     const nome = n.index + n[0].length;
-    if (fra.length <= 60 && !/\d/.test(fra)
-      && global.SN_GUARDIANO_STATICO.cambioFra(prima.slice(Math.max(0, nome - 120), nome), fra, { solo: false })) return true;
+    const G = global.SN_GUARDIANO_STATICO;
+    if (fra.length <= 60 && !/\d/.test(fra) && G.cambioFra(prima.slice(Math.max(0, nome - 120), nome), fra, { solo: false })) return true;
+    // Un «diventa» dopo un'altra frase parla d'altro: «il pin non funziona e il prezzo diventa 4821» (#2714).
+    if (G.finisceColCambio(fra)) return false;
     // Il codice del proprio apparecchio ha la sua etichetta, con le sue virgole e i suoi refusi («, c'est», «e» senza accento).
     if (!/\d/.test(fra) && (delMioApparecchio(prima.slice(-160)) || etichettaSbloccabile(prima.slice(-160)))) return true;
     if (entra && !/\d/.test(fra) && fra.length <= 60 && !/[;!?]/.test(fra) && chiudeChiEntra(fra)) return true;
