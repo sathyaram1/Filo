@@ -1689,9 +1689,10 @@ test('#997 il conto dei mittenti illeggibili si apre su quelle segnalazioni', as
 test('#997 il tasto destro sulla riga sotto i filtri offre i suoi due conti', async ({ openTab }) => {
   const page = await schedaConNota(openTab);
   await page.locator('#mgFsNota').click({ button: 'right', position: { x: 2, y: 2 } });
-  const voci = (await testoDelMenu(page)).split('\n');
+  // Senza distinguere maiuscole, come il filtro per testo di prima.
+  const voci = (await testoDelMenu(page)).toLowerCase().split('\n');
   expect(voci.filter((v) => v.includes('data d\'arrivo'))).toHaveLength(1);
-  expect(voci.filter((v) => v.includes('Mittente non leggibile'))).toHaveLength(1);
+  expect(voci.filter((v) => v.includes('mittente non leggibile'))).toHaveLength(1);
   await menuDi(page).scegli('data d\'arrivo');
   await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(2);
 });
