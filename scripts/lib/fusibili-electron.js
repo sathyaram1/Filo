@@ -76,8 +76,8 @@ function spegniPrivilegiFile(eseguibile, { firma = false, piattaforma = process.
     for (const p of posizioni(fd, file)) fs.writeSync(fd, Buffer.from([SPENTO]), 0, 1, p);
   } finally { fs.closeSync(fd); }
   if (privilegiFile(eseguibile) !== 'spento') throw new Error(`il fusibile in ${file} non si è spento`);
-  if (firma && piattaforma === 'darwin' && file !== eseguibile) {
-    const app = String(eseguibile).endsWith('.app') ? eseguibile : String(eseguibile).split(/[\\/]Contents[\\/]MacOS[\\/]/)[0];
+  const app = appDelMac(eseguibile);
+  if (firma && piattaforma === 'darwin' && app) {
     const r = spawnSync('codesign', ['--sign', '-', '--force', '--preserve-metadata=entitlements,requirements,flags,runtime', '--deep', app], { encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`firma locale dopo il fusibile non riuscita: ${(r.stderr || r.error || '').toString().trim()}`);
   }
