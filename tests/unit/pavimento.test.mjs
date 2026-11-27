@@ -1232,6 +1232,7 @@ test('il valore sotto l\'etichetta col segno d\'elenco o di citazione davanti, o
     ['Password:', '• Nyckel!2024'], ['Password:', '1. Nyckel!2024'], ['Password:', '> Nyckel!2024'], ['> Password:', '> Nyckel!2024'],
     ['> **Password:**', '> > Nyckel!2024'], ['- Password:', '  - Nyckel!2024'], ['Password =', 'Nyckel!2024'],
     ['Password:', '"Nyckel 2024 casa"'], ['Password:', '«Nyckel 2024 casa»'], ['Password:', '- "Nyckel 2024 casa"'],
+    ['Password:', 'Nyckel 2024 casa'], ['Password:', '- Nyckel 2024 casa'],
   ];
   for (const a of OGNI_A_CAPO) {
     for (const [etichetta, riga] of forme) {
