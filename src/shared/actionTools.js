@@ -382,6 +382,11 @@
       description: 'il testo di una pagina (url, o scheda aperta per numero), anche le parti chiuse; da: il seguito.',
       properties: { url: S(), scheda: I(), da: I(), cerca_nel_sito: S() }, required: [],
     },
+    TRASCRIVI_MEDIA: {
+      via: ['web', 'trascrivi'], risultato: true,
+      description: 'il parlato di un audio o un video (url di un file o di una pagina che lo contiene, o scheda aperta per numero); da: il seguito.',
+      properties: { url: S(), scheda: I(), da: I() }, required: [],
+    },
 
     // ── memoria ──
     SALVA_LEZIONE: {
