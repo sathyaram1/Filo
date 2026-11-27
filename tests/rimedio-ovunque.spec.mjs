@@ -618,7 +618,7 @@ test('«Leggi» coi crediti finiti porta ai Crediti; col modello che vuole il no
       const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
     });
     await page.locator('#t').click({ button: 'right' });
-    await menuDi(page).locator('.sn-menu-label', { hasText: 'Leggi' }).first().click();
+    await menuDi(page).scegli('Leggi');
   };
 
   await leggi();
