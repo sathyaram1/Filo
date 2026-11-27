@@ -932,7 +932,7 @@ function trascrizioniForPrompt(actions) {
     const seguito = Number.isFinite(out.seguito)
       ? `\n[La trascrizione continua: il seguito con web(trascrivi), lo stesso url e da: ${out.seguito}.]` : '';
     blocks.push(`[Trascrizione del parlato di un audio o un video (${dove}, durata ${out.durata || '?'}, ${out.pezzi || 1} pezzi)]\n`
-      + E.imbustaCampi({ tipo: 'PAGINA_WEB', campi: { Indirizzo: indirizzo }, corpo: String(out.trascrizione), conIntestazione: true })
+      + E.imbustaCampi({ tipo: 'PAGINA_WEB', campi: { Indirizzo: indirizzo }, corpo: String(out.trascrizione), conIntestazione: true, max: PageRead.MAX_TEXT_CHARS + 4000 })
       + seguito);
   }
   return blocks.join('\n\n');
