@@ -147,3 +147,28 @@ test('#2695.1: nella riga di una tabella ogni etichetta, non solo la password, t
     assert.equal(alCorrettore(riga), riga, `correttore: ${riga}`);
   }
 });
+
+test('#2695.7: l\'etichetta in grassetto, in corsivo o fra tag HTML, coi due punti dentro, toglie il valore da tutti e due i cancelli', () => {
+  for (const [testo, v] of [
+    ['| **Password:** | Nyckel!2024 |', 'Nyckel!2024'], ['| *Password:* | Nyckel!2024 |', 'Nyckel!2024'],
+    ['**PIN:** 4821', '4821'], ['**CVV:** 123', '123'], ['*CVV:* 123', '123'],
+    ['<b>Password:</b> Nyckel!2024', 'Nyckel!2024'], ['<strong>Password:</strong> Nyckel!2024', 'Nyckel!2024'],
+    ['<b>PIN:</b> 4821', '4821'], ['<b>CVV:</b> 123', '123'], ['<i>CVV:</i> 123', '123'], ['<B>PIN:</B> 4821', '4821'],
+    ['| <b>Password:</b> | Nyckel!2024 |', 'Nyckel!2024'], ['<span class="k">Password:</span> Nyckel!2024', 'Nyckel!2024'],
+    ['**<b>CVV:</b>** 123', '123'], ['<b>**PIN:**</b> 4821', '4821'], ['<p>Password:</p> Nyckel!2024', 'Nyckel!2024'],
+    ['<tr><td>CVV:</td><td>123</td></tr>', '123'], ['Password:<br>Nyckel!2024', 'Nyckel!2024'],
+    ['Password: <b>Nyckel!2024</b>', 'Nyckel!2024'], ['Il <b>PIN</b> è 4821', '4821'],
+    ['<strong>Codice di sicurezza (CVV):</strong> 847', '847'],
+  ]) {
+    assert.equal(P.oscura(testo), testo.replace(v, S), `pavimento: ${testo}`);
+    assert.equal(alCorrettore(testo), testo.replace(v, S), `correttore: ${testo}`);
+  }
+  // Una password scritta fra parentesi angolari è una password, non un tag.
+  assert.equal(P.oscura('Password: <Nyckel2024>'), `Password: ${S}`);
+  // I tag non fanno di una spiegazione un valore.
+  for (const testo of ['<em>Password:</em> obbligatoria', '**Password:** almeno 8 caratteri', '<b>Nota:</b> la password è obbligatoria',
+    '<p>Ciao <b>Mario</b>, ci vediamo alle 5</p>']) {
+    assert.equal(P.oscura(testo), testo, `pavimento: ${testo}`);
+    assert.equal(alCorrettore(testo), testo, `correttore: ${testo}`);
+  }
+});
