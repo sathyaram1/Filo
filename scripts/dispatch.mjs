@@ -1437,7 +1437,24 @@ export function motivoRifiuto(r) {
   return detail ? `${reason}: ${detail}` : reason;
 }
 
-async function deliverToChannel(intent, data) {
+/**
+ * Cosa fa dispatch dopo la presa in carico (#2674): un no del server vuol dire che il ruolo non regge lo stato vero, e
+ * non si consegna. L'eccezione è la ripresa di un lavoro in verifica (rossi del ramo, risposta di processo, ramo vecchio
+ * sbloccato): lì `working` non si raggiunge per tabella, e la consegna in revisione il server la accetta. PURA.
+ * @returns {{ azione: 'lavora', statoVero?: string } | { azione: 'ferma', messaggio: string }}
+ */
+export function esitoDellaPresa(presa, { branch = '', ripresa = false } = {}) {
+  if (!presa || presa.outcome !== 'refused') return { azione: 'lavora' };
+  const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
+  if (presa.reason === 'branch_mismatch') {
+    return { azione: 'ferma', messaggio: `il server ha legato questo biglietto a un altro ramo e rifiuta la presa in carico su ${branch} (${motivo}): la consegna da qui verrebbe rifiutata, non si lavora` };
+  }
+  const daVerifica = /^(revision_capability|revision_security) → working$/.exec(String(presa.detail || '').trim());
+  if (ripresa && presa.reason === 'illegal_transition' && daVerifica) return { azione: 'lavora', statoVero: daVerifica[1] };
+  return { azione: 'ferma', messaggio: `il server rifiuta la presa in carico (${motivo}): il ruolo che dispatch consegnerebbe non regge lo stato vero del feedback, non si lavora` };
+}
+
+async function deliverToChannel(intent, data, { rifiutoAtteso = null } = {}) {
   const ticket = readRoutineTicket(ROOT);
   // Senza biglietto il server non viene nemmeno chiamato: dirlo con le parole
   // di un server giù ha già mandato un worker a diagnosticare per mezz'ora un
