@@ -117,14 +117,20 @@ const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repea
   })
   .replace(SPAZIO_HTML, (e) => ' '.repeat(e.length))
   .replace(DUE_PUNTI_HTML, (e) => ':' + ' '.repeat(e.length - 1));
-// Così i segni di blocco in testa alla riga (voce d'elenco, citazione, titolo) e le righe che aprono o chiudono un blocco
-// di codice: «Password:» e sotto «- Nyckel!2024» o «```» è la riga sotto l'etichetta (#2673.10). Un segno senza niente
-// dopo resta: le etichette rileggono all'indietro le file lunghe di spazi, e mille voci vuote le farebbero lente. Il
-// blocco di codice dentro una citazione o una voce («> ```») è una riga di segni sola, come senza.
-const SEGNO_BLOCCO = '(?:>[ \\t]*|(?:[-*+•]|\\d{1,9}[.)])[ \\t]+(?:\\[[ xX]\\][ \\t]+)?|#{1,6}[ \\t]+)';
-const BLOCCO = new RegExp(`^([ \\t]*)(${SEGNO_BLOCCO}*(?:\`{3,}|~{3,})[^\`\\n]*$|${SEGNO_BLOCCO}+(?=\\S))`, 'gmu');
+// I segni di blocco in testa alla riga (citazione, voce d'elenco, titolo, definizione) si leggono come spazi: «Password:»
+// e sotto «- x», «> x» o «: x» vale «Password:» e sotto «x»; la riga citata vuota («>») è una riga vuota (#2673.10).
+// Le righe di sola struttura (apertura o chiusura di un blocco di codice, riga di separazione, sottolineatura di un
+// titolo) si attaccano alla riga sopra: non sono righe fra l'etichetta e il valore. «```Nyckel2024» non è un'apertura.
+const SEGNO_BLOCCO = '(?:>[ \\t]*|(?:[-*+•](?:[ \\t]+|$)|\\d{1,9}[.)][ \\t]+)(?:\\[[ xX]\\][ \\t]+)?|#{1,6}(?:[ \\t]+|$)|:[ \\t]+)';
+const LINGUAGGIO = '(?:[a-z][a-z+#-]{0,19}|[A-Z][A-Z+#-]{0,19})\\d?(?:[ \\t][^\\n]*)?|\\{[^\\n]*';
+const STRUTTURA = `(?:(?:\`{3,}|~{3,})[ \\t]*(?:${LINGUAGGIO})?|(?:-[ \\t]*){3,}|(?:\\*[ \\t]*){3,}|(?:_[ \\t]*){3,}|=+)[ \\t]*`;
+const RIGA_DI_STRUTTURA = new RegExp(`(\\n?)^([ \\t]*${SEGNO_BLOCCO}*${STRUTTURA})$`, 'gmu');
+const BLOCCO = new RegExp(`^([ \\t]*)(${SEGNO_BLOCCO}+)`, 'gmu');
 const spazi = (s) => ' '.repeat(s.length);
-const senzaBlocchi = (s) => (/[-*+•>#`~.)]/.test(s) ? s.replace(BLOCCO, (_, rientro, segno) => rientro + spazi(segno)) : s);
+const senzaBlocchi = (s) => (/[-*+•>#`~.):=_]/.test(s)
+  ? s.replace(RIGA_DI_STRUTTURA, (_, aCapo, riga) => (aCapo ? ' ' : '') + spazi(riga))
+    .replace(BLOCCO, (_, rientro, segno) => rientro + spazi(segno))
+  : s);
 // Enfasi prima e dopo i tag: «**<b>CVV:</b>**» (#2695.7) la vuole prima, «&lt;b&gt;**PIN:**&lt;/b&gt;» dopo.
 const togliEnfasi = (s) => (/[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => spazi(segno) + dentro + spazi(segno)) : s);
 const senzaEnfasi = (t) => {
