@@ -671,6 +671,8 @@
       const password = !!n[3];
       const fine = n.index + n[0].length;
       const clausola = s.slice(Math.max(0, n.index - 80), n.index).split(/[.!?;,](?:\s|$)|\n/).pop();
+      // Il PIN di fabbrica sta sul manuale: non apre niente di nessuno (come per il pavimento).
+      if (PREDEFINITO_DEL_VALORE.test(clausola + s.slice(fine, fine + 60).split(/[.!?;](?:\s|$)|\n/)[0])) continue;
       let cambio = clausola.split(/[\s'’]+/).some((w) => UN_CAMBIO.test(w));
       let inglese = clausola.split(/[\s'’]+/).some((w) => CAMBIO_INGLESE.test(w));
       let presentato = false;
