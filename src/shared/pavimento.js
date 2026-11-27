@@ -13,14 +13,12 @@
   // del controllo delle uscite (#1403.33). Il «to» polacco sta accanto al nome che lo regge.
   if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
   const VERBO = `(?:${global.SN_GUARDIANO_STATICO.ANNUNCI.join('|')})`;
-  // Le lunghezze di PIN e CVV sono quelle del guardiano, che le usa anche per i numeri accanto in elenco.
-  const CIFRE_PIN = global.SN_GUARDIANO_STATICO.cifre('codice');
-  const CIFRE_DEL_CVV = global.SN_GUARDIANO_STATICO.cifre('cvv');
 
   // Il CVV al posto del valore, come la password: anche dopo una parentesi o nella cella; dopo altre parole («CVV code:»)
   // solo col separatore o il verbo davanti, perché una frase che nomina il CVV non ne è il valore.
-  // Come per la password il trattino o la freccia fra spazi («CVV — 123», #2681.2).
-  const TRATTINO = '[-–—→](?=[ \\t])';
+  // Il verbo è quello della password («Le CVV est 123»); il «to» polacco solo in una frase polacca (SEGNO_POLACCO).
+  // Dopo il verbo anche l'articolo («Il CVV è il 123», «Die Prüfnummer ist die 123»), e come per la password il trattino
+  // o la freccia fra spazi («CVV — 123», #2681.2).
   // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности».
   const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F';
   // Le parole che fanno polacca la frase, per il suo «to» dopo un nome che non è solo polacco come PIN e CVV («Mój PIN
@@ -28,30 +26,20 @@
   const POSSESSIVO_POLACCO = `(?:moj[${LETTERE}]*|mój|twoj[${LETTERE}]*|twój|swoj[${LETTERE}]*|swój|nasz[${LETTERE}]*|wasz[${LETTERE}]*)`;
   const SEGNO_POLACCO = `(?<![${LETTERE}])(?:${POSSESSIVO_POLACCO}|kod[${LETTERE}]*|numer[${LETTERE}]*|now(?:y|a|e|ego|ej|ym|ą)`
     + `|(?:tymczasow|jednorazow|tajn|poufn|prywatn|osobist|bankow)[${LETTERE}]*|kart(?:a|y|ę|ą|zie))(?![${LETTERE}])`;
-  // CVV_ALTRE_LINGUE (#2681.1) e NOMI_CVV (#1403.61) vanno ai campi dei moduli (da etichette() di campiSegreti.js);
-  // CVV_ALTRE_LINGUE anche agli indizi di pagamento (copia autonoma in safebrowseHints.js, uguale per
-  // tests/unit/cvvAltreLingue.test.mjs), coi separatori dei nomi di campo («codigo_de_seguridad»). Nel testo vale
-  // NOME_CVV, dove «Prüfnummer» da sola non è il CVV.
+  const VERBO_CVV = `(?:${VERBO}|(?<=${SEGNO_POLACCO}[^\\n]{0,40})to)(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?`;
+  const TRATTINO = '[-–—→](?=[ \\t])';
+  // CVV_ALTRE_LINGUE (#2681.1) è la parte che va anche ai campi dei moduli (da etichette() di campiSegreti.js) e agli
+  // indizi di pagamento (copia autonoma in safebrowseHints.js, uguale per tests/unit/cvvAltreLingue.test.mjs): coi
+  // separatori dei nomi di campo («codigo_de_seguridad»).
   const CVV_ALTRE_LINGUE = 'cryptogramme|code[\\s_-]*(?:de[\\s_-]*)?s[ée]curit[ée]|c[óo]digo[\\s_-]*(?:de[\\s_-]*)?(?:seguridad|seguran[çc]a)|(?:karten)?pr(?:ü|ue|u)f(?:nummer|ziffer)|sicherheits[\\s_-]*code|beveiligings[\\s_-]*code|kod[\\s_-]*bezpiecze[ńn]stwa';
+  // I nomi a parole in tutte le lingue delle etichette (#1403.61), anche senza accenti; li usano anche i campi dei moduli.
   const NOMI_CVV = '(?:(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:code|value|number)'
     + '|codice\\s+(?:di\\s+)?sicurezza|cryptogrammes?(?:\\s+visuels?)?|code\\s+(?:de\\s+)?s[ée]curit[ée]'
     + '|c[óo]digos?\\s+(?:de\\s+)?segur(?:idad|an[çc]a)|(?:karten-?)?pr(?:ü|ue?)f(?:nummer|ziffern?|zahl|code)'
     + '|(?:karten)?sicherheits-?(?:code|nummer)|(?:beveiligings|veiligheids)code|kaartverificatiecode'
     + '|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa)|код\\s+(?:безопасности|проверки))';
   const DELLA_CARTA = '(?:\\s+(?:(?:della|de\\s+la|de|do|da|der|van\\s+de|of\\s+the)\\s+(?:carta|carte|tarjeta|cart[ãa]o|karte|kaart|card)|karty))?';
-  // Il nome anche nelle lingue del verbo (#2681), anche senza accenti (#1403.61): «cryptogramme», «código de seguridad»,
-  // «Kartenprüfnummer». Il confine vede anche le lettere greche. «Prüfnummer» solo con la carta: da sola è il numero di
-  // controllo di qualunque cosa («Die Prüfnummer des Gutachtens ist 2024»).
-  const LETTERA_CVV = '[A-Za-z0-9_\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u052F]';
-  const NOME_CVV = `(?<!${LETTERA_CVV})(?:cvv2?|cvc2?|csc|cid|(?:(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:value|code|number)`
-    + '|codice\\s+(?:di\\s+)?sicurezza|cryptogrammes?(?:\\s+visuels?)?|code\\s+(?:(?:de\\s+)?s[ée]curit[ée]|de\\s+v[ée]rification)'
-    + '|c[óo]digos?\\s+(?:(?:de\\s+)?segur(?:idad|an[çc]a)|de\\s+(?:verificaci[óo]n|verifica[çc][ãa]o))|codi\\s+de\\s+(?:seguretat|verificaci[óo])'
-    + '|(?:kredit)?karten-?(?:pr(?:ü|ue|u)f(?:nummer|ziffern?|zahl|code)|verifizierungsnummer)|(?:(?:kredit)?karten)?sicherheits-?(?:code|nummer)'
-    + '|kaartverificatiecode|(?:beveiligings|veiligheids)code|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa|weryfikacyjny\\s+karty|cvv2?|cvc2?|csc)'
-    + `|код\\s+(?:безопасности|проверки)|κωδικ[όο]ς\\s+ασφαλε[ίι]ας)${DELLA_CARTA})(?!${LETTERA_CVV})`;
-  // «Prüfziffer», «Prüfcode» senza la carta solo annunciati subito dal verbo o dal separatore («Die Prüfziffer wird 321»,
-  // #2681.2): con altre parole in mezzo o senza annuncio sono il controllo di altro («Der Prüfcode des Produkts ist 456»).
-  const NOME_PRUF = `(?<!${LETTERA_CVV})pr(?:ü|ue|u)f(?:ziffern?|zahl|code)(?!${LETTERA_CVV})`;
+  const NOME_CVV = `(?<![${LETTERE}])(?:cvv2?|cvc2?|csc|cid|${NOMI_CVV}${DELLA_CARTA}|${CVV_ALTRE_LINGUE})(?![${LETTERE}])`;
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
   const APERTE = '«"\'“‘„';
@@ -67,46 +55,17 @@
   const INTORNO_APERTE = `[${APERTE}([{]`;
   const INTORNO_CHIUSE = `[${CHIUSE})\\]}]`;
   const DAVANTI = `(?:${INTORNO_APERTE}[ \\t]*){0,3}`;
-  const CIFRE_CVV = `${DAVANTI}(${CIFRE_DEL_CVV})(?![\\d/]|[.,:-]\\d)`;
-  // Il «to» polacco e il catalano «és» solo qui: in VERBO il «to» porterebbe a chi riceve. Conta se dopo il numero non
-  // segue una parola («send the CVV to 123 Main St»), o in una frase polacca (SEGNO_POLACCO: «Kod CVV to 123 z tyłu»).
-  // Dopo il verbo anche l'articolo («Il CVV è il 123», «Die Kartenprüfnummer ist die 123», #2681.2).
-  const VERBO_CVV = `(?:${VERBO}|és|to(?=\\s+${CIFRE_DEL_CVV}(?![\\d/]|[.,:-]\\d)(?![ \\t]*${LETTERA_CVV}))|(?<=${SEGNO_POLACCO}[^\\n]{0,40})to)`
-    + '(?:\\s+(?:il|lo|la|el|le|die|der|das|the|o)(?=\\s))?';
-  const CVV = new RegExp(`(?:${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV})?`
-    + `|${NOME_PRUF}\\s*(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV}))\\s*${CIFRE_CVV}`, 'gi');
+  const CIFRE_CVV = `${DAVANTI}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
+  const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
   const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*(?:[:=|\\t]|${TRATTINO})|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
-  // I refusi del nome («crytogramme», «seguirdad»): le parole lunghe dei nomi, riconosciute a un errore di distanza.
-  const PAROLE_CVV = ['cryptogramme', 'securite', 'verification', 'seguridad', 'seguranca', 'verificacion', 'verificacao',
-    'seguretat', 'kartenprufnummer', 'kartenpruefnummer', 'kartenprufziffer', 'sicherheitscode', 'kartensicherheitscode',
-    'kaartverificatiecode', 'beveiligingscode', 'bezpieczenstwa', 'безопасности', 'ασφαλειας', 'sicurezza', 'security'];
-  const NOVITA = () => global.SN_NOVITA || (typeof require === 'function' ? (require('./novita.js'), global.SN_NOVITA) : null);
-  const piatta = (w) => w.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  function nomiCvvCorretti(s) {
-    if (!/\d{3}/.test(s)) return s;
-    const N = NOVITA();
-    if (!N || typeof N.distanza !== 'function') return s;
-    return s.replace(/\p{L}{6,}/gu, (w) => {
-      const p = piatta(w);
-      // Prima la parola giusta: «security» è a un errore da «securite», e la lingua cambierebbe sotto il nome.
-      if (PAROLE_CVV.includes(p)) return w;
-      for (const giusta of PAROLE_CVV) {
-        if (Math.abs(p.length - giusta.length) > 1 || (p[0] !== giusta[0] && p[1] !== giusta[1])) continue;
-        if (N.distanza(p, giusta, 1) <= 1) return giusta;
-      }
-      return w;
-    });
-  }
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
   // falso allarme ferma un'azione; qui un falso allarme toglie un numero, e il codice di verifica non esce.
   // Le cifre in coda a una parola («Girasole2024») non sono il codice: è la password intera, e la toglie la regola delle
   // etichette; togliere solo «2024» lascerebbe il resto e cancellerebbe l'anno da tutto il messaggio.
   // Anche nelle lingue delle etichette (#1403.13): «le code d'accès 482913», «el código de acceso 482913».
-  const CODICE_ACCESSO = new RegExp(/\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])/.source
-    + `(${CIFRE_PIN})\\b`, 'gi');
-  const CODICE_ACCESSO_EN = new RegExp(/\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])/.source
-    + `(${CIFRE_PIN})\\b`, 'gi');
-  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|${VERBO}(?=\\s))?\\s*${DAVANTI}(${CIFRE_PIN})\\b`, 'gi');
+  const CODICE_ACCESSO = /\b(?:codice|code|c[óo]digo|kod|pin)\b(?:\s+(?:di|da|per|the|your|il|tuo|de|du|des|del|do|der|von|van))*\s+(?:d['’])?(?:verifica|accesso|conferma|sicurezza|autenticazione|autorizzazione|login|verification|security|confirmation|access|sign-?in|acc[èe]s|v[ée]rification|s[ée]curit[ée]|connexion|acceso|acesso|verificaci[óo]n|verifica[çc][ãa]o|confirmaci[óo]n|confirma[çc][ãa]o|seguridad|seguran[çc]a|dost[ęe]pu|weryfikacyjny)(?![A-Za-zÀ-ÿ])[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
+  const CODICE_ACCESSO_EN = /\b(?:verification|security|confirmation|access|login|sign-?in|one-?time|otp|2fa)\s+(?:code|codice|pin)\b[^\d\n]{0,24}?(?<![A-Za-zÀ-ÿ])(\d{4,8})\b/gi;
+  const PIN = new RegExp(`\\bpin\\b\\s*(?:[:=]|${VERBO}(?=\\s))?\\s*${DAVANTI}(\\d{4,8})\\b`, 'gi');
   // La regola sulla forma, per i codici: un numero con la forma di un codice (quattro-otto cifre, o due-tre gruppi) al
   // posto del codice (vedi alPostoDelCodice), nella frase che lo nomina o sulla riga sotto. Col nome del codice conta, a
   // meno che la frase lo dica un identificativo che non apre niente (cliente, ordine, prenotazione) senza parole
@@ -211,7 +170,8 @@
     + `|${RESTA_UN_CODICE.source.slice(1, -1)}|${RESTA_ALTRE.source.slice(1, -1)}|${SEGNO_FORTE.source})(?![\\p{L}])`;
   // Prima e dopo il verbo può stare un avverbio («ora è», «is now»), e il verbo può essere composto («è sempre stato»,
   // «has been»); «e» senza accento è un refuso; la virgola o i due punti valgono il verbo («il codice del mio telefono, 4829»).
-  const AVVERBIO_SBLOCCO = global.SN_GUARDIANO_STATICO.AVVERBIO;
+  const AVVERBIO_SBLOCCO = '(?:now|always|still|currently|actually|just|sempre|ancora|ora|adesso|attualmente|toujours|maintenant|actuellement'
+    + '|siempre|ahora|todav[íi]a|actualmente|agora|ainda|jetzt|immer|noch|aktuell|nu|altijd|nog|teraz|zawsze|nadal|wci[ąa][żz])';
   const VERBO_SBLOCCO = `(?:${VERBO}|e|cest|serait|ser[íi]a|wäre|would\\s+be|to|will\\s+be|sind|zijn)`;
   const PARTICIPIO = '(?:stat[oaie]|been|[ée]t[ée]|sido|gewesen|geweest)';
   const AUSILIARE = '(?:has|have|had|ha|hat|heeft|a|avait|hab[íi]a|tem|tinha)';
@@ -244,12 +204,19 @@
   const DOPO_IL_NUMERO = new RegExp(`^\\s*(?:[:=-]\\s*)?${VERBO_SBLOCCO}\\s+(?:(?:il|lo|la|the|le|el|o|der|de|het)\\s+)?${NUCLEO}(?![\\p{L}])`, 'iu');
   // «Quello del pc è 5512» dopo il codice del telefono, nella frase o in quella dopo: il pronome sta per il codice.
   const QUELLO_DEL_MIO = new RegExp(`(?<![\\p{L}])(?:quell[oa]|celui|celle|the\\s+one|that|der|die|el|la)\\s+(?:${LEGAME_SBLOCCO}\\s+)*`
-    + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
+    + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
   const NUCLEO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${NUCLEO}`, 'iu');
   // Lo sblocco detto col verbo, senza «codice»: «Per sbloccare il mio telefono uso 6118», «I unlock my phone with 6215».
+  // Anche col nome dello sblocco al posto del codice: «Lo sblocco del mio telefono è 4829».
+  const COL_NUMERO = '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)\\s*[:=]?';
   const SBLOCCO_COL_NUMERO = new RegExp(`(?<![\\p{L}])${SBLOCCA}\\s+(?:${LEGAME_SBLOCCO}\\s+)*(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}`
-    + '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)'
-    + `\\s*[:=]?\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
+    + `(?:${COL_NUMERO}|${CHIUDE_VERO})\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
+  // L'apparecchio prima del verbo: «Il mio telefono si sblocca con 4829», «My phone unlocks with 6215».
+  const APPARECCHIO_SI_SBLOCCA = new RegExp(`(?<![\\p{L}])(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}(?:\\s+(?:si|se|sich|zich|się))?\\s+${SBLOCCA}`
+    + `${COL_NUMERO}\\s*["«“]?(\\d{4,8})${NON_UN_PREZZO}`, 'giu');
+  // Le cifre staccate dopo l'etichetta del proprio apparecchio («Il codice del mio telefono è 48 29»): da quattro a otto.
+  const CIFRE_STACCATE = new RegExp(`(?<![\\p{L}])(?:${NUCLEO_COL_NOME}${DOPO_APPARECCHIO}?${CHIUDE_VERO}|${NUCLEO}${CHIUDE_VERO})`
+    + '\\s*["«“]?(\\d{1,4}(?:[ .-]\\d{1,4}){1,7})(?![\\d\\p{L}])', 'giu');
   // Le regole lunghe partono solo dove c'è un apparecchio: su una riga di 120.000 caratteri senza, costerebbero secondi.
   const UN_APPARECCHIO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${APPARECCHIO}`, 'iu');
   function codiceDelMioApparecchio(s, out) {
@@ -257,10 +224,16 @@
     for (const m of s.matchAll(QUELLO_DEL_MIO)) {
       if (NUCLEO_NEL_TESTO.test(s.slice(Math.max(0, m.index - 200), m.index))) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
     }
-    for (const m of s.matchAll(SBLOCCO_COL_NUMERO)) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
+    for (const re of [SBLOCCO_COL_NUMERO, APPARECCHIO_SI_SBLOCCA]) {
+      for (const m of s.matchAll(re)) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
+    }
+    for (const m of s.matchAll(CIFRE_STACCATE)) {
+      const n = m[1].replace(/\D/g, '').length;
+      if (n >= 4 && n <= 8) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
+    }
   }
   // `apre`: il codice di qualcosa che apre (il mio telefono, il cancello, la carta). Il controllo delle uscite prende
-  // solo questi, che non legge da sé (guardianoStatico.js, segretiInUscita); il resto lo legge con le sue forme.
+  // questi, la password e il CVV (guardianoStatico.js, segretiInUscita); il resto lo legge con le sue forme.
   const conCheApre = (x, apre) => (apre ? Object.assign(x, { apre: true }) : x);
   // «The serial code of my phone»: un nome comune davanti a «code» ne fa un identificativo, come nell'etichetta inglese.
   const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
@@ -484,8 +457,6 @@
   const NOME_SEGRETO = /^(?:access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|api[_-]?key|apikey|key|secret|client[_-]?secret|password|passwd|pwd|pass|otp|sig|signature|x-amz-signature|x-amz-credential|x-amz-security-token|session[_-]?id|sessionid|sid|auth|ticket|code)$/i;
   const NOME_CORTO = /^(?:password|passwd|pwd|pass|otp)$/i;
   const INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`)\]]+/gi;
-  // Un pezzo d'indirizzo senza lo schema («?q=password%3A%20…», «www.x.it/la%20password…»); con lo schema è un INDIRIZZO.
-  const CODIFICATO = /[^\s<>"'`()[\]«»]*%[0-9A-Fa-f]{2}[^\s<>"'`()[\]«»]*/g;
   // Le password accanto a un'etichetta. La regola generale è il posto del valore (alPostoDelValore): dopo il separatore o
   // il verbo che chiude l'etichetta, subito dopo di lei, sulla riga sotto. Mai il resto della riga: «la password di
   // Office365», un nome utente, un indirizzo di campo o una riga di codice vicini all'etichetta non sono il valore.
@@ -583,64 +554,6 @@
         if (pezzo.length >= 20 && /^[A-Za-z0-9_-]+$/.test(pezzo) && /[A-Za-z]/.test(pezzo) && !/^[a-z]+(?:[-_][a-z]+)*$/.test(pezzo)) out.push({ valore: pezzo, regola: 'token' });
       }
     }
-  }
-
-  // Un indirizzo con la codifica percentuale («?q=la%20password%20%C3%A8%20Mela!Verde77») dice al modello quello che dice
-  // decodificato, con le regole del controllo in uscita (urlExfil.js: giri e «+»): ogni pezzo fra «/ ? # & ; =» si legge
-  // anche decodificato, ognuno per conto suo, e dal testo si toglie la sua forma codificata (#1403.74).
-  // Un pezzo alla volta: messi in fila, «q» e «password» di «?q=…&oq=password» farebbero un'etichetta col suo valore.
-  function codificatiNellIndirizzo(url, inizioUrl, out, giro) {
-    if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
-    const U = global.SN_URL_EXFIL;
-    if (!U || !U.giroDiDecodifica || giro >= U.GIRI_DI_DECODIFICA || !/%[0-9A-Fa-f]{2}|\+/.test(url)) return;
-    const host = (url.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i) || [''])[0].length;
-    for (const m of url.slice(host).matchAll(/[^/?#&;=]+/g)) {
-      const pezzo = host + m.index;
-      let t = m[0];
-      let inizi = Array.from({ length: t.length }, (_, i) => i);
-      let fini = inizi.map((i) => i + 1);
-      for (let livello = 0; livello < U.GIRI_DI_DECODIFICA; livello++) {
-        const d = U.giroDiDecodifica(t);
-        if (d.testo === t) break;
-        const soloLettere = soloLettereAccentate(t, d);
-        inizi = d.da.map((i) => inizi[i]);
-        fini = d.a.map((j) => fini[j - 1]);
-        t = d.testo;
-        if (soloLettere) break;
-        for (const x of trova(t, { giro: giro + 1 })) {
-          const v = String(x.valore);
-          const posti = Number.isInteger(x.inizio) && t.startsWith(v, x.inizio) ? [{ k: x.inizio, n: v.length }] : [];
-          if (!posti.length) for (let k = t.indexOf(v); k >= 0; k = t.indexOf(v, k + 1)) posti.push({ k, n: v.length });
-          // Una carta trovata torna senza spazi né trattini: si cerca com'è scritta (formaDelValore).
-          if (!posti.length) for (const f of t.matchAll(new RegExp(formaDelValore(v), 'gu'))) posti.push({ k: f.index, n: f[0].length });
-          if (!posti.length) out.push({ valore: v, regola: x.regola });
-          for (const { k, n } of posti) {
-            const da = pezzo + inizi[k];
-            const a = pezzo + fini[k + n - 1];
-            out.push({ valore: url.slice(da, a), regola: x.regola, ...(Number.isInteger(x.inizio) ? { inizio: inizioUrl + da } : {}) });
-          }
-        }
-      }
-    }
-  }
-
-  // Un pezzo che decodificato è una parola sola e ha solo lettere latine accentate al posto dei «%xx» («Citt%C3%A0»)
-  // non dice niente di nuovo: senza separatori non c'è etichetta, e chiavi e carte sono ASCII (a parte una sequenza
-  // lunga con una cifra, che la lettera attaccata può staccare). Saltarlo tiene veloci le pagine piene di collegamenti.
-  function soloLettereAccentate(prima, d) {
-    const testo = d.testo;
-    if (!/^[\p{L}\p{M}\p{N}_.~'’-]+$/u.test(testo)) return false;
-    if ((testo.match(/[A-Za-z0-9]{12,}/g) || []).some((r) => /\d/.test(r))) return false;
-    for (let j = 0; j < testo.length; j++) {
-      if (d.a[j] - d.da[j] === 1 && prima[d.da[j]] !== '+') continue;
-      if (testo.charCodeAt(j) < 0x80 || !/\p{Script=Latin}/u.test(testo[j])) return false;
-    }
-    return true;
-  }
-
-  // Come si cerca un valore trovato: una carta, che torna di sole cifre, anche spezzata da spazi o trattini.
-  function formaDelValore(v) {
-    return /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
   }
 
   const TESTA_VALORE = new RegExp(`^[${APERTE}(]+`);
@@ -1122,12 +1035,9 @@
   const virgoletteStrette = (s) => (HA_VIRGOLETTE.test(s)
     ? s.replace(CON_SPAZI_DENTRO, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
   // Un valore preso con le virgolette attaccate («»Mela!Verde77«») nel testo vero le ha staccate: si cerca senza.
-  // Uno con dentro un avverbio letto come spazi («Password: casa è ancora mia») si riprende allo stesso posto.
-  function nelTestoVero(x, vero, letto) {
+  function nelTestoVero(x, vero) {
     const v = String(x.valore);
     if (vero.includes(v)) return x;
-    const k = /\s{2}/.test(v) && letto ? letto.indexOf(v) : -1;
-    if (k >= 0 && letto.length === vero.length) return { ...x, valore: vero.slice(k, k + v.length) };
     const testa = (v.match(TESTA_VIRGOLETTE) || [''])[0].length;
     const y = { ...x, valore: v.slice(testa).replace(CODA_VIRGOLETTE, '') };
     if (Number.isInteger(x.inizio)) y.inizio = x.inizio + testa;
@@ -1191,72 +1101,23 @@
 
   // `[{ valore, regola }]`: quello che in questo testo non deve uscire. Regola 'chiave' | 'password' | 'codice' |
   // 'carta' | 'cvv' | 'token'.
-  // `giro`: quante codifiche di un indirizzo si sono già tolte (codificatiNellIndirizzo).
-  function trova(valore, { giro = 0 } = {}) {
+  function trova(valore) {
     const vero = testo(valore);
     if (!global.SN_RISERVATI_TESTO && typeof require === 'function') require('./riservatiNelTesto.js');
     const R = global.SN_RISERVATI_TESTO;
     const copia = aCapo(vero);
     const piano = copia ? copia.piano : vero;
     // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
-    // Un avverbio fra il verbo e il valore («il pin è ancora 4821») si legge come spazi, come l'enfasi (guardianoStatico.js).
-    if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
-    const G = global.SN_GUARDIANO_STATICO;
-    const s = G.avverbiComeSpazi(virgoletteStrette(R ? R.senzaEnfasi(piano) : piano));
-    if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return [];
-    const out = regole(s, giro);
-    // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
-    const attaccate = R && R.cifreAttaccate(s);
-    if (attaccate) for (const x of comeScritti(regole(attaccate.piano, giro), attaccate, s)) out.push(x);
-    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano, s)))
-      .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
-      .filter((x) => String(x.valore).length >= 3);
-  }
-
-  // I valori trovati sulle cifre attaccate che stanno su un tratto scandito, presi dal testo vero. Gli altri li ha già
-  // trovati la lettura del testo com'è. Un valore senza posto si toglie ovunque (oscura): basta una volta per forma.
-  function comeScritti(trovati, { piano, posto, tratti }, s) {
+    const s = virgoletteStrette(R ? R.senzaEnfasi(piano) : piano);
     const out = [];
-    const visti = new Set();
-    // I tratti sono in ordine: il primo che finisce dopo `a` dice se [a, b) ne tocca uno.
-    const tocca = (a, b) => {
-      let lo = 0;
-      let hi = tratti.length;
-      while (lo < hi) { const m = (lo + hi) >> 1; if (tratti[m][1] <= a) lo = m + 1; else hi = m; }
-      return lo < tratti.length && tratti[lo][0] < b;
-    };
-    const prendi = (x, k, v, alPosto) => {
-      const a = posto[k];
-      const b = posto[k + v.length - 1] + 1;
-      if (!tocca(a, b)) return;
-      const valore = s.slice(a, b);
-      const chiave = alPosto ? `${a}:${valore}` : `${x.regola}:${valore}`;
-      if (visti.has(chiave)) return;
-      visti.add(chiave);
-      out.push(alPosto ? { ...x, valore, inizio: a } : { ...x, valore });
-    };
-    const cercati = new Set();
-    for (const x of trovati) {
-      const v = String(x.valore || '');
-      if (!v) continue;
-      if (Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio)) { prendi(x, x.inizio, v, true); continue; }
-      if (cercati.has(`${x.regola}:${v}`)) continue;
-      cercati.add(`${x.regola}:${v}`);
-      for (let k = piano.indexOf(v); k >= 0; k = piano.indexOf(v, k + v.length)) prendi(x, k, v, false);
-    }
-    return out;
-  }
-
-  function regole(s, giro) {
-    const out = [];
+    if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
     if (G && typeof G.segretiNelTesto === 'function') {
       for (const x of G.segretiNelTesto(s)) if (REGOLE_GUARDIANO.has(x.regola)) out.push(x);
     }
     passwordAccanto(s, out);
-    const conNomiCvv = nomiCvvCorretti(s);
-    for (const re of [CVV, CVV_DOPO]) for (const m of conNomiCvv.matchAll(re)) out.push({ valore: m[1], regola: 'cvv' });
+    for (const re of [CVV, CVV_DOPO]) for (const m of s.matchAll(re)) out.push({ valore: m[1], regola: 'cvv' });
     for (const re of [CODICE_ACCESSO, CODICE_ACCESSO_EN]) {
       for (const m of s.matchAll(re)) if (!FINE_DI_UN_NUMERO.test(m[0].slice(0, -m[1].length))) out.push({ valore: m[1], regola: 'codice' });
     }
@@ -1265,15 +1126,12 @@
     codiceDelMioApparecchio(s, out);
     codiciDiRecupero(s, out);
     for (const m of s.matchAll(BEARER)) out.push({ valore: m[1], regola: 'token' });
-    for (const m of s.matchAll(INDIRIZZO)) {
-      segretiNellIndirizzo(m[0], out);
-      codificatiNellIndirizzo(m[0], m.index, out, giro);
-    }
-    for (const m of s.matchAll(CODIFICATO)) if (!m[0].includes('://')) codificatiNellIndirizzo(m[0], m.index, out, giro);
+    for (const m of s.matchAll(INDIRIZZO)) segretiNellIndirizzo(m[0], out);
     scritteAMano(s, out);
-    if (G && typeof G.codiciInElenco === 'function') out.push(...G.codiciInElenco(s, out));
     out.push(...interiFraVirgolette(s, out));
-    return out;
+    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano)))
+      .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
+      .filter((x) => String(x.valore).length >= 3);
   }
 
   // Le password scritte a mano (la risposta sotto chi la chiede, «Utente / Password: mario / …», dopo il nome della rete):
@@ -1322,11 +1180,10 @@
     const lungo = (v) => v.length - (v.match(/\r\n/g) || []).length;
     const valori = [...ovunque].sort((a, b) => lungo(b) - lungo(a));
     for (const v of valori) {
-      const forma = formaDelValore(v);
+      const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
       // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga». Una lettera cinese o
-      // giapponese attaccata non è della stessa parola (FINE_VALORE), e nemmeno uno spazio codificato, anche due volte
-      // («%20Mela!Verde77», «%2520Mela»: codificatiNellIndirizzo).
-      const confine = /^[\p{L}\p{N}]/u.test(v) ? `(?:(?<=%(?:25){0,2}[0-9A-Fa-f]{2})|(?<!(?![${NON_LATINI.FINE_VALORE}])[\\p{L}\\p{N}]))` : '';
+      // giapponese attaccata non è della stessa parola (FINE_VALORE).
+      const confine = /^[\p{L}\p{N}]/u.test(v) ? `(?<!(?![${NON_LATINI.FINE_VALORE}])[\\p{L}\\p{N}])` : '';
       const fine = /[\p{L}\p{N}]$/u.test(v) ? `(?![\\p{L}\\p{N}](?<![${NON_LATINI.FINE_VALORE}]))` : '';
       // Un valore lunghissimo non entra in un'espressione regolare: si toglie com'è, senza confini.
       try { t = t.replace(new RegExp(`${confine}${forma}${fine}`, 'gu'), SEGNAPOSTO); } catch (_) { t = t.split(v).join(SEGNAPOSTO); }
