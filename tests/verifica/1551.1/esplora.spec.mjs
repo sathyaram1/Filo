@@ -43,7 +43,10 @@ for (const [W, s, z] of [[1000, 1.5, 1], [1000, 1.25, 1], [800, 1.25, 1], [720, 
   test(`esplora ${W} testo ${s} zoom ${z}`, async ({ app, shell }) => {
     await app.evaluate(({ BrowserWindow }, [w]) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setContentSize(w, 760), [W]);
     let page = await home(app);
-    const zz = await scala(app, page, s);
+    await scala(app, page, s);
+    await page.reload();
+    page = await home(app);
+    const zz = await page.evaluate(() => document.documentElement.style.zoom);
     if (z !== 1) {
       await app.evaluate(({ webContents }, f) => {
         webContents.getAllWebContents().find((w) => { try { return w.getURL().startsWith('filo://newtab'); } catch (_) { return false; } }).setZoomFactor(f);
