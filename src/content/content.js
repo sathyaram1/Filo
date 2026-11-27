@@ -2220,14 +2220,6 @@
     if (giudizio && giudizio.errore && giudizio.correzione) mostra(giudizio.correzione, native.filter((p) => p !== giudizio.correzione), giudizio.modello);
   }
 
-  function buildFeedbackItem() {
-    return {
-      type: 'item',
-      label: 'Invia feedback',
-      onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()),
-    };
-  }
-
   // #843 — spegne Filo sul sito della scheda (anche dal menu di un riquadro: «questo sito» è quello che si sta visitando).
   // Solo dove c'è un sito con un nome: una pagina di Filo, un IP o «localhost» non entrano nell'elenco.
   function buildSpegniFiloItem() {
