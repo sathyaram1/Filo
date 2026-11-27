@@ -835,13 +835,13 @@ test('#496 il tasto destro sulle pasticche della finestra e del mittente offre l
   await apri(page, { feedbacks: [fb({ seq: 1, createdAt: g(1) })], workerLog: [] });
 
   await page.locator('[data-fs-range="7g"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toContainText('Copia la finestra');
-  await page.keyboard.press('Escape');
+  expect(await testoDelMenu(page)).toContain('Copia la finestra');
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menuDi(page).pannelli.count(); }).toBe(0);
 
   await page.locator('[data-fs-creator="utente"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toContainText('Solo Utenti');
+  expect(await testoDelMenu(page)).toContain('Solo Utenti');
   // E la voce funziona: sceglie quel mittente e basta.
-  await page.locator('.mg-ctxmenu .sn-select-option').first().click();
+  await primaDelMenu(page).click();
   expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['utente']);
 });
 
