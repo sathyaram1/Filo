@@ -58,6 +58,15 @@ test('il filo di un\'app per Mac sta nel framework, sia dal nome dell\'app sia d
   assert.equal(F.fileDelFilo('/x/filo'), '/x/filo');
 });
 
+test('il file da spegnere e l\'app da rifirmare sul Mac escono dallo stesso conto', () => {
+  assert.equal(F.appDelMac('/x/Filo.app'), '/x/Filo.app');
+  assert.equal(F.appDelMac('/x/Filo.app/Contents/MacOS/Filo'), '/x/Filo.app');
+  assert.equal(F.appDelMac('/x/filo'), null);
+  const sorgente = readFileSync(require.resolve('../../scripts/lib/fusibili-electron.js'), 'utf8');
+  assert.equal(sorgente.match(/Contents\[\\\\\/\]MacOS/g).length, 2, 'la risalita dall\'eseguibile all\'app sta solo in appDelMac');
+  assert.match(sorgente.match(/function spegniPrivilegiFile[\s\S]*?\n}\n/)[0], /appDelMac\(eseguibile\)/, 'la firma rifirma l\'app di appDelMac');
+});
+
 test('after-pack spegne il fusibile sull\'eseguibile di ogni sistema, e prima del lanciatore di Linux', async () => {
   const dir = cartellaTemporanea('fusibili-');
   try {
