@@ -9,6 +9,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
 import { EDITOR, aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 
