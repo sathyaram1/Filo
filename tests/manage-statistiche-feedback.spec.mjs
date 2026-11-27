@@ -1504,8 +1504,8 @@ test('#496 la pasticca di un mittente apre le segnalazioni che il suo numero con
   await page.locator('[data-fs-range="tutto"]').click();
 
   await page.locator('[data-fs-creator="routine"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toContainText('Mostra la segnalazione contata');
-  await page.locator('.mg-ctxmenu .sn-select-option').filter({ hasText: 'Mostra' }).click();
+  expect(await testoDelMenu(page)).toContain('Mostra la segnalazione contata');
+  await menuDi(page).scegli('Mostra');
   await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
   // Il clic sulla pasticca resta il filtro: le due cose non si pestano.
   await page.locator('[data-fs-creator="routine"]').click();
