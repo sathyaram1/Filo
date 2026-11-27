@@ -56,7 +56,7 @@
   const CUSTODITO = 'custodito';
   const REGOLE_USCITA = Object.freeze([CUSTODITO, ...REGOLE_LETTE, 'guasto', ALTRO]);
   // I tipi d'azione dell'elenco delle uscite (USCITE e USCITE_PAGINA di urlExfil.js), scritti come nelle conferme (#1461).
-  const VERBI = Object.freeze(['NAVIGA', 'LEGGI_PAGINA', 'CERCA_WEB', 'ESEGUI_COMANDO', 'INVIA_FEEDBACK', 'APRI_FILE',
+  const VERBI = Object.freeze(['NAVIGA', 'LEGGI_PAGINA', 'TRASCRIVI_MEDIA', 'CERCA_WEB', 'ESEGUI_COMANDO', 'INVIA_FEEDBACK', 'APRI_FILE',
     'APRI_SALVATA', 'CERCA_DOCUMENTI', 'CERCA_IMMAGINE', 'IMMAGINI_WEB', 'CAMPO_PAGINA', 'SCARICA_COLLEGAMENTO', ALTRO]);
 
   // I tetti del codice che, toccati, fermano o tagliano qualcosa: chi li conta li nomina da qui.
