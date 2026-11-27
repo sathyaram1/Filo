@@ -23,7 +23,7 @@
     translate: v('Traduci', 'translate', 't', 'tradurre', ['traduci']),
     readAloud: v('Leggi', 'readAloud', 'l', 'leggere ad alta voce', ['leggi', 'ascolta']),
     dictate: v('Detta', 'mic', 'd', 'dettare', ['detta', 'parla']),
-    edit: v('Modifica', 'pencil', 'e', 'modificare', ['modifica', 'correggi']),
+    edit: v('Modifica', 'pencil', 'e', 'modificare', ['modifica', 'correggi', 'cambia']),
     valuta: v('Valuta', 'checklist', 'r', 'valutare', ['valuta']),
     correggiTutti: v('Correggi tutto', 'check', 'a', 'correggere', []),
     controlla: v('Controlla', 'readDocument', 't', 'controllare', ['controlla']),
