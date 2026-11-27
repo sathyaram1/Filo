@@ -668,7 +668,7 @@
     for (const n of s.matchAll(NOME_DEL_VALORE)) {
       const password = !!n[3];
       const fine = n.index + n[0].length;
-      const clausola = s.slice(Math.max(0, n.index - 80), n.index).split(/[.!?;,\n]/).pop();
+      const clausola = s.slice(Math.max(0, n.index - 80), n.index).split(/[.!?;,](?:\s|$)|\n/).pop();
       let cambio = clausola.split(/[\s'’]+/).some((w) => UN_CAMBIO.test(w));
       let inglese = clausola.split(/[\s'’]+/).some((w) => CAMBIO_INGLESE.test(w));
       let presentato = false;
