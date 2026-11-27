@@ -368,7 +368,17 @@
 
   // `keep: true` = il menu è già a schermo e ha cambiato altezza: si parte dalla posa corrente, non
   // dal cursore.
+  // La riga del nome chiude la griglia con una riga sottile solo se sotto c'è qualcosa che si vede (una spiegazione).
+  function confineDellaGriglia(root) {
+    const g = root.querySelector(':scope > .sn-menu-griglia');
+    if (!g) return;
+    let seguito = false;
+    for (let n = g.nextElementSibling; n && !seguito; n = n.nextElementSibling) seguito = n.getClientRects().length > 0;
+    g.classList.toggle('sn-menu-griglia-con-seguito', seguito);
+  }
+
   function place(root, x, y, opts) {
+    confineDellaGriglia(root);
     const keep = !!(opts && opts.keep);
     const { scale } = Place.applyCap(root);
     const vw = window.innerWidth, vh = window.innerHeight;
