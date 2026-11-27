@@ -159,23 +159,113 @@
   // Quella del menu aperto: il contesto e chi esegue le sue azioni, per ridisegnarla dopo un trascinamento.
   let aperta = null;
 
+  // ── Il menu a icone (#2555): un'icona per verbo, costruita dall'elenco unico ─────────────────────────────────────
+  // Per un verbo l'elemento sotto il mouse può offrire più oggetti (`su`: { <oggetto>: { onClick, label?, bersaglio? } }):
+  // il clic agisce sul primo nell'ordine dell'elenco, gli altri sono le varianti nel menu dell'icona.
+  const ICONA_PX = () => (aperta && aperta.aspetto && aperta.aspetto.icona) || 20;
+  const fraseOggetto = (o) => (aperta && aperta.oggetti && aperta.oggetti[o]) || Disp.OGGETTI[o] || '';
+  const nomeConOggetto = (nome, oggetto) => [nome, oggetto].filter(Boolean).join(' ');
+
+  // Le scelte di un verbo per gli oggetti che ha qui, in ordine. Un'azione con un solo `onClick` agisce sul primo
+  // oggetto dell'elenco.
+  function scelteDi(a, oggetti) {
+    const su = a && a.su && typeof a.su === 'object' ? a.su : null;
+    if (!su) return a && typeof a.onClick === 'function' ? [{ oggetto: oggetti[0] || 'elemento', ...a }] : [];
+    const ordine = [...oggetti, ...Object.keys(su).filter((o) => !oggetti.includes(o))];
+    return ordine.filter((o) => su[o] && typeof su[o].onClick === 'function').map((o) => ({ ...a, su: undefined, oggetto: o, ...su[o] }));
+  }
+
   // La voce per `id`, o null se qui non si può fare: l'azione manca a questo elemento, o è un'icona della pagina
   // dentro un riquadro incorporato.
   function voce(id, azioni, regPagina, regFinestra) {
-    const I = (name) => global.SN_ICONS[name](18);
+    const I = (name) => global.SN_ICONS[name](ICONA_PX());
     const d = Disp.descrizione(id);
     if (!d) return null;
     if (d.tipo === 'contesto') {
-      const a = azioni[d.azione];
-      if (!a || typeof a.onClick !== 'function') return null;
+      const scelte = scelteDi(azioni[d.azione], d.oggetti);
+      if (!scelte.length) return null;
+      const [a, ...altre] = scelte;
       const icona = a.icona && typeof global.SN_ICONS[a.icona] === 'function' ? a.icona : d.icona;
-      const v = { id, icon: I(icona), label: a.label || I18n.t(d.etichetta), onClick: a.onClick, tieneAperto: !!a.tieneAperto, disabled: !!a.disabled, draggable: true };
+      const nome = a.nome || d.nome;
+      const oggetto = a.fraseOggetto || fraseOggetto(a.oggetto);
+      const v = {
+        id, azione: d.azione, icon: I(icona), nome, oggetto, tasto: Disp.VERBI[d.azione]?.tasto || '',
+        label: a.label || nomeConOggetto(nome, oggetto), onClick: a.onClick, tieneAperto: !!a.tieneAperto,
+        disabled: !!a.disabled, draggable: true, bersaglio: a.bersaglio || bersaglioDi(a.oggetto),
+      };
       if (typeof a.acceso === 'boolean') v.acceso = a.acceso;
+      if (a.valore) v.valore = a.valore;
+      if (a.iconaImg) v.iconaImg = a.iconaImg;
+      if (altre.length) {
+        v.varianti = altre.map((x) => ({
+          label: x.label || nomeConOggetto(nome, x.fraseOggetto || fraseOggetto(x.oggetto)),
+          onClick: x.onClick, bersaglio: x.bersaglio || bersaglioDi(x.oggetto), disabled: !!x.disabled,
+        }));
+      }
+      if (Array.isArray(a.varianti)) v.varianti = [...(v.varianti || []), ...a.varianti];
       return v;
     }
     if (IS_SUBFRAME) return null;
     const r = d.tipo === 'pagina' ? regPagina[id] : regFinestra[id];
-    return r ? { ...r, draggable: true } : null;
+    if (!r) return null;
+    return { ...r, nome: r.label, tasto: '', draggable: true };
+  }
+
+  const bersaglioDi = (oggetto) => (aperta && aperta.bersagli && aperta.bersagli[oggetto]) || null;
+
+  // Le voci date come testo da una pagina di Filo (il messaggio della chat, una riga della home): il verbo dalla loro
+  // etichetta, e quelle con lo stesso verbo diventano un'icona sola con le varianti. Una voce che nessun verbo riconosce
+  // resta un'icona generica col suo nome: la sentinella tiene riconosciute quelle che il codice scrive.
+  function vociScritte(lista) {
+    const I = (name) => global.SN_ICONS[name](ICONA_PX());
+    const perVerbo = new Map();
+    for (const x of Array.isArray(lista) ? lista : []) {
+      if (!x || typeof x.onClick !== 'function' || !x.label) continue;
+      const r = (x.verbo && Disp.VERBI[x.verbo] ? { verbo: x.verbo, oggetto: x.oggetto || '' } : null) || Disp.verboDellEtichetta(x.label);
+      const verbo = r ? r.verbo : `scritta:${x.label}`;
+      if (!perVerbo.has(verbo)) perVerbo.set(verbo, []);
+      perVerbo.get(verbo).push({ ...x, oggettoScritto: r ? r.oggetto : '' });
+    }
+    return [...perVerbo.entries()].map(([verbo, voci]) => {
+      const d = Disp.VERBI[verbo] || null;
+      const [a, ...altre] = voci;
+      const nome = d ? d.nome : a.label;
+      return {
+        id: '', azione: d ? verbo : '', icon: d ? I(a.icona && global.SN_ICONS[a.icona] ? a.icona : d.icona) : I('list'),
+        nome, oggetto: d ? a.oggettoScritto : '', tasto: d ? d.tasto : '', label: a.label, onClick: a.onClick,
+        disabled: !!a.disabled, bersaglio: a.bersaglio || null, draggable: false,
+        ...(altre.length ? { varianti: altre.map((x) => ({ label: x.label, onClick: x.onClick, bersaglio: x.bersaglio || null, disabled: !!x.disabled })) } : {}),
+      };
+    });
+  }
+
+  // Un verbo che c'è già nella griglia prende la voce scritta come variante (con una selezione «Copia» copia la
+  // selezione, e «Copia il messaggio» sta nel suo menu); le altre voci scritte vengono prima, sono dell'elemento.
+  function unisci(scritte, inFila, inAltro) {
+    const tutte = [...inFila, ...inAltro];
+    const restano = [];
+    for (const s of scritte) {
+      const stessa = s.azione && tutte.find((v) => v.azione === s.azione);
+      if (!stessa) { restano.push(s); continue; }
+      stessa.varianti = [...(stessa.varianti || []), { label: s.label, onClick: s.onClick, bersaglio: s.bersaglio }, ...(s.varianti || [])];
+    }
+    return restano;
+  }
+
+  // Un tasto per icona: quello del verbo, o se è già preso una lettera del suo nome ancora libera.
+  function tastiUnici(voci) {
+    const presi = new Set();
+    for (const v of voci) {
+      if (!v || v.kind === 'overflow') continue;
+      const vuole = String(v.tasto || '').toLowerCase();
+      let t = vuole && !presi.has(vuole) ? vuole : '';
+      if (!t) {
+        const lettere = String(v.nome || '').toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
+        t = [...lettere].find((c) => !presi.has(c)) || '';
+      }
+      v.tasto = t;
+      if (t) presi.add(t);
+    }
   }
 
   function costruisci() {
@@ -187,25 +277,27 @@
     const voci = (lista) => lista.map((id) => voce(id, azioni, regPagina, regFinestra)).filter(Boolean);
     const inFila = voci(ids);
     const inAltro = voci(altro);
-    const items = [...inFila, {
+    const scritte = unisci(vociScritte(aperta.scritte), inFila, inAltro);
+    const griglia = [...scritte, ...inFila];
+    tastiUnici([...griglia, ...inAltro]);
+    const items = [...griglia, {
       kind: 'overflow',
       icon: global.SN_ICONS.plus(16),
       label: I18n.t('menu_overflow'),
-      onClick: (anchorEl) => Menu.openIconGridSubmenu(anchorEl, inAltro, {
-        cols: 4,
-        dropTarget: Disp.zonaAltro(contesto),
-        onDrop: (e) => applyIconDrop(e),
-      }),
+      nome: I18n.t('menu_overflow'),
     }];
-    return { items, inAltro, vuota: !inFila.length && !inAltro.length };
+    return { items, inAltro, vuota: !griglia.length && !inAltro.length };
   }
 
-  // La fila per il menu che si sta aprendo. `azioni`: { <azione>: { onClick, label?, icona?, tieneAperto?, disabled?,
-  // acceso? } }, quelle che l'elemento sotto il mouse permette; `icona` e `label` dicono lo stato (Riproduci o Pausa),
-  // `acceso` uno stile che la selezione ha già (Grassetto).
-  function fila(contesto, azioni = {}) {
+  // La griglia per il menu che si sta aprendo. `azioni`: { <azione>: { onClick | su, label?, nome?, icona?, tieneAperto?,
+  // disabled?, acceso?, valore?, iconaImg? } }, quelle che l'elemento sotto il mouse permette; `icona` e `nome` dicono lo
+  // stato (Riproduci o Pausa), `acceso` uno stato acceso (Grassetto, l'audio), `valore` un'azione col valore come icona.
+  // `opzioni`: { bersagli: { <oggetto>: [rect] }, oggetti: { <oggetto>: frase }, scritte: [voci delle pagine di Filo],
+  // aspetto: { icona, colonne }, oggetto: la frase della riga del nome a riposo }.
+  function fila(contesto, azioni = {}, opzioni = {}) {
     if (!Object.prototype.hasOwnProperty.call(Disp.CONTESTI, contesto)) { aperta = null; return null; }
-    aperta = { contesto, azioni: azioni || {} };
+    const o = opzioni && typeof opzioni === 'object' ? opzioni : {};
+    aperta = { contesto, azioni: azioni || {}, bersagli: o.bersagli || {}, oggetti: o.oggetti || {}, scritte: o.scritte || [], aspetto: o.aspetto || {} };
     const c = costruisci();
     return {
       type: 'row',
@@ -213,18 +305,22 @@
       dropTarget: Disp.zonaFila(contesto),
       onDrop: (e) => applyIconDrop(e),
       items: c.items,
+      altro: { items: c.inAltro, dropTarget: Disp.zonaAltro(contesto), onDrop: (e) => applyIconDrop(e) },
+      aspetto: aperta.aspetto,
+      oggetto: String(o.oggetto || ''),
       vuota: c.vuota,
     };
   }
 
   // Sul posto, senza chiudere il menu: chi riordina continua a riordinare. Serve anche quando cambia lo stato che
-  // decide il NOME di un'icona mentre il menu è sotto gli occhi (lo schermo intero spento da un'altra strada, #514).
-  function ridisegna() {
+  // decide il NOME di un'icona mentre il menu è sotto gli occhi (lo schermo intero spento da un'altra strada, #514), o
+  // il valore girato con la rotella. `azioni` nuove, se lo stato dell'elemento è cambiato.
+  function ridisegna(azioni) {
     if (!aperta || !Menu.isOpen?.()) return;
+    if (azioni && typeof azioni === 'object') aperta.azioni = azioni;
     const c = costruisci();
     if (!c) return;
-    try { Menu.refreshIconRow?.(c.items, { vuota: c.vuota }); } catch (_) {}
-    try { Menu.refreshIconGrid?.(c.inAltro); } catch (_) {}
+    try { Menu.refreshIconRow?.(c.items, { vuota: c.vuota, altro: c.inAltro }); } catch (_) {}
   }
 
   // ── la barra laterale, terza zona (#871) ─────────────────────────────────
