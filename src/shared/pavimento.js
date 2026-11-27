@@ -583,8 +583,8 @@
   // Anche dopo di cosa è («la password del wifi Mela!Verde77», #2678.7): il complemento non è il valore, quello dopo sì.
   const COMPLEMENTO = `(?:[ \\t]+${global.SN_GUARDIANO_STATICO.COMPLEMENTO})?`;
   const IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]+${VIRGOLETTA}([^\\s|\\[${VIRGOLETTE}(),;]{6,64})`, 'gi');
-  // Senza spazi il verbo o la particella stanno attaccati al nome («WiFi密码是12345678», «パスワードはPass2024!です»,
-  // «비밀번호는 Pass2024!»), e il valore finisce dove ricomincia la scrittura della frase.
+  // Senza spazi il verbo o la particella stanno attaccati al nome («WiFi口令是12345678», «暗証番号はPass2024!です»,
+  // «암호는 Pass2024!»), e il valore finisce dove ricomincia la scrittura della frase.
   const ATTACCATO = new RegExp(`(?:${NOMI_CJK})(?:(?:(?:就|也|还|還|都|一直)?(?:是|为|為)|は|が|も|는|은|이|가)[:：、，,]?|[:：=])[ \\t]*[「『“"']?([^\\s${CJK}「」『』“”"'。、，：；！？（）]{4,64})`, 'gu');
   const FORMA_FORTE = (v) => /\p{L}/u.test(v) && (/[0-9]/.test(v) || /[!@#$%^&*+=?~_]/.test(v));
   const INTESTAZIONE = new RegExp(`^${ETICHETTA}[^|\\t]{0,30}$`, 'i');
