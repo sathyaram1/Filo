@@ -431,7 +431,7 @@
   const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
   // Il «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
   const VERBO_PASSWORD = `(?:${VERBO}|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)`;
-  // Fra il nome e il valore, spazi compresi: l'annuncio, il verbo di cambio («diventa», «è rimasta»), «in», «a», «to»
+  // Fra il nome e il valore, spazi compresi: l'annuncio, il verbo di cambio («diventa …»), «in», «a», «to»
   // dopo un participio di cambio nella frase («ho cambiato la password in …»), l'annuncio dopo la domanda («ti ricordi
   // la password? Era …»). Gli elenchi sono del guardiano (CAMBI, #1403.67).
   const CAMBI = global.SN_GUARDIANO_STATICO.CAMBI;
