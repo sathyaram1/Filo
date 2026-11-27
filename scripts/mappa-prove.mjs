@@ -19,6 +19,8 @@ const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : 
 const TETTO_BYTE = 256 * 1024 * 1024;
 // La mappa nasce a ogni corsa: se nelle ultime cinque non c'è, il guasto è suo e cercarla più indietro costa e basta.
 const CORSE_GUARDATE = 5;
+// Il lavoro di suite.yml che stampa la mappa nel registro: la sentinella tests/unit/mappaProveFlusso.test.mjs.
+export const LAVORO_DELLA_MAPPA = 'verdetto';
 
 const AIUTO = `Uso:
   node scripts/mappa-prove.mjs [--base <rif>] [--diff <file>] [--mappa <file>] [--corsa <id>] [--json] [file…]
