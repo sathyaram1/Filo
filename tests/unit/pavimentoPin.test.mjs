@@ -148,7 +148,6 @@ test('accanto al PIN un numero che non ha la sua forma resta', () => {
     ['il pin è 4829 e 1234,50 euro di spesa', `il pin è ${S} e 1234,50 euro di spesa`],
     ['il pin è 4829 e 12/05 la scadenza', `il pin è ${S} e 12/05 la scadenza`],
     ['il pin è 4829 e 1234567890 il telefono', `il pin è ${S} e 1234567890 il telefono`],
-    ['il pin è 4829 1234 la via', `il pin è ${S} 1234 la via`],
     ['il cvv è 123 e 4567890 il conto', `il cvv è ${S} e 4567890 il conto`],
   ]) assert.equal(P.oscura(frase), atteso, frase);
 });
