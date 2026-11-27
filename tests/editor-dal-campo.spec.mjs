@@ -232,11 +232,10 @@ test('fotogrammi dell\'apertura: nessun fotogramma bianco fra la home e l\'edito
   const file = readdirSync(cartella).filter((f) => f.endsWith('.png')).sort();
   expect(file.length).toBeGreaterThan(20);
   // Un fotogramma «bianco» ha più di un terzo dell'area pagina in bianco pieno: lo sfondo di Filo non lo è mai.
-  const bianchi = await app.evaluate(async ({ nativeImage }, { cartella: dir, file: nomi }) => {
-    const path = require('node:path');
+  const bianchi = await app.evaluate(async ({ nativeImage }, percorsi) => {
     const out = [];
-    for (const n of nomi) {
-      const img = nativeImage.createFromPath(path.resolve(dir, n));
+    for (const n of percorsi) {
+      const img = nativeImage.createFromPath(n);
       const buf = img.toBitmap();
       let bianco = 0;
       for (let i = 0; i < buf.length; i += 16) if (buf[i] > 250 && buf[i + 1] > 250 && buf[i + 2] > 250) bianco++;
