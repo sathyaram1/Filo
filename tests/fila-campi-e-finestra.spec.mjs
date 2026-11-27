@@ -127,12 +127,12 @@ test('su un filmato o un audio icona e voce si chiamano allo stesso modo, e fann
   await expect(salva).toHaveAttribute('aria-label', 'Salva audio come…');
   await expect(menu.voce('Salva audio come…')).toBeVisible();
   // Ripeti dalla voce; riaperto, voce e icona del «+» dicono di toglierlo, e l'icona lo toglie.
-  await menu.voce('Ripeti in continuo').click();
+  await menu.scegli('Ripeti in continuo');
   await expect.poll(() => page.evaluate(() => document.getElementById('aud').loop)).toBe(true);
   await page.locator('#aud').click({ button: 'right' });
-  await expect(menu.voce('Non ripetere')).toBeVisible();
-  await menu.locator('.sn-menu-row .sn-menu-row-overflow').click();
-  const ripeti = menu.locator('.sn-menu-icon-grid [data-sn-icon-id="media:loop"]');
+  await expect(menu.voce('Non ripetere')).toHaveCount(1);
+  await menu.piu.click();
+  const ripeti = menu.locator('.sn-menu-altro [data-sn-icon-id="media:loop"]');
   await expect(ripeti).toHaveAttribute('aria-label', 'Non ripetere');
   await ripeti.click();
   await expect.poll(() => page.evaluate(() => document.getElementById('aud').loop)).toBe(false);
