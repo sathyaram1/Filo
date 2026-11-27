@@ -574,8 +574,9 @@
     if (!P || typeof P.trova !== 'function') return [];
     const out = [];
     // Il valore di un parametro si legge come una riga sua: «?t=La password del mio pc è …» è la frase, non un campo.
-    for (const x of P.trova(s.replace(/[?&#][\w.%[\]-]{0,64}=/g, '\n'))) {
-      const regola = DAL_PAVIMENTO[x.regola] ? DAL_PAVIMENTO[x.regola](x) : '';
+    const righe = s.replace(/[?&#][\w.%[\]-]{0,64}=/g, '\n');
+    for (const x of P.trova(righe)) {
+      const regola = DAL_PAVIMENTO[x.regola] ? DAL_PAVIMENTO[x.regola](x, righe) : '';
       if (regola) out.push({ valore: String(x.valore), regola });
     }
     return out;
