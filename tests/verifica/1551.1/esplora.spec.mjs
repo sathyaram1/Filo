@@ -39,7 +39,7 @@ function misura(page) {
   });
 }
 
-for (const [W, s, z] of [[1000, 1.5, 1], [1000, 1.25, 1], [800, 1.25, 1], [720, 1.5, 1], [720, 1.5, 1.5], [1280, 1.5, 1.25], [1000, 0.9, 1], [1000, 1.1, 1]]) {
+for (const [W, s, z] of [[1000, 1.5, 1.5], [1280, 1.5, 1.5], [1000, 1.25, 1.5], [720, 1.25, 1.25], [720, 1, 2]]) {
   test(`esplora ${W} testo ${s} zoom ${z}`, async ({ app, shell }) => {
     await app.evaluate(({ BrowserWindow }, [w]) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setContentSize(w, 760), [W]);
     let page = await home(app);
