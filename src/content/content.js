@@ -2783,7 +2783,7 @@
       }
       const incolla = Actions.buildPasteItem(clipboardHistory);
       azioni.paste = {
-        label: incolla.label, onClick: incolla.onClick, azione: incolla.azione,
+        label: incolla.label, onClick: incolla.onClick, azione: incolla.azione, nota: incolla.shortcut || '',
         cronologia: { history: incolla.history, onPick: incolla.onPickHistory, onRemove: incolla.onRemoveHistory, onClear: incolla.onClearHistory },
       };
       // Il modello della dettatura si sceglie dal menu dell'icona: i modelli sono le sue varianti.
