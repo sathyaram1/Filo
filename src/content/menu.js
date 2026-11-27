@@ -1540,12 +1540,16 @@
     const varianti = (Array.isArray(sub.varianti) && sub.varianti.length > 0) || !!cronologia;
     if (varianti) { b.dataset.snVarianti = '1'; b.setAttribute('aria-haspopup', 'menu'); }
     const griglia = () => b.closest('.sn-menu-griglia');
+    // Il nome letto su un'icona (#1471): chi ci resta sopra un attimo, non chi ci passa.
+    let letto = null;
     const mostra = () => {
       dettoNelNome(griglia(), sub.kind === 'overflow' ? { nome: sub.label, tasto: '' } : sub);
       if (sub.bersaglio) mostraBersaglio(sub.bersaglio);
       else nascondiBersaglio();
+      clearTimeout(letto);
+      if (sub.id) letto = setTimeout(() => lettura.mostrato(sub.id, 'menu'), 600);
     };
-    const via = () => { dettoNelNome(griglia(), null); nascondiBersaglio(); };
+    const via = () => { clearTimeout(letto); lettura.via(); dettoNelNome(griglia(), null); nascondiBersaglio(); };
     b.addEventListener('mouseenter', mostra);
     b.addEventListener('focus', mostra);
     b.addEventListener('mouseleave', () => { if (document.activeElement !== b) via(); });
