@@ -28,6 +28,9 @@ test('r1 il telefono come il cellulare: con chi lo possiede, un aggettivo, l\'ar
     'il codice del telefono è: 4821',
     'il codice del telefono È 4821',
     'IL CODICE DEL TELEFONO È 4821',
+    'il codice del telefono è sempre 4821',
+    'il codice del telefono, 4821',
+    'il codice della carta è ancora 4821',
   ]) togli(f);
 });
 
