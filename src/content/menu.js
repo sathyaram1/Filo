@@ -1608,14 +1608,27 @@
   }
 
   // Ridisegna sul posto, senza chiudere il menu: chi riordina continua a riordinare.
-  function refreshIconRow(items, { vuota = false } = {}) {
+  // `altro`: le icone dietro il «+». Il blocco aperto resta aperto, e l'icona che aveva il fuoco lo riprende: chi gira la
+  // rotella su un valore o riordina continua.
+  function refreshIconRow(items, { vuota = false, altro = null } = {}) {
     if (!activeMenu) return;
-    const row = activeMenu.root.querySelector('.sn-menu-row');
+    const g = activeMenu.root.querySelector('.sn-menu-griglia');
+    const row = g && g.querySelector('.sn-menu-row:not(.sn-menu-altro)');
     if (!row) return;
-    populateRow(row, items, row.__snRowOpts || {});
+    const blocco = g.querySelector('.sn-menu-altro');
+    const aperto = !!blocco && !blocco.hidden;
+    const fuoco = g.contains(document.activeElement) ? document.activeElement.dataset.snIconId : '';
+    riempiGriglia(g, { items, dropTarget: row.dataset.snDropTarget, altro: { items: Array.isArray(altro) ? altro : [], dropTarget: blocco && blocco.dataset.snDropTarget } });
+    if (aperto) { const piu = row.querySelector('.sn-menu-row-overflow'); if (piu) esecutori.get(piu)?.(); }
     if (vuota) row.dataset.snVuota = '1';
     else delete row.dataset.snVuota;
     row.hidden = !!vuota && !esterno;
+    const nome = g.querySelector('.sn-menu-nome');
+    if (nome) nome.hidden = row.hidden;
+    if (fuoco) {
+      const b = g.querySelector(`[data-sn-icon-id="${CSS.escape(fuoco)}"]`);
+      if (b) { try { b.focus({ preventScroll: true }); } catch (_) {} }
+    }
   }
 
   function refreshIconGrid(items) {
