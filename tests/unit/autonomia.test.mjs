@@ -810,8 +810,9 @@ test('segreti: controlli deterministici, che non gridano al lupo', () => {
   assert.deepEqual(A.segretoDettaglio('La mia password è Gatto!2024 e non entra.', { richiesta: 'la mia password è Gatto!2024' }).valori, ['Gatto!2024']);
 });
 
-// #1403.89 — il codice di ciò che si apre, che il pavimento toglie ai modelli, non esce nemmeno da un'azione.
-test('il codice del mio telefono, del cancello o il CVV in uscita chiedono la parola', () => {
+// #1403.89 — il codice di ciò che si apre, che il pavimento toglie ai modelli, non esce nemmeno da un'azione: non
+// scritto dall'utente è un no, scritto da lui vuole la parola.
+test('il codice del mio telefono, del cancello o il CVV non escono da un\'azione senza la parola', () => {
   for (const frase of ['Il codice del mio telefono è 4829', '4829 è il codice del mio telefono', 'my phone code is 4829',
     'Le code de mon téléphone est 4829', 'Per sbloccare il mio telefono uso 4829', 'Il codice del cancello è 4829',
     'Il codice del mio telefono è 1111. Quello del pc è 4829', 'CVV: 482']) {
