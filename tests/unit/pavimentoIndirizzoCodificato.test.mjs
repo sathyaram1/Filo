@@ -73,12 +73,51 @@ test('un indirizzo codificato qualunque resta com\'è', () => {
 
 test('la decodifica con i posti dà quello che dà decodeURIComponent, e ogni carattere sa da dove viene', () => {
   const s = 'a%20b%C3%A8%F0%9F%98%80c+d%2Bx%ZZ%E2%82';
-  const d = U.decodificaConPosti(s, { piu: true });
+  const d = U.giroDiDecodifica(s);
   assert.equal(d.testo, 'a bè😀c d+x%ZZ%E2%82');
   assert.equal(d.da.length, d.testo.length);
   const pezzo = (i) => s.slice(d.da[i], d.a[i]);
   assert.equal(pezzo(d.testo.indexOf('è')), '%C3%A8');
   assert.equal(pezzo(d.testo.indexOf('😀')), '%F0%9F%98%80');
   assert.equal(pezzo(d.testo.indexOf(' ', 3)), '+');
-  assert.equal(U.decodificaConPosti('c+d').testo, 'c+d', 'il «+» è uno spazio solo se chiesto');
+});
+
+test('una carta scritta a gruppi dentro un indirizzo codificato non arriva al modello', () => {
+  for (const url of [
+    'https://x.example/?q=carta%204111%201111%201111%201111',
+    'https://www.google.com/search?q=carta+4111+1111+1111+1111',
+    'https://x.example/?q=4111%2D1111%2D1111%2D1111&p=2',
+  ]) {
+    const t = P.oscura(url);
+    assert.ok(t.includes(S), t);
+    assert.ok(!decodeURIComponent(t.replace(/\+/g, ' ')).replace(/\D/g, '').includes('4111111111111111'), t);
+  }
+});
+
+test('il filtro legge l\'indirizzo come il controllo in uscita: il «+» è uno spazio anche nel percorso', () => {
+  for (const url of [
+    'https://x.example/cerca/la+password+%C3%A8+Mela!Verde77',
+    'https://x.example/cerca/la+password+del+wifi+Mela!Verde77',
+  ]) {
+    assert.ok(U.exposedAlnum(url).includes('passwordmelaverde77') || U.exposedAlnum(url).includes('melaverde77'), url);
+    const t = P.oscura(url);
+    assert.ok(!t.includes('Verde77'), t);
+    assert.ok(t.includes(S), t);
+  }
+  assert.equal(P.oscura('https://x.example/wiki/C++_(linguaggio)'), 'https://x.example/wiki/C++_(linguaggio)');
+});
+
+test('i collegamenti a voci accentate non rallentano il filtro, e una chiave attaccata a un accento si toglie lo stesso', () => {
+  const pagina = (voce) => Array.from({ length: 1500 }, (_, i) => `<a href="https://it.wikipedia.org/wiki/${voce}_${i}">voce ${i}</a>`).join(' ');
+  const misura = (t) => {
+    P.oscura(t);
+    const t0 = process.hrtime.bigint();
+    for (let k = 0; k < 3; k++) P.oscura(t);
+    return Number(process.hrtime.bigint() - t0) / 3e6;
+  };
+  const inChiaro = misura(pagina('Città'));
+  const codificati = misura(pagina('Citt%C3%A0'));
+  assert.ok(codificati < inChiaro * 3 + 20, `${codificati} ms contro ${inChiaro} ms`);
+  const chiave = 'https://x.example/?q=password%20%C3%A8%20Mela!Verde77&r=Citt%C3%A0';
+  assert.ok(!P.oscura(chiave).includes('Verde77'));
 });
