@@ -115,7 +115,7 @@ test('rinnovo: un giorno e un ora nel campo data vanno al server in millisecondi
   await expect(page.locator('#mgCrRinnovoB')).toHaveValue('2026-10-16T12:00');
   // Dal tasto destro si toglie, come col campo vuoto.
   await page.locator('#mgCrRinnovoB').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Togli il numero' }).click();
+  await menuDi(page).scegli('Togli il numero');
   await expect(page.locator('#mgCrRinnovoBMsg')).toHaveText('Tolto: vale mercoledì alle 9.');
   expect((await page.evaluate(() => window.__cr.inviati)).pop()).toEqual({ rinnovoB: null });
   await expect(page.locator('#mgCrRinnovoB')).toHaveValue('');
