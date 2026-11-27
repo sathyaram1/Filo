@@ -103,7 +103,7 @@ test('a menu aperto dall\'utente il sito non preme Incolla né la freccia; la cr
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
 
   await page.locator('#campo').click({ button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu-paste-arrow')).toBeVisible();
+  await expect(menuDi(page).incolla).toBeVisible();
   expect(await page.evaluate(() => window.freccia())).toBe(true);
   expect(await page.evaluate(() => window.incolla())).toBe(true);
   await page.waitForTimeout(800);
