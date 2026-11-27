@@ -58,9 +58,16 @@ function segui(app, prova, dir, { accumula: accumulaIn, comeIndirizzi }) {
   app.once('close', scrivi);
 }
 
-export function accendiCopertura() {
+/**
+ * `regola`: src/main/copertura.js, che dice quando una funzione conta come eseguita per il main e per le pagine. La
+ * passa chi accende perché gli strumenti fissati non portano src/main (tests/unit/toolsPin.test.mjs).
+ */
+export function accendiCopertura(regola) {
   const dir = process.env.FILO_COPERTURA;
   if (!dir) return;
+  if (typeof regola?.accumula !== 'function' || typeof regola?.comeIndirizzi !== 'function') {
+    throw new Error('accendiCopertura vuole la regola del main: accendiCopertura(require(\'./src/main/copertura.js\'))');
+  }
   const proto = Object.getPrototypeOf(_electron);
   if (proto.__filoCopertura) return;
   proto.__filoCopertura = true;
