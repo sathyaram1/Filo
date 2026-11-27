@@ -182,7 +182,7 @@ test('scelto tre volte, Filo propone una volta il menu del sito; accettato, il t
   await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.keyboard.press('Escape');
 
-  // Shift porta al menu di Filo, che dalla freccia della voce rimette le cose com'erano.
+  // Shift porta al menu di Filo, che dal menu dell'icona (tasto destro su di lei) rimette le cose com'erano.
   const prima = await page.evaluate(() => window.aperture);
   await page.keyboard.down('Shift');
   await page.locator('#area').click({ button: 'right', position: { x: 30, y: 30 } });
