@@ -84,7 +84,6 @@
     leaveText: v('Lascia', 'typeText', 'l', 'lasciare il testo', ['lascia']),
     later: v('Rimanda', 'alarm', 'd', 'rimandare', ['rimanda', 'riprendi dopo']),
     gift: v('Regala', 'gift', 'g', 'regalare', ['regala']),
-    favorite: v('Preferito', 'pin', 'p', 'tenere fra i preferiti', ['preferit', 'tra i preferiti', 'fra i preferiti']),
     more: v('Altro', 'list', 'w', 'fare altro'),
   });
 
