@@ -155,8 +155,8 @@
     for (const [p, id] of PAROLE) {
       if (!basso.startsWith(p)) continue;
       const dopo = basso.charAt(p.length);
-      // «Copia» sì, «Copiature» no; una parola di più parole («tieni aperto») vale intera, e le spezzate («preferit») no.
-      if (dopo && /[a-zà-ù]/i.test(dopo) && !p.endsWith('preferit')) continue;
+      // «Copia» sì, «Copiature» no; un verbo di più parole («tieni aperto») vale intero.
+      if (dopo && /[a-zà-ù]/i.test(dopo)) continue;
       const resto = t.slice(p.length).replace(/^[\s·:,–—-]+/, '').trim();
       return { verbo: id, oggetto: resto };
     }
