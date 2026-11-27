@@ -13,7 +13,7 @@ require('../../src/shared/campiSegreti.js');
 const P = require('../../src/shared/pavimento.js');
 const G = globalThis.SN_GUARDIANO_STATICO;
 const S = globalThis.SN_CAMPI_SEGRETI;
-const { pageHints } = require('../../src/content/safebrowseHints.js');
+const { pageHints, PAGE_HINTS_JS } = require('../../src/content/safebrowseHints.js');
 
 const NOMI = ['Cryptogramme', 'Cryptogramme visuel', 'Code de sécurité', 'Code de securite', 'Código de seguridad',
   'Codigo de seguridad', 'Código de segurança', 'Kartenprüfnummer', 'Kartenpruefnummer', 'Prüfnummer', 'Prüfziffer',
