@@ -201,7 +201,7 @@ test('trascino i Mazzi sopra l’Editor e si scambiano; tolti finiscono in «alt
     // E si ritolgono, e l'Editor va in fondo: dopo il riavvio è tutto com'era.
     await page.locator('#tieni .dash-carta[data-tipo="mazzi"] .dash-carta-togli').click({ force: true });
     await page.locator('#tieni .dash-carta[data-tipo="editor"]').click({ button: 'right' });
-    await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Sposta giù' }).click();
+    await menuDi(page).scegli('Sposta giù');
     await expect.poll(() => ordineDestra(page)).toEqual(['suggerimenti', 'editor', 'rapide']);
     await chiudiApp(app);
 
