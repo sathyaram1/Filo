@@ -572,7 +572,7 @@ test('la carta dei Crediti tolta va in «altro» e si rimette da sola: la destra
 
   const crediti = page.locator('#accade .dash-carta[data-tipo="crediti"]');
   await crediti.click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: /^Togli/ }).click();
+  await menuDi(page).scegli(menuDi(page).locator('.sn-menu-griglia .sn-menu-row-btn[aria-label^="Togli"]').first());
   await expect(crediti).toHaveCount(0);
 
   const inAltro = page.locator('#altro .dash-altro-app[data-tolta="1"]', { hasText: 'Crediti' });
