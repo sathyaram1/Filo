@@ -2620,3 +2620,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-riga-app-vai:hover,
 .dash-riga-app-vai:focus-visible { background: var(--dash-ink); color: var(--dash-paper); text-decoration: none; }
+
+/* Il velo del campo che diventa l'Editor (#2389): misure, colori e tempi li scrive dashboard-editor-campo.js. */
+.dash-velo-editor { position: fixed; z-index: 2147483000; box-sizing: border-box; overflow: hidden; }
+.dash-velo-testo { position: absolute; white-space: pre-wrap; overflow-wrap: break-word; }
+.dash-velo-testo p { margin: 0 0 var(--velo-spazio, 0); }
+.dash-velo-colonna { position: absolute; box-sizing: border-box; display: none; }
