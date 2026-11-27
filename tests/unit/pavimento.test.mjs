@@ -689,6 +689,35 @@ test('#2678.13: una riga lunghissima di emoji o di parentesi dopo «Password:» 
   }
 });
 
+test('#2678.14: un numero e una parola di tempo dentro la frase-password non la fanno passare per la sua data', () => {
+  for (const frase of ['ci vediamo tra due giorni', 'casa mia al mare da tre anni', 'il mio cane si chiama Fido e ha tre anni',
+    'sei la mia vita da 2 anni', 'we met 3 years ago in Rome']) {
+    for (const riga of [`Password: ${frase}`, `Password: «${frase}»`, `La password è "${frase}"`]) {
+      assert.ok(P.oscura(riga).includes(S) && !P.oscura(riga).includes(frase.split(' ').slice(-2).join(' ')), riga);
+    }
+  }
+  assert.equal(P.oscura('Password: ci vediamo tra due giorni'), `Password: ${S}`);
+  for (const riga of ['Password: 8 o più caratteri', 'Password: valida per 90 giorni', 'Password: ultima modifica 3 mesi fa',
+    'Password: ultima modifica il 12 marzo 2024', 'Password: marzo 2024', 'Password: last changed 3 months ago',
+    'Password: at least 8 characters', 'Password: 90 giorni', 'Password: «almeno 8 caratteri»', 'Password: tre anni fa']) {
+    assert.equal(P.oscura(riga), riga, riga);
+  }
+});
+
+test('#2678.14: la frase-password che apre col tempo si toglie; la riga che dice lo stato della password resta, con e senza virgolette', () => {
+  for (const [frase, pezzo] of [['tre anni al mare con mia madre', 'mia madre'], ['due giorni a Parigi con Luca', 'Luca'],
+    ['dieci anni di matrimonio felice', 'felice'], ['da tre anni vivo a Milano', 'Milano'], ['tra due giorni parto per Roma', 'Roma'],
+    ['sette giorni in barca', 'barca'], ['three days in Paris', 'Paris']]) {
+    for (const riga of [`Password: ${frase}`, `Password: «${frase}»`]) assert.ok(!P.oscura(riga).includes(pezzo), riga);
+  }
+  for (const stato of ['bloccata per 30 minuti', 'reimpostata 2 ore fa', 'la devo cambiare tra due giorni', 'me la chiede ogni 3 giorni',
+    'te la dico tra due giorni', 'cambiala ogni tre mesi', 'sempre la solita da 5 anni', 'minimum 8 characters',
+    'between 8 and 64 characters', 'lunga almeno 8 caratteri', 'creata 2 mesi fa', 'created 3 months ago', 'reset 2 days ago',
+    'impostata il 3 marzo 2024', 'tra 8 e 16 caratteri', 'da 8 a 16 caratteri', 'scade tra 30 giorni', 'expires in 90 days']) {
+    for (const riga of [`Password: ${stato}`, `Password: «${stato}»`]) assert.equal(P.oscura(riga), riga, riga);
+  }
+});
+
 test('una chiave o una password per nome, in un file di configurazione o sulla pagina di un servizio, non esce', () => {
   const segreti = {
     'PGPASSWORD=Girasole2024': 'Girasole2024',
