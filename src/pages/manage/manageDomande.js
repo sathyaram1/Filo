@@ -1041,7 +1041,7 @@
     const tante = ids.length > 1;
     for (const id of ids) {
       const d = trova(id);
-      if (!d || d.stato !== 'aperta') { fuori.push({ id, perche: 'non aspetta più una risposta' }); continue; }
+      if (!d || !daRispondere(d)) { fuori.push({ id, perche: 'non aspetta più una risposta' }); continue; }
       const o = consigliata(d);
       const etichetta = etichettaDi(o);
       if (!etichetta) {
