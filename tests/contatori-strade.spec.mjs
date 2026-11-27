@@ -161,7 +161,7 @@ document.addEventListener('click', function () { document.getElementById('menu-s
 
   await page.locator('#area').click({ button: 'right', position: { x: 60, y: 50 } });
   await expect.poll(() => voce(app, 'contesto_box', 'pagina')).toBe(1);
-  await menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: 'Menu di Sito di prova' }).click();
+  await menuDi(page).icona('siteMenu').and(menuDi(page).voce('Menu di Sito di prova')).click();
   await expect(page.locator('#menu-suo')).toBeVisible();
   await expect.poll(() => voce(app, 'menu_nativo_scelto', 'menu_del_sito:voce')).toBe(1);
 
