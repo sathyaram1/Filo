@@ -107,7 +107,7 @@ test('il filtro legge l\'indirizzo come il controllo in uscita: il «+» è uno 
   assert.equal(P.oscura('https://x.example/wiki/C++_(linguaggio)'), 'https://x.example/wiki/C++_(linguaggio)');
 });
 
-test('i collegamenti a voci accentate non rallentano il filtro, e una chiave attaccata a un accento si toglie lo stesso', () => {
+test('i collegamenti a voci accentate non rallentano il filtro, e accanto a loro una password codificata si toglie', () => {
   const pagina = (voce) => Array.from({ length: 1500 }, (_, i) => `<a href="https://it.wikipedia.org/wiki/${voce}_${i}">voce ${i}</a>`).join(' ');
   const misura = (t) => {
     P.oscura(t);
