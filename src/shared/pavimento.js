@@ -319,7 +319,7 @@
   const DOPO_VIRGOLETTA = new RegExp(`^(?:[ \\t]*${INTORNO_CHIUSE})+`);
   // `risposta`: la riga sotto, dopo chi scrive (`testa`). Sotto chi chiede il codice vale ogni punto del messaggio,
   // come per la password («Luc: è sempre 4821», #2692); sotto una riga che lo nomina e basta, solo la testa.
-  function alPostoDelCodice(z, m, inTesta, forte, risposta) {
+  function alPostoDelCodice(z, m, inTesta, forte, risposta, entra) {
     const prima = z.slice(0, m.index).replace(SENZA_VIRGOLETTA, '');
     if (inTesta) {
       if (!risposta) return !prima.trim();
