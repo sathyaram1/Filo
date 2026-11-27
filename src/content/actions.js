@@ -1751,7 +1751,17 @@
   // (la finestra mobile dove il filmato non la permette).
   function azioniDelMedia(el, link = null) {
     const audio = isAudioEl(el);
+    const transcribe = { label: I18n.t('menu_transcribe'), onClick: () => trascriviMedia(el) };
+    // Un media che la pagina suona fuori dal documento (il vocale di WhatsApp) qui è solo il suo indirizzo: niente comandi.
+    if (el.staccato) {
+      return {
+        transcribe,
+        copyLink: { label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'), onClick: () => copyMediaUrl(el) },
+        save: { label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'), onClick: () => downloadMedia(el, link) },
+      };
+    }
     return {
+      transcribe,
       playPause: { label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'), icona: el.paused ? 'play' : 'pause', onClick: () => toggleMediaPlay(el) },
       mute: { label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'), icona: el.muted ? 'volume' : 'volumeMute', onClick: () => toggleMediaMute(el) },
       loop: { label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'), onClick: () => toggleMediaLoop(el) },
