@@ -153,30 +153,6 @@ test('con la riduzione del movimento l\'editor si apre senza animazione', async 
   await expect(h.locator('#input')).toHaveValue('');
 });
 
-test('una bozza che l\'editor non prende torna nel campo', async ({ app }) => {
-  const h = await home(app);
-  // L'editor non chiede la bozza: il main la rende alla home allo scadere.
-  await app.evaluate(() => {
-    const M = globalThis.SN_MSG.MSG;
-    globalThis.__vecchio = globalThis.__vecchio || null;
-    const D = require('./src/main/services/editorDalCampo.js');
-    void M; void D;
-  }).catch(() => {});
-  await h.evaluate(() => {
-    const M = window.SN_MSG.MSG;
-    window.__mandato = null;
-    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === M.EDITOR_BOZZA_RESA) window.__mandato = m.testo; });
-  });
-  // Un id che il main non conosce viene ignorato; qui si simula la resa con il suo messaggio.
-  await h.fill('#input', '');
-  await h.evaluate(() => {
-    const M = window.SN_MSG.MSG;
-    chrome.runtime.onMessage.dispatch?.({ type: M.EDITOR_BOZZA_RESA, id: 'x', testo: 'Caro condominio,' });
-  });
-  test.skip(!(await h.evaluate(() => typeof chrome.runtime.onMessage.dispatch === 'function')), 'resa provata negli unit');
-  await expect(h.locator('#input')).toHaveValue('Caro condominio,');
-});
-
 test('nell\'editor l\'Aiuto vede la selezione e «riscrivilo più breve» cambia solo quel paragrafo', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await app.evaluate(async () => {
