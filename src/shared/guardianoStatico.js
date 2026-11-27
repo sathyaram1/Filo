@@ -554,7 +554,35 @@
     for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
     for (const m of s.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) out.push({ valore: m[1], regola: 'codice' });
     for (const m of s.matchAll(PIN_CON_COMPLEMENTO)) out.push({ valore: m[1], regola: 'codice' });
+    out.push(...codiciInElenco(s, out.valori));
     return Object.defineProperty(out.valori, 'saturo', { value: out.saturo });
+  }
+
+  // Un PIN, un codice o un CVV trovato vale per i numeri della stessa forma che gli stanno accanto in elenco: «i pin
+  // sono 4829 e 1234», «il cvv è 123, 456» (#1403.79). Le regole qui e nel pavimento trovano il primo, questa gli altri.
+  const CONGIUNZIONE = '(?:e|ed|o|oppure|and|or|und|oder|et|ou|y|i|oraz|lub|albo|en|of)';
+  const ACCANTO_IN_ELENCO = new RegExp(`["'»”)]?(?:[ \\t]*[,/&][ \\t]*(?:${CONGIUNZIONE}[ \\t]+)?|[ \\t]+${CONGIUNZIONE}[ \\t]+)`
+    + '["\'«“(]?(\\d{3,8})(?![\\d\\p{L}]|[.,/:-]\\d)', 'uy');
+  const CIFRE_IN_ELENCO = { codice: [4, 8], cvv: [3, 4] };
+  function codiciInElenco(s, valori) {
+    const nuovi = [];
+    const visti = new Set((valori || []).map((x) => `${x.regola}:${x.valore}`));
+    for (const x of valori || []) {
+      const misura = CIFRE_IN_ELENCO[x.regola];
+      const v = String(x.valore);
+      if (!misura || !/^\d+$/.test(v)) continue;
+      for (let i = s.indexOf(v); i >= 0; i = s.indexOf(v, i + 1)) {
+        if (/[\p{L}\p{N}]/u.test(s[i - 1] || '') || /[\p{L}\p{N}]/u.test(s[i + v.length] || '')) continue;
+        ACCANTO_IN_ELENCO.lastIndex = i + v.length;
+        let m;
+        for (let n = 0; n < 40 && (m = ACCANTO_IN_ELENCO.exec(s)); n++) {
+          if (m[1].length < misura[0] || m[1].length > misura[1]) break;
+          const k = `${x.regola}:${m[1]}`;
+          if (!visti.has(k)) { visti.add(k); nuovi.push({ valore: m[1], regola: x.regola }); }
+        }
+      }
+    }
+    return nuovi;
   }
 
   function raccogli(s, out, forma) {
