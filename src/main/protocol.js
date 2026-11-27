@@ -110,6 +110,8 @@ async function filoHandler(request) {
     if (resolved !== ROOT && !resolved.startsWith(ROOT + path.sep)) {
       return new Response('Forbidden', { status: 403 });
     }
+    // Nella suite la mappa prova → file sa così chi carica i fogli di stile e gli HTML (#2502).
+    if (process.env.FILO_COPERTURA) require('./copertura').servito(request.url);
 
     const servito = (await paginaInPausa(resolved)) || resolved;
     const res = await net.fetch(pathToFileURL(servito).href);
