@@ -1606,7 +1606,7 @@ test('#997 lo stesso dal filtro per creatore e dal tasto destro', async ({ openT
   await page.locator('[data-fs-tile="audit"]').click();
   await expect(page.locator('#mgFsAltro .mg-fs-detail')).toBeVisible();
   await page.locator('[data-fs-range="oggi"]').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Guarda questa finestra' }).click();
+  await menuDi(page).scegli('Guarda questa finestra');
   await expect(page.locator('#mgFsAltro .mg-fs-detail')).toHaveCount(0);
 });
 
