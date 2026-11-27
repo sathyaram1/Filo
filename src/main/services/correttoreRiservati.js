@@ -101,11 +101,12 @@ function riservati(grezzo) {
   return valori;
 }
 
-// Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
+// Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino;
+// in un numero corto anche il separatore delle cifre scandite («4.8.2.1», riservatiNelTesto.js).
 // Una parola di sole lettere vale intera: il «camera» di una risposta non tocca «cameraman». Così un numero corto (CVV,
 // PIN): «123» non tocca l'ordine «81234». Uno lungo no, perché nei pezzi incollati due carte stanno attaccate.
 function formaDi(valore) {
-  if (/^\d{1,7}$/.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore.split('').join('[\\s-]?')}(?![\\p{L}\\p{N}])`, 'giu');
+  if (/^\d{1,7}$/.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore.split('').join(`(?:\\s|${RT().SEPARA_CIFRE})?`)}(?![\\p{L}\\p{N}])`, 'giu');
   if (/^\d+$/.test(valore)) return new RegExp(valore.split('').join('[\\s-]?'), 'gi');
   if (/^\p{L}+$/u.test(valore)) return new RegExp(`(?<![\\p{L}\\p{N}])${valore}(?![\\p{L}\\p{N}])`, 'giu');
   return new RegExp(esc(valore), 'gi');
