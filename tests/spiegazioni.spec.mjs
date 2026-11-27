@@ -93,7 +93,7 @@ test('una risposta con due termini spiegati: passaggio, annidati, clic, Esc, tas
   // «Spiegami di più» arriva in chat, nella stessa conversazione, senza toccare quello che stavi scrivendo.
   await page.locator('#input').fill('bozza che resta');
   await parola(page, 'DNS').click({ button: 'right' });
-  await page.locator('.filo-spiega-menu [data-voce="piu"]').click();
+  await menuDi(page).scegli('Spiegami di più');
   await expect(page.locator('.dash-bubble-user').last()).toHaveText('Spiegami di più su «DNS».');
   await expect(page.locator('.dash-bubble-filo').last()).toContainText('Il DNS è la rubrica di internet.');
   const chiamate = await chiamateAlModello(app);
@@ -139,7 +139,7 @@ test('nel riquadro di «Spiega» la parola spiegata si apre, e «Spiegami di pi�
   await expect(riquadri(page)).toHaveCount(1);
   await expect(riquadri(page)).toContainText('Un\'assemblea di vescovi');
   await termine.click({ button: 'right' });
-  await page.locator('.filo-spiega-menu [data-voce="piu"]').click();
+  await menuDi(page).scegli('Spiegami di più');
   await expect(page.locator('.sn-popup-body .sn-msg-user .sn-msg-text').last()).toHaveText('Spiegami di più su «sinodo».');
   await expect(page.locator('.sn-popup-body')).toContainText('convocato dal Papa', { timeout: 15_000 });
   const richieste = await app.evaluate(() => globalThis.__spiegaRichieste);
@@ -192,7 +192,7 @@ test('nella chat dei Mazzi la risposta ha le spiegazioni al passaggio, e le cart
   await risposta.locator('.filo-spiega').hover();
   await expect(riquadri(page)).toContainText('Le carte che ti danno mana in più');
   await risposta.locator('.filo-spiega').click({ button: 'right' });
-  await page.locator('.filo-spiega-menu [data-voce="piu"]').click();
+  await menuDi(page).scegli('Spiegami di più');
   await expect(page.locator('.dk-msg-user').last()).toHaveText('Spiegami di più su «ramp».');
   await expect(page.locator('.dk-msg-bot').last().locator('.dk-msg-text')).toContainText('Il ramp accelera il mana.');
   expect((await app.evaluate(() => globalThis.__mazziRichieste)).at(-1)).toContain('Spiegami di più su «ramp».');
@@ -263,7 +263,7 @@ test('nella home una parola spiegata dentro un riquadro chiede di più nella ste
   await expect(riquadri(page)).toHaveCount(1);
   await riquadri(page).first().locator('.filo-spiega', { hasText: 'indirizzo IP' }).click({ button: 'right' });
   await expect(page.locator('.filo-spiega-menu .filo-spiega-voce')).toHaveText(['Spiegami di più', 'Copia la spiegazione']);
-  await page.locator('.filo-spiega-menu [data-voce="piu"]').click();
+  await menuDi(page).scegli('Spiegami di più');
   await expect(page.locator('.dash-bubble-user').last()).toHaveText('Spiegami di più su «indirizzo IP».');
   await ripristina(app);
 });
