@@ -167,8 +167,7 @@ document.addEventListener('click', function () { document.getElementById('menu-s
 
   await page.mouse.click(600, 400);
   await page.locator('#area').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu .sn-menu-split-arrow').first().hover();
-  await menuDi(page).locator('.sn-menu-sub .sn-menu-item', { hasText: 'Aprilo subito col tasto destro' }).click();
+  await menuDi(page).variante(menuDi(page).icona('siteMenu'), 'Aprilo subito col tasto destro');
   await expect.poll(() => voce(app, 'menu_nativo_scelto', 'menu_del_sito:sempre_acceso')).toBe(1);
 
   const pref = await openTab('filo://preferences/preferences.html');
