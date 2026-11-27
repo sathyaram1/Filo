@@ -196,5 +196,5 @@ test('Il menu di una parola spiegata', async ({ openTab }) => {
   const parola = page.locator('#prova .filo-spiega');
   await scorriAlGesto(page, 'contextmenu', parola, { finestra: true });
   await parola.click({ button: 'right' });
-  await restaPoiSiChiude(page, page.locator('.filo-spiega-menu'));
+  await restaPoiSiChiude(page, menuDi(page).principale);
 });
