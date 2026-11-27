@@ -120,7 +120,7 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   // Una «Nuova categoria…» col nome delle non categorizzate porta lì, senza un secondo riquadro uguale.
   await riquadro(home, 'Video da guardare').click();
   await scheda(home, 'b').click({ button: 'right' });
-  await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Sposta in…' }).click();
+  await menuDi(home).scegli('Sposta in…');
   await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Nuova categoria…' }).click();
   await home.locator('.home-ctxmenu .home-campo').fill('da vedere');
   await home.locator('.home-ctxmenu .home-campo').press('Enter');
