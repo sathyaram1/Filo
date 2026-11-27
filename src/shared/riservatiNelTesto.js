@@ -133,8 +133,8 @@ const SEGNI_DI_RIGA = /^[ \t]*(?:>[ \t]*)*(?:(?:[-*+•]|\d{1,3}[.)])(?=[ \t]))?
 const togliSegni = (s) => (/[>*+•\-.)]/.test(s) ? s.replace(SEGNI_DI_RIGA, (segni) => segni.replace(/[^ \t]/g, ' ')) : s);
 const senzaEnfasi = (t) => {
   const s = String(t == null ? '' : t);
-  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(togliSegni(senzaBlocchi(s)));
-  return togliEnfasi(togliSegni(senzaBlocchi(senzaTag(togliEnfasi(s)))));
+  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(senzaBlocchi(s));
+  return togliEnfasi(senzaBlocchi(senzaTag(togliEnfasi(s))));
 };
 const vistePerLeRegole = (t) => {
   const s = String(t == null ? '' : t);
