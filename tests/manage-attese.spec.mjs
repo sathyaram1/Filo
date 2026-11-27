@@ -159,7 +159,7 @@ test('tasto destro sulla scheda: «Aspetta un altro feedback…» apre la casell
 
   await tabBtn(page, 'waiting').click();
   await page.locator('.mg-item[data-id="f903"]').click({ button: 'right' });
-  await menu.locator('.sn-select-option', { hasText: 'Non aspettare più' }).click();
+  await menu.scegli('Non aspettare più');
   await expect(tabBtn(page, 'waiting')).toHaveText('Aspettano (0)');
   expect((await page.evaluate(() => window.__updates)).map(gesto)).toEqual(['12', ['f12']]);
 });
