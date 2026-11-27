@@ -1573,6 +1573,19 @@ Cosa garantisce la scala:
   suo compito: il 3 prende il primo posto libero. Per ora il 3 vale anche per
   il lavoro sul processo (routine, gestione dei feedback, strumenti): finché non
   ci sono utenti conta più della sicurezza.
+- **Smistamento e risposta passano sopra anche il 3** (#2702): stanno fra
+  l'owner e il lavoro che una domanda ferma, costano pochi minuti, e a
+  sessioni piene di 3 non partivano mai (D-337 ferma dieci ore). Vale la
+  tabella, anche per un compito nato con l'urgenza di prima.
+- **Il posto per lo smistamento e la risposta.** Il freno `maxSessions` non si
+  supera: il posto lo lascia una sessione. Con la voce riservati che ha tutti i
+  compiti, una sessione A/B o server che chiede il biglietto a posti pieni se
+  ne va quando c'è un compito sopra le fasi senza un'accensione dei riservati
+  in arrivo e la voce riservati si può accendere (`vociPronte.riservati`); al
+  giro dopo la voce riservati decide per quei soli compiti prima della server
+  e di A/B, e passa il parallelismo N come una 3. Senza la voce riservati i
+  compiti li prendono A/B, e la sessione che passa al biglietto dopo prende
+  lo smistamento per urgenza.
 - **Sotto il 3, un feedback iniziato** passa davanti a uno nuovo con un gradino
   di priorità in più, non con due.
 - **Fiducia e figli** non scavalcano mai una casella: fra una casella e l'altra
