@@ -288,6 +288,9 @@ test('una tabella rientrata, le entità, i commenti e un tag dentro la password 
   assert.ok(!P.oscura('<b>Password:</b> <!-- x --> Nyckel!2024').includes('Nyckel!2024'));
   const tabella = '<table>\n  <tr>\n    <td>Rete</td>\n    <td>Casa</td>\n  </tr>\n  <tr>\n    <td>Password</td>\n    <td>Nyckel!2024</td>\n  </tr>\n</table>';
   assert.equal(P.oscura(tabella), tabella.replace('Nyckel!2024', S));
+  const colonne = '<table>\n  <thead>\n    <tr>\n      <th>Rete</th>\n      <th>Password</th>\n    </tr>\n  </thead>\n'
+    + '  <tbody>\n    <tr>\n      <td>Casa</td>\n      <td>Nyckel!2024</td>\n    </tr>\n  </tbody>\n</table>';
+  assert.equal(P.oscura(colonne), colonne.replace('Nyckel!2024', S));
 });
 
 test('un testo di 120.000 caratteri pieno di tag aperti e mai chiusi si controlla in fretta', () => {
