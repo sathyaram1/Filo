@@ -57,14 +57,25 @@ test('sotto il velo del sito la voce della cronologia scelta senza vederla non i
   const page = await apri(openTab, testServer);
   await page.evaluate(() => window.alMenu(() => window.stendi()));
 
+  // Sotto il velo il tasto destro su Incolla, che apre la cronologia (il menu dell'icona, #2555), non conta: l'icona
+  // coperta non si vede.
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
-  // Il primo quadrato sta su Incolla, da premere col tasto destro: la cronologia (il menu dell'icona, #2555) si apre
-  // sotto il velo.
+  await page.waitForTimeout(700);
   const freccia = await centro(menuDi(page).incolla);
   await page.mouse.move(freccia.x, freccia.y, { steps: 4 });
   await page.mouse.click(freccia.x, freccia.y, { button: 'right' });
+  await page.waitForTimeout(700);
+  expect(await statoCronologia(app, page), 'la cronologia non si apre sotto il velo').toBeNull();
+  await page.keyboard.press('Escape');
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
+
+  // Il velo steso dopo che l'utente ha aperto la cronologia: la voce scelta senza vederla non incolla.
+  await page.evaluate(() => window.togli());
+  await page.locator('#campo').click({ button: 'right' });
+  await menuDi(page).incolla.click({ button: 'right' });
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
+  await page.evaluate(() => window.stendi()); // menu-dal-sito
   await page.waitForTimeout(700);
   const voce = (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO);
   expect(voce.pronta, 'il browser vede la voce coperta dal velo').toBe(false);
