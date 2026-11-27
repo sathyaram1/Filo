@@ -52,6 +52,37 @@ test('una frase che parla della password senza dirla arriva intera ai due cancel
   }
 });
 
+// Giro 1 della verifica: la punteggiatura attaccata, le forme che dopo il nome valgono già (lingue, «pass», «e» senza
+// accento, l'elenco condiviso degli annunci coi modali) e le frasi qualunque che finiscono con «è la password».
+test('con la punteggiatura attaccata e nelle forme valide dopo il nome la password non passa', () => {
+  for (const frase of ['Gatto2024! è la password', 'usa Gatto2024! come password', 'Gatto2024! è la mia password',
+    'Gatto2024!! è la password', 'Gatto2024? è la password', 'Gatto2024, è la password',
+    'Gatto2024 ist das Passwort', 'Gatto2024 est le mot de passe', 'Gatto2024 es la contraseña',
+    'benutze Gatto2024 als Passwort', 'usa Gatto2024 como contraseña', 'usa Gatto2024 come pass',
+    'Gatto2024 e la password', 'Gatto2024 sarebbe la password', 'Gatto2024 dovrebbe essere la password',
+    'Gatto2024 remains the password', 'ciao\nGatto2024 è la password']) {
+    const pav = P.oscura(frase);
+    assert.ok(!pav.includes('Gatto2024') && pav.includes(S), `pavimento: ${frase} -> ${pav}`);
+    const cor = alCorrettore(frase);
+    assert.ok(!cor.includes('Gatto2024') && cor.includes(S), `correttore: ${frase} -> ${cor}`);
+  }
+  assert.equal(P.oscura('Gatto2024! è la password'), `${S} è la password`, 'il «!» va via con la password');
+  assert.ok(!alCorrettore('gattonero sarebbe la password').includes('gattonero'));
+});
+
+test('una frase qualunque che finisce con «è la password» resta intera, anche con un segno o un nome corto', () => {
+  for (const frase of ['la cosa che mi manca è la password', "l'unica cosa che non ricordo è la password",
+    'quello che ho dimenticato è la password', 'la cosa più importante è la password', 'gattonero e la password',
+    "l'utente e la password", 'dopo il 2024, è la password che non va', 'Grazie! è la password che cercavo',
+    'il pass per la partita è 2024', 'usa il pass come password', 'Gatto2024 è il password managers']) {
+    assert.equal(P.oscura(frase), frase, `pavimento: ${frase}`);
+    assert.ok(!alCorrettore(frase).startsWith(S) && !alCorrettore(frase).includes(`${S} è`), `correttore: ${frase} -> ${alCorrettore(frase)}`);
+  }
+  for (const frase of ['la cosa che mi manca è la password', 'quello che ho dimenticato è la password']) {
+    assert.equal(alCorrettore(frase), frase, frase);
+  }
+});
+
 test('di sole lettere e senza virgolette il pavimento la lascia, come dopo il nome', () => {
   // Il pavimento non toglie una parola qualunque: «la password è gattonero» passa, e così l'ordine inverso.
   assert.equal(P.oscura('la password è gattonero'), 'la password è gattonero');
