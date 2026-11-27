@@ -2534,8 +2534,13 @@
         }
       }
     };
-    walk(docEl);
+    walk(radice);
     return out;
+  }
+  function testoDelRange(r) {
+    const box = document.createElement('div');
+    box.appendChild(r.cloneContents());
+    return testoDi(box).replace(/\n$/, '');
   }
   // Quello che chat, titolo e riassunto mandano al modello: intero fino al tetto, oltre col taglio detto (#1475).
   function docPerIlModello() {
