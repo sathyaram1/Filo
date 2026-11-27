@@ -298,11 +298,11 @@ test('un\'icona della barra portata nella fila del tasto destro lascia la barra,
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, SITO(testServer.asset(PNG, 'image/png')));
   const barra = await barraPage(app);
-  // Niente sotto il mouse: la fila della pagina è vuota e nascosta, e si apre per accogliere l'icona.
+  // Niente sotto il mouse: la fila della pagina ha solo l'Aiuto di ogni menu (#2555), e accoglie l'icona.
   await page.locator('#vuoto').click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.principale).toBeVisible();
-  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeHidden();
+  expect(await iconeDellaFila(menu)).toEqual(['pagina:help']);
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   const src = await barra.locator('#nav .ico[data-id="saveForLater"]').boundingBox();
