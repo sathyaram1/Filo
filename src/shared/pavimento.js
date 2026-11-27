@@ -58,7 +58,7 @@
   const INTORNO_APERTE = `[${APERTE}([{]`;
   const INTORNO_CHIUSE = `[${CHIUSE})\\]}]`;
   const DAVANTI = `(?:${INTORNO_APERTE}[ \\t]*){0,3}`;
-  const CIFRE_CVV = `${DAVANTI}(\\d{3,4})(?![\\d/]|[.,:-]\\d)`;
+  const CIFRE_CVV = `${DAVANTI}(${CIFRE_DEL_CVV})(?![\\d/]|[.,:-]\\d)`;
   const CVV = new RegExp(`${NOME_CVV}\\s*${PARENTESI}(?:[:=|\\t]|${TRATTINO}|${VERBO_CVV})?\\s*${CIFRE_CVV}`, 'gi');
   const CVV_DOPO = new RegExp(`${NOME_CVV}[^\\d\\n|\\t:=.!?;]{1,40}?${PARENTESI}(?:\\s*(?:[:=|\\t]|${TRATTINO})|\\s+${VERBO_CVV}(?=\\s))\\s*${CIFRE_CVV}`, 'gi');
   // Il codice che una mail o un SMS manda per entrare: il guardiano riconosce solo i marchi del monouso, perché lì un
