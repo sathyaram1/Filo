@@ -1363,6 +1363,7 @@
   const apritori = new WeakMap();
   const esecutori = new WeakMap();
   const menuDellIcona = new WeakMap();
+  const disegniDelPiu = new WeakMap();
 
   // Un tasto destro dentro il menu aperto (sui siti lo smista il ponte del preload prima che arrivi al bottone): su
   // un'icona con varianti apre il suo menu, altrove non fa niente. Vero se il clic era nel menu.
