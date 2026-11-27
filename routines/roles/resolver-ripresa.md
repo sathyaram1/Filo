@@ -27,8 +27,8 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
   un riallineamento non li cambia: i `rilievi` li nominano, e li fai tornare
   verdi tu, anche se vuol dire cambiare la logica o togliere un'asserzione
   che prova un difetto di `main`. Se la `domanda` è una nota del manutentore,
-  segui quella. Prima di consegnare, `npm run test:unit` sul ramo fuso con
-  `origin/main` (in una cartella a parte, senza toccare il ramo) li dà verdi.
+  segui quella. Prima di consegnare, i test dei `rilievi` sono verdi in
+  `npm run test:unit`.
 
 <!-- includi: _ripresa-bocciatura.md -->
 
