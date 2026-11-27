@@ -621,9 +621,9 @@
   function opzioni(d) {
     const ops = Array.isArray(d.opzioni) ? d.opzioni : [];
     if (!ops.length) return null;
-    const rispondibile = d.stato === 'aperta';
+    const rispondibile = daRispondere(d);
     const occupata = inCorso.has(d.id);
-    const fatta = d.stato === 'aperta' ? null : sceltaFatta(d);
+    const fatta = rispondibile ? null : sceltaFatta(d);
     const lista = el('ol', 'mg-dq-opzioni');
     ops.forEach((o, i) => {
       const li = el('li', 'mg-dq-opzione');
