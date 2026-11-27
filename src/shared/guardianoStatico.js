@@ -723,7 +723,13 @@
     if (senzaAvverbi !== s) s = `${s}\n${senzaAvverbi}`;
     const out = raccolta();
     raccogli(s, out, FORMA_USCENTE);
-    for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
+    // «ho cambiato la password in PayPal» dice dove: dopo «in», «su» o «a» un nome di sole lettere non è il valore.
+    for (const m of s.matchAll(PAROLA_PASSWORD)) {
+      if (passwordInUscita(m[1]) && !(/^\p{L}+$/u.test(m[1]) && /(?:^|\s)(?:in|su|on|a)\s*$/i.test(m[0].slice(0, -m[1].length)))) {
+        out.push({ valore: m[1], regola: 'password' });
+      }
+    }
+    for (const v of valoriDopoIlNome(s, { uscita: true })) out.push(v);
     for (const m of s.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) out.push({ valore: m[1], regola: 'codice' });
     for (const m of s.matchAll(PIN_CON_COMPLEMENTO)) out.push({ valore: m[1], regola: 'codice' });
     for (const x of codiciDelPavimento(s)) out.push(x);
