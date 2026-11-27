@@ -41,7 +41,7 @@
     media: Object.freeze({
       su: 'su un filmato o un audio',
       fila: Object.freeze(['playPause', 'mute', 'save', 'openTab']),
-      altro: Object.freeze(['loop', 'pip', 'copyLink', 'linkCopy']),
+      altro: Object.freeze(['transcribe', 'loop', 'pip', 'copyLink', 'linkCopy']),
     }),
     cursore: Object.freeze({
       su: 'in un campo dove scrivi, senza selezione',
