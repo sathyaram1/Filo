@@ -105,6 +105,7 @@ export function menuDi(scheda) {
         await scegli(b, { button: 'right' });
         await locator('.sn-menu-sub').first().waitFor({ state: 'visible', timeout: 2000 });
         out.push(...(await locator('.sn-menu-sub .sn-menu-item').allTextContents()).map((t) => t.trim()));
+        await chiudiSub();
       }
       return out;
     },
