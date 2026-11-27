@@ -134,7 +134,7 @@ test('#1657 dal tasto destro e dal «+»: aggiungi un sito scritto a mano, rinom
 
   // Rinomina dal tasto destro: un nome con markup resta testo.
   await page.locator('#barraSiti .dash-barra-voce[aria-label="example.org"]').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rinomina…' }).click();
+  await menuDi(page).scegli('Rinomina…');
   await page.locator('.dash-barra-campo input').fill('<b>Esempio</b>');
   await page.keyboard.press('Enter');
   await expect.poll(etichette).toEqual(['wikipedia.org', '<b>Esempio</b>']);
