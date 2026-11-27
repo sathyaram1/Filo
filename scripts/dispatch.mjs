@@ -2763,15 +2763,19 @@ async function finalizeBucket(bucket, fromServer) {
   // il feedback è tornato `todo`, e senza questo passaggio la dashboard direbbe
   // «in coda» per tutta la lavorazione.
   const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa);
+  let statoVero = '';
   if (bucket.id && (bucket.role === 'new-work' || (bucket.role === 'fixer' && ripresa))) {
+    const opzioni = { branch: bucket.branch || '', ripresa: bucket.role === 'fixer' && ripresa };
     const presa = await deliverToChannel('status', {
       status: 'working', branch: bucket.branch || '',
       ...(bucket.ripartenzaPersa ? { notes: testoRipartenzaPersa(bucket.ripartenzaPersa), ripartenzaPersa: bucket.ripartenzaPersa.ramo } : {}),
-    });
-    // Il biglietto è legato a un altro ramo: la consegna da questo verrebbe rifiutata a lavoro finito (#1632).
-    if (presa.outcome === 'refused' && presa.reason === 'branch_mismatch') {
-      const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
-      return emitHalt('transient', `il server ha legato questo biglietto a un altro ramo e rifiuta la presa in carico su ${bucket.branch} (${motivo}): la consegna da qui verrebbe rifiutata, non si lavora`);
+    }, { rifiutoAtteso: (r) => !!esitoDellaPresa(r, opzioni).statoVero });
+    // Il biglietto legato a un altro ramo (#1632), o un ruolo che lo stato vero non ammette (#2674): non si lavora.
+    const esito = esitoDellaPresa(presa, opzioni);
+    if (esito.azione === 'ferma') return emitHalt('transient', esito.messaggio);
+    if (esito.statoVero) {
+      statoVero = esito.statoVero;
+      process.stderr.write(`[dispatch] ripresa di un lavoro in verifica (${statoVero}): la presa in carico non sposta lo stato, la consegna in revisione resta quella di sempre\n`);
     }
   }
 
