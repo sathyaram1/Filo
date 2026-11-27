@@ -407,12 +407,14 @@ const SOLO_CORTE = new RegExp(`^${ETICHETTE_CORTE}$`, 'u');
 const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
 // Dopo un'etichetta corta una parola qualunque è il resto della frase («la pass giornaliera», «il pw del documento»):
 // conta se ha la forma di una password, o se la presenta un annuncio o i due punti; dopo «pw» anche se viene subito.
-// Come dopo «password»: anche con un avverbio («la pass ora è …») o un verbo di cambio («pw diventa …») in mezzo.
-// L'annuncio largo, i modali, gli avverbi e i verbi di cambio stanno nel guardiano, con l'elenco degli annunci: anche il
-// participio da solo («pw rimasta …», «pw became …») presenta il valore e non lo è (#1403.67).
+// Come dopo «password»: anche con un avverbio («la pass ora è …», «la pass è ancora …») o un verbo di cambio («pw
+// diventa …») in mezzo. L'annuncio largo, i modali, gli avverbi e i verbi di cambio stanno nel guardiano, con l'elenco
+// degli annunci: anche il participio da solo («pw rimasta …», «pw became …») presenta il valore e non lo è (#1403.67).
+const AVVERBI = guardiano().AVVERBIO;
 const CAMBIATA = `${guardiano().PARTICIPI}|${guardiano().PASSATI}`;
-const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:[:=]|(?<!\\p{L})(?:${guardiano().ANNUNCIO_LARGO}|${CAMBIATA})(?!\\p{L}))\\s*$`, 'u');
-const PONTE = new RegExp(`^(?:${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO}|${CAMBIATA}|${guardiano().CAMBI})$`, 'u');
+const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:${AVVERBI}\\s+)?(?:[:=]|(?<!\\p{L})(?:${guardiano().ANNUNCIO_LARGO}|${CAMBIATA})(?!\\p{L}))`
+  + `(?:\\s+${AVVERBI}(?!\\p{L})){0,3}\\s*$`, 'u');
+const PONTE = new RegExp(`^(?:${AVVERBI}|${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO}|${CAMBIATA}|${guardiano().CAMBI})$`, 'u');
 const ACCANTO = /^\s*$/u;
 
 function formeLibere(testo) {

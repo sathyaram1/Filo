@@ -361,6 +361,22 @@
   // Di cosa è la password, fra il nome e il valore («la password del wifi», «la pass per il router»): lo stesso per il
   // pavimento e per il correttore. Senza spazi ai lati: li mette chi lo usa.
   const COMPLEMENTO = "(?:(?:del(?:la|lo)?|di|per|for|of)[ \\t]+|dell['’][ \\t]*)(?:(?:il|la|lo|the|my|your|our|mio|mia|tuo|tua)[ \\t]+)?[A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F][A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F_-]{0,30}";
+  // Fra l'annuncio e il dato un avverbio o il participio di un tempo composto non spostano il dato: «il pin è ancora
+  // 4821», «the pin is still 4821», «è sempre stato 4821» (#2678.9). Un elenco solo, come ANNUNCI; prove in
+  // tests/unit/avverbiDopoAnnuncio.test.mjs.
+  const AVVERBI_DEL_DATO = Object.freeze(['ancora', 'sempre', 'ora', 'adesso', 'attualmente', 'tuttora', 'già', 'gia', 'invece',
+    'comunque', 'di nuovo', 'stato', 'stata', 'now', 'still', 'always', 'currently', 'actually', 'just', 'already',
+    'toujours', 'maintenant', 'actuellement', 'encore', 'déjà', 'siempre', 'ahora', 'todavía', 'todavia', 'actualmente',
+    'aún', 'aun', 'ya', 'agora', 'ainda', 'atualmente', 'já', 'jetzt', 'immer', 'noch', 'aktuell', 'nun', 'weiterhin',
+    'nu', 'altijd', 'nog', 'steeds', 'teraz', 'zawsze', 'nadal', 'wciąż', 'wciaz', 'już']);
+  const AVVERBIO = `(?:${AVVERBI_DEL_DATO.map((w) => w.replace(/ /g, '\\s+')).join('|')})`;
+  const AVVERBI_DOPO_ANNUNCIO = new RegExp(`(${ANNUNCIO})((?:\\s+${AVVERBIO}(?![\\p{L}\\p{N}])){1,3})(?=\\s+\\S)`, 'giu');
+  // Il testo con quegli avverbi letti come spazi della stessa lunghezza, così ogni posto trovato vale nel testo vero; con
+  // `stessaLunghezza: false` tolti, per chi cerca il dato a pochi spazi dal verbo e guarda solo i valori.
+  function avverbiComeSpazi(s, { stessaLunghezza = true } = {}) {
+    const t = String(s == null ? '' : s);
+    return t.replace(AVVERBI_DOPO_ANNUNCIO, (_, a, resto) => a + (stessaLunghezza ? resto.replace(/\S/g, ' ') : ''));
+  }
   // Le etichette fuori dall'alfabeto latino, e i verbi attaccati del cinese, giapponese, coreano e thai, sono quelli dei
   // campi segreti (#1403.8); i verbi che sono una parola stanno in ANNUNCI qui sopra.
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
@@ -556,6 +572,8 @@
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
     try { s = `${s}\n${decodeURIComponent(s.replace(/\+/g, ' '))}`; } catch (_) { /* un % che non codifica niente */ }
+    const senzaAvverbi = avverbiComeSpazi(s, { stessaLunghezza: false });
+    if (senzaAvverbi !== s) s = `${s}\n${senzaAvverbi}`;
     const out = raccolta();
     raccogli(s, out, FORMA_USCENTE);
     for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
@@ -829,5 +847,6 @@
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
     segretiNelTesto, segretiInUscita, codiciInElenco, MISURE_CIFRE, cifre, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
     sembraPassword, indirizzoOEmail, ANNUNCI, ANNUNCIO_LARGO, AVVERBI, MODALI, COMPLEMENTO, CAMBI, PARTICIPI, PASSATI,
+    AVVERBIO, avverbiComeSpazi,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

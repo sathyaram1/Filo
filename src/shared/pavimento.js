@@ -174,8 +174,7 @@
     + `|${RESTA_UN_CODICE.source.slice(1, -1)}|${RESTA_ALTRE.source.slice(1, -1)}|${SEGNO_FORTE.source})(?![\\p{L}])`;
   // Prima e dopo il verbo può stare un avverbio («ora è», «is now»), e il verbo può essere composto («è sempre stato»,
   // «has been»); «e» senza accento è un refuso; la virgola o i due punti valgono il verbo («il codice del mio telefono, 4829»).
-  const AVVERBIO_SBLOCCO = '(?:now|always|still|currently|actually|just|sempre|ancora|ora|adesso|attualmente|toujours|maintenant|actuellement'
-    + '|siempre|ahora|todav[íi]a|actualmente|agora|ainda|jetzt|immer|noch|aktuell|nu|altijd|nog|teraz|zawsze|nadal|wci[ąa][żz])';
+  const AVVERBIO_SBLOCCO = global.SN_GUARDIANO_STATICO.AVVERBIO;
   const VERBO_SBLOCCO = `(?:${VERBO}|e|cest|serait|ser[íi]a|wäre|would\\s+be|to|will\\s+be|sind|zijn)`;
   const PARTICIPIO = '(?:stat[oaie]|been|[ée]t[ée]|sido|gewesen|geweest)';
   const AUSILIARE = '(?:has|have|had|ha|hat|heeft|a|avait|hab[íi]a|tem|tinha)';
@@ -1022,9 +1021,12 @@
   const virgoletteStrette = (s) => (HA_VIRGOLETTE.test(s)
     ? s.replace(CON_SPAZI_DENTRO, (_, a, w1, v, w2, c) => `${spazi(w1)}${a}${v}${c}${spazi(w2)}`) : s);
   // Un valore preso con le virgolette attaccate («»Mela!Verde77«») nel testo vero le ha staccate: si cerca senza.
-  function nelTestoVero(x, vero) {
+  // Uno con dentro un avverbio letto come spazi («Password: casa è ancora mia») si riprende allo stesso posto.
+  function nelTestoVero(x, vero, letto) {
     const v = String(x.valore);
     if (vero.includes(v)) return x;
+    const k = /\s{2}/.test(v) && letto ? letto.indexOf(v) : -1;
+    if (k >= 0 && letto.length === vero.length) return { ...x, valore: vero.slice(k, k + v.length) };
     const testa = (v.match(TESTA_VIRGOLETTE) || [''])[0].length;
     const y = { ...x, valore: v.slice(testa).replace(CODA_VIRGOLETTE, '') };
     if (Number.isInteger(x.inizio)) y.inizio = x.inizio + testa;
@@ -1095,13 +1097,16 @@
     const copia = aCapo(vero);
     const piano = copia ? copia.piano : vero;
     // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
-    const s = virgoletteStrette(R ? R.senzaEnfasi(piano) : piano);
+    // Un avverbio fra il verbo e il valore («il pin è ancora 4821») si legge come spazi, come l'enfasi (guardianoStatico.js).
+    if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
+    const G = global.SN_GUARDIANO_STATICO;
+    const s = G.avverbiComeSpazi(virgoletteStrette(R ? R.senzaEnfasi(piano) : piano));
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return [];
     const out = regole(s);
     // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
     const attaccate = R && R.cifreAttaccate(s);
     if (attaccate) for (const x of comeScritti(regole(attaccate.piano), attaccate, s)) out.push(x);
-    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano)))
+    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano, s)))
       .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
       .filter((x) => String(x.valore).length >= 3);
   }
