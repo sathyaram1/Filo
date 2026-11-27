@@ -378,7 +378,8 @@ async function perLaChat({ url, da = 0, origin = '' }) {
     while (RICORDATE.size > RICORDATE_MAX) RICORDATE.delete(RICORDATE.keys().next().value);
   }
   const inizio = Math.max(0, Math.min(r.testo.length, Number(da) || 0));
-  const tratto = r.testo.slice(inizio, inizio + TESTO_MAX);
+  // Per volta torna quanto una pagina letta; il seguito con `da`.
+  const tratto = r.testo.slice(inizio, inizio + require('./pageRead').MAX_TEXT_CHARS);
   const seguito = inizio + tratto.length < r.testo.length ? inizio + tratto.length : null;
   const output = {
     trascritto: url, durata: durata(r.secondi), pezzi: r.pezzi, fonte: r.da,
