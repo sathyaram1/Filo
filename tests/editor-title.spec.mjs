@@ -361,7 +361,7 @@ test('la copia di un documento col titolo automatico, riscritta su un altro argo
   await scrivi(page, giardino(150));
   await expect.poll(async () => (await documenti(page))[0].riassunto, { timeout: 20_000 }).toBe('Testo su Il giardino.');
   await page.click('#docTitle', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Duplica file', { exact: true }).click();
+  await menuDi(page).scegli('Duplica file');
   await expect(page.locator('#docTitle')).toHaveText('Il giardino (copia)');
   await scrivi(page, montagna(150));
   await expect(page.locator('#docTitle')).toHaveText('La montagna', { timeout: 20_000 });
@@ -379,7 +379,7 @@ test('la copia di un documento col titolo scritto a mano lo tiene, e il riassunt
   await scrivi(page, giardino(150));
   await expect.poll(async () => (await documenti(page))[0].riassunto, { timeout: 20_000 }).toBe('Testo su Il giardino.');
   await page.click('#docTitle', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Duplica file', { exact: true }).click();
+  await menuDi(page).scegli('Duplica file');
   await expect(page.locator('#docTitle')).toHaveText('Appunti (copia)');
   await scrivi(page, montagna(150));
   await expect.poll(async () => (await documenti(page)).find((d) => d.titolo === 'Appunti (copia)').riassunto, { timeout: 20_000 })
@@ -393,7 +393,7 @@ test('la copia di un documento che il titolo non l\'ha ancora, arrivata a cento 
   const page = await nuovaPagina(openTab);
   await scrivi(page, 'poche parole sul giardino');
   await page.click('#docTitle', { button: 'right' });
-  await page.locator('.ed-title-ctxmenu').getByText('Duplica file', { exact: true }).click();
+  await menuDi(page).scegli('Duplica file');
   await expect.poll(async () => (await documenti(page)).length).toBe(2);
   await scrivi(page, montagna(150));
   await expect(page.locator('#docTitle')).toHaveText('La montagna', { timeout: 20_000 });
