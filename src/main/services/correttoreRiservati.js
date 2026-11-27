@@ -64,7 +64,7 @@ function coperte(parole) {
     if (annuncio(i)) catena = -1;
     const w = p[i];
     const sola = pezzoDi[i] !== null && lunghezza.get(pezzoDi[i]) === 1;
-    if (STATO.test(w) || (S && (S.descrive.test(w) || S.nonValore.test(w)))
+    if (STATO.test(w) || CAMBIO().test(w) || (S &&(S.descrive.test(w) || S.nonValore.test(w)))
       || (!sola && (QUANDO.test(w) || (S && (S.tempo.test(w) || S.misura.test(w)))))) out[i] = true;
     if (APOSTROFATA.test(w) && (i === catena || !/^l['’]/.test(w))) { out[i] = true; if (i === catena) catena = i + 1; continue; }
     if (LUOGO.test(w) || (DI.test(w) && (i === catena || (i > 0 && S && S.descrive.test(p[i - 1]))))) {
