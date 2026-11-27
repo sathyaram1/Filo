@@ -131,7 +131,7 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   // Apri e tienila in lista → la pagina si apre in una scheda e resta fra le salvate.
   await riquadro(home, 'Da leggere').click();
   await scheda(home, 'a').click({ button: 'right' });
-  await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Apri e tienila in lista' }).click();
+  await menuDi(home).scegli('Apri e tienila in lista');
   await expect.poll(async () => shell.evaluate(async (u) => {
     const snap = await window.filoShell.tabs.snapshot();
     return snap.tabs.some((t) => t.url === u);
