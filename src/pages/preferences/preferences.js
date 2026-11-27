@@ -2155,6 +2155,10 @@
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
     }
+    for (const [id, campo] of [['menuIconeIcona', 'icona'], ['menuIconeColonne', 'colonne']]) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('blur', () => { $(id).value = String(opzioniMenuIcone({ [campo]: $(id).value })[campo]); });
+    }
     for (const id of ['pannelloSpinta', 'pannelloStriscia', 'pannelloBloccato']) $(id).addEventListener('change', persist);
     for (const [id, campo] of [['pannelloAttesa', 'attesaMs'], ['pannelloUscita', 'uscitaMs']]) {
       $(id).addEventListener('change', persist);
