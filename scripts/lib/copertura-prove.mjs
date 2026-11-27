@@ -76,7 +76,7 @@ export function accendiCopertura(regola) {
     const prova = provaInCorsa();
     const env = { ...(options.env || process.env), FILO_COPERTURA: resolve(dir), FILO_COPERTURA_PROVA: prova };
     const app = await launch.call(this, { ...options, env });
-    segui(app, prova, resolve(dir));
+    segui(app, prova, resolve(dir), regola);
     return app;
   };
 }
