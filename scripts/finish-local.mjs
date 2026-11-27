@@ -77,7 +77,7 @@ import { fileRiscritti } from './lib/su-main.mjs';
 import { cambiatiSoloNeiCommenti } from './lib/solo-commenti.mjs';
 import { specCheUsano, leggiSorgenti, SOGLIA_SPEC_DI_UN_MODULO } from './lib/spec-che-usano.mjs';
 import { proveDelCambio } from './lib/mappaProve.mjs';
-import { cambiDelDiff, leggiMappa } from './mappa-prove.mjs';
+import { cambiDelDiff, leggiMappa, sorgenteDellaMappa } from './mappa-prove.mjs';
 import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva, refspecMain, unitProseguono } from './lib/unit-sulla-fusione.mjs';
 import { unitLontane, VAR_LONTANE, specSulPc, cambiatiDelRamo } from './lib/unit-sul-pc.mjs';
