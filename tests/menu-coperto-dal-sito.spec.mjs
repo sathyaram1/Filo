@@ -82,8 +82,9 @@ test('sotto il velo del sito la voce della cronologia scelta senza vederla non i
 
   // Il secondo quadrato sta sulla voce: il clic è vero, ma l'utente vedeva solo il velo.
   await page.mouse.move(voce.incolla.x, voce.incolla.y, { steps: 4 });
+  const avvisiPrima = await avvisoCoperto(page).count();
   await page.mouse.click(voce.incolla.x, voce.incolla.y);
-  await expect(avvisoCoperto(page)).toBeVisible();
+  await expect.poll(() => avvisoCoperto(page).count()).toBeGreaterThan(avvisiPrima);
   expect(await page.locator('#campo').inputValue(), 'la password non arriva al campo del sito').not.toContain(SEGRETO);
   await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 
