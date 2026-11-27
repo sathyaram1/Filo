@@ -288,7 +288,11 @@
     if (!m || !d || d.id !== m.id) return;
     if (d.cosa === 'inline' && Number.isInteger(d.n)) applicaInline(d.n, d);
     else if (d.cosa === 'correzione' && Number.isInteger(d.n)) applicaCorrezione(d.n, d);
-    else if (d.cosa === 'riga') Menu.refreshIconRow(costruisci(d.items, []), { vuota: d.vuota === true });
+    else if (d.cosa === 'riga') {
+      Menu.refreshIconRow(incollaNellaGriglia(costruisci(d.items, m.cronologia), m.cronologia), {
+        vuota: d.vuota === true, altro: incollaNellaGriglia(costruisci(d.altro, m.cronologia), m.cronologia),
+      });
+    }
     else if (d.cosa === 'griglia') Menu.refreshIconGrid(costruisci(d.items, []));
     else if (d.cosa === 'fuori') {
       // L'anteprima finisce in innerHTML: passa solo un SVG ripulito, il resto come testo.
