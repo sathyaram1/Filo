@@ -123,7 +123,7 @@ test('un lettore disegnato dal sito con l\'audio blob: nascosto, e uno che suona
   await expect(menu.voce('Salva audio come')).toBeVisible();
   await menu.voce('Trascrivi').click();
   await expect.poll(() => testoDelRiquadro(app, page), { timeout: 60_000 }).toContain('PEZZO-1');
-  await page.keyboard.press('Escape');
+  await (await paginaDelloStrato(app, page)).locator('.sn-popup-close').click();
   await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 10_000 }).toBe(0);
 
   await page.locator('#play').click();
