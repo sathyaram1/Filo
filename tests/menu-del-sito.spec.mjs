@@ -103,7 +103,7 @@ test('«Menu di <sito>» in cima apre il menu della pagina nello stesso punto, e
   expect(await riservaAperta(app)).toBe(false);
 });
 
-const vociDelSito = (page) => menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: /^Menu di/ });
+const vociDelSito = (page) => menuDi(page).locator('.sn-menu-griglia [data-sn-verbo="siteMenu"]', { hasText: /^Menu di/ });
 
 // L'altra porta standard per ascoltare il tasto destro: il gestore oncontextmenu, da script o come attributo.
 const COL_GESTORE = (registra, attributo) => MENU_SUO
