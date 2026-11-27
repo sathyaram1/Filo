@@ -185,7 +185,6 @@
     fila_ask_image: 'Chiedi a Filo',
     fila_link_indirizzo: 'Indirizzo del collegamento',
     fila_link_non_valido: 'Questo non è un indirizzo: scrivine uno come esempio.it',
-    fila_altro_vuoto: 'Trascina qui un\'icona',
     menu_color_picker: 'Color picker',
     menu_close_tab: 'Chiudi pagina',
     menu_open_options: 'Opzioni Filo',
