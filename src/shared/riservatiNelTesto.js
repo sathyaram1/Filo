@@ -145,7 +145,7 @@ function cifreAttaccate(testo) {
 }
 
 // «Marco: …» a inizio riga: chi scrive il messaggio.
-const PARLA =/^[^\S\n]*(\p{L}[\p{L}\p{N} ._'’-]{0,30}?)[^\S\n]*:\s/u;
+const PARLA = /^[^\S\n]*(\p{L}[\p{L}\p{N} ._'’-]{0,30}?)[^\S\n]*:\s/u;
 
 function presenta() {
   const P = exfil() && exfil().PRESENTA;
