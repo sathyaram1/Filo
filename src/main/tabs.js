@@ -2622,10 +2622,14 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     const cambiata = this.activeId !== id;
+    const prima = cambiata ? (this.tabs.find((t) => t.id === this.activeId) || this._chiusaOra || null) : null;
     if (cambiata) this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
     this.anteprime.mostrata(tab);
     this.activeId = id;
+    if (this._inArrivo === id) this._inArrivo = null;
     if (cambiata && !this._restoring) this._nelFilo('schedaDavanti', tab);
+    // Prima di renderla visibile: la home che torna dall'editor deve saperlo al suo primo fotogramma (#2389).
+    if (cambiata) EditorDalCampo.schedaDavanti(prima, tab);
     if (tab._senzaReteInAttesa) this._senzaRete(tab, tab._senzaReteInAttesa);
     Strade.misura('inVista', this, tab, tab.url, { incognito: this.incognito });
     // §2.1 — una scheda che diventa attiva è "usata adesso". Approssimazione
