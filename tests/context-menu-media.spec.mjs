@@ -93,7 +93,7 @@ test('Pausa e Riproduci agiscono davvero sulla riproduzione', async ({ openTab, 
     await expect.poll(() => page.evaluate(() => document.getElementById('a').paused)).toBe(false);
 
     let menu = await openMenuOn(page, '#a');
-    await menu.locator('button', { hasText: 'Pausa' }).first().click();
+    await menu.scegli('Pausa');
     await expect.poll(() => page.evaluate(() => document.getElementById('a').paused)).toBe(true);
 
     // Invariante: la stessa voce ora propone (e fa) l'azione opposta.
