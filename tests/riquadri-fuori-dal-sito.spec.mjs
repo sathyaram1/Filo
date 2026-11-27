@@ -380,7 +380,7 @@ test('feedback su un sito: la foto lasciata o incollata entra fra gli allegati, 
 
   // «Incolla» dal tasto destro di Filo sulla casella.
   const menu = menuDi(await clicca(app, p, '.sn-fb-text', { button: 'right' }));
-  await menu.locator('.sn-menu-paste-main').click({ timeout: 10_000 });
+  await menu.incolla.click({ timeout: 10_000 });
   await expect.poll(() => conta(app, p, '.sn-fb-thumb'), { timeout: 8_000 }).toBe(3);
 
   await p.waitForTimeout(400);
