@@ -1106,7 +1106,7 @@
     // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
     const attaccate = R && R.cifreAttaccate(s);
     if (attaccate) for (const x of comeScritti(regole(attaccate.piano), attaccate, s)) out.push(x);
-    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano)))
+    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano, s)))
       .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
       .filter((x) => String(x.valore).length >= 3);
   }
