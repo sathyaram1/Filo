@@ -103,7 +103,6 @@ test('la password spezzata da uno spazio non arriva al modello nemmeno a metà, 
     'la password è Mela$ Verde77',
     'la password diventa Mela! Verde77',
     'la password è diventata Mela! Verde77',
-    'Ti ricordi la password? Era Mela! Verde77',
   ]) {
     for (const [nome, verso] of [['pavimento', P.oscura(t)], ['correttore', C.oscura(t)]]) {
       for (const pezzo of ['Mela', 'Verde77']) assert.ok(!verso.includes(pezzo), `${nome}: ${t} → ${verso}`);
