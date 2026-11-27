@@ -787,7 +787,8 @@
     global.SN_FILO_UI?.soloGestiVeri(wrap);
   }
 
-  // Sotto-menu generico (lista di {label, onClick}). Si ancora a `anchorEl`.
+  // Sotto-menu generico (lista di {label, onClick, bersaglio?}). Si ancora a `anchorEl`. Da tastiera il fuoco entra
+  // nella prima voce; passando su una voce che ha un `bersaglio` il suo oggetto si contorna nella pagina.
   function openGenericSubmenu(anchorEl, items) {
     if (!activeMenu) return;
     if (activeMenu.subRoot) staccaSub();
