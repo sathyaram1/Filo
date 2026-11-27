@@ -579,7 +579,7 @@
     const visti = new Set((valori || []).map((x) => `${x.regola}:${x.valore}`));
     const letti = new Set();
     for (const x of valori || []) {
-      const misura = CIFRE_IN_ELENCO[x.regola];
+      const misura = MISURE_CIFRE[x.regola];
       const v = String(x.valore);
       if (!misura || !/^\d+$/.test(v) || letti.has(`${x.regola}:${v}`)) continue;
       letti.add(`${x.regola}:${v}`);
