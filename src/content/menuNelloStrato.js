@@ -162,6 +162,11 @@
         }
         return;
       }
+      // La griglia a icone (#2555): l'icona Incolla, come la voce, la fa il main con lo strato.
+      if (it.type === 'row') {
+        voci.push(D.descrivi({ ...it, items: perLoStrato(it.items), altro: it.altro ? { ...it.altro, items: perLoStrato(it.altro.items) } : null }, op));
+        return;
+      }
       // Incolla e la sua cronologia li fa il main con lo strato: qui non arrivano né gli appunti né le voci.
       if (it.type === 'paste') {
         voci.push({ type: 'paste', label: String(it.label || ''), shortcut: it.shortcut ? String(it.shortcut) : '', disabled: !!it.disabled, $incolla: true });
