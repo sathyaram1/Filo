@@ -1756,8 +1756,9 @@
       mute: { label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'), icona: el.muted ? 'volume' : 'volumeMute', onClick: () => toggleMediaMute(el) },
       loop: { label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'), onClick: () => toggleMediaLoop(el) },
       ...(mediaPipAvailable(el)
-        ? { pip: { label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'), onClick: () => toggleMediaPip(el) } }
+        ? { pip: { label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'), acceso: isMediaInPip(el), onClick: () => toggleMediaPip(el) } }
         : {}),
+      speed: velocitaDelMedia(el),
       controls: { label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'), onClick: () => toggleMediaControls(el) },
       copyLink: { label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'), onClick: () => copyMediaUrl(el) },
       save: { label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'), onClick: () => downloadMedia(el, link) },
