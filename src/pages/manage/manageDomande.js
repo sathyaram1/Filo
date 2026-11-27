@@ -571,6 +571,11 @@
       && !d.soloOwner && !e.automatica && !e.smistata;
   }
 
+  // L'owner risponde anche mentre la smista un agente: la sua risposta chiude lo smistamento (#2702).
+  function daRispondere(d) {
+    return d.stato === 'aperta' || d.stato === 'in_smistamento';
+  }
+
   // Cosa fa al suo lavoro una domanda aperta o in smistamento (#1577): lo ferma, o lo lascia andare con la consigliata.
   function fermaIlLavoro(d) {
     if ((d.stato !== 'aperta' && d.stato !== 'in_smistamento') || !d.legata || d.attesa) return null;
@@ -616,9 +621,9 @@
   function opzioni(d) {
     const ops = Array.isArray(d.opzioni) ? d.opzioni : [];
     if (!ops.length) return null;
-    const rispondibile = d.stato === 'aperta';
+    const rispondibile = daRispondere(d);
     const occupata = inCorso.has(d.id);
-    const fatta = d.stato === 'aperta' ? null : sceltaFatta(d);
+    const fatta = rispondibile ? null : sceltaFatta(d);
     const lista = el('ol', 'mg-dq-opzioni');
     ops.forEach((o, i) => {
       const li = el('li', 'mg-dq-opzione');
@@ -666,7 +671,7 @@
     const s = sezione('mg-dq-consiglio', 'Consiglio', corpo);
     // Con un'opzione sola il pulsante dell'opzione è già il consiglio: due pulsanti uguali non servono (#1640).
     const doppio = (d.opzioni || []).length === 1;
-    const etichetta = d.stato === 'aperta' && !doppio ? etichettaDi(o) : null;
+    const etichetta = daRispondere(d) && !doppio ? etichettaDi(o) : null;
     if (etichetta) {
       const b = el('button', 'sn-btn mg-dq-applica', `Applica il consiglio: ${etichetta}`);
       b.type = 'button';
@@ -708,7 +713,7 @@
       }
     }
     // Il compito «Gestisci la domanda» (§3.5) la tiene prima che arrivi a te: si dice cosa sta succedendo e com'è finita.
-    else if (d.stato === 'in_smistamento') testo = 'La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre.';
+    else if (d.stato === 'in_smistamento') testo = 'La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre. Se rispondi adesso, vale la tua risposta.';
     else if (e && e.smistata === 'guasto') testo = 'Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.';
     // Chiusa sulla domanda viva che chiedeva la stessa scelta (#1928): si risponde una volta, là.
     else if (e && e.smistata === 'doppione') {
@@ -870,20 +875,20 @@
   function risposta(d) {
     const box = el('div', 'mg-dq-risposta');
     const occupata = inCorso.has(d.id);
-    const rispondibile = d.stato === 'aperta' || d.stato === 'in_lavorazione';
-    // In smistamento la tiene un agente: si legge e basta, e l'unica cosa che si può fare è archiviarla.
+    const rispondibile = daRispondere(d) || d.stato === 'in_lavorazione';
+    // In smistamento una sessione non ci arriva da «Discutiamone»: il server risponde solo all'owner.
     const inSmistamento = d.stato === 'in_smistamento';
     if (rispondibile && !d.illeggibile) {
       const ta = el('textarea', 'mg-dq-testo');
       ta.rows = 3;
-      ta.placeholder = d.stato === 'aperta' ? 'Rispondi a parole…' : 'Aggiungi qualcosa…';
+      ta.placeholder = daRispondere(d) ? 'Rispondi a parole…' : 'Aggiungi qualcosa…';
       ta.value = bozze.get(d.id) || '';
       ta.dataset.id = d.id;
       ta.disabled = occupata;
       allegati.collega(ta, d.id);
       box.appendChild(ta);
       // D-186: l'azione parte solo dal pulsante di un'opzione, le parole le legge un agente.
-      if (d.stato === 'aperta' && (d.opzioni || []).length) {
+      if (daRispondere(d) && (d.opzioni || []).length) {
         box.appendChild(el('p', 'mg-dq-parole', 'Le parole non riprendono il lavoro: per riprenderlo scegli un’opzione'));
       }
       box.appendChild(allegati.riga(d.id, { disabilitata: occupata }));
@@ -897,9 +902,9 @@
       if (titolo) b.title = titolo;
       tasti.appendChild(b);
     };
-    if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', TASTO_MANDA ? `Manda il testo (${TASTO_MANDA})` : 'Manda il testo');
+    if (rispondibile && !d.illeggibile) tasto(daRispondere(d) ? 'Rispondi' : 'Aggiungi', 'testo', '', TASTO_MANDA ? `Manda il testo (${TASTO_MANDA})` : 'Manda il testo');
     if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', titoloDiscuti(idDi(d)));
-    if (rispondibile || inSmistamento) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
+    if (rispondibile) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
     else if (riapribile(d)) tasto('Riapri', 'riapri', 'sn-btn-secondary', titoloRiapri(d));
     if (fidabile(d)) tasto('Segna fidata', 'fidata', 'sn-btn-secondary', TITOLO_SEGNA_FIDATA);
     else if (sfidabile(d)) tasto('Togli fiducia', 'sfidata', 'sn-btn-secondary', TITOLO_TOGLI_FIDUCIA);
@@ -1036,7 +1041,7 @@
     const tante = ids.length > 1;
     for (const id of ids) {
       const d = trova(id);
-      if (!d || d.stato !== 'aperta') { fuori.push({ id, perche: 'non aspetta più una risposta' }); continue; }
+      if (!d || !daRispondere(d)) { fuori.push({ id, perche: 'non aspetta più una risposta' }); continue; }
       const o = consigliata(d);
       const etichetta = etichettaDi(o);
       if (!etichetta) {
@@ -1413,13 +1418,13 @@
       e.preventDefault();
       const voci = [{ testo: 'Apri', azione: () => { apri([d.id]); disegna(); } }];
       // Su un «da fare» l'azione principale è il suo pulsante, «Fatto» (#2229.1): le stesse voci del dettaglio.
-      if (d.stato === 'aperta' && D.daFare(d) && !inCorso.has(d.id)) {
+      if (daRispondere(d) && D.daFare(d) && !inCorso.has(d.id)) {
         (d.opzioni || []).forEach((o, i) => {
           const nome = D.etichettaOpzione(d, i, stato.riferimenti);
           if (nome) voci.push({ testo: nome, azione: () => { apri([d.id]); disegna(); rispondi(d.id, i); } });
         });
       }
-      const et = d.stato === 'aperta' ? etichettaDi(consigliata(d)) : null;
+      const et = daRispondere(d) ? etichettaDi(consigliata(d)) : null;
       if (et) voci.push({ testo: `Applica il consiglio: ${et}`, azione: () => { apri([d.id]); disegna(); consiglioUna(d.id); } });
       if (d.stato !== 'in_smistamento') voci.push({ testo: voceDiscuti(d.id), titolo: titoloDiscuti(d.id), azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
       if (['aperta', 'in_lavorazione', 'in_smistamento'].includes(d.stato)) voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });

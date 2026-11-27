@@ -362,8 +362,9 @@ test('una domanda in smistamento sta nella sua scheda e lo dice; una smistata co
   await page.locator('.mg-tab[data-tab="domande-smistamento"]').click();
   await page.locator('#mgDomandeLista .mg-domanda').first().click();
   const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-20"]');
-  await expect(dq.locator('.mg-dq-esito')).toHaveText('La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre.');
-  await expect(dq.locator('.mg-dq-testo')).toHaveCount(0);
+  await expect(dq.locator('.mg-dq-esito')).toHaveText('La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre. Se rispondi adesso, vale la tua risposta.');
+  // L'owner non aspetta lo smistamento (#2702): la casella c'è.
+  await expect(dq.locator('.mg-dq-testo')).toHaveCount(1);
   await dq.screenshot({ path: 'tests/.shots/manage-domande-smistamento.png' });
   await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
   await page.locator('#mgDomandeLista .mg-domanda').first().click();
