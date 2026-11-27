@@ -1466,7 +1466,7 @@ test('#496 i lavori che la torta lascia fuori si possono guardare', async ({ ope
   await page.locator('#mgFsDrillClose').click();
   // …e il tasto destro sulla frase intera offre i conti che ci stanno dentro.
   await page.locator('#mgFsPieHint').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toContainText('Mostra');
+  expect(await testoDelMenu(page)).toContain('Mostra');
 });
 
 // ══ I numeri si scrivono all'italiana ══════════════════════════════════════
