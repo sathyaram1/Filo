@@ -140,7 +140,10 @@ async function chatFinta(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({ models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' } });
-    globalThis.SN_TRASCRIVI_MEDIA_MAIN._dip.scarica = (url, opts) => fetch(url, opts);
+    // YouTube risponde con la sua pagina, come quello vero: il video non è un file.
+    globalThis.SN_TRASCRIVI_MEDIA_MAIN._dip.scarica = (url, opts) => (/youtube\.com/.test(url)
+      ? Promise.resolve(new Response('<html><video src="blob:x"></video></html>', { headers: { 'content-type': 'text/html' } }))
+      : fetch(url, opts));
     globalThis.SN_TRASCRIVI_MEDIA_MAIN._ricordate.clear();
     globalThis.__esiti = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => ({
