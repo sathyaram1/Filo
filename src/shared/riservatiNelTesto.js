@@ -101,7 +101,7 @@ const TAG_HTML = new RegExp(`(<|&lt;)(/\\s*|)(${TAG_TESTO}|${TAG_A_CAPO}|ul|ol|d
 const A_CAPO = new RegExp(`^(?:${TAG_A_CAPO})$`, 'i');
 const SPAZIO_HTML = /&(?:nbsp|#160|#x0*a0);/gi;
 const DUE_PUNTI_HTML = /&(?:colon|#0*58|#x0*3a);/gi;
-const VERSO_CELLA = /[\r\n](?=[ \t\r\n]*(?:<|&lt;)t[dh](?:[\s/>]|&gt;))/gi;
+const VERSO_CELLA = /(?<![ \t\r\n])[ \t]*[\r\n][ \t\r\n]*(?=(?:<|&lt;)t[dh](?:[\s/>]|&gt;))/gi;
 // Un segno che sta dentro un valore: non uno spazio, un tag, un due punti, una cella o un'entità.
 const DEL_VALORE = /[^\s<>:：|&]/u;
 // I commenti si leggono in due modi: coi soli segni come spazi (una password scritta dentro si vede) e interi come
