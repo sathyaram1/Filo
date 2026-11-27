@@ -2700,7 +2700,7 @@
         { label: 'per tag', run: () => saveDeck(Decks.setRaggruppamento(current, 'tag')) },
         { label: 'per costo di mana', run: () => saveDeck(Decks.setRaggruppamento(current, 'cmc')) },
         { label: 'per colore', run: () => saveDeck(Decks.setRaggruppamento(current, 'colore')) },
-      ]);
+      ], { valori: true });
     });
 
     window.addEventListener('hashchange', route);
