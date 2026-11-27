@@ -335,6 +335,19 @@ test('il PIN chiamato numero segreto, codice confidenziale, Geheimzahl o Pincode
   ]) assert.equal(P.oscura(t), t, t);
 });
 
+// #1403.80 — il «to» polacco dopo il PIN o il CVV, con una parola polacca davanti; in inglese «to» resta una destinazione.
+test('in polacco il PIN, il numero segreto e il CVV detti con «to» non escono, anche col possessivo davanti', () => {
+  for (const t of [
+    'Mój PIN to 4829', 'Mój kod PIN to 4829', 'Mój tajny numer to 4829', 'Twój PIN to 4829', 'Twój nowy kod PIN to 4829',
+    'Nowy PIN to 4829', 'Mój numer PIN to 4829', 'Twój PIN do karty to 4829', 'Moja nowa karta: PIN to 4829',
+    'Mój PIN to «4829»', 'Mój CVV to 4829', 'Moja karta, CVV to 4829',
+  ]) assert.ok(!P.oscura(t).includes('4829'), t);
+  for (const t of [
+    'Send the PIN to 4829 people', 'Send the CVV to 4829 people', 'Mój numer to 4829', 'Numer klienta to 4829',
+    'Kod rabatowy to 4829',
+  ]) assert.equal(P.oscura(t), t, t);
+});
+
 // Come in italiano, nelle altre lingue un nome comune dopo il codice lo fa un identificativo, salvo quello che apre.
 test('nelle altre lingue il codice di un ordine, di una spedizione o di un errore resta; quello di una porta no', () => {
   for (const t of [
