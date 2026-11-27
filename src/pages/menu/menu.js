@@ -212,17 +212,6 @@
           },
         };
       }
-      if (it.type === 'paste' && it.$incolla) {
-        const chiave = (e) => (Clip ? Clip.chiave(e) : '');
-        return {
-          type: 'paste', label: it.label, shortcut: it.shortcut, disabled: !!it.disabled,
-          history: cronologia,
-          onClick: () => chiedi('incolla'),
-          onPickHistory: (e) => chiedi('scegli', { chiave: chiave(e) }),
-          onRemoveHistory: (e) => chiedi('togli', { chiave: chiave(e) }),
-          onClearHistory: () => chiedi('svuota'),
-        };
-      }
       return it;
     });
   }
