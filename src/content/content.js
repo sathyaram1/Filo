@@ -1910,7 +1910,7 @@
     }
   }
 
-  async function buildBaseItemsAt(mouseEvent, { senzaValuta = false } = {}) {
+  async function buildBaseItemsAt(mouseEvent, { senzaValuta = false, sito = null, minimoCorreggi = 1, scritte = [] } = {}) {
     const target = realTarget(mouseEvent);
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
