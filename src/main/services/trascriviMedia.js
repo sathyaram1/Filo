@@ -254,8 +254,8 @@ function suggerimentoStreaming(url) {
     errore: 'streaming',
     frase: `Il video di ${host || 'questa pagina'} arriva a segmenti o protetto: il file non si può scaricare, quindi non lo posso ascoltare.`,
     alternativa: yt
-      ? 'Su YouTube la trascrizione della pagina, quando c\'è, la legge LEGGI_PAGINA su questo indirizzo: proponila all\'utente.'
-      : 'Se la pagina ha sottotitoli o una trascrizione scritta, LEGGI_PAGINA la può leggere: proponilo all\'utente.',
+      ? 'Su YouTube la trascrizione della pagina, quando c\'è, la legge web(leggi) su questo indirizzo: proponila all\'utente.'
+      : 'Se la pagina ha sottotitoli o una trascrizione scritta, web(leggi) la può leggere: proponilo all\'utente.',
   };
 }
 
