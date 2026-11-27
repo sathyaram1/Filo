@@ -29,7 +29,6 @@
     // #889 — la riga viene da un marchio nei pixel, non da un'etichetta del file.
     menu_origin_hint_mark: 'Il programma che ha generato l’immagine ha scritto questo marchio nei pixel. Un ritaglio o un ridimensionamento lo cancellano, e molti generatori non lo mettono.',
     menu_explain_deep: 'Approfondisci',
-    menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
     menu_paste_no_results: 'Nessun risultato',
     menu_paste_remove: 'Rimuovi dalla cronologia',
