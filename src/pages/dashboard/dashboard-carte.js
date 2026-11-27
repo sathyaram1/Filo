@@ -1429,6 +1429,7 @@
 
   global.SN_DASH_CARTE = {
     init,
+    apriEditor: () => apri(URL_EDITOR),
     // Lo stesso menu e lo stesso avviso per le altre parti della home (la barra dei siti, #1803).
     apriMenu,
     avviso,
