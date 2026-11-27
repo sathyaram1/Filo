@@ -1255,10 +1255,20 @@
     const G = global.SN_GUARDIANO_STATICO;
     const s = G.avverbiComeSpazi(virgoletteStrette(R ? R.senzaEnfasi(piano) : piano));
     if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return [];
-    const out = regole(s, giro);
-    // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
-    const attaccate = R && R.cifreAttaccate(s);
-    if (attaccate) for (const x of comeScritti(regole(attaccate.piano, giro), attaccate, s)) out.push(x);
+    const out = [];
+    for (const lettura of [s, celleComeRighe(s)]) {
+      if (lettura === null) continue;
+      const trovati = regole(lettura, giro);
+      // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
+      const attaccate = R && R.cifreAttaccate(lettura);
+      if (attaccate) trovati.push(...comeScritti(regole(attaccate.piano, giro), attaccate, s));
+      // La lettura delle celle ha la stessa lunghezza del testo: vale quello che nel testo c'è così com'è.
+      for (const x of trovati) {
+        if (lettura === s) { out.push(x); continue; }
+        const v = String(x.valore || '');
+        if (Number.isInteger(x.inizio) ? s.startsWith(v, x.inizio) : s.includes(v)) out.push(x);
+      }
+    }
     return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano, s)))
       .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
       .filter((x) => String(x.valore).length >= 3);
