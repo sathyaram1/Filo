@@ -70,7 +70,7 @@ export async function apriImpostazioni(page, id, { via } = {}) {
   if (!via) via = (await strumento(page, 'settings').count()) ? 'ingranaggio' : 'menu';
   if (via === 'menu') {
     await strumento(page, id).locator(BERSAGLIO[id] || '.pd-contenuto').first().click({ button: 'right' });
-    await page.locator('.pd-menu .sn-select-option', { hasText: 'Impostazioni di' }).click();
+    await menuDi(page).scegli('Impostazioni di');
   } else {
     await strumento(page, 'settings').locator('.ed-strumenti-btn').click();
     await page.locator(`#overlay [data-strumento="${id}"]`).click();
