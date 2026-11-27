@@ -84,6 +84,47 @@ test('un indirizzo che porta la password detta così non esce', () => {
   const X = globalThis.SN_URL_EXFIL;
   assert.ok(X.taintScritto('https://esempio.it/?q=gattonero', 'la password scade, la nuova è gattonero'));
   assert.equal(X.taintScritto('https://esempio.it/?q=funziona', 'Ho cambiato la password ieri, adesso funziona'), null);
+  assert.ok(X.taintScritto('https://esempio.it/?q=gattonero', 'la password scade, e la nuova è gattonero'));
+  assert.equal(X.taintScritto('https://esempio.it/?q=domani', 'la password è sbagliata, prova domani'), null);
+});
+
+test('con un raccordo, un altro giro di parole, i due punti o un\'altra lingua la password non arriva al correttore', () => {
+  for (const frase of [
+    'la password scade, e la nuova è gattonero', 'la password scade, ma la nuova è gattonero',
+    'la password scade, comunque la nuova è gattonero', 'la password scade, quindi adesso è gattonero',
+    'la password è cambiata, è gattonero', 'la password scade, la prossima è gattonero',
+    'la password è scaduta, rimettila a gattonero', 'the password changed, now it\'s gattonero',
+    'my password expired, use gattonero instead', 'la password scade, te la mando: gattonero',
+    'la password del wifi non va più, quella nuova te la scrivo qui: gattonero',
+    'le mot de passe a expiré, le nouveau est gattonero', 'la password su whatsapp, comunque è gattonero',
+  ]) {
+    assert.doesNotMatch(alCorrettore(frase), /gattonero/, frase);
+  }
+  const fuori = alCorrettore('la password è sbagliata, prova gattonero oppure micio77');
+  assert.doesNotMatch(fuori, /gattonero|micio77/, fuori);
+});
+
+test('con un raccordo davanti, o di sole cifre, la tolgono tutti e due i cancelli', () => {
+  for (const [frase, v] of [
+    ['la password scade, e la nuova è Gatto!Nero77', 'Gatto!Nero77'], ['la password scade, ma la nuova è Gatto!Nero77', 'Gatto!Nero77'],
+    ['il pin è sbagliato, prova 4821', '4821'], ['il pin è cambiato, adesso 4821', '4821'],
+    ['la password è sbagliata, prova 48213719', '48213719'],
+  ]) {
+    assert.doesNotMatch(P.oscura(frase), new RegExp(v.replace('!', '\\!')), `pavimento: ${frase}`);
+    assert.doesNotMatch(alCorrettore(frase), new RegExp(v.replace('!', '\\!')), `correttore: ${frase}`);
+  }
+});
+
+test('le parole del discorso dopo il rimando arrivano intere, anche dopo un nome corto e con un raccordo', () => {
+  for (const frase of [
+    'password cambiata ieri, adesso dimmi', 'password changed, now working', 'the password is wrong, try harder',
+    'the password expired, new one coming', 'la pass è sbagliata, prova domani', 'la pass è debole, usa numeri',
+    'Ho comprato la pass giornaliera, è carissima', 'la password è sbagliata, e il problema è grave',
+    'la password è sbagliata, ma adesso funziona', 'la password è scaduta, ecco cosa fare: chiamare l\'assistenza',
+    'la password è scaduta, è semplice: chiama l\'assistenza', 'la password è scaduta, ora nel 2025 la cambio',
+  ]) {
+    assert.equal(alCorrettore(frase), frase, frase);
+  }
 });
 
 test('un testo lungo che ripete il nome e il rimando costa quanto la sua lunghezza, non il suo quadrato', () => {
