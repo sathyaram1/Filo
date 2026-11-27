@@ -8,10 +8,12 @@
 function pageHints(doc, opz) {
   const nonLatine = opz && typeof opz.nonLatine === 'string' && opz.nonLatine ? `|${opz.nonLatine}` : '';
   const PASSWORD = new RegExp(`pass ?word|passwort|contrase[ñn]a|mot de passe|\\bsenha\\b|parola d.ordine|passcode|\\bpin\\b${nonLatine}`, 'i');
+  // La stessa riga di pavimento.js, ricopiata perché qui non arriva niente da fuori (tests/unit/cvvAltreLingue.test.mjs).
+  const CVV_ALTRE_LINGUE = 'cryptogramme|code[\\s_-]*(?:de[\\s_-]*)?s[ée]curit[ée]|c[óo]digo[\\s_-]*(?:de[\\s_-]*)?(?:seguridad|seguran[çc]a)|(?:karten)?pr(?:ü|ue|u)f(?:nummer|ziffer)|sicherheits[\\s_-]*code|beveiligings[\\s_-]*code|kod[\\s_-]*bezpiecze[ńn]stwa';
   const CARTA = new RegExp(['carta di (credito|debito)', 'numero (della |di )?carta', 'credit ?card', 'debit ?card',
     'card ?number', 'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)', 'num[eé]ro de (la )?carte',
     'carte (bancaire|de cr[eé]dit)', 'kartennummer', 'kreditkarte', '\\bcvv2?\\b', '\\bcvc2?\\b',
-    'codice di sicurezza', 'security code'].join('|'), 'i');
+    'codice di sicurezza', 'security code', CVV_ALTRE_LINGUE].join('|'), 'i');
   const CAMPI = 'input:not([type]),input[type="text"],input[type="email"],input[type="tel"],input[type="number"],'
     + 'input[type="password"],textarea';
   const PAGAMENTO = 'input[autocomplete*="cc-"], input[name*="card" i], input[name*="cardnumber" i]';

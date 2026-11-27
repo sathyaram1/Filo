@@ -23,12 +23,15 @@
   const TRATTINO = '[-–—→](?=[ \\t])';
   // Il confine di una parola anche fuori dall'ASCII, dove \b non vede le lettere: «Код безопасности».
   const LETTERE = 'A-Za-z0-9\\u00C0-\\u024F\\u0400-\\u052F';
-  // Il nome del CVV nelle lingue delle etichette, quelle del verbo.
+  // Il nome del CVV nelle lingue delle etichette, quelle del verbo. CVV_ALTRE_LINGUE (#2681.1) è la parte che va anche ai
+  // campi dei moduli (da etichette() di campiSegreti.js) e agli indizi di pagamento (copia autonoma in safebrowseHints.js,
+  // uguale per tests/unit/cvvAltreLingue.test.mjs): coi separatori dei nomi di campo («codigo_de_seguridad»).
+  const CVV_ALTRE_LINGUE = 'cryptogramme|code[\\s_-]*(?:de[\\s_-]*)?s[ée]curit[ée]|c[óo]digo[\\s_-]*(?:de[\\s_-]*)?(?:seguridad|seguran[çc]a)|(?:karten)?pr(?:ü|ue|u)f(?:nummer|ziffer)|sicherheits[\\s_-]*code|beveiligings[\\s_-]*code|kod[\\s_-]*bezpiecze[ńn]stwa';
   const NOME_CVV = `(?<![${LETTERE}])(?:cvv2?|cvc2?|csc|cid|(?:card\\s+)?security\\s+code|card\\s+verification\\s+(?:code|value|number)`
     + '|codice\\s+(?:di\\s+)?sicurezza(?:\\s+della\\s+carta)?|cryptogrammes?(?:\\s+visuels?)?|code\\s+de\\s+s[ée]curit[ée]'
     + '|c[óo]digos?\\s+de\\s+(?:seguridad|seguran[çc]a)|(?:karten)?pr[üu]f(?:nummer|ziffern?|zahl|code)|sicherheits(?:code|nummer)'
     + '|beveiligingscode|kaartverificatiecode|kod\\s+(?:zabezpieczaj[ąa]cy|bezpiecze[ńn]stwa)'
-    + `|код\\s+(?:безопасности|проверки))(?![${LETTERE}])`;
+    + `|${CVV_ALTRE_LINGUE}|код\\s+(?:безопасности|проверки))(?![${LETTERE}])`;
   const PARENTESI = '(?:\\([^)\\n]{0,30}\\)[ \\t]*)?';
   // Le virgolette intorno a un valore non sono il valore né un confine: «il pin è «4821»» (#2678). Tutte le forme da qui.
   const APERTE = '«"\'“‘„';
@@ -1105,10 +1108,10 @@
     return giro(valore, 0);
   }
 
-  // ETICHETTE: il testo della regola dei nomi della password, per i campi dei moduli (campiSegreti.js); NOMI_DEL_PIN per
-  // i segreti detti dall'utente che non devono uscire in un indirizzo (urlExfil.js); SPIEGA, le parole che spiegano la
-  // password, per il correttore.
+  // ETICHETTE e CVV_ALTRE_LINGUE: il testo delle regole dei nomi della password e del CVV, per i campi dei moduli
+  // (campiSegreti.js); NOMI_DEL_PIN per i segreti detti dall'utente che non devono uscire in un indirizzo (urlExfil.js);
+  // SPIEGA, le parole che spiegano la password, per il correttore.
   const SPIEGA = { inizio: INIZIO_SPIEGAZIONE, misura: MISURA, tempo: TEMPO, descrive: DESCRIVE, nonValore: NON_VALORE };
-  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, SPIEGA, ETICHETTE: ETICHETTA_NUDA, NOMI_DEL_PIN };
+  global.SN_PAVIMENTO = { SEGNAPOSTO, trova, oscura, oscuraTutto, interiFraVirgolette, SPIEGA, ETICHETTE: ETICHETTA_NUDA, CVV_ALTRE_LINGUE, NOMI_DEL_PIN };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAVIMENTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

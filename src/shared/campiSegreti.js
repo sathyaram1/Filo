@@ -6,8 +6,8 @@
   'use strict';
 
   // `cartaValida(testo)`: il riconoscimento del numero di carta, quello di SN_GUARDIANO_STATICO. `ricorda`: solo chi
-  // resta nella pagina (il content script), non la misura usa e getta del main. `etichette`: i nomi della password e
-  // della chiave del wifi in tutte le lingue, quelli del testo (vedi etichette() qui sotto): `crea` gira anche dove
+  // resta nella pagina (il content script), non la misura usa e getta del main. `etichette`: i nomi della password,
+  // della chiave del wifi e del CVV in tutte le lingue, quelli del testo (vedi etichette() qui sotto): `crea` gira anche dove
   // pavimento.js non c'è, e li riceve come testo.
   function crea(win, cartaValida, { ricorda = false, etichette = '' } = {}) {
     const doc = win.document;
@@ -231,10 +231,12 @@
       LETTERA, ANNUNCI_ATTACCATI, FINE_VALORE, APRE_VALORE };
   }
 
-  // Il testo della regola delle etichette del pavimento, da passare a `crea`: una lista sola per campi e testo.
+  // Il testo delle regole delle etichette e dei nomi del CVV del pavimento, da passare a `crea`: una lista sola per
+  // campi e testo.
   function etichette() {
     if (!global.SN_PAVIMENTO && typeof require === 'function') { try { require('./pavimento.js'); } catch (_) {} }
-    return (global.SN_PAVIMENTO && global.SN_PAVIMENTO.ETICHETTE) || '';
+    const P = global.SN_PAVIMENTO || {};
+    return [P.ETICHETTE, P.CVV_ALTRE_LINGUE].filter(Boolean).join('|');
   }
 
   // Il testo a schermo che ripete il valore di un campo segreto (#810.16), come l'anteprima della carta che si compone
