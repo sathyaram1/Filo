@@ -639,7 +639,10 @@
   const PIN_CHIUDE = `(?!(?:be|essere|here|ecco)(?![\\p{L}\\p{N}]))${ANNUNCIO}`;
   // Il verbo di cambio (CAMBIO_VALORE) si prova per primo, e solo dopo un complemento del nome: dopo «è» di «è diventata» il
   // valore non c'è ancora, e «il pin non funziona e il prezzo diventa 4821» parla d'altro: lì chiude anche il soggetto nuovo.
-  const NUOVO_SOGGETTO = `(?:e|ed|ma|and|but)\\s{1,8}(?:(?:il|lo|la|i|gli|le|uno?|una|the|an?|my|your)\\s|l['’])`;
+  // Un altro segreto come soggetto nuovo non chiude: «il pin e il puk sono 4821 e 12345678». Una regola sola per le uscite,
+  // per valoriDopoIlNome e per la finestra dei codici del pavimento.
+  const ALTRO_SEGRETO = '(?:pin|puk|cvv|cvc|otp|codic[ei]|codes?|password|passwd|pwd|passphrase)(?![\\p{L}\\p{N}])';
+  const NUOVO_SOGGETTO = `(?:e|ed|ma|and|but)\\s{1,8}(?:(?:il|lo|la|i|gli|le|uno?|una|the|an?|my|your)\\s|l['’])(?!\\s*${ALTRO_SEGRETO})`;
   const PIN_CON_COMPLEMENTO = new RegExp(`\\bpin\\b(?:${COMPLEMENTO_NOME}${CAMBIO_VALORE}`
     + `|(?:\\s{1,8}(?!${PIN_CHIUDE})(?!(?:${intera(VERBI_CAMBIO.diventa)})(?=\\s))(?!${NUOVO_SOGGETTO})[^\\s\\d:=.,;!?|"'«“]{1,24}){1,5}?`
     + `\\s{0,8}(?:[:=]|(?<![\\p{L}\\p{N}])(?:${ANNUNCIO_LARGO})(?=[\\s:=])(?:\\s{0,8}[:=])?))`
