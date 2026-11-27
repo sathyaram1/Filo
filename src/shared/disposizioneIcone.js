@@ -85,6 +85,8 @@
     later: v('Rimanda', 'alarm', 'd', 'rimandare', ['rimanda', 'riprendi dopo']),
     gift: v('Regala', 'gift', 'g', 'regalare', ['regala']),
     ignore: v('Ignora', 'blocked', 'i', 'ignorare', ['ignora']),
+    history: v('Storico', 'history', 'v', 'vedere le versioni', ['storico']),
+    bin: v('Cestino', 'folder', 'k', 'aprire il cestino', ['cestino']),
   });
 
   // Come si dice l'oggetto su cui agisce un'azione, nella riga del nome («Copia · il collegamento · C»).
