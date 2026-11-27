@@ -77,7 +77,7 @@ test('tasto destro su un <audio>: «Trascrivi» scrive il parlato pezzo dopo pez
   // «Salva audio come…»: il file arriva negli scaricamenti coi byte giusti.
   menu = await apriMenu(page, '#a');
   await menu.voce('Salva audio come').click();
-  const dir = process.env.FILO_DOWNLOAD_DIR;
+  const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
   let nome = '';
   await expect.poll(() => {
     nome = existsSync(dir) ? readdirSync(dir).find((f) => !/\.(part|crdownload)$/.test(f) && readFileSync(join(dir, f)).length === audio.length) || '' : '';
