@@ -116,7 +116,7 @@ test('dal tasto destro sulla scheda fa la stessa cosa del tasto, e apre la prati
   await expect(menu.principale).toBeVisible();
   const voci = await menu.vociScritte();
   expect(voci.join('\n')).not.toContain('Segna fidato');
-  expect(voci).toContain('Togli fiducia');
+  expect(voci.join('\n')).toContain('Togli fiducia');
   await menu.scegli('Togli fiducia');
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'false');
   expect((await page.evaluate(() => window.__fiducia)).at(-1)).toEqual({ type: 'fiducia_segna', feedbackId: fb._id, fidato: false });
