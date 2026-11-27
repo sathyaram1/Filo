@@ -311,7 +311,7 @@ test('in un editor dentro un riquadro dello stesso sito «Valuta» apre l’Aiut
     await fr.locator(sel).click({ button: 'right' });
     const menu = menuDi(fr);
     await expect(menu.voce('Valuta')).toHaveCount(1, { timeout: 5000 });
-    await menu.voce('Valuta').click();
+    await menu.scegli('Valuta');
     const A = await paginaDellAiuto(app, page);
     const ultima = A.locator('.sn-sidebar-correzione').last();
     await expect(A.locator('.sn-sidebar-msg-user').last()).toContainText(sel === '#ta' ? 'Ieri sono andato' : 'Vado con i mei', { timeout: 8000 });
