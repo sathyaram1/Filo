@@ -169,6 +169,32 @@ test('il messaggio della chat nel filo: rispondi, copia, nascondi e togli come i
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('licheni');
 });
 
+test('il menu proprio di una pagina di Filo (il titolo dell\'Editor) è a icone, con le varianti dello stesso verbo', async ({ openTab }) => {
+  const editor = await openTab('filo://editor/editor.html');
+  await editor.waitForSelector('#doc');
+  await editor.locator('#docbar').click({ button: 'right' });
+  const menu = menuDi(editor);
+  await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
+  await expect(editor.locator('.ed-title-ctxmenu')).toHaveCount(0);
+  const s = await statoMenu(menu);
+  expect(s.testo).toEqual([]);
+  expect(new Set(verbi(s)).size).toBe(verbi(s).length);
+  expect(verbi(s)).toEqual(expect.arrayContaining(['reload', 'history', 'rename', 'duplicate', 'delete']));
+  // «Rigenera titolo» e «Rigenera riassunto» sono lo stesso verbo: un'icona, e l'altro nel suo menu.
+  expect(await variantiDi(editor, menu, 'reload')).toEqual(['Rigenera riassunto']);
+  await editor.keyboard.press('Escape');
+  await editor.keyboard.press('Escape');
+  // Il tasto singolo vale anche qui: R… di Rinomina, mostrato nella riga del nome.
+  await editor.locator('#docbar').click({ button: 'right' });
+  await menu.locator('.sn-menu-griglia [data-sn-verbo="rename"]').hover();
+  const nome = await menu.locator('.sn-menu-nome').textContent();
+  const tasto = nome.split(' · ').pop();
+  expect(tasto).toMatch(/^[A-Z0-9]$/);
+  await editor.keyboard.press(tasto.toLowerCase());
+  await expect(menu.pannelli).toHaveCount(0);
+  await editor.screenshot({ path: resolve(SHOTS, 'menu-a-icone-editor.png') });
+});
+
 test('«copia» copia la selezione quando c\'è, l\'elemento quando non c\'è', async ({ app, openTab, testServer }) => {
   const img = testServer.asset(PNG, 'image/png');
   const page = await testServer.openReady(openTab, SITO(img));
