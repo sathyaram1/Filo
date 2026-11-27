@@ -129,7 +129,7 @@
     s.left = `${b.left}px`; s.top = `${b.top}px`; s.width = `${b.width}px`; s.height = `${b.height}px`;
     s.borderRadius = `${mix(da.box.raggio, a.box.raggio, t)}px`;
     s.backgroundColor = css(mixC(da.sfondo, a.sfondo, t));
-    s.borderColor = css(mixC(da.bordo, a.bordo, t));
+    s.boxShadow = `inset 0 0 0 1px ${css(mixC(da.bordo, a.bordo, t))}`;
     const w = v.scritto.style;
     w.left = `${mix(da.testo.left, a.testo.left, t) - b.left}px`;
     w.top = `${mix(da.testo.top, a.testo.top, t) - b.top}px`;
