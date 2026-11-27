@@ -1073,24 +1073,35 @@
   }
 
   // I valori trovati sulle cifre attaccate che stanno su un tratto scandito, presi dal testo vero. Gli altri li ha già
-  // trovati la lettura del testo com'è.
+  // trovati la lettura del testo com'è. Un valore senza posto si toglie ovunque (oscura): basta una volta per forma.
   function comeScritti(trovati, { piano, posto, tratti }, s) {
     const out = [];
-    const tocca = (a, b) => tratti.some(([x, y]) => a < y && b > x);
+    const visti = new Set();
+    // I tratti sono in ordine: il primo che finisce dopo `a` dice se [a, b) ne tocca uno.
+    const tocca = (a, b) => {
+      let lo = 0;
+      let hi = tratti.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (tratti[m][1] <= a) lo = m + 1; else hi = m; }
+      return lo < tratti.length && tratti[lo][0] < b;
+    };
+    const prendi = (x, k, v, alPosto) => {
+      const a = posto[k];
+      const b = posto[k + v.length - 1] + 1;
+      if (!tocca(a, b)) return;
+      const valore = s.slice(a, b);
+      const chiave = alPosto ? `${a}:${valore}` : `${x.regola}:${valore}`;
+      if (visti.has(chiave)) return;
+      visti.add(chiave);
+      out.push(alPosto ? { ...x, valore, inizio: a } : { ...x, valore });
+    };
+    const cercati = new Set();
     for (const x of trovati) {
       const v = String(x.valore || '');
       if (!v) continue;
-      const posti = [];
-      if (Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio)) posti.push(x.inizio);
-      else for (let k = piano.indexOf(v); k >= 0; k = piano.indexOf(v, k + v.length)) posti.push(k);
-      for (const k of posti) {
-        const a = posto[k];
-        const b = posto[k + v.length - 1] + 1;
-        if (!tocca(a, b)) continue;
-        const y = { ...x, valore: s.slice(a, b) };
-        if (Number.isInteger(x.inizio)) y.inizio = a;
-        out.push(y);
-      }
+      if (Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio)) { prendi(x, x.inizio, v, true); continue; }
+      if (cercati.has(`${x.regola}:${v}`)) continue;
+      cercati.add(`${x.regola}:${v}`);
+      for (let k = piano.indexOf(v); k >= 0; k = piano.indexOf(v, k + v.length)) prendi(x, k, v, false);
     }
     return out;
   }
