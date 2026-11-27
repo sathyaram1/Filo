@@ -49,7 +49,7 @@ test('r1 il PIN in polacco col «to» senza «mój» davanti arriva intero al mo
   test.setTimeout(150_000);
   const home = await openTab('filo://newtab/');
   await chatFinta(app);
-  for (const frase of ['Słuchaj, PIN to 4829', 'Pamiętaj, PIN to 4829', 'Jego PIN to 4829', 'Jej PIN to 4829']) {
+  for (const frase of ['Słuchaj, PIN to 4829', 'Jego PIN to 4829', 'Jej PIN to 4829', 'Hej, PIN mojej karty to 4829', 'Pamiętaj: PIN do bankomatu to 4829']) {
     const mandato = await manda(app, home, frase);
     expect(mandato, frase).not.toContain('4829');
   }
