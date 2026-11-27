@@ -187,7 +187,8 @@ test('scelto tre volte, Filo propone una volta il menu del sito; accettato, il t
   await page.keyboard.down('Shift');
   await page.locator('#area').click({ button: 'right', position: { x: 30, y: 30 } });
   await page.keyboard.up('Shift');
-  expect(await primaVoce(page)).toBe('Menu di Sito di prova');
+  // Shift col clic estende la selezione: le icone del testo vengono prima, «Menu di» c'è lo stesso (#2555).
+  await expect(menuDi(page).icona('siteMenu')).toHaveAttribute('aria-label', 'Menu di Sito di prova');
   expect(await page.evaluate(() => window.aperture)).toBe(prima);
   await menuDi(page).variante(menuDi(page).icona('siteMenu'), 'Col tasto destro apri il menu di Filo');
   await expect.poll(() => sitiScelti(app)).toEqual([]);
