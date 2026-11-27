@@ -94,7 +94,7 @@ test('Scaricamenti: il menu di una voce', async ({ app, shell, openTab, testServ
     const voce = page.locator('.dl-item[data-state="completed"]').first();
     await expect(voce).toBeVisible();
     await scorriEApri(page, voce);
-    await restaPoiSiChiude(page, page.locator('.dl-ctxmenu'));
+    await restaPoiSiChiude(page, menuDi(page).principale);
   } finally {
     srv.close();
   }
