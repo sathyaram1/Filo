@@ -160,9 +160,9 @@ test('#2296 — Gestione: i tetti del server con la stima accanto, che segue il 
 
   // Dal tasto destro, con la voce vera del menu, tornano i numeri di fabbrica.
   await mg.locator('#mgRtRoot').click({ button: 'right', position: { x: 8, y: 8 } });
-  const voce = mg.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Rimetti i tetti di fabbrica' });
-  await expect(voce).toBeVisible();
-  await voce.click();
+  await expect(menuDi(mg).principale).toBeVisible();
+  expect(await menuDi(mg).vociScritte()).toContain('Rimetti i tetti di fabbrica');
+  await menuDi(mg).scegli('Rimetti i tetti di fabbrica');
   await expect(campo).toHaveValue('20');
   await expect(inTutto.locator('input')).toHaveValue('150');
   expect(scritture.at(-1)).toEqual({ op: 'imposta', perUserDay: 20, globalDay: 150 });
