@@ -192,8 +192,10 @@ differenze. Misurato il 05/11/2026 (§ 6): nemmeno per lui l'ora conviene.
 **Domande di processo dei worker.** Un worker che si ferma su un dubbio di
 processo (quale strumento, quale ordine, cosa fare di un rilievo) lo scrive nel
 rilascio come domanda al manutentore, non all'owner: il server lo sveglia, lui
-risponde nel feedback con una nota, il lavoro riparte. All'owner arrivano solo
-le scelte vere (SPEC-DOMANDE § 3).
+risponde nel feedback con una nota, il lavoro riparte. Su un lavoro già
+verificato, o in attesa di riallineamento, la nota la riceve il correttore, che
+può applicarla: controllo, cancello e riallineamento per ruolo non la
+applicherebbero (#2704). All'owner arrivano solo le scelte vere (SPEC-DOMANDE § 3).
 
 ## 5. Il taccuino
 
