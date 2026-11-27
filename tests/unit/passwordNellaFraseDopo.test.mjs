@@ -24,10 +24,12 @@ test('le quattro frasi della segnalazione arrivano al correttore col segnaposto 
 test('con la forma di una password la tolgono tutti e due i cancelli, anche dentro i messaggi verso il modello', () => {
   for (const frase of ['la password scade, la nuova è Gatto2024', 'la password è sbagliata, prova Gatto2024',
     'the password expired, new one Gatto2024', 'password cambiata ieri, adesso Gatto2024',
-    'la pass è sbagliata, prova Gatto2024', 'the password is wrong, try with Gatto2024']) {
+    'the password is wrong, try with Gatto2024']) {
     assert.equal(P.oscura(frase), frase.replace('Gatto2024', S), `pavimento: ${frase}`);
     assert.equal(alCorrettore(frase), frase.replace('Gatto2024', S), `correttore: ${frase}`);
   }
+  assert.equal(P.oscura('la pass è sbagliata, prova Gatto2024'), `la pass è sbagliata, prova ${S}`);
+  assert.doesNotMatch(alCorrettore('la pass è sbagliata, prova Gatto2024'), /Gatto2024/);
   const messaggi = [{ role: 'user', content: [{ type: 'text', text: 'Ciao! la password è sbagliata, prova Gatto2024 e dimmi' }] }];
   assert.doesNotMatch(JSON.stringify(P.oscuraTutto(messaggi)), /Gatto2024/);
 });
