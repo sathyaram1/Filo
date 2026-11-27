@@ -125,6 +125,50 @@ test('la riga del nome dice nome, oggetto e tasto senza ritardo, e il tasto sing
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://esempio.it/pagina');
 });
 
+test('il messaggio della chat nel filo: rispondi, copia, nascondi e togli come icone, e copia copia il messaggio', async ({ app }) => {
+  test.setTimeout(90_000);
+  await modelloFinto(app, [{ text: 'Il capitolo sui licheni va accorciato.' }]);
+  const casa = await home(app);
+  await chiedi(casa, 'come va il capitolo?');
+  const bolla = casa.locator('.dash-bubble-filo').last();
+  await expect(bolla).toContainText('licheni', { timeout: 15_000 });
+  await bolla.click({ button: 'right' });
+  const menu = menuDi(casa);
+  await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
+  const s = await statoMenu(menu);
+  expect(s.testo, 'nessuna riga di testo').toEqual([]);
+  expect(new Set(verbi(s)).size).toBe(verbi(s).length);
+  expect(verbi(s)).toEqual(expect.arrayContaining(['reply', 'copy', 'hide', 'remove']));
+  const copia = menu.locator('.sn-menu-griglia [data-sn-verbo="copy"]');
+  await copia.hover();
+  await expect(menu.locator('.sn-menu-nome')).toHaveText('Copia · il messaggio · C');
+  await expect(menu.locator('.sn-menu-bersaglio').first()).toBeVisible();
+  await casa.screenshot({ path: resolve(SHOTS, 'menu-a-icone-messaggio.png') });
+  await copia.click();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toContain('licheni');
+
+  // Con un pezzo selezionato «copia» copia la selezione, e il messaggio intero sta nel menu dell'icona.
+  await bolla.evaluate((b) => {
+    const t = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+    let n = t.nextNode();
+    while (n && !n.nodeValue.includes('licheni')) n = t.nextNode();
+    const i = n.nodeValue.indexOf('licheni');
+    const r = document.createRange();
+    r.setStart(n, i);
+    r.setEnd(n, i + 'licheni'.length);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+  });
+  const box = await casa.evaluate(() => { const r = getSelection().getRangeAt(0).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  await casa.mouse.click(box.x, box.y, { button: 'right' });
+  await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
+  expect(await variantiDi(casa, menu, 'copy')).toContain('Copia il messaggio');
+  await casa.keyboard.press('Escape');
+  await casa.mouse.click(box.x, box.y, { button: 'right' });
+  await menu.locator('.sn-menu-griglia [data-sn-verbo="copy"]').click();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('licheni');
+});
+
 test('«copia» copia la selezione quando c\'è, l\'elemento quando non c\'è', async ({ app, openTab, testServer }) => {
   const img = testServer.asset(PNG, 'image/png');
   const page = await testServer.openReady(openTab, SITO(img));
