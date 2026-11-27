@@ -18,7 +18,7 @@ const STATO = /^(?:scad(?:e|ono|rà|ut[aoie])|sbagliat[aoie]|errat[aoie]|corrett
 // I verbi di cambio («aggiornata», «rimasta», «became») sono quelli del guardiano, un elenco solo (#1403.67).
 let cambio = null;
 const CAMBIO = () => cambio || (cambio = ((G) => new RegExp(`^(?:${G.CAMBI}|${G.PARTICIPI}|${G.PASSATI})$`, 'iu'))(
-  globalThis.SN_GUARDIANO_STATICO || require('../../shared/guardianoStatico.js')));
+  globalThis.SN_GUARDIANO_STATICO || (require('../../shared/guardianoStatico.js'), globalThis.SN_GUARDIANO_STATICO)));
 // Quando e quanto, oltre a quelle del pavimento: «domani», «due volte», «una maiuscola», «un numero».
 const QUANDO = /^(?:domani|dopodomani|stamattina|stasera|stanotte|luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica|volt[ae]|tomorrow|times?|maiuscol[aei]|minuscol[aei]|numer[oi]|simbol[oi]|spazi[o]?|uppercase|lowercase|numbers?)$/;
 // Dove sta («sul retro del router», «nel portachiavi») e di chi è («del conto», «dell'email»): una parola sola dopo,
