@@ -673,8 +673,15 @@ rispondere.
 - **Non lo apre** sulle domande dell'addetto comunicazioni (`soloOwner`,
   § 4.1): nessun compito le legge, e arrivano all'owner come le scrive lui.
 - **Stato `in_smistamento`.** La domanda non sta fra quelle da rispondere (in
-  Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
+  Gestione ha la sua scheda). Il feedback legato resta fermo come
   sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
+  L'owner non aspetta lo smistamento (#2702): dalla finestra o dalla sua
+  chiave risponde come a un'aperta, la risposta vale e il compito di
+  smistamento si chiude superato; una sessione resta rifiutata
+  (`in_smistamento`).
+- **Urgenza.** Sopra ogni casella delle fasi, anche la 3 (§ 6.3), e a
+  sessioni piene il posto si libera per lui (§ 6.3, «Il posto per lo
+  smistamento e la risposta»).
 - **Fascicolo.** La domanda intera, note per gli agenti comprese; il feedback
   d'origine con conversazione e note (di uno riservato il testo arriva solo
   nell'ambiente dei riservati, e segna il biglietto; fuori ne escono numero,
