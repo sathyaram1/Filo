@@ -22,6 +22,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PDF = Buffer.from('%PDF-1.4\n% finto pdf di prova\n' + 'x'.repeat(2048));
 const EXE = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
