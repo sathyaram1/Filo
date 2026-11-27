@@ -79,7 +79,8 @@ test('duplica di una foto aperta dal computer', async ({ app }) => {
 
 test('collegamento a un sito da una pagina del computer, poi duplica', async ({ app, testServer }) => {
   const dir = cartella();
-  writeFileSync(join(dir, 'link.html'), `<!doctype html><title>Link</title><a id="l" href="${testServer.url}/">sito</a>`);
+  const sito = testServer.html('<!doctype html><title>Sito</title><p>web</p>', { pubblico: true });
+  writeFileSync(join(dir, 'link.html'), `<!doctype html><title>Link</title><a id="l" href="${sito}">sito</a>`);
   const { id, pagina } = await apri(app, join(dir, 'link.html'));
   await pagina.click('#l');
   await pagina.waitForTimeout(2500);
