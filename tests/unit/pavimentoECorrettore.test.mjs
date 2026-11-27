@@ -211,7 +211,8 @@ test('una riga di sola struttura Markdown fra etichetta e valore non prende il p
     '>> Password:\n>>\n>> Nyckel!2024', '> PIN:\n>\n> 4821', 'Password:\n~~~Nyckel2024', 'Password:\n```Nyckel2024',
     'Password:\n---\nNyckel!2024', 'Password:\n___\nNyckel!2024', 'Password:\n* * *\nNyckel!2024',
     '**Password:**\n\n---\n\nNyckel!2024', 'Password\n========\nNyckel!2024', 'Password:\n: Nyckel!2024',
-    'Password:\r\n>\r\n> Nyckel!2024', 'Password:\r\n---\r\nNyckel!2024', 'Password:\n\n---\n\n```bash\nNyckel!2024\n```']) {
+    'Password:\r\n>\r\n> Nyckel!2024', 'Password:\r\n---\r\nNyckel!2024', 'Password:\n\n---\n\n```bash\nNyckel!2024\n```',
+    '| **Password:** | Nyckel!2024 |']) {
     assert.doesNotMatch(P.oscura(testo), /Nyckel|4821/, `pavimento: ${testo}`);
     assert.doesNotMatch(alCorrettore(testo), /Nyckel|4821/, `correttore: ${testo}`);
   }
