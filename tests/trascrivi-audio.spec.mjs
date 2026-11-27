@@ -148,11 +148,12 @@ async function chatFinta(app) {
     });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
-      const esiti = messages.filter((m) => m.role === 'tool').map((m) => String(m.content || ''));
+      // Gli esiti di questo turno: dopo l'ultima domanda dell'utente.
+      const ultimaDomanda = messages.map((m) => m.role).lastIndexOf('user');
+      const esiti = messages.slice(ultimaDomanda + 1).filter((m) => m.role === 'tool').map((m) => String(m.content || ''));
       if (!esiti.length) {
-        const utente = messages.filter((m) => m.role === 'user').map((m) => String(m.content || '')).join('\n');
-        const url = (/http:\/\/127\.0\.0\.1:\d+\/\w+/.exec(utente) || [''])[0];
-        return { ...base, text: '', toolCalls: [{ id: 't1', name: 'web', arguments: JSON.stringify({ azione: 'trascrivi', url }) }], finishReason: 'tool_calls' };
+        const url = (/http:\/\/127\.0\.0\.1:\d+\/\w+/.exec(String(messages[ultimaDomanda]?.content || '')) || [''])[0];
+        return { ...base, text: '', toolCalls: [{ id: `t${ultimaDomanda}`, name: 'web', arguments: JSON.stringify({ azione: 'trascrivi', url }) }], finishReason: 'tool_calls' };
       }
       globalThis.__esiti.push(...esiti);
       const tutto = esiti.join('\n');
