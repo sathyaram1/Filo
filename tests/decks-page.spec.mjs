@@ -48,7 +48,7 @@ test('creare, rinominare, duplicare ed eliminare un mazzo dalla libreria', async
 
   // Elimina la copia (conferma nel popup di Filo, mai window.confirm nativo).
   await page.locator('[data-deck-id]', { hasText: '(copia)' }).click({ button: 'right' });
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Elimina' }).click();
+  await menuDi(page).scegli('Elimina');
   await clickConfirm(page, 'ok');
   await expect(page.locator('[data-deck-id]')).toHaveCount(1);
 });
