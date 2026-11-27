@@ -1815,6 +1815,8 @@
       linkEl,
       imgEl,
       mediaEl,
+      // Un lettore disegnato dal sito (#1660): il media nascosto o suonato fuori dal documento, ripiego dell'ultimo posto.
+      mediaLettore: (mediaEl || mediaUnder || imgEl || linkEl) ? null : Actions.mediaDelLettore(target),
       // I tre `*Under` escono da qui GIÀ VAGLIATI: chi li legge a valle non deve rifare il
       // controllo, né può dimenticarselo.
       mediaUnder,
