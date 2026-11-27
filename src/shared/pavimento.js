@@ -218,25 +218,34 @@
       || POSSESSIVO_SOLO.test(w[1]);
   };
   const POSSESSIVO_SOLO = new RegExp(`^${POSSESSIVO}$`, 'iu');
+  // Il codice del telefono o della carta li sblocca anche senza possessivo (#2678.10), ma solo se l'etichetta finisce lì:
+  // «il codice del telefono del cliente è 4821» resta un identificativo.
+  const SI_SBLOCCA_SOLO = new RegExp(`^(?:${APPARECCHIO}|cart[ae]|cards?)$`, 'iu');
   // Il nome del codice nell'etichetta prima del numero: quello che segue l'ultimo «codice», o la parola prima di «code».
   const nomeDelCodice = (prima) => {
     if (/\bkeycodes?\b/i.test(prima)) return { apre: true, solo: /\bkeycodes?\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima) };
     if (delMioApparecchio(prima.slice(-160))) return { apre: true, solo: true };
     const it = [...prima.matchAll(/\b(?:codic[ei]|pin)\b/gi)].pop();
     const en = [...prima.matchAll(/\b([A-Za-z-]+)\s+(?:codes?|pin)\b/g)].pop();
-    if (en && (!it || en.index > it.index) && NOME_CHE_APRE.test(en[1])) {
-      return { apre: true, solo: /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length)) };
+    if (en && (!it || en.index > it.index)) {
+      const solo = /^\s*(?:[:=#]|\bis\b)?\s*$/i.test(prima.slice(en.index + en[0].length));
+      if (NOME_CHE_APRE.test(en[1])) return { apre: true, solo };
+      if (solo && SI_SBLOCCA_SOLO.test(en[1])) return { apre: true, solo };
     }
     const altro = [...prima.matchAll(NOME_ALTRE)].pop();
     if (altro && (!it || altro.index > it.index)) {
       const coda = prima.slice(altro.index + altro[0].length).replace(LEGAMI_ALTRE, '');
       const p = /^[\p{L}-]+/u.exec(coda);
-      if (p && APRE_ALTRE_SOLO.test(p[0])) return { apre: true, solo: DOPO_IL_NOME.test(coda.slice(p[0].length)) };
+      const solo = !!p && DOPO_IL_NOME.test(coda.slice(p[0].length));
+      if (p && APRE_ALTRE_SOLO.test(p[0])) return { apre: true, solo };
+      if (solo && SI_SBLOCCA_SOLO.test(p[0])) return { apre: true, solo };
     }
     if (!it) return { apre: false, solo: false };
     // Un PIN non è mai un identificativo, di qualunque cosa sia: «il pin del telefono è 4821», anche se è un anno (#2678.3).
     if (/^pin$/i.test(it[0])) return { apre: true, solo: true, pin: true };
     const coda = prima.slice(it.index + it[0].length).replace(LEGAMI, '');
+    const cosa = /^[\p{L}-]+/u.exec(coda);
+    if (cosa && SI_SBLOCCA_SOLO.test(cosa[0]) && DOPO_IL_NOME.test(coda.slice(cosa[0].length))) return { apre: true, solo: true };
     return { apre: NOME_CHE_APRE.test(coda), solo: NOME_CHE_APRE_SOLO.test(coda) };
   };
   // Un verbo al posto dell'etichetta («Il codice sarà 4829», «El código era 4829») annuncia il valore, non lo nomina.
