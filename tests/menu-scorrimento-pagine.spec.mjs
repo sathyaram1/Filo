@@ -167,7 +167,7 @@ test('Gestione: il menu di una scheda', async ({ openTab }) => {
   await expect(page.locator('.mg-item')).toHaveCount(1);
   const scheda = page.locator('.mg-item').first();
   await scorriEApri(page, scheda);
-  await restaPoiSiChiude(page, page.locator('.mg-ctxmenu'));
+  await restaPoiSiChiude(page, menuDi(page).principale);
 });
 
 test('Home: il riquadro di una voce del sistema', async ({ app }) => {
