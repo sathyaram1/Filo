@@ -3201,7 +3201,26 @@ class TabManager {
 
   // Solo la scheda davanti si vede; una aperta dietro resta «visibile» a 0×0 finché non ha l'anteprima (#430).
   _visibile(t) {
-    return t.id === this.activeId || this.anteprime.tieneSveglia(t);
+    return t.id === this.activeId || this.anteprime.tieneSveglia(t) || t.id === this._inArrivo;
+  }
+
+  // #2389 — l'editor che nasce dal campo si disegna sotto la scheda davanti, a misura piena: quando viene davanti è
+  // già pronto, senza lampo né salto. Regia: services/editorDalCampo.js.
+  arrivoSotto(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab || id === this.activeId) return false;
+    this._inArrivo = id;
+    try { this.win.contentView.addChildView(tab.view, 0); } catch (_) {}
+    try { tab.view.setVisible?.(true); } catch (_) {}
+    this.layout();
+    return true;
+  }
+
+  fineArrivo(id) {
+    if (this._inArrivo !== id) return;
+    this._inArrivo = null;
+    for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
+    this.layout();
   }
 
 
