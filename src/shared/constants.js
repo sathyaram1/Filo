@@ -2779,6 +2779,8 @@
     // Il pannello di destra delle app di Filo (#1433): lo stesso meccanismo della barra laterale, sul bordo destro delle
     // pagine filo:// che ne hanno uno. `bloccato`: resta aperto e spinge il contenuto invece di coprirlo.
     pannelloDestro: { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, bloccato: false },
+    // Il tasto destro a icone (#2555): grandezza delle icone (px) e colonne della griglia.
+    menuIcone: { icona: 20, colonne: 6 },
     // Quanto resta la pillola col sito che si è preso lo schermo pieno (#1526). Non si spegne: è l'unico segno che
     // quello che si vede non è più Filo. Preferenze → Avanzate e IMPOSTA_PREFERENZA.
     avvisoSchermoPieno: { durataMs: 3000 },
