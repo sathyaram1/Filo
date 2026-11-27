@@ -1252,20 +1252,6 @@
     };
   }
 
-  function conMenuDelSito(items, sito) {
-    if (!sito) return;
-    items.unshift({
-      type: 'split',
-      azione: 'site-own-menu',
-      label: I18n.t('menu_del_sito').replace('%s', () => sito.nome),
-      onClick: () => apriMenuDelSito(sito),
-      arrowTitle: I18n.t('menu_del_sito_scelta'),
-      subItems: [sito.prima
-        ? { label: I18n.t('menu_del_sito_torna_filo'), onClick: () => impostaMenuDelSito(false) }
-        : { label: I18n.t('menu_del_sito_sempre'), onClick: () => impostaMenuDelSito(true) }],
-    }, { type: 'separator' });
-  }
-
   // Dopo il clic sulla voce, non dentro: il clic che risale al documento chiuderebbe il menu appena aperto.
   function apriMenuDelSito(sito) {
     Popup.conta({ misura: 'menu-nativo', voce: 'menu_del_sito:voce' });
