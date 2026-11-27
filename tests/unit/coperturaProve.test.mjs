@@ -128,7 +128,8 @@ test('il lancio dalle prove passa cartella e prova al main, e alla chiusura scri
 test('la config di Playwright accende la registrazione', () => {
   const config = readFileSync(join(ROOT, 'playwright.config.js'), 'utf8');
   assert.match(config, /import \{ accendiCopertura \} from '\.\/scripts\/lib\/copertura-prove\.mjs'/);
-  assert.match(config, /^accendiCopertura\(\);$/m);
+  assert.match(config, /^import regolaCopertura from '\.\/src\/main\/copertura\.js';$/m);
+  assert.match(config, /^accendiCopertura\(regolaCopertura\);$/m);
   const main = readFileSync(join(ROOT, 'src/main/main.js'), 'utf8');
   const riga = main.split('\n').findIndex((r) => r.includes("require('./copertura').accendi(app)"));
   const primoRequireLocale = main.split('\n').findIndex((r) => /require\('\.\//.test(r));
