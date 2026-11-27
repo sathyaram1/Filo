@@ -1116,7 +1116,7 @@
           }
           notaRipiego(bubble.text, m.keyFallback);
           notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
-          setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}${durata ? ` • ${durata}` : ''}`);
+          setMeta(popup, `${durata ? `${durata} • ` : ''}${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Le domande sulla trascrizione vanno a un modello che risponde, non di nuovo a quello che trascrive.
         if (trascrizione) popup.action = ACTIONS.EXPLAIN_DEEP;
