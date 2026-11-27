@@ -428,6 +428,7 @@
   // Dopo il rimando: l'annuncio, i due punti e gli avverbi si saltano; il valore è la parola dopo. Di sole lettere, senza
   // annuncio, solo se chiude la frase: «prova gattonero» sì, «adesso vado a cambiarla» no.
   const CONGIUNZIONE = /^(?:e|ed|ma|o|poi|and|but|or|then)$/u;
+  let avverbio = null;
   function dopoIlRinvio(resto, { soloCifre, spiega }) {
     const r = RINVIO.exec(resto);
     if (!r) return null;
