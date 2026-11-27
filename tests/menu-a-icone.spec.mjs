@@ -220,6 +220,31 @@ test('un filmato su un sito col suo menu: «Menu di …» ha l\'icona del sito, 
   await page.screenshot({ path: resolve(SHOTS, 'menu-a-icone-youtube.png') });
 });
 
+test('grandezza delle icone e icone per riga si cambiano dalle Preferenze, e il menu le usa', async ({ app, openTab, testServer }) => {
+  const img = testServer.asset(PNG, 'image/png');
+  const page = await testServer.openReady(openTab, SITO(img));
+  const menu = menuDi(page);
+  const misura = () => menu.valuta(() => {
+    const b = document.querySelector('.sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)');
+    const svg = b.querySelector('svg');
+    const row = document.querySelector('.sn-menu-griglia .sn-menu-row');
+    return { cella: b.getBoundingClientRect().width, icona: svg.getBoundingClientRect().width, colonne: getComputedStyle(row).gridTemplateColumns.split(' ').length };
+  });
+  await page.locator('#film').click({ button: 'right' });
+  await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
+  const prima = await misura();
+  expect(prima.cella).toBeGreaterThanOrEqual(32);
+  await page.keyboard.press('Escape');
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ menuIcone: { icona: 28, colonne: 3 } }); });
+  await expect.poll(async () => {
+    await page.locator('#film').click({ button: 'right' });
+    await expect(menu.locator('.sn-menu-griglia')).toBeVisible();
+    const m = await misura();
+    await page.keyboard.press('Escape');
+    return m;
+  }).toEqual({ cella: 42, icona: 28, colonne: 3 });
+});
+
 test.describe('col menu nello strato sopra la scheda', () => {
   test.use({ stratoDelMenu: true });
 
