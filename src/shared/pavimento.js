@@ -253,10 +253,13 @@
   function codiceDelMioApparecchio(s, out) {
     if (!UN_APPARECCHIO_NEL_TESTO.test(s)) return;
     for (const m of s.matchAll(QUELLO_DEL_MIO)) {
-      if (NUCLEO_NEL_TESTO.test(s.slice(Math.max(0, m.index - 200), m.index))) out.push({ valore: m[1], regola: 'codice' });
+      if (NUCLEO_NEL_TESTO.test(s.slice(Math.max(0, m.index - 200), m.index))) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
     }
-    for (const m of s.matchAll(SBLOCCO_COL_NUMERO)) out.push({ valore: m[1], regola: 'codice' });
+    for (const m of s.matchAll(SBLOCCO_COL_NUMERO)) out.push(conCheApre({ valore: m[1], regola: 'codice' }, true));
   }
+  // `apre`: il codice di qualcosa che apre (il mio telefono, il cancello, la carta). Il controllo delle uscite prende
+  // questi e il CVV, che non legge da sé (guardianoStatico.js, segretiInUscita); il resto lo legge con le sue forme.
+  const conCheApre = (x, apre) => (apre ? Object.assign(x, { apre: true }) : x);
   // «The serial code of my phone»: un nome comune davanti a «code» ne fa un identificativo, come nell'etichetta inglese.
   const INIZIA_COL_NOME = new RegExp(`^${NOME_SBLOCCO}`, 'iu');
   const DAVANTI_AL_NOME = /^(?:il|lo|la|le|el|un|the|and|gli|una|une|uno|los|las|der|die|das|den|dem|des|het|een|ein\w*|unlock|lock|screen|access|pin|puk|sim|what|what['’]?s|here|ecco|anche|also|plus)$/i;
