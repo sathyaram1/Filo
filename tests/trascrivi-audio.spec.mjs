@@ -189,4 +189,8 @@ test('in chat: «trascrivi <indirizzo>» risponde col parlato; un indirizzo che 
   const pagina = testServer.html('<!doctype html><html><body><p>Solo testo, nessun audio.</p></body></html>');
   await chiedi(page, `trascrivi ${pagina}`);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'non è un audio o un video' })).toBeVisible({ timeout: 30_000 });
+
+  // Un video in streaming (YouTube): Filo lo dice e propone la trascrizione della pagina, niente risposta vuota.
+  await chiedi(page, 'trascrivi https://www.youtube.com/watch?v=abc123');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Quel video è in streaming' })).toBeVisible({ timeout: 30_000 });
 });
