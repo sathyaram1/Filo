@@ -58,6 +58,15 @@ test('il WAV di un pezzo ha i suoi campioni e basta', () => {
   assert.equal(tot, c.length * 2, 'i pezzi insieme hanno ogni campione una volta');
 });
 
+test('in chat, di una pagina si trascrive il media diretto che dichiara, mai una playlist a segmenti', () => {
+  const M = require(join(ROOT, 'src', 'main', 'services', 'trascriviMedia.js'));
+  const base = 'https://radio.example/puntata/12';
+  assert.equal(M.mediaNellaPagina('<meta property="og:audio" content="/file/p12.mp3">', base), 'https://radio.example/file/p12.mp3');
+  assert.equal(M.mediaNellaPagina('<video controls><source src="https://cdn.example/v.mp4?x=1&amp;y=2"></video>', base), 'https://cdn.example/v.mp4?x=1&y=2');
+  assert.equal(M.mediaNellaPagina('<video src="https://cdn.example/live.m3u8"></video>', base), '', 'una playlist HLS non è un file');
+  assert.equal(M.mediaNellaPagina('<p>solo testo</p><img src="/a.png">', base), '');
+});
+
 test('i tetti dicono il numero', () => {
   assert.match(T.troppoGrande(400 * 1024 * 1024).message, /400 MB.*150 MB/);
   assert.match(T.troppoLungo(5 * 3600).message, /5 ore.*3 ore/);
