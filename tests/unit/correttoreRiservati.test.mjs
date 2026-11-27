@@ -51,6 +51,19 @@ test('un\'etichetta in grassetto HTML non fa partire il valore, nemmeno a pezzi'
   assert.equal(p.dopo, '<br><b>Utente:</b> mario');
 });
 
+// #2673.14 — il valore sotto l'etichetta col segno d'elenco o di citazione davanti, o fra virgolette con gli spazi.
+test('sotto l\'etichetta il valore col punto d\'elenco, la citazione o le virgolette non parte, con ogni a capo', () => {
+  for (const a of ['\n', '\r\n', '\r', String.fromCharCode(0x2028)]) {
+    for (const t of [`**Password:**${a}Nyckel!2024`, `Password:${a}+ Nyckel!2024`, `Password:${a}> Nyckel!2024`,
+      `> Password:${a}> Nyckel!2024`, `Password =${a}Nyckel!2024`, `Password:${a}"Nyckel 2024 casa"`, `Password:${a}«Nyckel 2024 casa»`]) {
+      assert.ok(!/Nyckel|2024|casa/.test(R.oscura(t)), JSON.stringify(t));
+      const p = R.richiestaSenzaRiservati({ prima: '', nuovo: t, dopo: '' });
+      assert.ok(!/Nyckel|2024|casa/.test(p.nuovo), JSON.stringify(t));
+    }
+  }
+  assert.equal(R.oscura('Lista della spesa:\n- latte\n> pane'), 'Lista della spesa:\n- latte\n> pane');
+});
+
 // La parola che presenta il dato e il dato possono partire in pezzi diversi, o la parola restare fuori dai pezzi: si
 // cerca nel campo intero, e il campo non parte.
 test('una password scritta dopo una pausa e una carta a metà fra due pezzi non partono', () => {
