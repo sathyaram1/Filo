@@ -187,8 +187,8 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     await expect.poll(() => statoCronologia(app, page), { timeout: 5000 }).toBeNull();
     await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 
-    // Riapri la cronologia dalla stessa freccetta: la voce rimossa NON torna.
-    await arrow.hover();
+    // Riapri la cronologia dalla stessa icona: la voce rimossa NON torna.
+    await incolla.click({ button: 'right' });
     await expect.poll(() => testiCronologia(app, page)).toEqual(['secondo testo generico', 'terzo testo normale']);
 
     await page.screenshot({ path: 'tests/.shots/clipboard-history-remove-reopen.png' });
