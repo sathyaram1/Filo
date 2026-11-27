@@ -114,7 +114,7 @@ test('Aperti per dopo: il menu di una scheda', async ({ openTab }) => {
   const scheda = page.locator('#grid .sn-card[data-page-id="a"]');
   await expect(scheda).toBeVisible();
   await scorriEApri(page, scheda);
-  await restaPoiSiChiude(page, page.locator('.home-ctxmenu'));
+  await restaPoiSiChiude(page, menuDi(page).principale);
 });
 
 test('Bacheca: il menu di una propria segnalazione', async ({ app, openTab }) => {
