@@ -18,8 +18,8 @@ for (const [testo, pin, soloPavimento] of [
   ['PIN: 4 - 8 - 2 - 1', '4821'],
   ['Il pin è 4  8  2  1', '4821'],
   ['il pin è 4 8 2 1', '4821'],
-  ['PIN: 4/8/2/1', '4821', true],
-  ['il pin è 4,8,2,1', '4821', true],
+  ['il pin è 4—8—2—1', '4821', true],
+  ['il pin è 4−8−2−1', '4821', true],
 ]) {
   test(`r1 pavimento: «${testo}» non lascia il PIN`, () => {
     expect(resta(P.oscura(testo), pin), P.oscura(testo)).toBe(false);
