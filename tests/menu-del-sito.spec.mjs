@@ -90,7 +90,7 @@ test('«Menu di <sito>» in cima apre il menu della pagina nello stesso punto, e
   // Il sito non ha visto il tasto destro che ha aperto il menu di Filo.
   expect(await page.evaluate(() => window.aperture)).toBe(0);
 
-  await menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: 'Menu di Sito di prova' }).click();
+  await menuDi(page).icona('siteMenu').click();
   await expect(page.locator('#menu-suo')).toBeVisible();
   await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
   const posto = await page.evaluate(() => {
