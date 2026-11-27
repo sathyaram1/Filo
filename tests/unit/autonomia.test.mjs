@@ -414,6 +414,7 @@ test('ogni tipo che urlExfil.contestoDaAzioni tratta come non fidato ha una font
     CERCA_DOCUMENTI: { _output: { risultati: [{ nome: 'a.txt', squarcio: 'x' }] } },
     CERCA_CHAT: { _output: { results: [], pagine: [{ url: 'https://x.example/', title: 'x' }] } },
     LEGGI_PAGINA: { url: 'https://x.example/', _output: { ok: true, url: 'https://x.example/', testo: 'pagina' } },
+    TRASCRIVI_MEDIA: { url: 'https://x.example/a.mp3', _output: { trascritto: 'https://x.example/a.mp3', trascrizione: 'parlato' } },
     CERCA_SALVATE: { _output: { pagine: [{ url: 'https://x.example/', title: 'x' }] } },
     APRI_SALVATA: { _output: { aperta: true, titolo: 'x', url: 'https://x.example/' } },
     CERCA_WEB: { query: 'x', _output: { results: [{ url: 'https://x.example/', title: 'x' }] } },
