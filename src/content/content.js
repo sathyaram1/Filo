@@ -2482,8 +2482,7 @@
   // oggetti (quale fa il clic, quali stanno nel menu dell'icona) lo decide l'elenco unico.
   function suOggetto(azioni, verbo, oggetto, spec) {
     if (!spec || typeof spec.onClick !== 'function') return;
-    if (!azioni[verbo]) azioni[verbo] = { su: {} };
-    if (!azioni[verbo].su) azioni[verbo] = { su: { [Disp().CONTESTI.pagina.oggetti[verbo]?.[0] || 'elemento']: azioni[verbo] } };
+    if (!azioni[verbo] || !azioni[verbo].su) azioni[verbo] = { ...(azioni[verbo] || {}), su: {} };
     azioni[verbo].su[oggetto] = spec;
   }
 
