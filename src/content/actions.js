@@ -1772,25 +1772,6 @@
     };
   }
 
-  // `link`: il collegamento a cui il menu lega il filmato (l'anteprima stesa sopra la scheda di una home).
-  function buildMediaItems(el, link = null) {
-    const a = azioniDelMedia(el, link);
-    const items = [
-      { type: 'item', azione: 'video-audio-controls', label: a.playPause.label, onClick: a.playPause.onClick },
-      { type: 'item', azione: 'video-audio-controls', label: a.mute.label, onClick: a.mute.onClick },
-      buildMediaSpeedItem(el),
-      { type: 'item', azione: 'video-audio-controls', label: a.loop.label, onClick: a.loop.onClick },
-    ];
-    if (a.pip) items.push({ type: 'item', azione: 'video-pip', label: a.pip.label, onClick: a.pip.onClick });
-    items.push(
-      { type: 'item', azione: 'video-audio-controls', label: a.controls.label, onClick: a.controls.onClick },
-      { type: 'separator' },
-      { type: 'item', azione: 'copy-download-video', label: a.copyLink.label, onClick: a.copyLink.onClick },
-      { type: 'item', azione: 'copy-download-video', label: a.save.label, onClick: a.save.onClick },
-    );
-    return items;
-  }
-
   // Lens-style reverse search (più affidabile di searchbyimage)
   function imageSearchUrlFor(imgEl) {
     return global.SN_URL_NAV.indirizzoRicercaImmagine(indirizzoDellImmagine(imgEl));
