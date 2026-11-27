@@ -525,7 +525,8 @@ test('in chat, chiuso il riquadro, «Rimetti il nome di prima» dal tasto destro
     // Rimesso, la voce non c'è più: non c'è un nome di prima da rimettere.
     await page.keyboard.press('Escape');
     await chip.click({ button: 'right' });
-    await expect(page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Rimetti' })).toHaveCount(0);
+    await expect(menuDi(page).principale).toBeVisible();
+    await expect(menuDi(page).voce('Rimetti')).toHaveCount(0);
     await page.keyboard.press('Escape');
 
     await page.evaluate((p) => {
