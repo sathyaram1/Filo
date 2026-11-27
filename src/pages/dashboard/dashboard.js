@@ -712,8 +712,9 @@
     if (!trovata && !riprendi) return false;
     if (riprendi && chatId !== chat.id) {
       if (chatId) closeCurrentChat({ via: 'home' });
-      if (await adotta(chat.id)) chatScelta = chat.id;
+      await adotta(chat.id);
     }
+    if (riprendi && chatId === chat.id) chatScelta = chat.id;
     inputEl.focus();
     return true;
   }
