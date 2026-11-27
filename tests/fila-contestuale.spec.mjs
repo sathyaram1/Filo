@@ -96,7 +96,7 @@ test('nell\'Editor sul testo selezionato la fila ha grassetto e corsivo, e il cl
 
   // Il corsivo sulla stessa selezione, rimasta dov'era.
   await editor.mouse.click(box.x, box.y, { button: 'right' });
-  await menuDi(editor).locator('.sn-menu-row [data-sn-icon-id="scrivibile:italic"]').click();
+  await menuDi(editor).locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="scrivibile:italic"]').click();
   await expect.poll(() => editor.evaluate(() => document.querySelector('#doc i, #doc em')?.textContent || '')).toBe('importante');
 });
 
@@ -107,7 +107,7 @@ test('su un\'immagine la fila ha le sue azioni, e il «+» le altre; sul testo d
   const menu = menuDi(page);
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   expect(await iconeDellaFila(menu)).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask']);
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="immagine:save"]')).toHaveAttribute('aria-label', /Salva immagine/);
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:save"]')).toHaveAttribute('aria-label', /Salva immagine/);
   await menu.locator('.sn-menu-row .sn-menu-row-overflow').click();
   const griglia = menu.locator('.sn-menu-icon-grid');
   await expect(griglia).toBeVisible();
@@ -155,7 +155,7 @@ test('nell\'Editor il collegamento e l\'evidenziato della fila si mettono e rest
   await editor.keyboard.type('Leggi la guida e poi la nota');
   await destroSullaParola(editor, 'guida');
   const menu = menuDi(editor);
-  await menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:link"]').click();
+  await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="scrivibile:link"]').click();
   const campo = menu.locator('.sn-menu-link-campo');
   await expect(campo).toBeFocused();
   // Uno schema che esegue non diventa un collegamento: lo si dice, e niente cambia.
@@ -164,14 +164,14 @@ test('nell\'Editor il collegamento e l\'evidenziato della fila si mettono e rest
   await expect(menu.pannelli).toHaveCount(0);
   expect(await editor.locator('#doc a').count()).toBe(0);
   await destroSullaParola(editor, 'guida');
-  await menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:link"]').click();
+  await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="scrivibile:link"]').click();
   await menu.locator('.sn-menu-link-campo').fill('esempio.it/guida');
   await menu.locator('.sn-menu-link-campo').press('Enter');
   await expect(editor.locator('#doc a')).toHaveText('guida');
   await expect(editor.locator('#doc a')).toHaveAttribute('href', 'https://esempio.it/guida');
 
   await destroSullaParola(editor, 'nota');
-  await menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:highlight"]').click();
+  await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="scrivibile:highlight"]').click();
   await expect.poll(() => editor.evaluate(() => [...document.querySelectorAll('#doc span')]
     .filter((s) => s.style.backgroundColor && s.textContent === 'nota').length)).toBe(1);
 
@@ -185,7 +185,7 @@ test('nell\'Editor il collegamento e l\'evidenziato della fila si mettono e rest
 
   // Sul collegamento il campo propone il suo indirizzo; svuotato, Invio lo toglie.
   await destroSullaParola(editor, 'guida');
-  await menuDi(editor).locator('.sn-menu-row [data-sn-icon-id="scrivibile:link"]').click();
+  await menuDi(editor).locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="scrivibile:link"]').click();
   await expect(menuDi(editor).locator('.sn-menu-link-campo')).toHaveValue('https://esempio.it/guida');
   await menuDi(editor).locator('.sn-menu-link-campo').fill('');
   await menuDi(editor).locator('.sn-menu-link-campo').press('Enter');
@@ -237,7 +237,7 @@ test('un\'icona portata dal «+» alla fila resta dopo il riavvio, e «rimetti c
     await expect(leggi).toBeVisible();
     // Trascinata col mouse vero davanti a «Copia», nella fila.
     const da = await fermo(leggi);
-    const davanti = await fermo(menu.locator('.sn-menu-row [data-sn-icon-id="testo:copy"]'));
+    const davanti = await fermo(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="testo:copy"]'));
     await page.mouse.move(da.x + da.width / 2, da.y + da.height / 2);
     await page.mouse.down();
     await page.mouse.move(da.x + 10, da.y + 10, { steps: 3 });
@@ -311,20 +311,20 @@ test('un\'icona della barra portata nella fila del tasto destro lascia la barra,
   await barra.mouse.up();
   await expect.poll(async () => (await salvata(app))['fila:pagina']).toEqual(['saveForLater']);
   await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('saveForLater');
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="saveForLater"]')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]')).toBeVisible();
   await comandaBarra(app, 'chiudi');
 
   // Il menu dopo, sulla pagina: l'icona c'è, e premuta fa la sua azione sulla pagina.
   await page.keyboard.press('Escape');
   await page.locator('#vuoto').click({ button: 'right' });
-  await menu.locator('.sn-menu-row [data-sn-icon-id="saveForLater"]').click();
+  await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]').click();
   await expect.poll(() => app.evaluate(async () => ((await globalThis.chrome.storage.local.get('savedPages')).savedPages || []).map((x) => x.url)),
     { timeout: 10_000 }).toContain(page.url());
   await page.locator('#vuoto').click({ button: 'right' });
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="saveForLater"]')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]')).toBeVisible();
 
   // Dalla fila alla barra: il trascinamento la apre, e la barra la riprende.
-  const icona = await fermo(menu.locator('.sn-menu-row [data-sn-icon-id="saveForLater"]'));
+  const icona = await fermo(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]'));
   await page.mouse.move(icona.x + icona.width / 2, icona.y + icona.height / 2);
   await page.mouse.down();
   await page.mouse.move(icona.x + 12, icona.y + 12, { steps: 3 });
@@ -336,7 +336,7 @@ test('un\'icona della barra portata nella fila del tasto destro lascia la barra,
   await expect(barra.locator('#nav')).toHaveClass(/mira/);
   await page.mouse.up();
   await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 6)).toEqual(['help', 'back', 'forward', 'reload', 'saveForLater', 'home']);
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="saveForLater"]')).toHaveCount(0);
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]')).toHaveCount(0);
   expect((await salvata(app))['fila:pagina']).toEqual([]);
 });
 
@@ -351,7 +351,7 @@ test.describe('col menu nello strato sopra la scheda', () => {
     expect(menu.superficie.url()).toMatch(/^filo:\/\/menu\//);
     expect(await iconeDellaFila(menu)).toEqual(['link:openTab', 'link:copy']);
     await app.evaluate(({ clipboard }) => clipboard.writeText('prima'));
-    await menu.locator('.sn-menu-row [data-sn-icon-id="link:copy"]').click();
+    await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="link:copy"]').click();
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 10_000 }).toBe('https://esempio.it/pagina');
 
     await page.locator('#vai').click({ button: 'right' });
@@ -383,7 +383,7 @@ test('a parole: Filo mette un\'icona nella fila di un contesto, come il trascina
   await expect.poll(async () => (await salvata(app))['fila:immagine']).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask', 'immagine:openTab', 'immagine:search']);
   await page.locator('#foto').click({ button: 'right' });
   const menu = menuDi(page);
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="immagine:search"]')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:search"]')).toBeVisible();
   await page.keyboard.press('Escape');
 
   // Un'icona della barra nella fila del testo: lascia la barra.
@@ -415,17 +415,17 @@ test('su un filmato e su un audio la fila ha le loro azioni, e in un campo col s
     await page.locator(sel).click({ button: 'right' });
     await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
     expect(await iconeDellaFila(menu)).toEqual(['media:playPause', 'media:mute', 'media:save']);
-    await expect(menu.locator('.sn-menu-row [data-sn-icon-id="media:playPause"]')).toHaveAttribute('aria-label', /Riproduci/);
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="media:playPause"]')).toHaveAttribute('aria-label', /Riproduci/);
     await expect(menu.locator('.sn-menu-row .sn-menu-row-overflow')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(menu.pannelli).toHaveCount(0);
   }
   // Il clic sull'icona dell'audio lo zittisce, e riaperta l'icona dice il contrario.
   await page.locator('#aud').click({ button: 'right' });
-  await menu.locator('.sn-menu-row [data-sn-icon-id="media:mute"]').click();
+  await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="media:mute"]').click();
   await expect.poll(() => page.evaluate(() => document.getElementById('aud').muted)).toBe(true);
   await page.locator('#aud').click({ button: 'right' });
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="media:mute"]')).toHaveAttribute('aria-label', /Riattiva audio/);
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="media:mute"]')).toHaveAttribute('aria-label', /Riattiva audio/);
   await page.keyboard.press('Escape');
 
   await app.evaluate(({ clipboard }) => clipboard.writeText('dagli appunti'));
@@ -433,7 +433,7 @@ test('su un filmato e su un audio la fila ha le loro azioni, e in un campo col s
   await page.locator('#area').click({ button: 'right' });
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
   expect((await iconeDellaFila(menu))[0]).toBe('cursore:paste');
-  await menu.locator('.sn-menu-row [data-sn-icon-id="cursore:paste"]').click();
+  await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="cursore:paste"]').click();
   await expect.poll(() => page.locator('#area').inputValue()).toBe('dagli appunti');
 });
 
@@ -489,7 +489,7 @@ test('Chiedi a Filo su un\'immagine scritta nella pagina (data:) la allega con u
     return u;
   });
   await page.locator('#foto').click({ button: 'right' });
-  await menuDi(page).locator('.sn-menu-row [data-sn-icon-id="immagine:ask"]').click();
+  await menuDi(page).locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:ask"]').click();
   let allegati = [];
   await expect.poll(async () => {
     allegati = await neiRiquadri(app, page, () => globalThis.__filoSidebarTest?.allegati?.() || []);
@@ -524,8 +524,8 @@ test('la fila legge gli stili della selezione: Grassetto acceso sul grassetto, E
   const menu = menuDi(page);
   let p = await selezionaParola(page, '#ricco', 'parola');
   await page.mouse.click(p.x, p.y, { button: 'right' });
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:bold"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:italic"]')).toHaveAttribute('aria-pressed', 'false');
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="scrivibile:bold"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="scrivibile:italic"]')).toHaveAttribute('aria-pressed', 'false');
   await page.keyboard.press('Escape');
 
   const fondo = () => page.evaluate(() => {
@@ -539,7 +539,7 @@ test('la fila legge gli stili della selezione: Grassetto acceso sul grassetto, E
   for (const [acceso, dopo] of [['false', /./], ['true', /^$/]]) {
     p = await selezionaParola(page, '#ricco', 'formattare');
     await page.mouse.click(p.x, p.y, { button: 'right' });
-    const ev = menu.locator('.sn-menu-row [data-sn-icon-id="scrivibile:highlight"]');
+    const ev = menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="scrivibile:highlight"]');
     await expect(ev).toHaveAttribute('aria-pressed', acceso);
     await ev.click();
     await expect.poll(fondo).toMatch(dopo);
@@ -559,6 +559,6 @@ test('su un\'immagine o un filmato dentro un collegamento la fila apre il colleg
     await page.keyboard.press('Escape');
   }
   await page.locator('#foto').click({ button: 'right' });
-  await menu.locator('.sn-menu-row [data-sn-icon-id="immagine:openTab"]').click();
+  await menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:openTab"]').click();
   await expect.poll(() => app.evaluate(({ webContents }, u) => webContents.getAllWebContents().some((w) => w.getURL() === u), meta)).toBe(true);
 });
