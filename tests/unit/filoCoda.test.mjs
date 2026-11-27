@@ -149,6 +149,13 @@ test('cercare nel filo: tutte le parole, senza accenti né maiuscole, nei messag
   assert.equal(C.cerca({ chats }, ' ').messaggi.length, 0);
 });
 
+test('#869.2 un messaggio trovato porta l\'estratto per la riga e il testo intero per «Copia il testo»', () => {
+  const lungo = `Le orche vivono in gruppi. ${'Parole di mezzo sul branco. '.repeat(20)}Alla fine cacciano come in un balletto.`;
+  const [r] = C.cerca({ chats: [chat('a', [m('filo', lungo, fa(3))])] }, 'balletto').messaggi;
+  assert.match(r.testo, /^…/);
+  assert.equal(r.intero, lungo);
+});
+
 test('nei passi allargati una parola corta vale da inizio parola (#1295)', () => {
   const chats = [
     chat('z', [m('user', 'Parliamo di Zen e del respiro', fa(30))]),
