@@ -893,6 +893,23 @@ module.exports = function register(on, ctx) {
   })));
   on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
 
+  // L'Editor che nasce dal campo (#2389): la bozza la manda solo una home, la prende solo l'editor preparato per lei.
+  const DalCampo = require('../editorDalCampo');
+  const vietato = { ok: false, code: 'forbidden', error: 'forbidden' };
+  on(MSG.EDITOR_DAL_CAMPO, async (msg, sender, origin) => {
+    if (!DalCampo.eHome(origin) || !sender || !sender.tab) return vietato;
+    return DalCampo.consegna({
+      tabs: sender.win && sender.win._filoTabs, homeTab: sender.tab, homeWc: sender.wc,
+      testo: msg && msg.testo, sfondo: msg && msg.sfondo, velo: !!(msg && msg.velo),
+    });
+  });
+  on(MSG.EDITOR_BOZZA, async (msg, sender, origin) => (
+    DalCampo.eEditor(origin) && sender ? DalCampo.prendi(msg && msg.id, sender.tab) : vietato));
+  on(MSG.EDITOR_BOZZA_PRONTA, async (msg, sender, origin) => (
+    DalCampo.eEditor(origin) && sender ? DalCampo.editorPronto(msg && msg.id, sender.tab, msg && msg.geometria) : vietato));
+  on(MSG.EDITOR_VELO_PRONTO, async (msg, sender, origin) => (
+    DalCampo.eHome(origin) && sender ? DalCampo.veloPronto(msg && msg.id, sender.wc) : vietato));
+
   // F4 — l'avviso della segnalazione automatica: mai da un sito, e solo per una partita da qui (#784.3, #784.6).
   const AttesaAutoFeedback = require('../autoFeedbackAttesa');
   on(MSG.CANCEL_AUTO_FEEDBACK, soloSuperficiDiFilo(async (msg) => {
