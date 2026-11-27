@@ -102,7 +102,7 @@ test('il tasto destro sul titolo apre il menu con "Rigenera titolo"', async ({ o
     doc.innerHTML = '<p>una breve nota di prova sul giardino</p>';
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await menu.getByText('Rigenera titolo', { exact: true }).click();
+  await menu.scegli('Rigenera titolo');
 
   // Il titolo diventa quello rigenerato dall'AI.
   await expect(page.locator('#docTitle')).toHaveText('Titolo rigenerato', { timeout: 8000 });
