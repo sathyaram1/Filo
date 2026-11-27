@@ -22,24 +22,31 @@ const ATTACCO = `
     c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true,
       clientX: r.left + 5, clientY: r.top + 5, button: 2, buttons: 2 }));
   };
-  window.freccia = () => {
-    const f = document.querySelector('.sn-menu-paste-arrow');
-    if (!f) return false;
+  // La cronologia è il menu dell'icona Incolla (#2555): il sito prova tutte le strade che la aprono.
+  const apriIlMenuDi = (f) => {
     for (const t of ['pointerover', 'pointerenter', 'mouseover', 'mouseenter', 'pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
       f.dispatchEvent(new MouseEvent(t, { bubbles: true, composed: true }));
     }
-    f.click();
+    f.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true, button: 2, buttons: 2 }));
+    f.dispatchEvent(new CustomEvent('sn-varianti', { bubbles: true }));
+    f.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }));
+  };
+  window.freccia = () => {
+    const f = document.querySelector('.sn-menu-griglia [data-sn-verbo="paste"]');
+    if (!f) return false;
+    apriIlMenuDi(f);
     return true;
   };
   // Il pulsante portato fuori dal menu, nella pagina, e premuto lì: fuori dal contenitore deve restare chiuso.
-  window.sposta = (sel) => {
+  window.sposta = (sel, menuDellIcona = false) => {
     const b = document.querySelector(sel);
     if (!b) return false;
     document.body.appendChild(b);
-    b.click();
+    if (menuDellIcona) apriIlMenuDi(b);
+    else b.click();
     return true;
   };
-  window.incolla = () => { const b = document.querySelector('.sn-menu-paste-main'); if (b) b.click(); return !!b; };
+  window.incolla = () => { const b = document.querySelector('.sn-menu-griglia [data-sn-verbo="paste"]'); if (b) b.click(); return !!b; };
   window.cosaVede = () => {
     let t = document.documentElement.outerHTML + (window.__visti || []).join(' ');
     for (const el of document.querySelectorAll('*')) if (el.shadowRoot) t += el.shadowRoot.innerHTML;
