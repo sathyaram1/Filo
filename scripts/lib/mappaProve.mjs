@@ -313,3 +313,52 @@ export function proveDelCambio(mappa, cambi, { soglia = SOGLIA_SPEC_DI_UN_MODULO
 }
 
 const ORDINE = { funzione: 0, larga: 1, file: 2 };
+
+const DICHIARAZIONE = /^(\s*)(?:export\s+)?(?:const|let|var|class|(?:async\s+)?function\s*\*?)\s*([A-Za-z_$][\w$]*|\{[^}]*\}|\[[^\]]*\])/;
+const CHIUSURA = /^\s*[\]})]/;
+const TETTO_NOMI = 500;
+
+/**
+ * Le righe che leggono i nomi dichiarati fuori dalle funzioni sulle righe `righe`: una costante, una tabella o
+ * un'espressione regolare in cima al modulo (o nel corpo dell'IIFE) cambia quello che fanno le funzioni che la usano,
+ * e fra le registrazioni ha solo il caricamento del file. Segue le dichiarazioni che si citano fra loro.
+ * `dentro(r)`: la riga sta in una funzione eseguita. PURA.
+ */
+export function righeDeiNomi(testo, righe, dentro) {
+  const linee = String(testo || '').split('\n');
+  const rientro = (l) => l.length - l.trimStart().length;
+  // Il livello del modulo: 0 in CommonJS, quello del corpo in un'IIFE.
+  let base = Infinity;
+  for (const l of linee) { const m = l.match(DICHIARAZIONE); if (m) base = Math.min(base, m[1].length); }
+  if (!Number.isFinite(base)) return [];
+  const nomiDi = (r) => {
+    for (let i = r - 1; i >= 0; i -= 1) {
+      const l = linee[i];
+      if (!l || !l.trim()) continue;
+      const rin = rientro(l);
+      if (rin > base || (i === r - 1 && rin === base && CHIUSURA.test(l))) continue;
+      if (rin < base) return [];
+      const m = l.match(DICHIARAZIONE);
+      return m ? m[2].match(/[A-Za-z_$][\w$]*/g) || [] : [];
+    }
+    return [];
+  };
+  const visti = new Set();
+  const out = new Set();
+  const coda = (righe || []).filter((r) => !dentro(r));
+  while (coda.length && visti.size < TETTO_NOMI) {
+    const r = coda.pop();
+    for (const nome of nomiDi(r)) {
+      if (visti.has(nome)) continue;
+      visti.add(nome);
+      const re = new RegExp(`(?<![\\w$.])${nome.replace(/\$/g, '\\$')}(?![\\w$])`);
+      linee.forEach((l, i) => {
+        const riga = i + 1;
+        if (riga === r || out.has(riga) || !re.test(l)) return;
+        out.add(riga);
+        if (!dentro(riga)) coda.push(riga);
+      });
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}
