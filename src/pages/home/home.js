@@ -474,6 +474,9 @@
     ];
     if (categories.length) voci.push({ label: I18n.t('home_menu_move'), run: () => apriMenuSposta(x, y, page) });
     voci.push({ label: I18n.t('home_remove'), run: (o) => rimuovi(page, o) });
+    // A icone come il tasto destro di Filo (#2555); «Sposta» apre poi l'elenco dei gruppi, che sono dati e restano testo.
+    const I = window.SN_MENU_ICONS;
+    if (I && I.apriVoci && I.apriVoci({ x, y, voci: voci.map((v) => ({ label: v.label, onClick: () => v.run() })) })) return;
     openMenuAt(x, y, voci);
   }
 
