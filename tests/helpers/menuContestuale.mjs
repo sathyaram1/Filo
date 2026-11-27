@@ -34,7 +34,19 @@ export function menuDi(scheda) {
   const voce = (testo) => locator('.sn-menu-item, .sn-menu-griglia .sn-menu-row-btn:not(.sn-menu-row-overflow)', { hasText: testo });
   const piu = locator('.sn-menu-griglia .sn-menu-row-overflow');
   // Il gesto dell'utente: un'azione rara sta dietro il «+», e prima di cliccarla si apre il «+» (#2555).
+  // Un nome che non è un'icona è una variante: sta nel menu di un'icona dello stesso verbo, e la si cerca lì.
   async function scegli(icona, opzioni) {
+    if (typeof icona === 'string') {
+      await locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia').first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+      if (!(await voce(icona).count())) {
+        const conVarianti = locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia [data-sn-varianti="1"]:not([data-sn-verbo="paste"])');
+        for (let i = 0, n = await conVarianti.count(); i < n; i++) {
+          await scegli(conVarianti.nth(i), { button: 'right' });
+          const sub = locator('.sn-menu-sub .sn-menu-item', { hasText: icona }).first();
+          if (await sub.isVisible().catch(() => false)) return sub.click(opzioni);
+        }
+      }
+    }
     const v = typeof icona === 'string' ? voce(icona).first() : icona;
     await v.waitFor({ state: 'attached' });
     if (!(await v.isVisible()) && await v.evaluate((b) => !!b.closest('.sn-menu-altro'))) {
