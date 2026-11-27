@@ -168,7 +168,9 @@ test('i motivi della dettatura, i suoi invii e i codici della lettura sono quell
   const invii = [...righe.join('\n').replace(/[!=]== '[a-z_]+'|imposta\('[a-z_]+'\)|motivo: '[a-z_]+'/g, '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
   assert.ok(new Set(invii).size >= 6, 'gli invii della dettatura si contano davvero');
   for (const i of invii) assert.ok(C.INVII_DETTATURA.includes(i), `«${i}» non è in INVII_DETTATURA`);
-  const scritti = globalThis.SN_CHAT_ERRORS.CODICI_GIA_SCRITTI.filter((c) => c !== 'FEEDBACK_READ_DENIED');
+  // Fuori dalla lettura: il feedback e la trascrizione di un audio intero (#1815) non passano dalla voce.
+  const fuori = ['FEEDBACK_READ_DENIED', 'NO_TRANSCRIBE_HOST', 'MEDIA_TROPPO', 'MEDIA_ILLEGGIBILE', 'MEDIA_SCADUTO'];
+  const scritti = globalThis.SN_CHAT_ERRORS.CODICI_GIA_SCRITTI.filter((c) => !fuori.includes(c));
   for (const c of [...scritti, 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN']) assert.ok(C.CODICI_LETTURA.includes(c), c);
   // Il perché della lettura lo compone sintesiNonRiuscita (#1344.2): lì stanno anche i due codici della voce.
   assert.match(tts, /CE\.sintesiNonRiuscita\(res\)/, 'la lettura spiega il perché con sintesiNonRiuscita');
