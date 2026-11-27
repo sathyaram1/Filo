@@ -1616,7 +1616,7 @@
     g.className = 'sn-menu-griglia';
     const a = it.aspetto && typeof it.aspetto === 'object' ? it.aspetto : {};
     if (Number.isFinite(a.icona)) g.style.setProperty('--sn-icona', `${a.icona}px`);
-    if (Number.isFinite(a.colonne)) g.style.setProperty('--sn-colonne', String(a.colonne));
+    g.__snColonne = Number.isFinite(a.colonne) ? a.colonne : 6;
     g.__snRiposo = String(it.oggetto || '');
     const row = document.createElement('div');
     row.className = 'sn-menu-row';
