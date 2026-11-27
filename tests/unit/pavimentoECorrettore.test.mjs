@@ -13,6 +13,8 @@ require('../../src/shared/urlExfil.js');
 const P = require('../../src/shared/pavimento.js');
 const R = require('../../src/main/services/correttoreRiservati.js');
 const S = P.SEGNAPOSTO;
+// In unità di riferimento: la lettura giusta sta sotto 30, quella che rilegge all'indietro le file di spazi sopra 1000.
+const TETTO_VOCI_VUOTE = 200;
 const alCorrettore = (campo) => R.richiestaSenzaRiservati({ prima: '', nuovo: campo, dopo: '', campo, campoDa: 0 }).nuovo;
 
 test('nella riga di una tabella il valore nella cella dopo l\'etichetta coi due punti non arriva al modello', () => {
