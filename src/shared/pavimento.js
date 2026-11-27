@@ -232,37 +232,53 @@
   const NOME_CHE_APRE_SOLO = new RegExp(`^(?:${COSE_CHE_SI_APRONO}|port[ae])(?:${CHIUDE_VERO})?\\s*$`, 'iu');
   const SOLO_DOPO_IL_NOME = new RegExp(`^(?:${CHIUDE_VERO})?\\s*$`, 'iu');
   const AGGETTIVO = '(?:[\\p{L}-]+\\s+)?';
+  // Le marche di telefoni e computer sono un elenco solo (#1403.91), dopo l'apparecchio e al suo posto (MARCA).
+  const MARCHE = 'samsung|galaxy|iphone|pixel|xiaomi|redmi|huawei|honor|oppo|oneplus|motorola|nokia|sony|xperia|lg|realme|vivo|apple'
+    + '|macbook|imac|dell|hp|lenovo|thinkpad|asus|acer|surface|android|windows|chromebook|zte|tcl|alcatel|fairphone|doro|brondi|wiko';
+  const MARCHE_COMUNI = 'moto|poco';
   // Dopo l'apparecchio, una o due parole sue («telefono nuovo», «di lavoro», «Samsung», «13», «mio»): elencate, perché dopo
   // «phone» può venire «number»; e solo col verbo dopo: «codice del mio telefono nuovo serie 71034» è un altro dato.
   const DOPO_APPARECCHIO = '(?:\\s+(?:(?:di|de|da|du|del|of|for|para|pour|f[üu]r)\\s+)?(?:mi[oaei]|tu[oaei]|su[oaei]|nostr[oaei]|vostr[oaei]'
     + '|nuov\\p{L}*|vecchi\\p{L}*|aziendal\\p{L}*|personal\\p{L}*'
     + '|privat\\p{L}*|fisso|portatile|principale|attuale|lavoro|ufficio|casa|nuev\\p{L}*|viej\\p{L}*|trabajo|nouve(?:au|l|lle)|vieux|ancien\\p{L}*'
     + '|travail|bureau|perso|pro|professionnel\\p{L}*|new|old|work|office|home|current|main|neu\\p{L}*|alt\\p{L}*|arbeit|dienst\\p{L}*|nieuw\\p{L}*'
-    + '|oud\\p{L}*|werk|novo|nova|antigo|velho|móvil|movil|portable|cellulare|celular|samsung|galaxy|iphone|pixel|xiaomi|redmi|huawei|honor'
-    + '|oppo|oneplus|motorola|moto|nokia|sony|lg|realme|vivo|apple|macbook|dell|hp|lenovo|thinkpad|asus|acer|surface|pro|max|plus|mini'
+    + `|oud\\p{L}*|werk|novo|nova|antigo|velho|móvil|movil|portable|cellulare|celular|${MARCHE}|${MARCHE_COMUNI}|pro|max|plus|mini`
     + '|ultra|air|se|lite|\\d{1,3})(?![\\p{L}\\d]))'
     + '{1,2}';
-  const UN_APPARECCHIO = `${AGGETTIVO}${APPARECCHIO}(?:\\s*(?:,|e|and|et|y|und|en|i|o|or|ou)\\s+(?:${LEGAME_SBLOCCO}\\s+)*${POSSESSIVO}`
-    + `\\s+${AGGETTIVO}${APPARECCHIO})?`;
+  // Col possessivo il telefono si chiama anche per marca, col suo modello («il codice del mio Galaxy S23 è …»): senza,
+  // «il codice del pixel» può essere un colore. Le marche che sono anche parole comuni solo col modello («Moto G»).
+  const MODELLO = '(?:\\s+(?:\\p{L}{0,3}\\d{1,4}\\p{L}{0,3}|note|tab|pro|max|plus|mini|ultra|lite|fold|flip|edge|fe|neo|play|power|go|watch|[gxz])'
+    + '(?![\\p{L}\\d]))';
+  const MARCA = `(?:(?:${MARCHE})(?![\\p{L}])${MODELLO}{0,3}|(?:${MARCHE_COMUNI})${MODELLO}{1,3})`;
+  const IL_MIO = `(?:${APPARECCHIO}|${MARCA})`;
+  const UN_APPARECCHIO = `${AGGETTIVO}${IL_MIO}(?:\\s*(?:,|e|and|et|y|und|en|i|o|or|ou)\\s+(?:${LEGAME_SBLOCCO}\\s+)*${POSSESSIVO}`
+    + `\\s+${AGGETTIVO}${IL_MIO})?`;
   const TRA_NOME_E_APPARECCHIO = `(?:\\s+(?:${LEGAME_SBLOCCO}|${QUALIFICA_SBLOCCO}))*`;
   const NUCLEO_COL_NOME = `(?:${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${POSSESSIVO}\\s+${UN_APPARECCHIO}`
     + `|${POSSESSIVO}\\s+${NOME_SBLOCCO}${TRA_NOME_E_APPARECCHIO}\\s+${UN_APPARECCHIO})`;
   const NUCLEO = `(?:${NUCLEO_COL_NOME}`
-    + `|${POSSESSIVO}\\s+${AGGETTIVO}${APPARECCHIO}(?:['’]s)?(?:\\s+(?:ha|has|hat|heeft|tiene|tem|ma)(?:\\s+(?:il|un|the|a|el|o|den|einen|de))?)?`
+    + `|${POSSESSIVO}\\s+${AGGETTIVO}${IL_MIO}(?:['’]s)?(?:\\s+(?:ha|has|hat|heeft|tiene|tem|ma)(?:\\s+(?:il|un|the|a|el|o|den|einen|de))?)?`
     + `(?:\\s+(?:(?:unlock|lock|screen|access)\\s+)?|-)?${NOME_SBLOCCO})`;
   const DEL_MIO_APPARECCHIO = new RegExp(`(?<![\\p{L}])(?:${NUCLEO_COL_NOME}${DOPO_APPARECCHIO}${CHIUDE_VERO}|${NUCLEO}${CHIUDE_CORPO})\\s*$`, 'iu');
   const NON_UN_PREZZO = '(?![\\d\\p{L}]|\\s?(?:€|%|euro\\b|eur\\b|usd\\b|\\$))';
+  // Il codice che sblocca può avere lettere ed essere corto come un PIN («Il pin è 48A9», «Mela77», #1403.91), e i
+  // simboli di una password («M3l@77!»): intero, come la password con lo stesso valore. Il punto no: chiude la frase.
+  const SIMBOLI_CODICE = '!@#$%^&*+?~_\\-';
+  // Gli sguardi avanti hanno la misura del codice: senza, una riga di soli simboli costava secondi.
+  const CON_LETTERE = `(?=[\\p{L}\\p{N}${SIMBOLI_CODICE}]{0,31}\\p{N})(?=[\\p{L}\\p{N}${SIMBOLI_CODICE}]{0,31}\\p{L})[\\p{L}\\p{N}]`
+    + `[\\p{L}\\p{N}${SIMBOLI_CODICE}]{3,31}(?<![?_\\-])`;
+  const PIN_O_LETTERE = `(${CIFRE_PIN}|${CON_LETTERE})`;
   // Il numero prima del nome: «4829 è il codice del mio telefono», «4829 is my phone code».
   const DOPO_IL_NUMERO = new RegExp(`^\\s*(?:[:=-]\\s*)?${VERBO_SBLOCCO}\\s+(?:(?:il|lo|la|the|le|el|o|der|de|het)\\s+)?${NUCLEO}(?![\\p{L}])`, 'iu');
   // «Quello del pc è 5512» dopo il codice del telefono, nella frase o in quella dopo: il pronome sta per il codice.
   const QUELLO_DEL_MIO = new RegExp(`(?<![\\p{L}])(?:quell[oa]|celui|celle|the\\s+one|that|der|die|el|la)\\s+(?:${LEGAME_SBLOCCO}\\s+)*`
-    + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
+    + `(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}${CHIUDE_CORPO}\\s*["«“]?${PIN_O_LETTERE}${NON_UN_PREZZO}`, 'giu');
   const NUCLEO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${NUCLEO}`, 'iu');
   // Lo sblocco detto col verbo, senza «codice»: «Per sbloccare il mio telefono uso 6118», «I unlock my phone with 6215».
   // Anche col nome dello sblocco al posto del codice: «Lo sblocco del mio telefono è 4829».
   const COL_NUMERO = '(?:\\s+[\\p{L}\'’]+){0,3}?\\s+(?:con|with|avec|mit|met|uso|use|using|usando|utilizzo|digito|typing|tapant|codice|code|c[óo]digo|pin)\\s*[:=]?';
   const SBLOCCO_COL_NUMERO = new RegExp(`(?<![\\p{L}])${SBLOCCA}\\s+(?:${LEGAME_SBLOCCO}\\s+)*(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}`
-    + `(?:${COL_NUMERO}|${CHIUDE_VERO})\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
+    + `(?:${COL_NUMERO}|${CHIUDE_VERO})\\s*["«“]?${PIN_O_LETTERE}${NON_UN_PREZZO}`, 'giu');
   // L'apparecchio prima del verbo: «Il mio telefono si sblocca con 4829», «My phone unlocks with 6215».
   const APPARECCHIO_SI_SBLOCCA = new RegExp(`(?<![\\p{L}])(?:${POSSESSIVO}\\s+)?${UN_APPARECCHIO}(?:\\s+(?:si|se|sich|zich|się))?\\s+${SBLOCCA}`
     + `${COL_NUMERO}\\s*["«“]?(${CIFRE_PIN})${NON_UN_PREZZO}`, 'giu');
@@ -270,7 +286,7 @@
   // Si parte dalle cifre e si guarda l'etichetta prima, come per il codice intero: un testo lungo resta lineare.
   const CIFRE_STACCATE = /(?<![\d\p{L}])\d{1,4}(?:[ .-]\d{1,4}){1,7}(?![\d\p{L}])/gu;
   // Le regole lunghe partono solo dove c'è un apparecchio: su una riga di 120.000 caratteri senza, costerebbero secondi.
-  const UN_APPARECCHIO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${APPARECCHIO}`, 'iu');
+  const UN_APPARECCHIO_NEL_TESTO = new RegExp(`(?<![\\p{L}])${IL_MIO}`, 'iu');
   function codiceDelMioApparecchio(s, out) {
     if (!UN_APPARECCHIO_NEL_TESTO.test(s)) return;
     for (const m of s.matchAll(QUELLO_DEL_MIO)) {
@@ -407,9 +423,23 @@
   // Un codice usa e getta di lettere e cifre («Steam Guard code: 7K2F9», quello da scrivere sulla TV, «WDJB-MJHT»):
   // conta solo al posto del codice, come i numeri, e col nome del codice nella frase.
   const CODICE_ALFANUMERICO = /(?<![\w./:-])(?:(?=[A-Z]*\d)(?=\d*[A-Z])[A-Z0-9]{5,10}|[A-Z]{4}-[A-Z]{4})(?![\w/-])/g;
+  // Lo sblocco con le lettere (CON_LETTERE) solo dove il nome dice il PIN, lo sblocco o l'entrare.
+  const CODICE_CON_LETTERE = new RegExp(`(?<![\\p{L}\\p{N}./:@_-])${CON_LETTERE}(?![\\p{L}\\p{N}/@_-]|\\.[\\p{L}\\p{N}])`, 'gu');
+  // Il blocco schermo di Android («codice di blocco schermo», «schermata di blocco») è lo stesso sblocco.
+  // «Il codice del blocco try» è un pezzo di programma: il blocco conta col «di» o con lo schermo.
+  const DI_SBLOCCO = new RegExp(`(?<![\\p{L}])(?:${SBLOCCA}|di\\s+blocco|blocco\\s+(?:dello\\s+)?schermo|schermata|lock|screen)(?![\\p{L}])`
+    + `|${SEGNO_FORTE.source}`, 'iu');
+  // «Codice di sblocco iPhone15: 4821»: la parola con le cifre è dell'etichetta, il valore viene dopo.
+  const POI_UN_VALORE = new RegExp(`^\\s*(?:[:=#]|(?:${VERBO})(?![\\p{L}]))\\s*["«“]?[\\p{L}\\p{N}]*\\p{N}`, 'iu');
+  // Le sigle che non aprono niente, se la frase non parla di sblocco: il pin di una scheda elettronica («Il pin del relè
+  // è PB13», «SDA1», «GPIO4») e il modello di un apparecchio («Il codice del mio Samsung è SM-A525F», «i7-1255U»).
+  const SIGLA_DI_UN_PIN = /^(?:gpio\d{1,3}|p[a-k]\d{1,2}|rst\d?|sda\d?|scl\d?|[tr]x\d{1,2}|io\d{1,2}|adc\d{1,2}|pwm\d{1,2})$/i;
+  const SIGLA_DI_UN_MODELLO = /^(?:[A-Z]{1,4}-[A-Z]*\d[A-Z\d]*|i[3579]-\d{4,5}[A-Z]{0,2})$/;
   const UN_CODICE = new RegExp(FORMA_CODICE.source);
   const UN_ALFANUMERICO = new RegExp(CODICE_ALFANUMERICO.source);
-  const haUnCodice = (z, nome) => UN_CODICE.test(z) || (nome && UN_ALFANUMERICO.test(z));
+  // La risposta sotto chi chiede il codice può essere quello con le lettere («Mela77»): la cerca la stessa forma.
+  const UN_CON_LETTERE = new RegExp(CODICE_CON_LETTERE.source, 'u');
+  const haUnCodice = (z, nome) => UN_CODICE.test(z) || (nome && (UN_ALFANUMERICO.test(z) || UN_CON_LETTERE.test(z)));
   // I messaggi sotto la domanda che si saltano cercando la risposta: in chat ne passano parecchi senza numero.
   const RIGHE_SALTATE = 8;
   function codiciVicini(s, out) {
@@ -417,7 +447,8 @@
     for (let i = 0; i < righe.length; i++) {
       const celle = righe[i].split(/[|\t]/);
       for (let c = 0; c < celle.length; c++) {
-        const pezzi = celle[c].split(/(?<=[.!?;])\s+(?=[A-ZÀ-Ý«"])/);
+        // Il punto di un'abbreviazione non chiude la frase: «Codice sblocco tel. Mela77».
+        const pezzi = celle[c].split(/(?<=[.!?;])(?<!(?<![A-Za-zÀ-ÿ])(?:[Tt]el|[Cc]ell|[Cc]od|[Nn]um|[Nn]r)\.)\s+(?=[A-ZÀ-Ý«"])/);
         for (let f = 0; f < pezzi.length; f++) {
           const frase = pezzi[f];
           const nome = NOME_CODICE.test(frase);
@@ -451,7 +482,11 @@
             const nonApre = predefinito || NON_APRE.test(`${frase} ${z}`);
             const trovati = [...z.matchAll(FORMA_CODICE)].map((m) => ({ m, v: m[2] || m[4] }));
             if (nome) for (const m of z.matchAll(CODICE_ALFANUMERICO)) trovati.push({ m, v: m[0], lettere: true });
-            for (const { m, v, lettere } of trovati) {
+            if (nome) {
+              const gia = new Set(trovati.map((t) => t.m.index));
+              for (const m of z.matchAll(CODICE_CON_LETTERE)) if (!gia.has(m.index)) trovati.push({ m, v: m[0], lettere: true, largo: true });
+            }
+            for (const { m, v, lettere, largo } of trovati) {
               const prima = z.slice(Math.max(0, m.index - CODA), m.index).replace(SENZA_VIRGOLETTA, '');
               const etichetta = inTesta ? frase.slice(-CODA) : prima;
               let chiave = nome ? nomeDelCodice(etichetta) : { apre: false, solo: false };
@@ -462,6 +497,15 @@
               const ultimo = pinNellaFrase ? [...etichetta.matchAll(NOMI_CODICE)].pop() : null;
               const pin = !!ultimo && NOME_PIN.test(ultimo[0]);
               const entra = forte || pin || chiave.apre;
+              if (lettere) {
+                const n = [...etichetta.matchAll(NOMI_CODICE)].pop();
+                // Il nome e quello che lo segue, o la parola subito prima («unlock code»).
+                const davanti = n ? /[\p{L}-]+\s*$/u.exec(etichetta.slice(0, n.index)) : null;
+                const sblocca = n && DI_SBLOCCO.test(`${davanti ? davanti[0] : ''}${etichetta.slice(n.index)}`);
+                if (!sblocca && (SIGLA_DI_UN_PIN.test(v) || SIGLA_DI_UN_MODELLO.test(v))) continue;
+                if (largo && !(chiave.apre || pin || sblocca)) continue;
+              }
+              if (largo && POI_UN_VALORE.test(z.slice(m.index + m[0].length, m.index + m[0].length + 60))) continue;
               if (nonApre && !(nome && entra)) continue;
               if (predefinito && chiave.pin && !forte) continue;
               if (nome ? !(alPostoDelCodice(z, m, inTesta, forte || pin, risposta, entra) || (!lettere && (m[1] || m[3] || INTRODOTTO.test(prima))))
@@ -1363,6 +1407,27 @@
     return out;
   }
 
+  // L'elenco del guardiano parte solo da un codice di cifre e aggiunge solo cifre: qui anche da e verso quello con le
+  // lettere («è Mela77 e Pera88», «i pin sono 4829 oppure 48A9»), coi suoi separatori e le sue congiunzioni. Fra i due
+  // codici al più un «anche»: una parola qualunque in mezzo farebbe un codice di ogni sigla della frase.
+  const { SEPARA: SEPARA_ELENCO, CONGIUNZIONE } = global.SN_GUARDIANO_STATICO.ELENCO;
+  const ANCHE = '(?:anche|pure|forse|also|maybe|perhaps|aussi|auch|vielleicht|tambi[ée]n|tamb[ée]m|te[żz]|ook)';
+  const ACCANTO_CON_LETTERE = new RegExp(`["'»”)*_]{0,4}${SEPARA_ELENCO}(?:${CONGIUNZIONE}[ \\t]+)?(?:${ANCHE}[ \\t]+)?["'«“(*_]{0,4}`
+    + `${PIN_O_LETTERE}(?![\\p{L}\\p{N}/@_-]|[.,:-]\\d|\\.[\\p{L}\\p{N}])`, 'iuy');
+  function codiciConLettereInElenco(s, out) {
+    const visti = new Set(out.map((x) => String(x.valore)));
+    for (const v of [...new Set(out.filter((x) => x.regola === 'codice').map((x) => String(x.valore)))]) {
+      for (let i = s.indexOf(v); i >= 0; i = s.indexOf(v, i + 1)) {
+        if (/[\p{L}\p{N}]/u.test(s[i - 1] || '') || /[\p{L}\p{N}]/u.test(s[i + v.length] || '')) continue;
+        ACCANTO_CON_LETTERE.lastIndex = i + v.length;
+        let m;
+        for (let n = 0; n < 40 && (m = ACCANTO_CON_LETTERE.exec(s)); n++) {
+          if (!visti.has(m[1])) { visti.add(m[1]); out.push({ valore: m[1], regola: 'codice' }); }
+        }
+      }
+    }
+  }
+
   function regole(s, giro) {
     const out = [];
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
@@ -1388,6 +1453,7 @@
     for (const m of s.matchAll(CODIFICATO)) if (!m[0].includes('://')) codificatiNellIndirizzo(m[0], m.index, out, giro);
     scritteAMano(s, out);
     if (G && typeof G.codiciInElenco === 'function') out.push(...G.codiciInElenco(s, out));
+    codiciConLettereInElenco(s, out);
     out.push(...interiFraVirgolette(s, out));
     return out;
   }
