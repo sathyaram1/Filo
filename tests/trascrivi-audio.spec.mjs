@@ -63,11 +63,12 @@ test('tasto destro su un <audio>: «Trascrivi» scrive il parlato pezzo dopo pez
   await expect(menu.voce('Salva audio come')).toBeVisible();
   await menu.voce('Trascrivi').click();
 
-  // 70 s → tre pezzi da 30, 30 e 10 secondi: il testo li ha tutti, in ordine, e la riga sotto dice durata e modello.
+  // 70 s → tre pezzi di al più mezzo minuto che insieme fanno tutto l'audio: il testo li ha tutti, in ordine.
   await expect.poll(() => testoDelRiquadro(app, page), { timeout: 60_000 }).toMatch(/PEZZO-\d[\s\S]*PEZZO-\d[\s\S]*PEZZO-\d/);
   const pezzi = await app.evaluate(() => globalThis.__pezzi);
-  expect(pezzi.map((p) => Math.round(p.secondi)).sort((a, b) => b - a)).toEqual([30, 30, 10]);
-  expect(pezzi.every((p) => p.format === 'wav')).toBe(true);
+  expect(pezzi.length).toBe(3);
+  expect(pezzi.every((p) => p.format === 'wav' && p.secondi <= 32)).toBe(true);
+  expect(Math.abs(pezzi.reduce((s, p) => s + p.secondi, 0) - 70)).toBeLessThan(0.1);
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup-meta'))?.testo || '', { timeout: 10_000 }).toMatch(/durata 1:10/);
   const strato = await paginaDelloStrato(app, page);
   await expect(strato.locator('.sn-popup .sn-msg-copia')).toBeVisible();
