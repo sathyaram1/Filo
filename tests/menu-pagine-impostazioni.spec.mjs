@@ -320,7 +320,7 @@ test('Editor: il tasto destro su un documento dell’elenco è di quel documento
   await expect(page.locator('.ed-doc-item', { hasText: 'secondo (copia)' })).toHaveCount(0);
 
   await page.locator('.ed-doc-item', { hasText: 'primo (copia)' }).click({ button: 'right' });
-  await page.locator('.ed-title-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
+  await menu.scegli('Rinomina');
   await page.locator('.ed-doc-item-input').fill('terzo');
   await page.locator('.ed-doc-item-input').press('Enter');
   if (await page.locator('#docPop').isHidden()) await page.click('#docSwitch');
