@@ -1558,6 +1558,8 @@
       const esegui = () => {
         if (sub.disabled) return;
         if (valore && apriValori(b, sub)) return;
+        // Quale icona rara si sceglie dal «+» (#1471): come prima dalla griglia «Altro…».
+        if (sub.id && b.closest('.sn-menu-altro')) contaGesto('altro_del_menu', { icona: sub.id });
         premi(b, sub);
       };
       esecutori.set(b, esegui);
