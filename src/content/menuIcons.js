@@ -199,6 +199,7 @@
       if (a.valore) v.valore = a.valore;
       if (a.iconaImg) v.iconaImg = a.iconaImg;
       if (a.cronologia) v.cronologia = a.cronologia;
+      if (a.nota) v.nota = String(a.nota);
       if (altre.length) {
         v.varianti = altre.map((x) => ({
           label: x.label || nomeConOggetto(nome, x.fraseOggetto || fraseOggetto(x.oggetto)),
