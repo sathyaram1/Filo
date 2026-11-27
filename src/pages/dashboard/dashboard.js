@@ -1142,8 +1142,7 @@
     const id = r && r.ok ? r.id : null;
     if (!id || id === chatId) return;
     const prima = chatId;
-    const storia = threadHistory;
-    if (!(await adotta(id).catch(() => false))) { chatId = prima; threadHistory = storia; return; }
+    if (!(await adotta(id).catch(() => false))) return;
     if (prima) { try { send({ type: MSG.FILO_CHAT_CLOSE, id: prima, via: 'home' }); } catch (_) {} }
   }
 
