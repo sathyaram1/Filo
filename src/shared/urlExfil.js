@@ -437,12 +437,20 @@
     if (!r) return null;
     const G = global.SN_GUARDIANO_STATICO;
     if (!avverbio && G) avverbio = new RegExp(`^(?:${G.AVVERBIO}|${G.AVVERBI})$`, 'u');
-    const parole = fineFrase(resto.slice(r[0].length).replace(/^\s+/, '')).split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
+    const seguito = fineFrase(resto.slice(r[0].length).replace(/^\s+/, ''));
+    const parole = seguito.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
     let annunciato = false;
+    let da = 0;
     for (const [k, w] of parole.entries()) {
+      da = seguito.indexOf(w, da);
       const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
       if (/^[:=]+$/.test(w) || (G && G.ANNUNCI.includes(t))) { annunciato = true; continue; }
       if (avverbio && avverbio.test(t)) continue;
+      // Fra virgolette il valore è tutto quello che chiudono, anche con gli spazi: «prova «Mela! Verde77»».
+      const q = new RegExp(FRA_VIRGOLETTE.source, 'uy');
+      q.lastIndex = da;
+      const fra = q.exec(seguito);
+      if (fra) return fra[3].length >= 4 ? { valore: fra[3], regola: 'password', rinvio: true } : null;
       const cifre = /\d/.test(t);
       if (cifre) return soloAlnum(t).length >= 4 ? { valore: t, regola: 'codice', rinvio: true } : null;
       // Dopo un punto comincia un altro discorso: lì la parola qualunque vuole l'annuncio («La nuova è …»).
