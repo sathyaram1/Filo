@@ -273,10 +273,6 @@
       });
     }
   };
-  Menu.refreshIconGrid = (items) => {
-    if (!acceso()) return locale.refreshIconGrid(items);
-    if (corrente) aggiorna(corrente, 'griglia', { items: D.descrivi(items || [], opDi(corrente)) });
-  };
   Menu.isSubMenuOpen = () => (acceso() ? false : locale.isSubMenuOpen());
   Menu.isOpen = () => (acceso() ? !!corrente : locale.isOpen());
   // Il testo di un'immagine descritta nello strato è testo e basta: lì non c'è un sito che lo cerchi.
