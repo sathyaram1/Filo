@@ -123,7 +123,7 @@ test('su un filmato o un audio icona e voce si chiamano allo stesso modo, e fann
     <audio id="aud" controls></audio></body></html>`);
   const menu = menuDi(page);
   await page.locator('#aud').click({ button: 'right' });
-  const salva = menu.locator('.sn-menu-row [data-sn-icon-id="media:save"]');
+  const salva = menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="media:save"]');
   await expect(salva).toHaveAttribute('aria-label', 'Salva audio come…');
   await expect(menu.voce('Salva audio come…')).toBeVisible();
   // Ripeti dalla voce; riaperto, voce e icona del «+» dicono di toglierlo, e l'icona lo toglie.
@@ -146,13 +146,13 @@ test('un\'icona della finestra nella fila è spenta come nella barra, premuta fa
     <body style="margin:0;padding:40px;height:900px"><a id="vai" href="${seconda}">avanti</a><div id="vuoto" style="height:400px"></div></body></html>`);
   const prima = page.url();
   const menu = menuDi(page);
-  const indietro = menu.locator('.sn-menu-row [data-sn-icon-id="back"]');
+  const indietro = menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="back"]');
 
   // Scheda appena aperta: non c'è dove tornare.
   await page.locator('#vuoto').click({ button: 'right' });
   await expect(indietro).toBeVisible();
   await expect(indietro).toHaveAttribute('data-sn-disabled', '1');
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="feedbackApp"]')).toHaveCount(0);
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="feedbackApp"]')).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   await page.locator('#vai').click();
@@ -210,7 +210,7 @@ test('un\'icona della finestra portata nella fila a menu aperto ci compare subit
   await page.locator('#vuoto').click({ button: 'right' });
   await expect(menu.principale).toBeVisible();
   expect((await esegui(app, { type: 'SPOSTA_ICONA', icona: 'reload', dove: 'fila', contesto: 'pagina' })).executed).toBe(true);
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="reload"]')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="reload"]')).toBeVisible();
   await page.keyboard.press('Escape');
 
   // Dalla barra, col mouse: Home lascia la barra e arriva nella fila.
@@ -230,7 +230,7 @@ test('un\'icona della finestra portata nella fila a menu aperto ci compare subit
   await barra.mouse.move(fila.x + 20, fila.y + fila.height / 2 - alto, { steps: 4 });
   await barra.mouse.up();
   await expect.poll(async () => (await salvata(app))['fila:pagina']).toContain('home');
-  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="home"]')).toBeVisible();
+  await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="home"]')).toBeVisible();
 });
 
 test.describe('col menu nello strato sopra la scheda', () => {
@@ -244,12 +244,12 @@ test.describe('col menu nello strato sopra la scheda', () => {
     const barra = await barraPage(app);
     const menu = menuDi(page);
     await page.locator('#vuoto').click({ button: 'right' });
-    await expect(menu.locator('.sn-menu-row [data-sn-icon-id="saveForLater"]')).toBeVisible();
+    await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]')).toBeVisible();
     expect(menu.superficie.url()).toMatch(/^filo:\/\/menu\//);
 
     // Dalla fila alla barra: il trascinamento la apre, e la barra la prende davanti a Home.
     const m = menu.superficie;
-    const icona = await fermo(menu.locator('.sn-menu-row [data-sn-icon-id="saveForLater"]'));
+    const icona = await fermo(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]'));
     await m.mouse.move(icona.x + icona.width / 2, icona.y + icona.height / 2);
     await m.mouse.down();
     await m.mouse.move(icona.x + 12, icona.y + 12, { steps: 3 });
