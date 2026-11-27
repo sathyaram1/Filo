@@ -57,7 +57,7 @@ const fine = (rel, frammento) => off(rel, frammento) + frammento.length;
 
 function registrazioni() {
   const x = 'src/main/x.js';
-  const ux = `file://${ROOT}/${x}`;
+  const ux = urlDi(x);
   const s = 'src/renderer/shell.js';
   return [
     // la prova A esegue a(), in due lanci; la B carica x e basta; la C passa dalla shell e da d()
