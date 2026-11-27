@@ -74,6 +74,33 @@
     });
   }
 
+  // La stessa decodifica, carattere per carattere, con dove sta nel testo codificato ogni carattere decodificato
+  // (`da`, `a` esclusa): il pavimento toglie dall'indirizzo il pezzo codificato di quello che legge decodificato.
+  // `piu`: il «+» di una query è uno spazio. Una sequenza UTF-8 rotta resta com'è, come sopra.
+  const HEX2 = /^%[0-9A-Fa-f]{2}$/;
+  function decodificaConPosti(s, { piu = false } = {}) {
+    const t = String(s || '');
+    let testo = '';
+    const da = [];
+    const a = [];
+    const metti = (c, i, j) => { for (let k = 0; k < c.length; k++) { da.push(i); a.push(j); } testo += c; };
+    for (let i = 0; i < t.length;) {
+      if (t[i] === '%' && HEX2.test(t.substr(i, 3))) {
+        const b = parseInt(t.substr(i + 1, 2), 16);
+        const n = b < 0x80 ? 1 : b >= 0xF0 && b < 0xF8 ? 4 : b >= 0xE0 ? 3 : b >= 0xC2 && b < 0xE0 ? 2 : 0;
+        const pezzo = n ? t.substr(i, 3 * n) : '';
+        if (n && /^(?:%[0-9A-Fa-f]{2})+$/.test(pezzo) && pezzo.length === 3 * n) {
+          let c = null;
+          try { c = decodeURIComponent(pezzo); } catch (_) { c = null; }
+          if (c) { metti(c, i, i + 3 * n); i += 3 * n; continue; }
+        }
+      }
+      metti(piu && t[i] === '+' ? ' ' : t[i], i, i + 1);
+      i++;
+    }
+    return { testo, da, a };
+  }
+
   // Cifre e lettere di altri alfabeti nella forma base: chi riceve le riporta all'ASCII, quindi una scrittura nuova non è
   // una porta nuova (#810). Le cifre Unicode stanno in serie contigue da 0 a 9: il valore è la distanza dall'inizio.
   const CIFRA = /\p{Nd}/u;
