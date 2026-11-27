@@ -662,6 +662,8 @@
   const UNITA = /^(?:euro|eur|€|\$|usd|dollari|dollars?|km|kg|pagine|pagina|pages?|anni|giorni|ore|minuti|mesi|metri|persone|volte|cifre|caratteri|%)$/i;
   const ANNO_VALORE = /^(?:19|20)\d\d$/;
   const LUOGO_DEL_CAMBIO = /^(?:in|su|on|a)$/i;
+  // «con quella di Gmail2024»: dopo «di» c'è di chi è, non il valore.
+  const DI_CHI = /^(?:di|del|della|dello|dell|of|for|per)$/i;
   function valoriDopoIlNome(testoIntero, { uscita = false } = {}) {
     const s = testo(testoIntero);
     const out = [];
