@@ -29,8 +29,9 @@ const filtroDelicate = (settings) => require('./pagineDelicate').filtroSicuro(se
 // Il riassunto delle schede chiuse (#1004): spento, di una scheda che si chiude non parte niente verso i modelli.
 const riassuntoAcceso = (settings) => !(settings && settings.riassuntoSchede && settings.riassuntoSchede.enabled === false);
 // Una scheda archiviata che non va a nessun modello, nemmeno dopo: della rete di casa (#591), delicata, o chiusa col
-// riassunto spento (#1004), che resta fuori anche se il riassunto si riaccende.
-const restaQui = (it, fuori) => Boolean(it.casa || isHomeNetworkUrl(it.url) || it.senzaRiassunto || fuori.voce(it));
+// riassunto spento (#1004), che resta fuori anche se il riassunto si riaccende. Un file del computer pure (#1905.1).
+const fileDelComputer = (url) => /^file:/i.test(String(url || '').trim());
+const restaQui = (it, fuori) => Boolean(it.casa || isHomeNetworkUrl(it.url) || fileDelComputer(it.url) || it.senzaRiassunto || fuori.voce(it));
 
 // Alla riapertura la sessione di prima è finita e l'utente si aspetta una barra pulita (#349): il giudizio si fa deciso.
 const TRIAGE_RIAPERTURA = [
