@@ -398,7 +398,7 @@ test('il riquadro fa scegliere partita, mulligan e pescate extra, e il numero ca
 
   // A due iniziando si salta la pescata: 7 carte, una in meno.
   await page.click('#probGame');
-  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizio io' }).click();
+  await menuDi(page).scegli('Partita a due, inizio io');
   await expect(page.locator('#probGame')).toHaveText(/a due, inizio io/);
   const play = await settledPct(page);
   expect(Math.abs(play - hyperAtLeast(99, 40, 7, 3) * 100)).toBeLessThan(0.5);
