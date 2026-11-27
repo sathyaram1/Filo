@@ -45,8 +45,14 @@ test('una parola dell\'elenco attaccata a cifre non annuncia niente', () => {
 });
 
 test('il pavimento e il correttore non tengono un elenco loro', () => {
-  for (const f of ['pavimento.js', 'riservatiNelTesto.js']) {
+  for (const f of ['pavimento.js', 'riservatiNelTesto.js', 'campiSegreti.js', 'urlExfil.js']) {
     const src = readFileSync(join(ROOT, 'src', 'shared', f), 'utf8');
-    assert.ok(!/luidt|brzmi|είναι/.test(src), `${f}: le parole stanno in guardianoStatico.js (ANNUNCI)`);
+    assert.ok(!/luidt|brzmi|είναι|это|هي|היא/.test(src), `${f}: le parole stanno in guardianoStatico.js (ANNUNCI)`);
   }
+});
+
+// #1403.8 — il confine delle etichette della password, cosa vale come lettera, è uno solo per i nomi latini e non latini.
+test('urlExfil non tiene un suo confine delle lettere: lo prende dai campi segreti', () => {
+  const src = readFileSync(join(ROOT, 'src', 'shared', 'urlExfil.js'), 'utf8');
+  assert.doesNotMatch(src, /\\\\u0370|\\\\u0400/, 'urlExfil.js: LETTERA sta in campiSegreti.js');
 });

@@ -400,8 +400,9 @@
   // Le parole senza la forma di una password («Password: hunter», la cella, la colonna) contano solo da sole al posto del
   // valore, con l'etichetta in testa alla riga o alla cella: «un campo password o carta: …» resta.
   // Le etichette: anche la password del wifi del router, il codice di accesso e le altre lingue, che porta urlExfil.js
-  // (PRESENTA) col loro confine. ETICHETTA_NUDA vale anche attaccata a un prefisso («login_password»). Le stesse
-  // riconoscono i campi dei moduli (campiSegreti.js le prende da ETICHETTE, #1403.19).
+  // (PRESENTA) col loro confine; quelle non latine vengono da campiSegreti.js (ETICHETTE_NON_LATINE). ETICHETTA_NUDA
+  // vale anche attaccata a un prefisso («login_password»). Le stesse riconoscono i campi dei moduli (campiSegreti.js le
+  // prende da ETICHETTE, #1403.19).
   if (!global.SN_URL_EXFIL && typeof require === 'function') require('./urlExfil.js');
   const ALTRE_LINGUE = global.SN_URL_EXFIL && global.SN_URL_EXFIL.PRESENTA ? `|${global.SN_URL_EXFIL.PRESENTA.altreLingue}` : '';
   const NOMI = '(?:password|passwd|passcode|passphrase|parola\\s+d[\'’]ordine|pwd|pswd?'
@@ -417,6 +418,14 @@
   const NON_ETICHETTA = '(?!\\s*(?:managers?|policy|reset|recovery|generator|hint|strength)\\b)';
   const ETICHETTA = `(?:\\b${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
   const ETICHETTA_NUDA = `(?:${NOMI}${ALTRE_LINGUE}${CHIAVI_DI_RETE})${NON_ETICHETTA}`;
+  // Cinese, giapponese e thai non staccano le parole: dove finisce il valore e le parole che lo annunciano senza i due
+  // punti le tiene campiSegreti.js.
+  if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
+  const NON_LATINI = global.SN_CAMPI_SEGRETI.crea({}, () => false);
+  const FINE_VALORE = new RegExp(`[${NON_LATINI.FINE_VALORE}]`);
+  const ANNUNCI_NON_LATINI = `(?:${NON_LATINI.ANNUNCI_ATTACCATI})[ \\t]*`;
+  const APRE_VALORE = new RegExp(`^[${NON_LATINI.APRE_VALORE}]+`);
+  const finoAllaFrase = (v) => v.replace(APRE_VALORE, '').split(FINE_VALORE)[0];
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
@@ -431,8 +440,8 @@
   const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*([:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
   // Il «to» polacco solo dopo «hasło»: in inglese «send the password to …» porta a chi la riceve, non al valore.
   const VERBO_PASSWORD = `(?:${VERBO}|(?<=\\bhas[łl]o\\b[^\\n]{0,40})to)`;
-  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]+${VERBO_PASSWORD}[ \\t]+([^\\s|\\[]{4,64})`, 'gi');
-  const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*:?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
+  const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:[ \\t]+${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
+  const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：]?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
   const QUALIFICA = '(?:[ \\t]+(?:provvisori[ao]|temporane[ao]|iniziale|nuova|attuale|new|temporary|initial|current))?';
@@ -444,7 +453,7 @@
   const INTESTAZIONE_CSV = new RegExp(`^(?:[A-Za-z0-9]{1,20}[_.\\s-])?${ETICHETTA_NUDA}(?:[_.\\s-]?[A-Za-z0-9()]{1,20})?$`, 'i');
   const NOMINA_ETICHETTA = new RegExp(ETICHETTA_NUDA, 'i');
   // Le parole che una pagina mette accanto all'etichetta senza che siano la password.
-  const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|chiedi|chiedila|ask|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or|не|нет|неверн(?:ый|ая|о)|неправильн(?:ый|ая|о)|обязательн(?:ый|ая|о)|изменён|изменен|скрыт|нов(?:ый|ая)|текущ(?:ий|ая)|введите|подтвердите|λάθος|λανθασμένος|υποχρεωτικός|νέος|错误|錯誤|不正确|不正確|必填|已修改|已更改|必須|필수)$/i;
+  const NON_VALORE = /^(?:obbligatori[ao]|richiest[ao]|required|optional|facoltativ[ao]|dimenticat[ao]|forgot(?:ten)?|забыл[аио]?|забыт[аоы]?|ξέχασα|نسيت|שכחתי|almeno|minimo|mostra|nascondi|show|hide|non|not|errat[ao]|sbagliat[ao]|incorrect|wrong|invalid[ao]?|nuova|new|attuale|current|conferma|confirm|ripeti|repeat|inserisci|enter|digita|type|scegli|choose|cambia|change|imposta|set|chiedi|chiedila|ask|la|il|lo|una|un|the|an?|your|tu[aoe]|del|della|di|per|for|e|and|o|or|не|нет|неверн(?:ый|ая|о)|неправильн(?:ый|ая|о)|обязательн(?:ый|ая|о)|изменён|изменен|скрыт|нов(?:ый|ая)|текущ(?:ий|ая)|введите|подтвердите|λάθος|λανθασμένος|υποχρεωτικός|νέος|错误|錯誤|不正确|不正確|必填|已修改|已更改|必須|필수)$/i;
 
   function testo(v) {
     return String(v == null ? '' : v);
@@ -481,7 +490,7 @@
   const TESTA_VALORE = new RegExp(`^[${APERTE}(]+`);
   const CODA_VALORE = new RegExp(`[.,;:)${CHIUSE}]+$`);
   function valorePassword(grezzo, { forma = false } = {}) {
-    const v = testo(grezzo).trim().replace(TESTA_VALORE, '').replace(CODA_VALORE, '');
+    const v = finoAllaFrase(testo(grezzo).trim().replace(TESTA_VALORE, '')).replace(CODA_VALORE, '');
     if (v.length < 3 || v.startsWith('[') || NON_VALORE.test(v.split(/\s/)[0]) || CODICE_SORGENTE.test(v) || NOME_DI_TIPO.test(v)) return '';
     if (forma && SENZA_FORMA(v)) return '';
     return v;
@@ -502,7 +511,7 @@
   // Un indirizzo o un'email sotto «Reset your password:» ha la forma di una password ma è il link per cambiarla.
   const INDIRIZZO_O_EMAIL = global.SN_GUARDIANO_STATICO.indirizzoOEmail;
   function formaVicina(pezzo) {
-    const v = pezzo.replace(/^[:=\-–—→«"'“‘(\[]+/, '').replace(/[.,;:!?)»"'”’\]]+$/, '');
+    const v = finoAllaFrase(pezzo.replace(/^[:=\-–—→«"'“‘(\[]+/, '')).replace(/[.,;:!?)»"'”’\]]+$/, '');
     if (v.length < 6 || v.length > 64 || v.includes(SEGNAPOSTO) || INDIRIZZO_O_EMAIL(v) || CODICE_SORGENTE.test(v)) return '';
     return FORMA_FORTE(v) ? v : '';
   }
@@ -524,7 +533,7 @@
   // qualunque solo da sola: dopo di lei la riga finisce o comincia un altro campo o una parentesi. Seguita da altre
   // parole è una frase («Password: deve avere almeno otto caratteri») e resta.
   const AL_POSTO = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*([^\\s|\\t\\[(]{3,64})([^\\n|\\t]*)`, 'gid');
-  const DOPO = `[ \\t]*(?:[:：=|\\t]|[-–—→](?=[ \\t])|[ \\t]${VERBO_PASSWORD}(?=[ \\t]))[ \\t]*([^\\s|\\t]{6,70})`;
+  const DOPO = `[ \\t]*(?:[:：=|\\t]|[-–—→](?=[ \\t])|[ \\t]${VERBO_PASSWORD}(?=[ \\t])|${ANNUNCI_NON_LATINI})[ \\t]*([^\\s|\\t]{6,70})`;
   const DOPO_LUNGO = new RegExp(`${ETICHETTA}${ACCANTO_LUNGO}${DOPO}`, 'gi');
   const DOPO_CORTA = new RegExp(`${ETICHETTA_CORTA}${ACCANTO}[ \\t]*[:=][ \\t]*([^\\s|\\t]{6,70})`, 'gi');
   const DA_SOLA = /^[.,;!]?[ \t]*(?:$|\(|[^\s:]{1,30}:(?:\s|$)|[·•–—-]\s)/;
@@ -589,7 +598,7 @@
       const q = tutta.match(SOLO_FRA_VIRGOLETTE);
       const v = q ? q[3] : tutta;
       const parole = v.split(/\s+/);
-      if (parole.length < 2 || parole.some((p) => !PAROLA_DI_FRASE.test(p)) || v.startsWith('[') || formaVicina(parole[0])) continue;
+      if (FINE_VALORE.test(v) || parole.length < 2 || parole.some((p) => !PAROLA_DI_FRASE.test(p)) || v.startsWith('[') || formaVicina(parole[0])) continue;
       if (spiegazione(parole)) continue;
       out.push({ valore: v.replace(/[.,;:]+$/, ''), regola: 'password' });
     }
@@ -745,7 +754,7 @@
     }
   }
 
-  // I due punti e l'uguale a tutta larghezza («パスワード：…», «パスワード＝…») valgono i nostri: le regole leggono una copia
+  // I due punti e l'uguale a tutta larghezza («口令：…», «암호＝…») valgono i nostri: le regole leggono una copia
   // della stessa lunghezza, e il valore torna com'è scritto nel testo.
   function passwordAccanto(s, out) {
     const n = s.replace(/：/g, ':').replace(/＝/g, '=');
@@ -1053,10 +1062,12 @@
     const valori = [...ovunque].sort((a, b) => lungo(b) - lungo(a));
     for (const v of valori) {
       const forma = /^\d{12,19}$/.test(v) ? v.split('').map(escRe).join('[ -]?') : escRe(v);
-      // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga».
-      const confine = /^[\p{L}\p{N}]/u.test(v) ? '(?<![\\p{L}\\p{N}])' : '';
-      const fine = /[\p{L}\p{N}]$/u.test(v) ? '(?![\\p{L}\\p{N}])' : '';
-      t = t.replace(new RegExp(`${confine}${forma}${fine}`, 'gu'), SEGNAPOSTO);
+      // Il valore si toglie come parola intera: la password «casa» non spezza «casalinga». Una lettera cinese o
+      // giapponese attaccata non è della stessa parola (FINE_VALORE).
+      const confine = /^[\p{L}\p{N}]/u.test(v) ? `(?<!(?![${NON_LATINI.FINE_VALORE}])[\\p{L}\\p{N}])` : '';
+      const fine = /[\p{L}\p{N}]$/u.test(v) ? `(?![\\p{L}\\p{N}](?<![${NON_LATINI.FINE_VALORE}]))` : '';
+      // Un valore lunghissimo non entra in un'espressione regolare: si toglie com'è, senza confini.
+      try { t = t.replace(new RegExp(`${confine}${forma}${fine}`, 'gu'), SEGNAPOSTO); } catch (_) { t = t.split(v).join(SEGNAPOSTO); }
     }
     return t;
   }

@@ -15,6 +15,7 @@
         { testo: 'Una password, un PIN o un CVV dopo un\'etichetta in grassetto o in corsivo, come «**Password:** …» negli appunti scritti in Markdown o in una risposta copiata da un modello, non arrivano più a nessun modello, come quando l\'etichetta è scritta senza formattazione.', segnalazione: 2673 },
         { testo: 'Una password sotto «Password:» in un file di testo creato su Windows non arriva più ai modelli, come in qualunque altro testo.', segnalazione: 2673 },
         { testo: 'Una password in una tabella, come «| Password: | … |», non arriva più ai modelli, e il correttore non riceve più il CVV della carta. Una frase sulla password, come «va cambiata ogni 90 giorni», arriva intera al correttore.', segnalazione: 2695 },
+        { testo: 'Una pagina in russo, greco, cinese o in un altro alfabeto che ti chiede la password in un campo di testo qualunque passa dal controllo dei siti pericolosi come una in italiano. E Filo non manda fuori da sé una password scritta dopo «пароль:» o «密码：», né in una ricerca né dentro un indirizzo.', segnalazione: 1403 },
       ],
     },
     {
