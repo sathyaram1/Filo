@@ -586,17 +586,13 @@
   // Un pezzo che decodificato è una parola sola e ha solo lettere latine accentate al posto dei «%xx» («Citt%C3%A0»)
   // non dice niente di nuovo: senza separatori non c'è etichetta, e chiavi e carte sono ASCII (a parte una sequenza
   // lunga con una cifra, che la lettera attaccata può staccare). Saltarlo tiene veloci le pagine piene di collegamenti.
-  const LATINA_ACCENTATA = /^[^\x00-\x7f]$/u;
   function soloLettereAccentate(prima, d) {
-    if (!/^[\p{L}\p{M}\p{N}_.~'’-]+$/u.test(d.testo)) return false;
-    if ((d.testo.match(/[A-Za-z0-9]{12,}/g) || []).some((r) => /\d/.test(r))) return false;
     const testo = d.testo;
+    if (!/^[\p{L}\p{M}\p{N}_.~'’-]+$/u.test(testo)) return false;
+    if ((testo.match(/[A-Za-z0-9]{12,}/g) || []).some((r) => /\d/.test(r))) return false;
     for (let j = 0; j < testo.length; j++) {
-      const da = d.da[j];
-      if (d.a[j] - da === 1 && prima[da] !== '+') continue;
-      const c = String.fromCodePoint(testo.codePointAt(j));
-      if (!LATINA_ACCENTATA.test(c) || !/\p{Script=Latin}/u.test(c)) return false;
-      if (c.length > 1) j++;
+      if (d.a[j] - d.da[j] === 1 && prima[d.da[j]] !== '+') continue;
+      if (testo.charCodeAt(j) < 0x80 || !/\p{Script=Latin}/u.test(testo[j])) return false;
     }
     return true;
   }
