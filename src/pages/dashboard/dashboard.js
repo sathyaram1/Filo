@@ -376,6 +376,15 @@
     // Il lavoro che si vede già al centro è quello che gira in questa scheda: la stessa conversazione, continuata in una
     // scheda nuova (#869), lì non lo mostra.
     chatCorrente: () => (sending ? chatId : null),
+    editorDalCampo: () => EditorCampo.apri(),
+  });
+  // Il campo che diventa l'Editor (#2389): la bozza lascia il campo, e se l'editor non la prende ci torna.
+  const EditorCampo = self.SN_DASH_EDITOR_CAMPO;
+  EditorCampo.init({
+    send, input: inputEl, form: $('inputForm'),
+    svuota: () => { inputEl.value = ''; autoGrowInput(); Comandi.updateInputClass(); },
+    riempi: (t) => scriviNelCampo(inputEl.value.trim() ? `${t}\n${inputEl.value}` : t),
+    apriEditor: () => Carte.apriEditor(),
   });
   const Tastiera = self.SN_DASH_TASTIERA;
   Tastiera.init({
