@@ -396,6 +396,7 @@
     const scritte = (Array.isArray(voci) ? voci : []).filter(azioneScritta).map((v) => ({ bersaglio, ...v }));
     if (!scritte.length) return false;
     const griglia = fila('pagina', {}, { scritte, soloScritte: true, oggetto, aspetto: deps.aspetto?.() || {} });
+    if (sopra) griglia.sopra = true;
     // `spiegazione`: una riga che spiega, sotto la griglia, come le spiegazioni del tasto destro.
     Menu.open({ x, y, alChiudere, items: [griglia, ...(spiegazione ? [{ type: 'inline', content: String(spiegazione) }] : [])] });
     return true;
