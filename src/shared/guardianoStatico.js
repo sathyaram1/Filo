@@ -690,7 +690,8 @@
           out.push({ valore: nucleo, regola: 'codice' });
           presentato = true;
         } else if (password && presentato && (uscita ? passwordInUscita(nucleo) : sembraPassword(nucleo))
-          && !(LUOGO_DEL_CAMBIO.test(prec) && /^\p{L}+$/u.test(nucleo)) && !PRESENTA_VALORE.test(parola) && !NEUTRA.test(parola)) {
+          && !(LUOGO_DEL_CAMBIO.test(prec) && /^\p{L}+$/u.test(nucleo)) && !DI_CHI.test(prec) && !PRESENTA_VALORE.test(parola)
+          && !NEUTRA.test(parola)) {
           out.push({ valore: nucleo, regola: 'password' });
         } else if (PRESENTA_VALORE.test(parola)) {
           presentato = true;
