@@ -524,7 +524,8 @@ test.describe('spellcheck-input-menu-top', () => {
     await expect(correction).toBeVisible({ timeout: 5_000 });
 
     // È davvero il primo item del menu (in cima).
-    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
+    // Da #2555 la griglia delle icone sta sopra: la correzione è il primo testo, subito sotto.
+    await expect(menuDi(page).primaCorrezione).toBeVisible();
 
     // Mostra il suggerimento di correzione.
     await expect(correction.locator('.sn-menu-label').first()).toHaveText('ciao');
@@ -811,7 +812,8 @@ test.describe('spellcheck-native', () => {
     await expect(corr.first()).toContainText('world');
 
     // Ed è davvero la prima voce cliccabile del menu.
-    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
+    // Da #2555 la griglia delle icone sta sopra: la correzione è il primo testo, subito sotto.
+    await expect(menuDi(page).primaCorrezione).toBeVisible();
   });
 });
 
@@ -1426,7 +1428,8 @@ test.describe('spellcheck-shadow-editable', () => {
     await expect(corr.first()).toContainText('ciao');
 
     // Ed è davvero la prima voce cliccabile del menu, come in light DOM.
-    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
+    // Da #2555 la griglia delle icone sta sopra: la correzione è il primo testo, subito sotto.
+    await expect(menuDi(page).primaCorrezione).toBeVisible();
     await expect(menu).toBeVisible();
   });
 
