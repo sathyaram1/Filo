@@ -642,6 +642,7 @@
   // in mezzo («e il nome utente è «…»») non è la password.
   const LEGAME = `(?:[^\\n.!?:;${DOPPIE}'‘’]|(?<=[A-Za-zÀ-ÿ])['’](?=[A-Za-zÀ-ÿ]))`;
   const SEGUITO = new RegExp(`[ \\t]*,?(?<gap>${LEGAME}{0,50}?[ \\t])?(?:${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO}|in|a|to|into|con|with)${FRA_VIRGOLETTE}`, 'yid');
+  const SEGUITO_NUDO = /[ \t]+(?:a|to|in|into|con|with)[ \t]+([^\s|[]{6,64})/y;
   const ALTRO_CAMPO = /(?<![A-Za-zÀ-ÿ])(?:utente|username|user|nome|name|e-?mail|mail|login|account|indirizzo|address|server|ssid|rete|network|telefono|phone|numero|number)(?![A-Za-zÀ-ÿ])/i;
   const DESCRIVE = /^(?:stess[aoie]|quell[aoie]|ugual[ei]|identic[aoie]|vedi|vedere|guarda|same|see|disponibil[ei]|available|scritt[ao]|indicat[ao]|riportat[ao]|fornit[ao]|inviat[ao]|stampat[ao]|vuot[ao]|nessun[ao]?|deve|devono|può|must|should|almeno|minimo|min|massimo|max)$/i;
   const descrive = (parole) => {
