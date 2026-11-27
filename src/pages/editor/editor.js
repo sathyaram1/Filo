@@ -3295,6 +3295,75 @@
     return false;
   }
 
+  // La parte selezionata del foglio va all'Aiuto come contesto, e «riscrivi» la sostituisce (#2389). Vale il range di
+  // quando è partita la domanda (il fuoco nel campo dell'Aiuto toglie la selezione dal foglio); una selezione tagliata
+  // per il tetto non si riscrive, o si perderebbe la parte che il modello non ha visto.
+  const SELEZIONE_MAX = 100_000;
+  let selezioneChiesta = null;
+  function selezioneAlModello() {
+    selezioneChiesta = null;
+    const r = ultimaSelezioneFoglio;
+    if (!r || r.collapsed || !docEl.contains(r.commonAncestorContainer)) return {};
+    const testo = testoDelRange(r);
+    if (!testo.trim()) return {};
+    const tagliata = testo.length > SELEZIONE_MAX;
+    selezioneChiesta = { range: r.cloneRange(), testo, docId: doc ? doc.id : '', tagliata };
+    return tagliata ? { selezione: testo.slice(0, SELEZIONE_MAX), selezioneTagliata: true } : { selezione: testo };
+  }
+  function bloccoDi(n) {
+    let x = n && n.nodeType === 1 ? n : n && n.parentNode;
+    while (x && x.parentNode && x.parentNode !== docEl && x.tagName !== 'LI') x = x.parentNode;
+    return x && x !== docEl ? x : null;
+  }
+  // Una riga del testo nuovo, un paragrafo; il resto del blocco dopo la selezione segue l'ultima riga.
+  function riscriviSelezione(nuovo) {
+    const s = selezioneChiesta;
+    if (typeof nuovo !== 'string' || !s || s.tagliata || !doc || s.docId !== doc.id) return false;
+    const r = s.range;
+    if (r.collapsed || !docEl.contains(r.commonAncestorContainer) || testoDelRange(r) !== s.testo) return false;
+    let inizio = bloccoDi(r.startContainer);
+    let fine = bloccoDi(r.endContainer);
+    if (!inizio || !fine) return false;
+    // Il triplo clic finisce all'inizio del blocco dopo: quel blocco non è selezionato.
+    if (fine !== inizio) {
+      const dentro = document.createRange();
+      dentro.setStart(fine, 0);
+      dentro.setEnd(r.endContainer, r.endOffset);
+      const prec = fine.previousElementSibling;
+      if (!dentro.toString() && prec) { r.setEnd(prec, prec.childNodes.length); fine = prec; }
+    }
+    r.deleteContents();
+    if (fine !== inizio && fine.isConnected) {
+      while (fine.firstChild) inizio.appendChild(fine.firstChild);
+      fine.remove();
+    }
+    const righe = nuovo.replace(/\r\n?/g, '\n').split(/\n+/);
+    const primo = document.createTextNode(righe[0]);
+    r.insertNode(primo);
+    let ultimo = primo;
+    if (righe.length > 1) {
+      const resto = document.createRange();
+      resto.setStartAfter(primo);
+      resto.setEnd(inizio, inizio.childNodes.length);
+      const coda = resto.extractContents();
+      let blocco = inizio;
+      for (const riga of righe.slice(1)) {
+        const p = document.createElement(inizio.tagName === 'LI' ? 'li' : 'p');
+        ultimo = document.createTextNode(riga);
+        p.appendChild(ultimo);
+        blocco.after(p);
+        blocco = p;
+      }
+      blocco.appendChild(coda);
+    }
+    const dopo = document.createRange();
+    dopo.setStart(primo, 0);
+    dopo.setEnd(ultimo, ultimo.nodeValue.length);
+    ultimaSelezioneFoglio = dopo;
+    selezioneChiesta = null;
+    return true;
+  }
+
   // Ritorna il numero di blocchi toccati (0 = niente da fare, es. target senza corrispondenze).
   function applyFormatActions(actions) {
     if (!Array.isArray(actions)) return 0;
