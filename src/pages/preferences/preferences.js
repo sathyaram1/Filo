@@ -1189,6 +1189,9 @@
     if (vuole('barraLaterale.bloccata')) $('barraBloccata').checked = barra.bloccata;
     if (vuole('barraLaterale.attesaMs')) $('barraAttesa').value = String(barra.attesaMs);
     if (vuole('barraLaterale.uscitaMs')) $('barraUscita').value = String(barra.uscitaMs);
+    const menuIcone = opzioniMenuIcone(settings.menuIcone);
+    if (vuole('menuIcone.icona')) $('menuIconeIcona').value = String(menuIcone.icona);
+    if (vuole('menuIcone.colonne')) $('menuIconeColonne').value = String(menuIcone.colonne);
     const pannello = opzioniPannelloDestro(settings.pannelloDestro);
     if (vuole('pannelloDestro.spinta')) $('pannelloSpinta').checked = pannello.spinta;
     if (vuole('pannelloDestro.striscia')) $('pannelloStriscia').checked = pannello.striscia;
