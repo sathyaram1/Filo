@@ -1301,7 +1301,8 @@
     const R = global.SN_RISERVATI_TESTO;
     const copia = aCapo(vero);
     const piano = copia ? copia.piano : vero;
-    // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
+    // L'enfasi del Markdown e i tag HTML fra etichetta e valore («**Password:** …», «<b>PIN:</b> …») si leggono come
+    // spazi (riservatiNelTesto.js).
     // Un avverbio fra il verbo e il valore («il pin è ancora 4821») si legge come spazi, come l'enfasi (guardianoStatico.js).
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
