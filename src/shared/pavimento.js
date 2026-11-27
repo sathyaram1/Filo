@@ -627,6 +627,22 @@
   const FRA_VIRGOLETTE = `[ \\t]*(?:[${DOPPIE}](?<d>[^\\n|\\t${DOPPIE}]{1,2000})[${DOPPIE}]|[${SINGOLE}](?<s>[^\\n|\\t${SINGOLE}]{1,2000})[${SINGOLE}])`;
   const VIRGOLETTATO_DOPO = new RegExp(`${ETICHETTA}${ACCANTO}(?:[ \\t]*(?<sep>${FRECCIA}|[:=])|[ \\t]+${VERBO_PASSWORD})${FRA_VIRGOLETTE}`, 'gid');
   const VIRGOLETTATO_IN_FRASE = new RegExp(`${ETICHETTA}${QUALIFICA}${COMPLEMENTO}[ \\t]${FRA_VIRGOLETTE}`, 'gid');
+  // Gli altri ponti fra il nome e il valore (#1403.67): chi l'ha messa («come password ho messo «…»»), e la risposta
+  // dopo la domanda o dopo il cambio, staccata da un segno («Ti ricordi la password? Era «…»», «l'ho cambiata, ora è
+  // «…»»): dopo il segno solo parole che non aprono un altro discorso, poi l'annuncio.
+  const RIEMPI = "(?:ora|adesso|invece|now|mi[ \\t]+pare|mi[ \\t]+sembra|credo|penso|forse|i[ \\t]+think|maybe|it|that|this)";
+  const RISPOSTA = `[ \\t]*(?:\\?+|[:.,;!])[ \\t]*(?:${RIEMPI}[ \\t]+){0,2}(?:it['’]s|${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO})`;
+  const MESSA = "[ \\t]+(?:ho|hai|ha|abbiamo|avete|hanno|l['’](?:ho|hai|ha|abbiamo)|i(?:['’]ve)?|we)[ \\t]+(?:mess[ao]|scelt[ao]|usat[ao]|set|chose|picked|used|put)";
+  const VIRGOLETTATO_PONTE = new RegExp(`${ETICHETTA}${ACCANTO}(?:${MESSA}|${RISPOSTA})${FRA_VIRGOLETTE}`, 'gid');
+  // Dopo la sola domanda («Ti ricordi la password? «…»») conta la forma della password, come senza verbo.
+  const VIRGOLETTATO_DOMANDA = new RegExp(`${ETICHETTA}${ACCANTO}[ \\t]*\\?+${FRA_VIRGOLETTE}`, 'gid');
+  const RISPOSTA_NUDA = new RegExp(`${ETICHETTA}${ACCANTO}${RISPOSTA}[ \\t]+([^\\s|\\[]{6,64})`, 'gi');
+  // Dopo una password fra virgolette, nella stessa frase, la seconda che le si lega con un annuncio o una preposizione
+  // («da «…» a «…»», «era «…», l'ho cambiata in «…»», «la vecchia era «…» e la nuova è «…»»). Un altro campo nominato
+  // in mezzo («e il nome utente è «…»») non è la password.
+  const LEGAME = `(?:[^\\n.!?:;${DOPPIE}'‘’]|(?<=[A-Za-zÀ-ÿ])['’](?=[A-Za-zÀ-ÿ]))`;
+  const SEGUITO = new RegExp(`[ \\t]*,?(?<gap>${LEGAME}{0,50}?[ \\t])?(?:${global.SN_GUARDIANO_STATICO.ANNUNCIO_LARGO}|in|a|to|into|con|with)${FRA_VIRGOLETTE}`, 'yid');
+  const ALTRO_CAMPO = /(?<![A-Za-zÀ-ÿ])(?:utente|username|user|nome|name|e-?mail|mail|login|account|indirizzo|address|server|ssid|rete|network|telefono|phone|numero|number)(?![A-Za-zÀ-ÿ])/i;
   const DESCRIVE = /^(?:stess[aoie]|quell[aoie]|ugual[ei]|identic[aoie]|vedi|vedere|guarda|same|see|disponibil[ei]|available|scritt[ao]|indicat[ao]|riportat[ao]|fornit[ao]|inviat[ao]|stampat[ao]|vuot[ao]|nessun[ao]?|deve|devono|può|must|should|almeno|minimo|min|massimo|max)$/i;
   const descrive = (parole) => {
     const p = parole.map((x) => x.replace(/[.,;:]+$/, ''));
