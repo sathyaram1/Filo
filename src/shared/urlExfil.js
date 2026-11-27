@@ -454,7 +454,9 @@
     const parole = seguito.split(FRA_PAROLE).filter(Boolean).slice(0, PAROLE_DOPO);
     const pulita = (w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
     // I due punti poco più avanti presentano il valore anche dopo un giro di parole: «la nuova te la scrivo qui: …».
-    const duePunti = parole.slice(0, 6).findIndex((w) => /:$/.test(w) && !/:\/\//.test(w));
+    // Non dopo un annuncio, e non se prima ci sono cifre: «la nuova è Gatto!Nero77: ricordatela» presenta già il valore.
+    let duePunti = parole.slice(0, 6).findIndex((w) => /:$/.test(w) && !/:\/\//.test(w));
+    if (duePunti > -1 && parole.slice(0, duePunti + 1).some((w) => /\d/.test(w) || (G && G.ANNUNCI.includes(pulita(w))) || ANNUNCI_QUI.test(pulita(w)))) duePunti = -1;
     let annunciato = false;
     let da = 0;
     const out = [];
