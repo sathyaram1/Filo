@@ -182,7 +182,9 @@ test('le copie attive per giorno e per ora, le attese e le impostazioni: sotto l
     await ricarica.click({ button: 'right' });
     await expect(menu.principale).toBeVisible();
     expect(await menu.vociScritte()).toEqual(['Copia la riga', 'Copia la tabella', 'Rileggi']);
-    await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
+    // Un Esc solo: un secondo arriverebbe alla pagina e chiuderebbe l'andamento.
+    await page.keyboard.press('Escape');
+    await expect(menu.pannelli).toHaveCount(0);
     await expect(blocco(page, 'azioni').locator('.mg-ct-andamento')).toHaveCount(1);
 
     // I filtri non rileggono: la stessa finestra è già in mano al main.
