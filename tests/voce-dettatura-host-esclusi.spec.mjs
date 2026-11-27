@@ -276,13 +276,13 @@ test('Detta dal tasto destro: scegliere un modello che non partirebbe lo dice su
     '<textarea id="campoDetta" style="position:fixed;top:60px;left:20px;width:320px;height:60px;z-index:9"></textarea>'));
   await page.locator('#campoDetta').focus();
   await page.locator('#campoDetta').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  const detta = menu.locator('.sn-menu-split', { hasText: 'Detta' }).first();
-  await detta.locator('.sn-menu-split-arrow').hover();
-  const sub = menuDi(page).locator('.sn-menu-sub');
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  // I modelli della dettatura sono le varianti dell'icona Detta: il suo menu col tasto destro (#2555).
+  await menu.scegli(menu.icona('dictate'), { button: 'right' });
+  const sub = menu.sottomenu;
   await expect(sub).toBeVisible();
-  await sub.locator('button', { hasText: 'Ascolto misto' }).first().click();
+  await sub.locator('.sn-menu-item', { hasText: 'Ascolto misto' }).first().click();
   const avviso = page.locator('.sn-toast', { hasText: 'Modello dettatura aggiornato' });
   await expect(avviso).toContainText('Con «Ascolto misto» la dettatura non parte: lo serve anche OpenAI, che Filo esclude.');
   await expect.poll(async () => (await app.evaluate(() => globalThis.SN_STORAGE.getSettings())).models.transcribe_audio)
