@@ -148,12 +148,11 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     expect(page, 'la pagina di test deve aprirsi').toBeTruthy();
     await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
-    // Apri il menu e la cronologia passando col mouse sulla freccetta (senza
-    // click: è così che il sotto-menu resta libero di richiudersi da solo).
+    // Apri il menu e la cronologia: è il menu dell'icona Incolla, col tasto destro sull'icona (#2555).
     await page.locator('#ta').click({ button: 'right' });
     await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
-    const arrow = menuDi(page).locator('.sn-menu-paste-arrow');
-    await arrow.hover();
+    const incolla = menuDi(page).incolla;
+    await incolla.click({ button: 'right' });
     await expect.poll(() => testiCronologia(app, page)).toHaveLength(3);
 
     // Rimuovi la voce sensibile.
