@@ -883,6 +883,8 @@
       case 'barraLaterale.bloccata': return $('barraBloccata').checked;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
+      case 'menuIcone.icona': return opzioniMenuIcone({ icona: $('menuIconeIcona').value }).icona;
+      case 'menuIcone.colonne': return opzioniMenuIcone({ colonne: $('menuIconeColonne').value }).colonne;
       case 'pannelloDestro.spinta': return $('pannelloSpinta').checked;
       case 'pannelloDestro.striscia': return $('pannelloStriscia').checked;
       case 'pannelloDestro.bloccato': return $('pannelloBloccato').checked;
