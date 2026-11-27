@@ -572,6 +572,8 @@
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
     try { s = `${s}\n${decodeURIComponent(s.replace(/\+/g, ' '))}`; } catch (_) { /* un % che non codifica niente */ }
+    const senzaAvverbi = avverbiComeSpazi(s, { stessaLunghezza: false });
+    if (senzaAvverbi !== s) s = `${s}\n${senzaAvverbi}`;
     const out = raccolta();
     raccogli(s, out, FORMA_USCENTE);
     for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
