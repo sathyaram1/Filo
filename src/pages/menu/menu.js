@@ -293,7 +293,6 @@
         vuota: d.vuota === true, altro: incollaNellaGriglia(costruisci(d.altro, m.cronologia), m.cronologia),
       });
     }
-    else if (d.cosa === 'griglia') Menu.refreshIconGrid(costruisci(d.items, []));
     else if (d.cosa === 'fuori') {
       // L'anteprima finisce in innerHTML: passa solo un SVG ripulito, il resto come testo.
       const ic = pulisciIcona(String(d.svg || ''));
