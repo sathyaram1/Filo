@@ -219,11 +219,12 @@ async function inStreaming({ payload, origin, signal, onDelta, onMeta }) {
   meta({ model, provider, avanzamento: { fase: 'leggo' } });
   const byte = voce.byte || await byteDallaScheda(voce, signal);
   return conDecodificatore(byte, async ({ secondi, pezzi, pezzo }) => {
-    meta({ avanzamento: { fatti: 0, totale: pezzi, secondi } });
+    const lunga = durata(secondi);
+    meta({ avanzamento: { fatti: 0, totale: pezzi, durata: lunga } });
     let primo = true;
     const r = await trascriviPezzi({
       totale: pezzi, pezzo, origin, signal,
-      onAvanzamento: (fatti, totale) => meta({ avanzamento: { fatti, totale, secondi } }),
+      onAvanzamento: (fatti, totale) => meta({ avanzamento: { fatti, totale, durata: lunga } }),
       onTesto: (t) => {
         if (!t || !onDelta) return;
         onDelta(primo ? t : `\n\n${t}`);
