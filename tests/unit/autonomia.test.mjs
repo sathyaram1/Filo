@@ -812,7 +812,7 @@ test('segreti: controlli deterministici, che non gridano al lupo', () => {
 
 // #1403.89 — il codice di ciò che si apre, che il pavimento toglie ai modelli, non esce nemmeno da un'azione: non
 // scritto dall'utente è un no, scritto da lui vuole la parola.
-test('il codice del mio telefono, del cancello o il CVV non escono da un\'azione senza la parola', () => {
+test('il codice del mio telefono o del cancello non esce da un\'azione senza la parola', () => {
   for (const frase of ['Il codice del mio telefono è 4829', '4829 è il codice del mio telefono', 'my phone code is 4829',
     'Le code de mon téléphone est 4829', 'Per sbloccare il mio telefono uso 4829', 'Il codice del cancello è 4829',
     'Il codice del mio telefono è 1111. Quello del pc è 4829']) {
