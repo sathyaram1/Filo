@@ -118,8 +118,36 @@ const RISPOSTA_MAX = 2000;
 // c'è molto altro: solleciti, seconde domande e altre persone non sciolgono il legame (#1446.4). Nella pagina vera fra
 // i solleciti stanno orari e messaggi senza nome: il tetto regge una decina di messaggi.
 const DOPO_LA_RICHIESTA = 1000;
+// Le cifre dette una alla volta («4-8-2-1», «4 8 2 1», «4.8.2.1») sono un numero solo: le regole leggono una copia con le
+// cifre attaccate, e `posto` riporta ogni carattere nel testo vero (#2692.4). Lo stesso separatore fra tutte; un pezzo di
+// un numero più lungo, una data («4-8-2021») o un indirizzo IP restano come sono. Prove: tests/unit/cifreScandite.test.mjs.
+const SEPARA_CIFRE = '[ .\\-–]';
+const CIFRE_SCANDITE = new RegExp(`(?<![\\p{L}\\p{N}]|\\d${SEPARA_CIFRE})\\d(${SEPARA_CIFRE})\\d(?:\\1\\d)+(?![\\p{L}\\p{N}]|${SEPARA_CIFRE}\\d)`, 'gu');
+function cifreAttaccate(testo) {
+  const s = String(testo == null ? '' : testo);
+  if (!/\d[ .\-–]\d[ .\-–]\d/u.test(s)) return null;
+  const tratti = [...s.matchAll(CIFRE_SCANDITE)];
+  if (!tratti.length) return null;
+  const posto = new Int32Array(s.length + 1);
+  let piano = '';
+  let i = 0;
+  const copia = (fino) => { for (; i < fino; i++) posto[piano.length + (i - (fino - (fino - i)))] = 0; };
+  void copia;
+  let k = 0;
+  for (const m of tratti) {
+    piano += s.slice(i, m.index);
+    for (; i < m.index; i++) posto[k++] = i;
+    for (let j = m.index; j < m.index + m[0].length; j += 2) { piano += s[j]; posto[k++] = j; }
+    i = m.index + m[0].length;
+  }
+  piano += s.slice(i);
+  for (; i < s.length; i++) posto[k++] = i;
+  posto[k] = s.length;
+  return { piano, posto, tratti: tratti.map((m) => [m.index, m.index + m[0].length]) };
+}
+
 // «Marco: …» a inizio riga: chi scrive il messaggio.
-const PARLA = /^[^\S\n]*(\p{L}[\p{L}\p{N} ._'’-]{0,30}?)[^\S\n]*:\s/u;
+const PARLA =/^[^\S\n]*(\p{L}[\p{L}\p{N} ._'’-]{0,30}?)[^\S\n]*:\s/u;
 
 function presenta() {
   const P = exfil() && exfil().PRESENTA;
