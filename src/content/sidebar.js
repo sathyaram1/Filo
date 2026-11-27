@@ -2309,7 +2309,12 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       if (valutazione) valutazione.mandato = testoCampo;
     }
     const conDocumento = () => {
-      if (letto) payload.documento = { titolo: letto.titolo, testo: letto.testo, avviso: letto.avviso || '' };
+      if (letto) {
+        payload.documento = {
+          titolo: letto.titolo, testo: letto.testo, avviso: letto.avviso || '',
+          ...(letto.selezione ? { selezione: letto.selezione, selezioneTagliata: !!letto.selezioneTagliata } : {}),
+        };
+      }
     };
     conDocumento();
 
