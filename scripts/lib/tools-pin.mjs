@@ -69,6 +69,8 @@ export const PINNED_PATHS = [
   'src/main/auth',
   // Il campanello che avvisa l'owner quando una fusione resta in attesa.
   'src/main/services/mergeApprovalSignal.js',
+  // La regola delle funzioni eseguite della mappa prova → file, che usa anche il lato delle prove (#2502).
+  'src/main/copertura.js',
 ];
 
 const REPO_MARK = '.filo-repo-root';
