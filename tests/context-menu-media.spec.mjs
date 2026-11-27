@@ -151,10 +151,10 @@ test('ripetizione e controlli si attivano davvero, e la voce racconta lo stato',
 test('tasto destro su un audio: le voci parlano di audio, non di video', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, pageHtml('/nonexistent.mp4'));
   const menu = await openMenuOn(page, '#a');
-  await expect(menu.getByText('Copia URL audio')).toBeVisible();
-  await expect(menu.getByText('Salva audio come…')).toBeVisible();
+  await expect(menu.voce('Copia URL audio')).toBeVisible();
+  await expect(menu.voce('Salva audio come…')).toBeVisible();
   // La finestra mobile è roba da video: sull'audio non deve comparire.
-  await expect(menu.getByText('Apri in finestra mobile')).toHaveCount(0);
+  await expect(menu.voce('Apri in finestra mobile')).toHaveCount(0);
 });
 
 test('il video coperto dai comandi del player resta raggiungibile col tasto destro', async ({ openTab, testServer }) => {
