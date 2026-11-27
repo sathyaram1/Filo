@@ -671,7 +671,7 @@
     const s = sezione('mg-dq-consiglio', 'Consiglio', corpo);
     // Con un'opzione sola il pulsante dell'opzione è già il consiglio: due pulsanti uguali non servono (#1640).
     const doppio = (d.opzioni || []).length === 1;
-    const etichetta = d.stato === 'aperta' && !doppio ? etichettaDi(o) : null;
+    const etichetta = daRispondere(d) && !doppio ? etichettaDi(o) : null;
     if (etichetta) {
       const b = el('button', 'sn-btn mg-dq-applica', `Applica il consiglio: ${etichetta}`);
       b.type = 'button';
