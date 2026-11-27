@@ -12,6 +12,7 @@ import { test, expect, aspettaFinestra, chiudiApp } from './fixtures/electron.mj
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
 import { GESTIONE } from './helpers/gestione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
