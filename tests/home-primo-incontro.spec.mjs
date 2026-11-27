@@ -3,6 +3,7 @@
 // Foto chiara e scura in tests/.shots/.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 test.use({ accoglienzaFatta: false });
 
