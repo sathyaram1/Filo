@@ -618,8 +618,12 @@
   // `[{ valore, regola }]` con regola 'codice' | 'password' | 'chiave' | 'iban' | 'carta'. `saturo` sull'elenco: il
   // testo ne aveva più del tetto, o una chiave più lunga di MAX_TOKEN, e chi controlla un'uscita lì guarda la presenza
   // dei suoi pezzi (urlExfil.js).
+  // La password detta dopo il nome con un verbo di cambio o dopo la domanda la riconosce la regola delle uscite (#2714).
   function segretiNelTesto(testoLetto) {
-    return raccogli(testo(testoLetto), raccolta(), FORMA_LETTA);
+    const s = testo(testoLetto);
+    const out = raccogli(s, raccolta(), FORMA_LETTA);
+    for (const v of valoriDopoIlNome(s)) if (v.regola === 'password') out.push(v);
+    return out;
   }
 
   // Quello che un'azione porterebbe fuori (autonomia.js): le stesse forme di segretiNelTesto, anche percent-codificate, più
