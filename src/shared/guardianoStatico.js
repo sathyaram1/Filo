@@ -419,8 +419,10 @@
     + `|[ \\t]+(?:${intera(VERBI_CAMBIO.verso)}(?<=${PARTICIPIO_IT}[^\\n.!?:;,]{1,80})|${intera(VERBI_CAMBIO.versoInglese)}(?<=${PARTICIPIO_EN}[^\\n.!?:;,]{1,80}))`
     + `|[ \\t]+(?:${ORA}[ \\t]+${PRESENTE}|${PRESENTE}[ \\t]+${ORA})`
     // Dopo «ho cambiato il pin» il valore nella frase che segue: solo le forme che lo presentano, non una frase qualunque.
-    + `|(?:[ \\t]+(?:${CLITICO})?${AUSILIARE_CAMBIO}${PARTICIPIO_CAMBIO})?(?<=${PARTICIPIO_CAMBIO}[^\\n.!?:;,]{0,60})`
-    + `(?:[ \\t]*[,.;:][ \\t]*|[ \\t]+)(?:${E_POI}[ \\t]+)?${intera(VERBI_CAMBIO.dopo)})`;
+    // Anche qui il participio si cerca all'indietro solo dopo la parola che presenta il valore: a ogni nome ripetuto
+    // costava sei volte main (pavimento.test.mjs, 120.000 caratteri).
+    + `|[ \\t]+(?:${CLITICO})?${AUSILIARE_CAMBIO}${PARTICIPIO_CAMBIO}${DOPO_IL_CAMBIO}`
+    + `|(?=${DOPO_IL_CAMBIO})(?<=${PARTICIPIO_CAMBIO}[^\\n.!?:;,]{0,60})${DOPO_IL_CAMBIO})`;
   const CAMBIO_IN_CODA = new RegExp(`(?:${CAMBIO_VALORE})[ \\t]*["'«“‘„(]*[ \\t]*$`, 'i');
   const DIVENTA_IN_CODA = new RegExp(`${intera(VERBI_CAMBIO.diventa)}[ \\t]*["'«“‘„(]*[ \\t]*$`, 'i');
   // Fra il nome e il verbo di cambio solo un complemento del nome («del cancello», «for my phone»): «il pin non funziona
