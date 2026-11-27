@@ -35,6 +35,16 @@ async function chatDellEditor(app, { id, ts, messaggi, soggetto = 'tesi' }) {
   }, { id, ts, messaggi, soggetto });
 }
 
+// La home numero `i` torna davanti: nella finestra parcheggiata dei test il cambio di visibilità si annuncia a mano.
+async function davanti(shell, page, i) {
+  await shell.evaluate(async (k) => {
+    const s = await window.filoShell.tabs.snapshot();
+    const t = s.tabs.filter((x) => String(x.url).startsWith('filo://newtab'))[k];
+    await window.filoShell.tabs.activate(t.id);
+  }, i);
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+}
+
 test('#1204.6 chiudere la conversazione col bottone o con la spunta dell’appunto lascia la bozza nella casella', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await home(app);
