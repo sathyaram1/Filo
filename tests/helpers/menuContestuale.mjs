@@ -42,6 +42,7 @@ export function menuDi(scheda) {
         const conVarianti = locator('.sn-menu:not(.sn-menu-sub) .sn-menu-griglia [data-sn-varianti="1"]:not([data-sn-verbo="paste"])');
         for (let i = 0, n = await conVarianti.count(); i < n; i++) {
           await scegli(conVarianti.nth(i), { button: 'right' });
+          await locator('.sn-menu-sub').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
           const sub = locator('.sn-menu-sub .sn-menu-item', { hasText: icona }).first();
           if (await sub.isVisible().catch(() => false)) return sub.click(opzioni);
         }
