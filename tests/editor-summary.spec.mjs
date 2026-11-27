@@ -264,7 +264,7 @@ const notaTaglio = (chat) => chat.locator('.sn-sidebar-log', { hasText: 'Il docu
 
 async function dalMenuDelTitolo(editor, voce) {
   await editor.locator('#docTitle').click({ button: 'right' });
-  await editor.locator('.ed-title-ctxmenu .sn-select-option', { hasText: voce }).click();
+  await menuDi(editor).scegli(voce);
 }
 
 const richieste = (app, tipo) => app.evaluate((_electron, t) => globalThis.__richieste.filter((r) => r.tipo === t), tipo);
