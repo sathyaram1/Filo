@@ -107,12 +107,16 @@ test('su un\'immagine la fila ha le sue azioni, e il «+» le altre; sul testo d
   await page.locator('#foto').click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro)')).toBeVisible();
-  expect(await iconeDellaFila(menu)).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask']);
+  // La fila di partenza di #2555 (disposizioneIcone.js, CONTESTI): l'Aiuto c'è in ogni menu.
+  const fila = await iconeDellaFila(menu);
+  expect(fila).toEqual(['immagine:save', 'immagine:copy', 'immagine:ask', 'immagine:search', 'immagine:help']);
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="immagine:save"]')).toHaveAttribute('aria-label', /Salva immagine/);
   await menu.locator('.sn-menu-row:not(.sn-menu-altro) .sn-menu-row-overflow').click();
   const griglia = menu.locator('.sn-menu-altro');
   await expect(griglia).toBeVisible();
-  expect(await griglia.locator('[data-sn-icon-id]').evaluateAll((els) => els.map((e) => e.dataset.snIconId))).toEqual(['immagine:copyLink', 'immagine:search', 'immagine:transcribe']);
+  const altro = await griglia.locator('[data-sn-icon-id]').evaluateAll((els) => els.map((e) => e.dataset.snIconId));
+  expect(altro[0]).toBe('immagine:transcribe');
+  expect(altro.filter((id) => fila.includes(id)), 'un\'icona sta in un posto solo').toEqual([]);
   await page.keyboard.press('Escape');
   await expect(menu.pannelli).toHaveCount(0);
 
