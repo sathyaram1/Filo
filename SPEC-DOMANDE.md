@@ -238,7 +238,8 @@ lo può scrivere anche un agente pulito.
   assoluta (#1451). Coi compiti (#1196) spariscono anche lo spareggio
   provvisorio e l'ordine per ruolo (`REVIEW_RANK`): decide l'urgenza (§ 6.3),
   quindi un feedback iniziato passa davanti a uno nuovo solo con un gradino di
-  priorità in più, e la priorità 3 passa sopra tutto. Il controllo di sicurezza
+  priorità in più, e la priorità 3 passa sopra tutto tranne smistamento e
+  risposta delle domande (§ 6.3, #2702). Il controllo di sicurezza
   di un ramo finito non aspetta a nessuna priorità (#1451); gli altri lavori
   aspettano solo chi li supera sia in priorità sia in urgenza (filo-security
   `functions/src/routine/select.js`, `ordinaLavori`).
