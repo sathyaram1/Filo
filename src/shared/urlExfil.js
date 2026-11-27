@@ -432,6 +432,7 @@
   // «ora rinnovala», «try again», «is ready».
   const SEGUITO_DEL_DISCORSO = /^(?:meglio|peggio|calma|basta|dopo|subito|pure|così|cosi|tardi|presto|pront[ao]|fatt[ao]|entr[aoi]|entrate|esc[oie]|arriv[aoi]|torn[aoi]|funzion[aoi]|aspetta|attendi|riavvia|grazie|later|soon|ready|done|works?|fine|thanks|please|\p{L}{3,}[aei]rl[aoie]|(?:rinnov|cambi|scriv|mett|prov|us|inserisc|ripet|digit|controll|salv|cancell)[aie](?:l[aoie]|mel[ao]|tel[ao]))$/u;
   let avverbio = null;
+  const VIRGOLETTE_QUI = new RegExp(FRA_VIRGOLETTE.source, 'uy');
   function dopoIlRinvio(resto, { soloCifre, spiega }) {
     const r = RINVIO.exec(resto);
     if (!r) return null;
