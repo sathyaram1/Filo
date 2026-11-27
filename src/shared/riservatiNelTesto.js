@@ -466,12 +466,20 @@ const ACCANTO = /^\s*$/u;
 // mette («usa gattonero come password», non «vale come password»). Prove: tests/unit/passwordPrimaDelNome.test.mjs.
 const DAVANTI_AL_NOME = "(?:(?:l['’]|(?:la|il|lo|le|the|a|an|una|un|my|your|our|his|her|their|mia|mio|tua|tuo|sua|suo"
   + '|nostra|nostro|vostra|vostro|loro|nuova|nuovo|vecchia|vecchio|attuale|vera|vero|giusta|giusto|corretta|solita|stessa'
-  + '|unica|new|old|current|real|right|correct|usual|same|only)[^\\S\\n]+))*';
-const PRIMA_DEL_NOME = new RegExp(`(?:^|[^\\S\\n])(\\S{1,128})[^\\S\\n]+(?:${AVVERBI}[^\\S\\n]+)?`
-  + `(?:(?<verbo>è|e['’]|é|era|sarà|sara|sia|fosse|resta|rimane|diventa|is|was|becomes|will[^\\S\\n]+be)(?:[^\\S\\n]+${AVVERBI})?`
-  + `|(?<come>come|as))[^\\S\\n]+${DAVANTI_AL_NOME}$`, 'u');
-// «Bitwarden è il password manager»: il nome è di un'altra cosa.
-const NOME_DI_ALTRO = /^[^\S\n]*-?[^\S\n]*(?:manager|policy|hint|reset|field|generator|strength|length|recovery|vault|checker|hash)(?![\p{L}\p{N}])/u;
+  + '|unica|new|old|current|real|right|correct|usual|same|only|das|der|die|dein|deine|mein|meine|unser|unsere|neue|neues'
+  + '|les|mon|ma|ton|ta|votre|notre|nouveau|nouvelle|el|mi|tu|su|nueva|nuevo)[^\\S\\n]+))*';
+// I verbi sono l'elenco condiviso degli annunci, coi modali davanti («dovrebbe essere»): «ecco» e «here» presentano
+// quello che segue. «e» e «sara» senza accento valgono solo per un valore con cifre, simboli o virgolette.
+const VERBI_PRIMA = ANNUNCI.filter((w) => w !== 'ecco' && w !== 'here').map(esc).join('|');
+const PRIMA_DEL_NOME = new RegExp(`(?:^|\\s)(\\S{1,128})[^\\S\\n]+(?:${AVVERBI}[^\\S\\n]+)?`
+  + `(?:(?:(?:${guardiano().MODALI})[^\\S\\n]+)?(?<verbo>${VERBI_PRIMA})(?:[^\\S\\n]+${AVVERBI})?|(?<senzaAccento>e|sara)`
+  + `|(?<come>come|as|als|comme|como))[^\\S\\n]+${DAVANTI_AL_NOME}$`, 'u');
+const NOME_DI_ALTRO = new RegExp(`^[^\\S\\n]*-?[^\\S\\n]*(?:${guardiano().PROPRIETA_PASSWORD})(?![\\p{L}\\p{N}])`, 'u');
+// «pass» e «pw» da soli, che menzioni non legge come nomi: prima del nome solo per un valore con cifre o simboli.
+const NOME_CORTO = /(?<![\p{L}\p{N}])(?:pass|pw)(?![\p{L}\p{N}'’-])/gu;
+// Una parola di sole lettere col verbo conta solo in testa alla frase: dopo un segno, un saluto, un «se» o un «ma».
+// «la cosa che mi manca è la password» è una frase qualunque.
+const APRE_FRASE = /^(?:se|if|ma|but|e|and|però|pero|quindi|poi|ok|sì|si|no|intanto|ricorda|ricordati|remember|nota|ciao|hey|hi|ehi|hello|senti|think|guess|believe|suppose)$/u;
 const NON_UN_VALORE = /^(?:quest[aoie]|quell[aoie]|quale|qual|cosa|che|chi|dove|come|non|ecco|qui|qua|ciò|cio|lei|lui|ess[ao]|tutto|niente|nulla|sol[oa]|soltanto|anche|perché|perche|quando|forse|allora|dunque|quindi|this|that|what|which|here|there|it|nothing|everything|something|who|where|how|why|then|also|only|not|mine|yours|ours|mia|tua|sua|nostra|vostra|loro|davvero|sicuro|beh|però|pero|okay|really|maybe|perhaps|probably|actually|surely|well|\p{L}{4,}mente)$/u;
 const ARTICOLO = /^(?:il|lo|la|i|gli|le|un|uno|una|del|della|dello|dei|degli|delle|di|da|dal|dalla|al|alla|nel|nella|sul|sulla|con|per|tra|fra|ogni|quel|mio|mia|tuo|tua|suo|sua|nostro|nostra|vostro|vostra|the|an|of|my|your|his|her|our|their|these|those|every|each|any|some)$|^(?:dell|nell|sull|dall|all|un|l|quell)['’]/u;
 const RELATIVO = /^(?:che|chi|cui|which|that|what|who)$/u;
