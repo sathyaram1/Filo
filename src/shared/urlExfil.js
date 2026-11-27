@@ -442,7 +442,8 @@
       if (avverbio && avverbio.test(t)) continue;
       const cifre = /\d/.test(t);
       if (cifre) return soloAlnum(t).length >= 4 ? { valore: t, regola: 'codice', rinvio: true } : null;
-      const chiude = k === parole.length - 1 || CONGIUNZIONE.test(parole[k + 1]);
+      // Dopo un punto comincia un altro discorso: lì la parola qualunque vuole l'annuncio («La nuova è …»).
+      const chiude = /^[,;]/.test(r[0]) && (k === parole.length - 1 || CONGIUNZIONE.test(parole[k + 1]));
       if (soloCifre || t.length < MIN_TOKEN || RIEMPITIVI.has(t) || (spiega && spiega(parole, k)) || !(annunciato || chiude)) return null;
       return { valore: t, regola: 'password', rinvio: true };
     }
