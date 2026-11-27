@@ -98,7 +98,7 @@ test('Pausa e Riproduci agiscono davvero sulla riproduzione', async ({ openTab, 
 
     // Invariante: la stessa voce ora propone (e fa) l'azione opposta.
     menu = await openMenuOn(page, '#a');
-    await menu.locator('button', { hasText: 'Riproduci' }).first().click();
+    await menu.scegli('Riproduci');
     await expect.poll(() => page.evaluate(() => document.getElementById('a').paused)).toBe(false);
   } finally {
     await media.close();
