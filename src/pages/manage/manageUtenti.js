@@ -978,6 +978,9 @@
   // `di` è la riga a cui il menu appartiene: se la riga sparisce in una rilettura, il menu se ne va con lei.
   function apriMenu(voci, x, y, di = null) {
     chiudiMenuPersona();
+    // A icone come il tasto destro di Filo (#2555), con la riga contornata.
+    const I = window.SN_MENU_ICONS;
+    if (I && I.apriVoci && I.apriVoci({ x, y, elemento: di, voci: voci.map(([testo, azione]) => ({ label: testo, onClick: azione })) })) return;
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
     menu.setAttribute('role', 'menu');
