@@ -2782,7 +2782,7 @@
       }
       const incolla = Actions.buildPasteItem(clipboardHistory);
       azioni.paste = {
-        label: incolla.label, onClick: incolla.onClick, misura: incolla.azione,
+        label: incolla.label, onClick: incolla.onClick, azione: incolla.azione,
         cronologia: { history: incolla.history, onPick: incolla.onPickHistory, onRemove: incolla.onRemoveHistory, onClear: incolla.onClearHistory },
       };
       const detta = TTS.buildDictateItem(target);
