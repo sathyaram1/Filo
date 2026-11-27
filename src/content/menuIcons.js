@@ -345,7 +345,7 @@
 
   // Lo stato delle icone della finestra è cambiato col menu aperto (lo schermo intero spento da un'altra strada, #514).
   function ridisegnaFinestra() {
-    chiediFinestra().then(ridisegna, ridisegna);
+    chiediFinestra().then(() => ridisegna(), () => ridisegna());
   }
 
   loadIconLayout();
