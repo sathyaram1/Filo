@@ -515,7 +515,7 @@
           out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
         }
         if (coda.length < 200) {
-          out.push(...dopoIlRinvio(testo.slice(da + coda.length, da + coda.length + 200), { soloCifre, spiega }));
+          out.push(...dopoIlRinvio(testo.slice(da + coda.length, da + coda.length + 200), { soloCifre, spiega, prima: testo.slice(Math.max(0, m.index - 60), da + coda.length) }));
         }
       }
     };
