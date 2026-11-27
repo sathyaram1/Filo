@@ -213,7 +213,7 @@ test('«qual\'è» e «il il» hanno il segno pieno subito, prima che il modello
   expect(prima.candidati).toBe('');
   expect(prima.sistema, 'le regole viaggiano nel messaggio di sistema').toBe(true);
   const menu = await tastoDestroSu(page, errore(page, 'qual'));
-  await expect(menu.primaVoce).toHaveText(/qual è/);
+  await expect(menu.primaCorrezione).toHaveText(/qual è/);
   await expect(menu.voce('Correggi tutti gli errori (2)')).toBeVisible();
   await app.evaluate(() => globalThis.__rilascia());
 });
@@ -243,7 +243,7 @@ test('«oggi sonno andato al mare»: un errore su «sonno», con «sono» in cim
   await expect(segno).toHaveText('sonno', { timeout: 6000 });
   await expect(segno).not.toHaveClass(/sn-dubbio/);
   const menu = await tastoDestroSu(page, segno);
-  const prima = menu.primaVoce;
+  const prima = menu.primaCorrezione;
   await expect(prima).toHaveText(/^sono/);
   await prima.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('oggi sono andato al mare ');
@@ -257,7 +257,7 @@ test('il modello cita il pezzo con uno spazio in più e l\'altro apice: il segno
   await expect(segno).toHaveText('sonno', { timeout: 6000 });
   await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(1);
   const menu = await tastoDestroSu(page, segno);
-  const prima = menu.primaVoce;
+  const prima = menu.primaCorrezione;
   await expect(prima).toHaveText(/^sono/);
   await prima.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('oggi l’amico sono andato al mare ');
@@ -354,7 +354,7 @@ test('«quasi quasi» non è segnato, «il il» sì', async ({ app, openTab, tes
   await expect(errore(page, 'quasi')).toHaveCount(0);
   await expect(errore(page, 'piano')).toHaveCount(0);
   const menu = await tastoDestroSu(page, errore(page, 'il'));
-  await menu.primaVoce.locator('.sn-menu-correction-main').click();
+  await menu.primaCorrezione.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('quasi quasi vado piano piano con il cane ');
 });
 
@@ -400,7 +400,7 @@ test('spenta la parte del modello restano i segni del codice, pieni i sicuri e s
   expect(await rapide(app)).toEqual([]);
   // Il tasto destro sul candidato propone lo stesso la correzione che il codice conosce.
   const menu = await tastoDestroSu(page, errore(page, 'qual'));
-  await expect(menu.primaVoce).toHaveText(/qual è/);
+  await expect(menu.primaCorrezione).toHaveText(/qual è/);
 });
 
 test('lo zigzag del browser si spegne dove i segni li disegna Filo; con «Errori» spento anche nelle caselle di una riga', async ({ app, openTab, testServer }) => {
