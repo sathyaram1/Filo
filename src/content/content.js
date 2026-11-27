@@ -1811,19 +1811,21 @@
     const view = { stack: deepElementsFromPoint(x, y), x, y };
     const { mediaEl, mediaUnder } = findMedia(target, view);
     const imgUnder = imgEl ? null : findUnder(view, 'img', target);
+    // Il collegamento lo può dire il DOM (la copertina adottata sta dentro un
+    // <a>) prima ancora della pila di strati.
+    const linkUnder = linkEl ? null : findLinkUnder(view, target, mediaUnder || imgUnder);
+    // Un lettore disegnato dal sito (#1660): il media nascosto nel suo riquadro, o suonato fuori dal documento. Solo
+    // dove niente altro risponde, come ogni ripiego che sta sotto.
+    const delLettore = (mediaEl || mediaUnder || imgEl || linkEl || imgUnder || linkUnder) ? null : Actions.mediaDelLettore(target);
     return {
       linkEl,
       imgEl,
       mediaEl,
-      // Un lettore disegnato dal sito (#1660): il media nascosto o suonato fuori dal documento, ripiego dell'ultimo posto.
-      mediaLettore: (mediaEl || mediaUnder || imgEl || linkEl) ? null : Actions.mediaDelLettore(target),
       // I tre `*Under` escono da qui GIÀ VAGLIATI: chi li legge a valle non deve rifare il
       // controllo, né può dimenticarselo.
-      mediaUnder,
+      mediaUnder: mediaUnder || delLettore,
       imgUnder,
-      // Il collegamento lo può dire il DOM (la copertina adottata sta dentro un
-      // <a>) prima ancora della pila di strati.
-      linkUnder: linkEl ? null : findLinkUnder(view, target, mediaUnder || imgUnder),
+      linkUnder,
       // Gli strati come li ha visti il freno: servono a valle per sapere se copertina e
       // collegamento sono la STESSA scheda, che i soli rettangoli sbagliano (#444).
       layers: view,
