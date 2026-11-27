@@ -252,7 +252,7 @@ function verbiDopoIlNome(s) {
       if (ACCENTO_SBAGLIATO.test(t.l)) { metti(t, 'è'); break; }
       if (!/^[\p{L}'’]+$/u.test(t.l)) break;
       if (t.l === 'e' && (tra(dopo, PARTICIPI_DEL_CAMBIO) || vicino(dopo, PARTICIPI_DEL_CAMBIO) || tra(dopo, CAMBI_DEL_VALORE) || vicino(dopo, CAMBI_DEL_VALORE))) { metti(t, 'è'); continue; }
-      if (k === 0 && (t.l === 'si' || t.l === 'iz') && INGLESE_PRIMA.test(s.slice(Math.max(0, m.index - 8), m.index))) { metti(t, 'is'); break; }
+      if (k === 0 && !NON_IS.test(t.l) && /^[a-z]{1,3}$/.test(t.l) && NOVITA().distanza(t.l, 'is', 1) <= 1 && INGLESE_PRIMA.test(s.slice(Math.max(0, m.index - 8), m.index))) { metti(t, 'is'); break; }
       if (vicino(t.l, COPULE)) { metti(t, 'è'); break; }
       if (k > 0 && AUSILIARE.test(parole[k - 1].l) && vicino(t.l, PARTICIPI_DEL_CAMBIO)) { metti(t, ''); continue; }
       if (/^(?:in|a|to)$/.test(dopo) && vicino(t.l, CAMBI_DEL_VALORE)) { metti(t, 'messa'); break; }
