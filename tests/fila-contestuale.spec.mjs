@@ -85,8 +85,9 @@ test('nell\'Editor sul testo selezionato la fila ha grassetto e corsivo, e il cl
   const ids = await iconeDellaFila(menu);
   expect(ids.slice(0, 2)).toEqual(['scrivibile:bold', 'scrivibile:italic']);
   expect(ids.every((id) => id.startsWith('scrivibile:')), 'nessuna azione della pagina intera di partenza').toBe(true);
-  // La fila sta in cima, sopra le voci di sempre, che restano.
-  expect(await menu.principale.evaluate((m) => m.firstElementChild.classList.contains('sn-menu-row'))).toBe(true);
+  // La fila sta in cima, sopra le voci di sempre, che restano: prima riga della griglia, che apre il menu (#2555).
+  expect(await menu.principale.evaluate((m) => m.firstElementChild.classList.contains('sn-menu-griglia')
+    && m.firstElementChild.firstElementChild.classList.contains('sn-menu-row'))).toBe(true);
   await expect(menu.voce('Taglia')).toBeVisible();
   await expect(fila.locator('.sn-menu-row-overflow')).toBeVisible();
 
