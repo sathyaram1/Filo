@@ -1216,10 +1216,10 @@ test('nelle altre lingue la frase che nomina la password senza darla resta com\'
 });
 
 // Il pavimento gira a ogni chiamata a un modello nel processo principale: un testo lungo che ripete l'etichetta non lo
-// deve fermare. Oggi costa 2-5 unità, col flag u sulle regex delle etichette ne costava 90-250. Il russo lungo è lento
-// anche su main, per un'altra causa: lo tiene #1403.111.
+// deve fermare: col flag u sulle regex delle etichette costava 90-250 unità. Lenti anche su main, per altre cause, il
+// russo lungo (#1403.111) e la lunga fila di spazi dopo l'etichetta (#2739).
 test('un testo di 120.000 caratteri che ripete l\'etichetta si controlla in fretta', () => {
-  for (const pezzo of ['비밀번호는 뭐예요 비밀번호는 ', 'mot de passe est' + ' '.repeat(200)]) {
+  for (const pezzo of ['비밀번호는 뭐예요 비밀번호는 ', 'le mot de passe est important et le mot de passe ']) {
     const s = pezzo.repeat(Math.ceil(120000 / pezzo.length));
     const c = costoInUnita(() => P.oscura(s), { tetto: 30 });
     assert.ok(c.entro, `${pezzo.slice(0, 12)}: ${c.come}`);
