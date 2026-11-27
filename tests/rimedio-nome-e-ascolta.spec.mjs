@@ -6,6 +6,7 @@ import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = join(process.cwd(), 'tests', '.shots');
 
