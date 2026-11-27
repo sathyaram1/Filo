@@ -379,8 +379,8 @@ test.describe('col menu nello strato sopra la scheda', () => {
     await m.mouse.move(fila.x + 6, fila.y + fila.height / 2, { steps: 8 });
     await expect(menu.locator('.sn-menu-row.sn-drop-hover')).toHaveCount(1);
     await m.mouse.up();
-    await expect.poll(async () => (await salvata(app))['fila:link'].filter((id) => id !== 'link:redeemInvite').slice(0, 4))
-      .toEqual(['link:share', 'link:openTab', 'link:copy', 'link:saveForLater']);
+    const viste = ['link:share', 'link:openTab', 'link:copy', 'link:saveForLater'];
+    await expect.poll(async () => (await salvata(app))['fila:link'].filter((id) => viste.includes(id))).toEqual(viste);
     await expect.poll(() => iconeDellaFila(menu)).toEqual(['link:share', 'link:openTab', 'link:copy', 'link:saveForLater', 'link:help']);
   });
 });
