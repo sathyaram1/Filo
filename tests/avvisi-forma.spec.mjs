@@ -166,7 +166,7 @@ test('con la riduzione del movimento la carta compare subito nella colonna, senz
   await expect(carte).toHaveCount(2);
   await expect(carte.first()).toContainText('Secondo nella colonna');
   await carte.first().click({ button: 'right' });
-  await home.locator('.dash-menu .dash-menu-voce', { hasText: 'Chiudi tutti' }).click();
+  await menuDi(home).scegli('Chiudi tutti');
   await expect(carte).toHaveCount(0, { timeout: 5_000 });
   await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(0);
 });
