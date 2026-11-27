@@ -127,3 +127,23 @@ test('una cella che descrive la password resta, in tutti e due i cancelli; quell
     assert.ok(alCorrettore(riga).includes(S), riga);
   }
 });
+
+test('#2695.1: nella riga di una tabella ogni etichetta, non solo la password, toglie il valore della cella dopo', () => {
+  for (const [riga, v] of [
+    ['| CVV: | 123 |', '123'], ['| CVV: | 1234 |', '1234'], ['| Codice CVV: | 123 |', '123'],
+    ['| Codice di sicurezza: | 123 |', '123'], ['| CVV = | 123 |', '123'],
+    ['| login_password: | Nyckel!2024 |', 'Nyckel!2024'], ['| login_password | Nyckel!2024 |', 'Nyckel!2024'],
+    ['| db_password | hunter2x |', 'hunter2x'], ['| Chiave API: | abcd1234efgh5678 |', 'abcd1234efgh5678'],
+    ['| api_key | abcd1234efgh5678 |', 'abcd1234efgh5678'],
+    ['| Campo | Valore |\n|---|---|\n| Carta: | Visa |\n| CVV: | 482 |', '482'],
+  ]) {
+    assert.equal(P.oscura(riga), riga.replace(v, S), `pavimento: ${riga}`);
+    assert.equal(alCorrettore(riga), riga.replace(v, S), `correttore: ${riga}`);
+  }
+  // Fuori dalla password e dalle chiavi la cella dopo resta: un numero qualunque, una spiegazione, una cella vuota.
+  for (const riga of ['| Utenti: | 123 |', '| CVV: | vedi retro |', '| CVV: | |', '| Porta: | 3000 |',
+    '| max_tokens | 4096 |', '| Campo | Note |\n|---|---|\n| CVV: | tre cifre sul retro |']) {
+    assert.equal(P.oscura(riga), riga, `pavimento: ${riga}`);
+    assert.equal(alCorrettore(riga), riga, `correttore: ${riga}`);
+  }
+});
