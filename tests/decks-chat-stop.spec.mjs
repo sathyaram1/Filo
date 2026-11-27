@@ -4,6 +4,7 @@
 // Modello e Scryfall sono finti nel main; i messaggi viaggiano sul cammino IPC vero della pagina.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function mockScryfall(app) {
   await app.evaluate(() => {
