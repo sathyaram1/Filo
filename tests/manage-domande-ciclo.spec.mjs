@@ -97,9 +97,13 @@ test('le schede del nuovo ciclo: conteggi, sola lettura in smistamento, automati
   await expect(s.locator('.mg-dq-azione, .mg-dq-applica')).toHaveCount(0);
   await expect(s.locator('.mg-dq-tasti button')).toHaveText(['Archivia']);
   await riga(page, 'D-51').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu, .sn-select-pop').last()).toContainText('Archivia senza azioni');
-  await expect(page.locator('.mg-ctxmenu, .sn-select-pop').last()).not.toContainText('Discutiamo');
-  await page.keyboard.press('Escape');
+  // A icone (#2555): le voci sono icone o varianti nel menu di un'icona.
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  const voci = await menu.vociScritte();
+  expect(voci.some((v) => v.includes('Archivia senza azioni'))).toBe(true);
+  expect(voci.some((v) => v.includes('Discutiamo'))).toBe(false);
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
   await s.locator('.mg-dq-tasti button', { hasText: 'Archivia' }).click();
   await expect(s.locator('.mg-dq-msg')).toHaveText('Archiviata.');
   expect(await app.evaluate(() => globalThis.__mandati.at(-1))).toEqual({ type: 'domanda_archivia', id: 'D-51' });
