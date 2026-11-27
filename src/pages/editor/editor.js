@@ -1264,6 +1264,20 @@
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
     }
+    // A icone come il tasto destro di Filo (#2555); il riquadro qui sotto dove il menu di Filo non c'è.
+    const I = window.SN_MENU_ICONS;
+    if (I && I.apriVoci && I.apriVoci({ x, y, voci })) return;
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop ed-title-ctxmenu';
+    menu.setAttribute('role', 'menu');
+    for (const v of voci) {
+      const o = document.createElement('div');
+      o.className = 'sn-select-option';
+      o.setAttribute('role', 'menuitem');
+      o.textContent = v.label;
+      o.addEventListener('click', () => { closeTitleMenu(); v.onClick(); });
+      menu.appendChild(o);
+    }
     document.body.appendChild(menu);
     const vw = window.innerWidth, vh = window.innerHeight;
     const w = menu.offsetWidth, h = menu.offsetHeight;
