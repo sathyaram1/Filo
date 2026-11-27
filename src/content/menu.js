@@ -1380,8 +1380,6 @@
       monta(el);
       bersagli.push(el);
     }
-    // Dietro il menu: il contorno non copre le icone.
-    if (activeMenu && activeMenu.root.isConnected && bersagli.length) monta(activeMenu.root);
   }
 
   function dettoNelNome(griglia, it) {
