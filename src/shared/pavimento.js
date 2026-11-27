@@ -1062,8 +1062,41 @@
     const piano = copia ? copia.piano : vero;
     // L'enfasi del Markdown fra etichetta e valore («**Password:** …») si legge come spazi (riservatiNelTesto.js).
     const s = virgoletteStrette(R ? R.senzaEnfasi(piano) : piano);
+    if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return [];
+    const out = regole(s);
+    // «Il pin è 4-8-2-1», «4 8 2 1»: le regole rilette sulle cifre attaccate, e il valore torna com'è scritto (#2692.4).
+    const attaccate = R && R.cifreAttaccate(s);
+    if (attaccate) out.push(...comeScritti(regole(attaccate.piano), attaccate, s));
+    return out.filter((x) => x.valore).map((x) => (s === piano ? x : nelTestoVero(x, piano)))
+      .map((x) => (copia ? conGliACapoVeri(x, copia, vero) : x))
+      .filter((x) => String(x.valore).length >= 3);
+  }
+
+  // I valori trovati sulle cifre attaccate che stanno su un tratto scandito, presi dal testo vero. Gli altri li ha già
+  // trovati la lettura del testo com'è.
+  function comeScritti(trovati, { piano, posto, tratti }, s) {
     const out = [];
-    if (!s.trim() || /^data:image\//i.test(s.slice(0, 16))) return out;
+    const tocca = (a, b) => tratti.some(([x, y]) => a < y && b > x);
+    for (const x of trovati) {
+      const v = String(x.valore || '');
+      if (!v) continue;
+      const posti = [];
+      if (Number.isInteger(x.inizio) && piano.startsWith(v, x.inizio)) posti.push(x.inizio);
+      else for (let k = piano.indexOf(v); k >= 0; k = piano.indexOf(v, k + v.length)) posti.push(k);
+      for (const k of posti) {
+        const a = posto[k];
+        const b = posto[k + v.length - 1] + 1;
+        if (!tocca(a, b)) continue;
+        const y = { ...x, valore: s.slice(a, b) };
+        if (Number.isInteger(x.inizio)) y.inizio = a;
+        out.push(y);
+      }
+    }
+    return out;
+  }
+
+  function regole(s) {
+    const out = [];
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
     if (G && typeof G.segretiNelTesto === 'function') {
