@@ -1486,6 +1486,8 @@
       for (const m of s.matchAll(re)) if (!FINE_DI_UN_NUMERO.test(m[0].slice(0, -m[1].length))) out.push({ valore: m[1], regola: 'codice' });
     }
     for (const m of s.matchAll(PIN)) out.push({ valore: m[1], regola: 'codice' });
+    // Il valore detto nella frase del nome o nella risposta alla domanda: la regola è quella delle uscite (#2714 giro 7).
+    out.push(...global.SN_GUARDIANO_STATICO.valoriDopoIlNome(s));
     codiciVicini(s, out);
     codiceDelMioApparecchio(s, out);
     codiciDiRecupero(s, out);
