@@ -1502,9 +1502,13 @@
     btn.type = 'button';
     btn.textContent = etichetta;
     btn.title = titolo;
+    // Spento con aria-disabled e non con disabled: un bottone disabled preso col mouse sposta il fuoco fuori dalla
+    // casella, e chi clicca due volte non sa più dove scrive (#1115.6). Il mousedown spento lo tiene nella casella.
+    const chiuso = () => btn.getAttribute('aria-disabled') === 'true';
+    btn.addEventListener('mousedown', (e) => { if (chiuso()) e.preventDefault(); });
     btn.addEventListener('click', () => {
-      if (btn.disabled) return;
-      btn.disabled = true;
+      if (chiuso()) return;
+      btn.setAttribute('aria-disabled', 'true');
       onAck();
       btn.textContent = '✓ Conversazione chiusa';
       btn.title = 'Il prossimo messaggio comincia una conversazione nuova';
