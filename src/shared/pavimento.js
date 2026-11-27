@@ -1288,9 +1288,10 @@
 
   // Gli a capo di Windows e quelli col solo \r (un file di testo allegato) valgono il nostro (#2673.6): le regole leggono
   // una copia col solo \n, e `posto` riporta ogni suo carattere nel testo vero, dove torna il valore di più righe.
+  // Così gli a capo di Unicode (U+2028, U+2029, NEL) e i salti di pagina, che contano uno per uno (#2673.14).
   function aCapo(vero) {
-    if (!vero.includes('\r')) return null;
-    const piano = vero.replace(/\r\n?/g, '\n');
+    if (!A_CAPO_ALTRI.test(vero)) return null;
+    const piano = vero.replace(/\r\n?|[\v\f\u0085  ]/g, '\n');
     const posto = new Int32Array(piano.length + 1);
     for (let i = 0, k = 0; i < vero.length; i++) {
       if (vero[i] === '\r' && vero[i + 1] === '\n') continue;
