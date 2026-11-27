@@ -165,7 +165,7 @@ test('vista per tipo, trascinare forza il gruppo (parità con "Sposta in gruppo"
   // Trascina Sol Ring dagli Artefatti alle Terre: nessun popup (non è vista tag),
   // l'override forza il gruppo e i tag NON cambiano.
   await dragCardOnto(page, 'c-solring', 'Terre');
-  await expect(page.locator('.dk-ctxmenu')).toHaveCount(0);
+  await expect(menuDi(page).pannelli).toHaveCount(0);
   await expect(page.locator('.dk-group[data-group="Terre"] .dk-row', { hasText: 'Sol Ring' })).toHaveCount(1);
   await expect.poll(() => tagsOf(page, deckId, 'c-solring')).toEqual(['ramp']);
 });
