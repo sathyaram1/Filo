@@ -363,7 +363,7 @@ test('#1657 tante voci si raggiungono tutte; Canc toglie; trascinata nel campo s
 
   // Tasto destro sulla barra: «Nascondi la barra» la toglie dalla home e dalle Preferenze.
   await page.locator('#barraSiti .dash-barra-piu').click({ button: 'right' });
-  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Nascondi la barra' }).click();
+  await menuDi(page).scegli('Nascondi la barra');
   await expect(barra).toBeHidden();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).barraSiti.visibile)).toBe(false);
 });
