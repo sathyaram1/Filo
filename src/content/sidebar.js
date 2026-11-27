@@ -2557,6 +2557,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       if (conFormati) {
         try { toccati = appPagina.applica(parsed.formatta, (letto && letto.id) || ''); } catch (_) { toccati = 0; }
         if (toccati === null) parsed.display = `Nel frattempo hai aperto un altro documento: la modifica era per «${(letto && letto.titolo) || 'il documento di prima'}», e non l'ho fatta. Tornaci e chiedimelo di nuovo.`;
+        else if (!toccati && parsed.formatta.some((a) => a && a.op === 'riscrivi')) parsed.display = 'Non ho cambiato il testo: la parte selezionata non è più com\'era. Selezionala di nuovo e chiedimelo.';
         else if (!toccati) parsed.display = 'Non ho trovato testo a cui applicare la formattazione.';
         else if (!parsed.display) parsed.display = 'Fatto.';
       }
