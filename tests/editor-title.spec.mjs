@@ -16,6 +16,7 @@
 // una memoria vuota — nessuna chiave modello richiesta.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Installa lo stub AI e restituisce un modo per cambiare la risposta del titolo.
 async function stubAI(page, initialTitle) {
