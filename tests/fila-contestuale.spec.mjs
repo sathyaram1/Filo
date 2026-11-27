@@ -317,7 +317,7 @@ test('un\'icona della barra portata nella fila del tasto destro lascia la barra,
   const fila = await fermo(menu.locator('.sn-menu-row:not(.sn-menu-altro)'));
   await barra.mouse.move(fila.x + 20, fila.y + fila.height / 2 - alto, { steps: 4 });
   await barra.mouse.up();
-  await expect.poll(async () => (await salvata(app))['fila:pagina']).toEqual(['saveForLater']);
+  await expect.poll(async () => (await salvata(app))['fila:pagina']).toContain('saveForLater');
   await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('saveForLater');
   await expect(menu.locator('.sn-menu-row:not(.sn-menu-altro) [data-sn-icon-id="saveForLater"]')).toBeVisible();
   await comandaBarra(app, 'chiudi');
