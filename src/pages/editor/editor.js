@@ -3304,6 +3304,7 @@
     let touched = 0;
     for (const a of actions) {
       if (!a || typeof a !== 'object') continue;
+      if (a.op === 'riscrivi') { if (riscriviSelezione(a.testo)) touched++; continue; }
       const style = a.style || a.format || a.mark;
       const isAlign = a.op === 'align' || (!style && (a.align !== undefined));
       const targets = resolveTargets(a.target);
