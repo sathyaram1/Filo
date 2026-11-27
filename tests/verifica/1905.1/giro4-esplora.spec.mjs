@@ -116,7 +116,26 @@ test('Ctrl+Shift+T dopo un collegamento a una pagina accanto', async ({ app }) =
   await expect.poll(async () => Boolean(p = await paginaDellaScheda(app, nid, (x) => x.url().endsWith('seconda.html'))), { timeout: 15_000 }).toBe(true);
   await expect.poll(() => p.evaluate(() => document.getElementById('i').naturalWidth), { timeout: 10_000 }).toBeGreaterThan(0);
   // indietro torna alla prima?
-  await tm(app, (t, i) => t.goBack && t.goBack(i), nid);
-  await p.waitForTimeout(2000);
-  console.log('INDIETRO', JSON.stringify(await schede(app)));
+  console.log('STORIA', JSON.stringify(await tm(app, (t, i) => t.tabs.find((x) => x.id === i).storia, nid)));
+  await tm(app, (t, i) => t.goBack(i), nid);
+  await new Promise((r) => setTimeout(r, 4000));
+  console.log('INDIETRO FILE', JSON.stringify(await schede(app)));
+});
+
+test('confronto web: indietro dopo Ctrl+Shift+T', async ({ app, testServer, openTab }) => {
+  const b = testServer.html('<!doctype html><title>B</title><p>b</p>', { pubblico: true });
+  const a = testServer.html(`<!doctype html><title>A</title><a id="l" href="${b}">b</a>`, { pubblico: true });
+  const pa = await openTab(a);
+  await pa.click('#l');
+  await expect(pa).toHaveTitle('B', { timeout: 10_000 });
+  const id = ((await schede(app)).find((s) => s.url === b) || {}).id;
+  await tm(app, (t, i) => t.closeTab(i), id);
+  await tm(app, (t) => t.riapriChiusa());
+  let nid = null;
+  await expect.poll(async () => (nid = ((await schede(app)).find((s) => s.url === b) || {}).id || null), { timeout: 10_000 }).toBeTruthy();
+  console.log('STORIA WEB', JSON.stringify(await tm(app, (t, i) => t.tabs.find((x) => x.id === i).storia, nid)));
+  await new Promise((r) => setTimeout(r, 1500));
+  await tm(app, (t, i) => t.goBack(i), nid);
+  await new Promise((r) => setTimeout(r, 4000));
+  console.log('INDIETRO WEB', JSON.stringify(await schede(app)));
 });
