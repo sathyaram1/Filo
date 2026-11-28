@@ -68,7 +68,7 @@ for (const [caso, csp] of Object.entries(CSP)) {
     }, figlio);
     await page.waitForTimeout(1200);
     await tastoDestroSullaFrase(page.locator('#paragraph'));
-    await menuCompleto(menuDi(page).locator('.sn-menu'));
+    await menuCompleto(menuDi(page));
   });
 }
 
