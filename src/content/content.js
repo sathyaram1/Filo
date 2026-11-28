@@ -1325,8 +1325,9 @@
           // Una parola che il browser segna e Filo no (il dizionario non ancora pronto, un campo mai entrato col fuoco):
           // la proposta del browser, come nelle caselle di una riga.
           const wordCtx = SpellCheck.erroriAttivi() ? SpellCheck.getWordAt(editableEl, e.clientX, e.clientY) : null;
+          const lingua = wordCtx && SpellCheck.linguaNelCampo ? SpellCheck.linguaNelCampo(editableEl, wordCtx.start) : '';
           if (wordCtx && !SpellCheck.parolaGiusta(editableEl, wordCtx.word)
-            && (SpellCheck.getNativeSuggestions(wordCtx.word).length || SpellCheck.sbagliataPerIlBrowser(wordCtx.word))) {
+            && ((!lingua && SpellCheck.getNativeSuggestions(wordCtx.word).length) || SpellCheck.sbagliataPerIlBrowser(wordCtx.word, lingua))) {
             contaContesto(['campo']);
             await openSpellWordMenu(editableEl, wordCtx, e, sito);
             return;
