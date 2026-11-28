@@ -543,7 +543,7 @@
     const parola = v.originale;
     impara({ passo: 'annullata', parola }, (r) => {
       if (r && r.rifiuta) contaAutomatica(v.fonte, 'imparata');
-      if (r && r.rifiuta && erroriAttivi() && parolaImparabile(parola)) return aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), v.start)));
+      if (r && r.rifiuta && erroriAttivi() && parolaImparabile(parola, linguaNelCampo(el, v.start))) return aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), v.start)));
       return null;
     });
   }
