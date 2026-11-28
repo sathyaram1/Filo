@@ -1,10 +1,11 @@
-// Perché qualche scheda resta aperta dopo una chiusura in blocco (#413, #1695): il conto per motivo e la frase, uguali
-// nel diario della chat e nell'avviso di «Chiudi le altre schede». Logica pura. Regole: tests/unit/restanoAperte.test.mjs.
+// Perché qualche scheda resta aperta dopo una chiusura in blocco chiesta in chat (#413, #2086): il conto per motivo e la
+// frase del diario. Logica pura. Regole: tests/unit/restanoAperte.test.mjs.
 
 (function (global) {
   'use strict';
 
   const PERCHE = {
+    bloccata: (n) => (n === 1 ? 'una era bloccata e l\'ho lasciata' : `${n} erano bloccate e le ho lasciate`),
     testo: (n) => (n === 1 ? 'una resta aperta col testo non inviato' : `${n} restano aperte col testo non inviato`),
     sempre: (n) => (n === 1 ? 'una resta aperta, è di un sito tenuto sempre aperto' : `${n} restano aperte, sono di siti tenuti sempre aperti`),
     nuova: (n) => (n === 1 ? 'una aperta dopo la richiesta resta' : `${n} aperte dopo la richiesta restano`),
