@@ -127,7 +127,7 @@
     },
     CHIUDI_SCHEDE: {
       via: ['scheda', 'chiudi'],
-      description: 'chiude schede per numero, sito o tutte, meno tranne; tutte e sito lasciano aperta questa chat e le bloccate.',
+      description: 'chiude schede per numero, sito o tutte, meno tranne; tutte e sito lasciano aperta questa chat.',
       properties: { schede: LISTA(I()), sito: S(), tutte: B(), tranne: LISTA(I()) }, required: [],
     },
     PULISCI_TAB: {
