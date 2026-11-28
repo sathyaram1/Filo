@@ -1437,9 +1437,12 @@
   // La lingua che la pagina ha riconosciuto nel testo (#2756): una parola inglese corretta in italiano è una traduzione.
   // Solo i nomi qui: il valore arriva dalla pagina.
   const NOMI_LINGUE = { it: 'italiano', en: 'inglese' };
+  // Senza lingua (testo ancora corto) la regola della parola straniera al posto di una italiana tradurrebbe un refuso.
   const rigaDellaLingua = (lingua) => {
     const nome = Object.prototype.hasOwnProperty.call(NOMI_LINGUE, lingua) ? NOMI_LINGUE[lingua] : '';
-    return nome ? `Il testo è scritto in ${nome}: le correzioni restano in ${nome}, mai una parola tradotta in un'altra lingua. Il motivo resta in italiano.\n` : '';
+    return nome
+      ? `Il testo è scritto in ${nome}: le correzioni restano in ${nome}, mai una parola tradotta in un'altra lingua. Il motivo resta in italiano.\n`
+      : `La lingua del testo non si capisce ancora: un refuso si corregge nella lingua della parola, mai tradotto, e una parola straniera non è un errore. Il motivo resta in italiano.\n`;
   };
 
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
