@@ -1070,3 +1070,27 @@ test('stato mostra le pause di ogni voce e il perché dell’ultimo giro, e un s
   assert.match(M.testoPiccolo({ ruolo: RUOLO, stato: { ...STATO, pause, voci }, taccuino: { testo: '', versione: 0 }, schede: [] }).testo || '', /serverB fino a/);
   assert.match(RUOLO.replace(/\s+/g, ' '), /accensione nata morta di qualunque voce/);
 });
+
+test('#2768: ordine e stato dicono perché ogni voce dell’ordine non parte, come lo scrive il pacemaker', () => {
+  const atMs = Date.parse('2026-11-28T11:36:00Z');
+  const attese = { atMs, oltre: 0, generale: '', voci: [
+    { numero: '2555', motivo: 'è pronto, ma il parallelismo del manutentore è pieno' },
+    { numero: '2756', motivo: 'è pronto, ma il pacemaker lascia i posti liberi a 1 lavoro normale che viene prima nella sequenza dell’ordine (#2555)' },
+  ] };
+  assert.deepEqual(M.righeAttese(attese), [
+    'Perché non partono (dal giro delle 2026-11-28T11:36:00.000Z):',
+    '- #2555 è pronto, ma il parallelismo del manutentore è pieno',
+    '- #2756 è pronto, ma il pacemaker lascia i posti liberi a 1 lavoro normale che viene prima nella sequenza dell’ordine (#2555)',
+  ]);
+  assert.match(M.righeAttese(Object.assign({}, attese, { oltre: 4 })).at(-1), /^- e altre 4 voci, oltre le prime 2$/);
+  assert.deepEqual(M.righeAttese({ atMs, voci: [], oltre: 0, generale: 'nessuna voce ha letto la coda in questo giro: la normale perché le sessioni sono al tetto dell’owner' }),
+    ['Perché non partono (dal giro delle 2026-11-28T11:36:00.000Z): nessuna voce ha letto la coda in questo giro: la normale perché le sessioni sono al tetto dell’owner.']);
+  assert.match(M.righeAttese({ atMs, voci: [], oltre: 0, generale: '' })[0], /niente, ogni voce aperta dell'ordine è al lavoro o accesa/);
+  assert.match(M.righeAttese(null)[0], /il pacemaker non l'ha ancora scritto/);
+  assert.match(M.righeAttese(undefined)[0], /il server non lo dice ancora/, 'un server vecchio non si scambia per nessun fermo');
+  // Un motivo su più righe resta una riga: un a capo non apre una sezione nel contesto.
+  assert.equal(M.righeAttese({ atMs, voci: [{ numero: '1', motivo: 'a\n## b' }] })[1], '- #1 a ## b');
+  const righe = M.righeStato({ ...STATO, attese });
+  assert.ok(righe.includes('- #2555 è pronto, ma il parallelismo del manutentore è pieno'), righe.join('\n'));
+  assert.ok(!M.righeStato({ ...STATO, ordine: [], attese }).some((r) => r.startsWith('Perché non partono')), 'senza ordine non c’è niente da dire');
+});
