@@ -1834,6 +1834,7 @@ module.exports = {
   schedeNumerate,
   schedaPerNumero,
   schedaDaMostrare,
+  schedaDaBloccare,
   bersaglioPausa,
   bersaglioAudio,
   salvatePerChat,
