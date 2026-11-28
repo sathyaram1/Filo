@@ -267,6 +267,24 @@ export function rigaPronti(p) {
     : `ORDINE CORTO: pronti ${n}, ne servono almeno ${p.servono} (2×N)${elenco}. Allungalo coi criteri del mattino.`;
 }
 
+/**
+ * Perché ogni voce dell'ordine che l'ultimo giro non ha acceso non parte, come lo scrive il pacemaker con le sue regole
+ * (#2768): senza, un pronto che non parte per ore è muto. Chi è al lavoro o acceso non ha una riga. PURA.
+ */
+export function righeAttese(a) {
+  if (a === undefined) return ['Perché non partono: il server non lo dice ancora.'];
+  if (!a || typeof a !== 'object') return ['Perché non partono: il pacemaker non l\'ha ancora scritto.'];
+  const dal = `dal giro delle ${istanteIso(a.atMs)}`;
+  if (a.generale) return [`Perché non partono (${dal}): ${unaRiga(a.generale)}.`];
+  const voci = Array.isArray(a.voci) ? a.voci : [];
+  if (!voci.length) return [`Perché non partono (${dal}): niente, ogni voce aperta dell'ordine è al lavoro o accesa.`];
+  return [
+    `Perché non partono (${dal}):`,
+    ...voci.map((v) => `- #${unaRiga(v && v.numero)} ${unaRiga(v && v.motivo)}`),
+    ...(Number(a.oltre) > 0 ? [`- e altre ${Number(a.oltre)} voci, oltre le prime ${voci.length}`] : []),
+  ];
+}
+
 const STATI_CHE_FERMANO = Object.freeze({ aperta: 'aspetta l\'owner', in_smistamento: 'in smistamento' });
 
 /**
@@ -810,6 +828,7 @@ export function righeStato(st) {
     `Accensione: ${s.accensione ? unaRiga(JSON.stringify(s.accensione)) : 'nessuna registrata'}.`,
     `Parallelismo: N ${s.parallelismo ?? 'non scritto'}, vale ${s.parallelismoEffettivo ?? '?'} sotto il freno dell'owner (${s.freno ?? '?'}).`,
     ...(s.pronti === undefined ? [] : [rigaPronti(s.pronti)]),
+    ...(Array.isArray(s.ordine) && s.ordine.length ? righeAttese(s.attese) : []),
     `Routine: ${s.routineAccese === false ? 'interruttore dell\'owner spento' : 'accese dall\'owner'}${s.routineSpente ? ', spente da te' : ''}.`,
     `Account: primo ${acc.primo || 'alternanza'}; spenti da te ${spenti.join(', ') || 'nessuno'}; esclusi dall'owner ${esclusi.join(', ') || 'nessuno'}.`,
     `Sveglia chiesta: ${s.sveglia && s.sveglia.ms ? new Date(s.sveglia.ms).toISOString() : 'nessuna'}. Mattino: ${unaRiga(JSON.stringify(s.mattino ?? null))}.`,
@@ -1499,7 +1518,9 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     case 'ordine': {
       const [st, sc] = await Promise.all([chiama(cred, 'stato', { pronti: true }), tutteLeSchede(cred)]);
       if (st.ok === false) return esito(st);
-      return esito(st, () => `${rigaOrdine(st.ordine || [], sc.ok === false ? [] : indiceDalServer(sc.schede), st.pronti)}\nParallelismo: N ${st.parallelismo ?? 'non scritto'}, vale ${st.parallelismoEffettivo} sotto il freno dell'owner (${st.freno}).`);
+      return esito(st, () => [rigaOrdine(st.ordine || [], sc.ok === false ? [] : indiceDalServer(sc.schede), st.pronti),
+        ...((st.ordine || []).length ? righeAttese(st.attese) : []),
+        `Parallelismo: N ${st.parallelismo ?? 'non scritto'}, vale ${st.parallelismoEffettivo} sotto il freno dell'owner (${st.freno}).`].join('\n'));
     }
     case 'accendi': {
       let numeri = [];
