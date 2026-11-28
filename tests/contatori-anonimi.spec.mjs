@@ -320,6 +320,8 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
     expect(await menu.vociScritte()).toEqual(['Copia il numero', 'Apri i contatori', 'Rileggi']);
     await app.evaluate(() => { globalThis.__installazioniGuaste = true; });
     await menu.scegli('Rileggi');
+    // L'icona scelta può lasciare il puntatore sul riquadro, e il suggerimento in corso ne tiene il title.
+    await page.mouse.move(1, 1);
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-valore')).toHaveText('—', { timeout: 5_000 });
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-nota')).toHaveText('non letti');
     const meseDiOggi = new Date().toLocaleDateString('it-IT', { month: 'long' });
