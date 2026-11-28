@@ -201,6 +201,7 @@ async function vociDelTastoDestro(openTab, testServer) {
   await page.locator('#t').click({ button: 'right' });
   const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
+  // A icone (#2555) «Invia attacco» sta dietro il «+», per scelta dell'owner: c'è, e si sceglie aprendolo.
   return { page, voce: menu.locator('.sn-menu-item', { hasText: 'Invia attacco' }) };
 }
 
