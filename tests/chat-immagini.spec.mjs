@@ -219,7 +219,8 @@ test('tasto destro su una foto trovata: salva il file, copia e cerca l\'indirizz
 
   await app.evaluate(({ clipboard }) => clipboard.clear());
   await imgs.first().click({ button: 'right' });
-  await menu.voce('Copia URL immagine').click();
+  // A icone (#2555): un'icona, o una variante nel menu dell'icona dello stesso verbo.
+  await menu.scegli('Copia URL immagine');
   await expect.poll(() => app.evaluate(async ({ clipboard }) => clipboard.readText()), { timeout: 8000 }).toBe(originale);
 
   // Si registra la scheda che Filo apre, senza andare in rete: con la rete Google porta Lens altrove e l'indirizzo
