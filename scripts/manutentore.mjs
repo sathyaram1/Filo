@@ -828,6 +828,7 @@ export function righeStato(st) {
     `Accensione: ${s.accensione ? unaRiga(JSON.stringify(s.accensione)) : 'nessuna registrata'}.`,
     `Parallelismo: N ${s.parallelismo ?? 'non scritto'}, vale ${s.parallelismoEffettivo ?? '?'} sotto il freno dell'owner (${s.freno ?? '?'}).`,
     ...(s.pronti === undefined ? [] : [rigaPronti(s.pronti)]),
+    ...(Array.isArray(s.ordine) && s.ordine.length ? righeAttese(s.attese) : []),
     `Routine: ${s.routineAccese === false ? 'interruttore dell\'owner spento' : 'accese dall\'owner'}${s.routineSpente ? ', spente da te' : ''}.`,
     `Account: primo ${acc.primo || 'alternanza'}; spenti da te ${spenti.join(', ') || 'nessuno'}; esclusi dall'owner ${esclusi.join(', ') || 'nessuno'}.`,
     `Sveglia chiesta: ${s.sveglia && s.sveglia.ms ? new Date(s.sveglia.ms).toISOString() : 'nessuna'}. Mattino: ${unaRiga(JSON.stringify(s.mattino ?? null))}.`,
