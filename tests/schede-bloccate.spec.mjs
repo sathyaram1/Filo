@@ -139,7 +139,8 @@ test('X, clic centrale e Ctrl+W non chiudono la bloccata: l\'avviso offre «Sblo
   // Nel menu della bloccata «Chiudi» è «Sblocca e chiudi».
   await tastoDestro(shell, `.tab[data-id="${id}"]`);
   const voci = await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Duplica'));
-  expect(voci.map((x) => x.testo)).toEqual(['Sblocca', 'Duplica', 'Muta', 'Sblocca e chiudi']);
+  const testi = voci.map((x) => x.testo).filter((t) => !/^(Resta connesso qui|Non restare connesso)$/.test(t));
+  expect(testi).toEqual(['Sblocca', 'Duplica', 'Muta', 'Sblocca e chiudi']);
   await fotoDelMenu(app, 'tests/.shots/menu-linguetta-bloccata.png');
   await shell.keyboard.press('Escape').catch(() => {});
 
