@@ -1005,13 +1005,16 @@
     },
     // Le schede (`_targets`, `_targetIds`) le sceglie il main, mai l'LLM (#413). Una si riapre dal filo della home:
     // costo 1; più d'una insieme è il freno di CANCELLA_SVEGLIA, così dopo una pagina letta «chiudile tutte» chiede.
+    // Una bloccata (`_bloccate`, contate dal main) costa 2 anche da sola: l'utente aveva chiesto di tenerla (#2086).
     CHIUDI_SCHEDE: {
-      costo: (a) => (targetCount(a) === 1 ? 1 : 2),
+      costo: (a) => (targetCount(a) === 1 && !(Number(a && a._bloccate) > 0) ? 1 : 2),
       campo: null,
       describe: (a) => {
         const list = targetList(a);
-        const dove = a && a._inIncognito ? '\n\nIn incognito non restano nel filo della home.'
-          : '\n\nLe pagine chiuse restano nel filo della home, da dove le riapri.';
+        const b = Number(a && a._bloccate) || 0;
+        const bloccate = !b ? '' : list.length === 1 ? '\n\nL\'avevi bloccata.' : `\n\n${b === 1 ? 'Una l\'avevi bloccata' : `${b} le avevi bloccate`}.`;
+        const dove = (a && a._inIncognito ? '\n\nIn incognito non restano nel filo della home.'
+          : '\n\nLe pagine chiuse restano nel filo della home, da dove le riapri.') + bloccate;
         if (!list.length) {
           const sito = String((a && (a.sito ?? a.dominio)) || '').trim();
           if (sito) return ['Chiudere le schede di ', cit(sito, true), dove];
