@@ -223,9 +223,12 @@ test('col fuoco nel riquadro, il tasto destro sul contenuto offre la dimensione 
   await expect.poll(async () => percentOf(app, page)).toBe(150);
 
   await frame.locator('#c').click({ button: 'right' });
-  const voce = menuDi(frame).locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
-  await expect(voce).toBeVisible({ timeout: 8000 });
-  await voce.click();
+  // A icone (#2555): l'icona col valore apre i valori, e fra loro «Dimensione reale».
+  const menu = menuDi(frame);
+  const icona = menu.voce('Dimensione reale (ora 150%)').first();
+  await expect(icona).toHaveCount(1, { timeout: 8000 });
+  await menu.scegli(icona);
+  await menu.locator('.sn-menu-sub .sn-menu-item', { hasText: 'Dimensione reale' }).click();
   await expect.poll(async () => percentOf(app, page)).toBe(100);
 });
 
