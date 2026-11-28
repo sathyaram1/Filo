@@ -238,7 +238,8 @@ lo può scrivere anche un agente pulito.
   assoluta (#1451). Coi compiti (#1196) spariscono anche lo spareggio
   provvisorio e l'ordine per ruolo (`REVIEW_RANK`): decide l'urgenza (§ 6.3),
   quindi un feedback iniziato passa davanti a uno nuovo solo con un gradino di
-  priorità in più, e la priorità 3 passa sopra tutto. Il controllo di sicurezza
+  priorità in più, e la priorità 3 passa sopra tutto tranne smistamento e
+  risposta delle domande (§ 6.3, #2702). Il controllo di sicurezza
   di un ramo finito non aspetta a nessuna priorità (#1451); gli altri lavori
   aspettano solo chi li supera sia in priorità sia in urgenza (filo-security
   `functions/src/routine/select.js`, `ordinaLavori`).
@@ -673,8 +674,15 @@ rispondere.
 - **Non lo apre** sulle domande dell'addetto comunicazioni (`soloOwner`,
   § 4.1): nessun compito le legge, e arrivano all'owner come le scrive lui.
 - **Stato `in_smistamento`.** La domanda non sta fra quelle da rispondere (in
-  Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
+  Gestione ha la sua scheda). Il feedback legato resta fermo come
   sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
+  L'owner non aspetta lo smistamento (#2702): dalla finestra o dalla sua
+  chiave risponde come a un'aperta, la risposta vale e il compito di
+  smistamento si chiude superato; una sessione resta rifiutata
+  (`in_smistamento`).
+- **Urgenza.** Sopra ogni casella delle fasi, anche la 3 (§ 6.3), e a
+  sessioni piene il posto si libera per lui (§ 6.3, «Il posto per lo
+  smistamento e la risposta»).
 - **Fascicolo.** La domanda intera, note per gli agenti comprese; il feedback
   d'origine con conversazione e note (di uno riservato il testo arriva solo
   nell'ambiente dei riservati, e segna il biglietto; fuori ne escono numero,
@@ -1551,7 +1559,8 @@ fidato e figlio. I nipoti contano come figli.
 
 | Compito | Urgenza |
 |---|---|
-| Gestisci la risposta | 47 |
+| Gestisci la domanda (smistamento) | 66 |
+| Gestisci la risposta | 65 |
 | Gestione del lavoro, audit di sicurezza, riordino della coda, suite completa: riporta verde | 45 |
 | Esperimento della gestione del lavoro, e il giudice cieco che ne confronta l'esito (§ 4.6) | 44 |
 | Revisione delle domande, addetto comunicazioni | 30 |
@@ -1565,6 +1574,19 @@ Cosa garantisce la scala:
   suo compito: il 3 prende il primo posto libero. Per ora il 3 vale anche per
   il lavoro sul processo (routine, gestione dei feedback, strumenti): finché non
   ci sono utenti conta più della sicurezza.
+- **Smistamento e risposta passano sopra anche il 3** (#2702): stanno fra
+  l'owner e il lavoro che una domanda ferma, costano pochi minuti, e a
+  sessioni piene di 3 non partivano mai (D-337 ferma dieci ore). Vale la
+  tabella, anche per un compito nato con l'urgenza di prima.
+- **Il posto per lo smistamento e la risposta.** Il freno `maxSessions` non si
+  supera: il posto lo lascia una sessione. Con la voce riservati che ha tutti i
+  compiti, una sessione A/B o server che chiede il biglietto a posti pieni se
+  ne va quando c'è un compito sopra le fasi senza un'accensione dei riservati
+  in arrivo e la voce riservati si può accendere (`vociPronte.riservati`); al
+  giro dopo la voce riservati decide per quei soli compiti prima della server
+  e di A/B, e passa il parallelismo N come una 3. Senza la voce riservati i
+  compiti li prendono A/B, e la sessione che passa al biglietto dopo prende
+  lo smistamento per urgenza.
 - **Sotto il 3, un feedback iniziato** passa davanti a uno nuovo con un gradino
   di priorità in più, non con due.
 - **Fiducia e figli** non scavalcano mai una casella: fra una casella e l'altra

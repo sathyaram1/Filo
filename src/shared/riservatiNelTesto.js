@@ -119,10 +119,14 @@ const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repea
   .replace(DUE_PUNTI_HTML, (e) => ':' + ' '.repeat(e.length - 1));
 // Enfasi prima e dopo i tag: «**<b>CVV:</b>**» (#2695.7) la vuole prima, «&lt;b&gt;**PIN:**&lt;/b&gt;» dopo.
 const togliEnfasi = (s) => (/[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s);
+// Così i segni in testa alla riga, la citazione e il punto d'elenco: «Password:» a capo «- x», «> x», «1. x» vale
+// «Password:» a capo «x», con ogni a capo (#2673.14).
+const SEGNI_DI_RIGA = /^[ \t]*(?:>[ \t]*)*(?:(?:[-*+•]|\d{1,3}[.)])(?=[ \t]))?/gm;
+const togliSegni = (s) => (/[>*+•\-.)]/.test(s) ? s.replace(SEGNI_DI_RIGA, (segni) => segni.replace(/[^ \t]/g, ' ')) : s);
 const senzaEnfasi = (t) => {
   const s = String(t == null ? '' : t);
-  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(s);
-  return togliEnfasi(senzaTag(togliEnfasi(s)));
+  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(togliSegni(s));
+  return togliEnfasi(togliSegni(senzaTag(togliEnfasi(s))));
 };
 const vistePerLeRegole = (t) => {
   const s = String(t == null ? '' : t);
@@ -196,12 +200,98 @@ function presenta() {
   return P ? [[new RegExp(P.password, 'gu'), 'password'], [new RegExp(CHIESTA_IN_CHAT, 'gu'), 'password'], [new RegExp(P.codice, 'gu'), 'codice']] : [];
 }
 
-// «pasword», «passowrd», «pssword»: chi chiede in chat sbaglia la parola e non la corregge. Al più due errori, e la
-// parola resta quella che comincia per p e finisce per d («passport» no).
+// «pasword», «passowrd», «pssword», «passwor», «oassword»: chi scrive sbaglia la parola e non la corregge. Un errore
+// ovunque; due solo se la parola comincia per p e finisce per d («passport» no, «paswd» sì).
 const NOVITA = () => globalThis.SN_NOVITA || (require('./novita.js'), globalThis.SN_NOVITA);
 function refusoDiPassword(w) {
-  if (w === 'password' || w.length < 6 || w.length > 10 || w[0] !== 'p' || !w.endsWith('d')) return false;
-  return NOVITA().distanza(w, 'password', 2) <= 2;
+  if (w === 'password' || w === 'passwords' || w.length < 5 || w.length > 10) return false;
+  if (w.length >= 7 && NOVITA().distanza(w, 'password', 1) <= 1) return true;
+  if (w[0] !== 'p' || !w.endsWith('d')) return false;
+  return w.length < 6 ? NOVITA().distanza(w, 'passwd', 1) <= 1 : NOVITA().distanza(w, 'password', 2) <= 2;
+}
+
+// Il refuso letto come il nome, a parità di lunghezza: il pavimento ritrova i posti nel testo vero (#2678.21). Solo la
+// parola intera: «Pasword!77» è un valore, non il nome.
+function refusiComeNome(s) {
+  return s.replace(/(?<=(?:^|\s)[^\p{L}\p{N}\s]*)\p{L}{5,10}(?=[^\p{L}\p{N}\s]*(?:\s|$))/gu, (w) => {
+    if (!refusoDiPassword(w.toLowerCase())) return w;
+    const nome = w.length >= 8 ? 'password' : w.length >= 6 ? 'passwd' : 'pass';
+    return nome + ' '.repeat(w.length - nome.length);
+  });
+}
+
+// Un tasto sbagliato nel verbo dopo il nome («the password si …», «diventta», «è statta cambita in», «e stata»): letto
+// come il verbo, alla stessa lunghezza, solo nelle prime parole dopo il nome; il valore lo giudicano le regole (#2678.21).
+const NOME_IN_TESTO = /(?<![\p{L}\p{N}])(?:password|passwd|pwd|pass|psw|pw)(?![\p{L}\p{N}])/giu;
+const COPULE = ['diventa', 'rimane', 'sarebbe', 'risulta', 'becomes', 'remains'];
+const PARTICIPI_DEL_CAMBIO = ['stata', 'stato'];
+const CAMBI_DEL_VALORE = ['cambiata', 'cambiato', 'impostata', 'impostato', 'modificata', 'modificato', 'aggiornata',
+  'aggiornato', 'changed'];
+const AUSILIARE = /^(?:è|e|é|e['’]|is|was|has|ha)$/;
+const ACCENTO_SBAGLIATO = /^(?:è['’`]|é['’`]|e`)$/;
+const PRIMA_DEL_VERBO = /^(?:del|della|dello|di|per|for|of|il|la|lo|the|my|mio|mia|tuo|tua|nuova|new|attuale|current|wifi)$/;
+const INGLESE_PRIMA = /(?:^|\s)(?:the|my|your|our|his|her)\s+$/i;
+// Le parole inglesi a un tasto da «is» che dopo il nome hanno un senso loro («the password in the file»).
+const NON_IS = /^(?:is|it|in|if|as|us|i|s|a|id|its)$/;
+const tra = (w, lista) => lista.includes(w);
+const vicino = (w, lista) => w.length >= 4 && lista.some((x) => x !== w && NOVITA().distanza(w, x, 1) <= 1);
+function verbiDopoIlNome(s) {
+  if (!/p(?:ass|w|sw)/i.test(s)) return s;
+  const cambi = [];
+  const metti = (t, nuovo) => cambi.push([t.i, nuovo + ' '.repeat(t.w.length - nuovo.length)]);
+  for (const m of s.matchAll(NOME_IN_TESTO)) {
+    // Chi l'ha cambiata la nomina dopo il verbo («ho cmbiato la password in …»).
+    const prima = s.slice(Math.max(0, m.index - 30), m.index).split('\n').pop();
+    for (const x of [...prima.matchAll(/\S+/g)].slice(-3)) {
+      if (vicino(x[0].toLowerCase(), CAMBI_DEL_VALORE)) metti({ i: m.index - prima.length + x.index, w: x[0] }, 'messo');
+    }
+    const da = m.index + m[0].length;
+    const riga = s.slice(da, da + 80).split('\n')[0];
+    const parole = [...riga.matchAll(/\S+/g)].slice(0, 6).map((x) => ({ i: da + x.index, w: x[0], l: x[0].toLowerCase() }));
+    for (let k = 0; k < parole.length; k++) {
+      const t = parole[k];
+      const dopo = parole[k + 1] ? parole[k + 1].l : '';
+      if (ACCENTO_SBAGLIATO.test(t.l)) { metti(t, 'è'); break; }
+      if (!/^[\p{L}'’]+$/u.test(t.l)) break;
+      if (t.l === 'e' && (tra(dopo, PARTICIPI_DEL_CAMBIO) || vicino(dopo, PARTICIPI_DEL_CAMBIO) || tra(dopo, CAMBI_DEL_VALORE) || vicino(dopo, CAMBI_DEL_VALORE))) { metti(t, 'è'); continue; }
+      if (k === 0 && !NON_IS.test(t.l) && /^[a-z]{1,3}$/.test(t.l) && NOVITA().distanza(t.l, 'is', 1) <= 1 && INGLESE_PRIMA.test(s.slice(Math.max(0, m.index - 8), m.index))) { metti(t, 'is'); break; }
+      if (vicino(t.l, COPULE)) { metti(t, 'è'); break; }
+      if (k > 0 && AUSILIARE.test(parole[k - 1].l) && vicino(t.l, PARTICIPI_DEL_CAMBIO)) { metti(t, ''); continue; }
+      if (/^(?:in|a|to)$/.test(dopo) && vicino(t.l, CAMBI_DEL_VALORE)) { metti(t, 'messa'); break; }
+      if (AUSILIARE.test(t.l) || tra(t.l, PARTICIPI_DEL_CAMBIO) || tra(t.l, CAMBI_DEL_VALORE) || PRIMA_DEL_VERBO.test(t.l)) continue;
+      break;
+    }
+  }
+  if (!cambi.length) return s;
+  let out = s;
+  for (const [i, nuovo] of cambi.sort((a, b) => b[0] - a[0])) out = out.slice(0, i) + nuovo + out.slice(i + nuovo.length);
+  return out;
+}
+
+// Un inciso fra il nome e il verbo («la password, che era vecchia, e …», «(quella nuova)», «- te lo dico -», «ora e …»):
+// una lettura in più con l'inciso come spazi, accanto a quella del testo com'è (#2678.21). null se non ce n'è.
+let incisoDopoNome = null;
+function incisiComeSpazi(s) {
+  if (!/p(?:ass|w|sw)/i.test(s)) return null;
+  if (!incisoDopoNome) {
+    const C = guardiano() ? guardiano().COMPLEMENTO : '(?!)';
+    incisoDopoNome = new RegExp(`(?<![\\p{L}\\p{N}])(?:password|passwd|pwd|pass|psw|pw)(?:[ \\t]+${C})?`
+      + '((?:[ \\t]*,[^\\n.!?:;«»"“”,]{1,80},|[ \\t]*\\([^()\\n]{1,80}\\)|[ \\t]+[-–—][ \\t][^\\n.!?:;«»"“”\\-–—]{1,80}?[ \\t][-–—]'
+      + '|[ \\t]+(?:ora|adesso|comunque|insomma|quindi|dunque|invece|intanto|allora|per[ \\t]+ora|now|anyway|btw)(?=[ \\t])){1,3})', 'giu');
+  }
+  let cambiato = false;
+  const out = s.replace(incisoDopoNome, (tutto, inciso) => {
+    cambiato = true;
+    return tutto.slice(0, tutto.length - inciso.length) + ' '.repeat(inciso.length);
+  });
+  return cambiato ? verbiDopoIlNome(out) : null;
+}
+
+// Le letture del testo col nome e il verbo corretti e con l'inciso come spazi, per chi cerca la password dopo il nome
+// (il correttore, sulle password di sole parole). Stessa lunghezza del testo.
+function lettureDelNome(s) {
+  const a = verbiDopoIlNome(refusiComeNome(s));
+  return [...new Set([a, incisiComeSpazi(a)])].filter((x) => x && x !== s);
 }
 
 // I nomi della password: quelli che il filtro riconosce già (urlExfil), «pw», «pass» e i refusi di «password».
@@ -217,7 +307,7 @@ function menzioni(l) {
   const out = [];
   const P = presenta();
   for (const [re, tipo] of P) for (const m of l.matchAll(re)) out.push({ i: m.index, j: m.index + m[0].length, tipo });
-  if (P.length) for (const m of l.matchAll(/(?<![\p{L}\p{N}])p\p{L}{4,9}(?![\p{L}\p{N}])/gu)) {
+  if (P.length) for (const m of l.matchAll(/(?<![\p{L}\p{N}])\p{L}{5,10}(?![\p{L}\p{N}])/gu)) {
     if (refusoDiPassword(m[0])) out.push({ i: m.index, j: m.index + m[0].length, tipo: 'password' });
   }
   return out;
@@ -455,9 +545,10 @@ const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
 // degli annunci: anche il participio da solo («pw rimasta …», «pw became …») presenta il valore e non lo è (#1403.67).
 const AVVERBI = guardiano().AVVERBIO;
 const CAMBIATA = `${guardiano().PARTICIPI}|${guardiano().PASSATI}`;
-const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:${AVVERBI}\\s+)?(?:[:=]|(?<!\\p{L})(?:${guardiano().ANNUNCIO_LARGO}|${CAMBIATA})(?!\\p{L}))`
+const CAMBIA = `(?:${guardiano().VERBI_CAMBIO.diventa.map((w) => esc(w).replace(/ /g, '\\s+')).join('|')})(?!\\p{L})`;
+const PRESENTATA = new RegExp(`^\\s*(?:${guardiano().COMPLEMENTO}\\s*)?(?:${AVVERBI}\\s+)?(?:[:=]|(?<!\\p{L})(?:${guardiano().ANNUNCIO_LARGO}|${CAMBIATA})(?!\\p{L})|(?<!\\p{L})${CAMBIA})`
   + `(?:\\s+${AVVERBI}(?!\\p{L})){0,3}\\s*$`, 'u');
-const PONTE = new RegExp(`^(?:${AVVERBI}|${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO}|${CAMBIATA}|${guardiano().CAMBI})$`, 'u');
+const PONTE = new RegExp(`^(?:${AVVERBI}|${guardiano().AVVERBI}|${guardiano().MODALI}|${ANNUNCIO}|${CAMBIATA}|${guardiano().CAMBI}|${CAMBIA})$`, 'u');
 const ACCANTO = /^\s*$/u;
 
 // La password detta prima del suo nome (#2695.8): «gattonero è la password», «usa Gatto2024 come password del wifi». Con
@@ -589,6 +680,6 @@ function trova(testo, { sotto = false } = {}) {
   return lunghi(out);
 }
 
-global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, SEPARA_CIFRE, cifreAttaccate, senzaEnfasi, vistePerLeRegole, minuscolo, trova, formeLibere, primaDelNome, valoriRisposta, richiestaAperta, lunghi, parlaInChat, chiede, PRESENTA_DATO };
+global.SN_RISERVATI_TESTO = { RISPOSTA_MAX, SEPARA_CIFRE, cifreAttaccate, senzaEnfasi, vistePerLeRegole, refusiComeNome, verbiDopoIlNome, incisiComeSpazi, lettureDelNome, minuscolo, trova, formeLibere, primaDelNome, valoriRisposta, richiestaAperta, lunghi, parlaInChat, chiede, PRESENTA_DATO };
 if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_RISERVATI_TESTO;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

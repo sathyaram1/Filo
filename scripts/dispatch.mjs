@@ -1437,7 +1437,24 @@ export function motivoRifiuto(r) {
   return detail ? `${reason}: ${detail}` : reason;
 }
 
-async function deliverToChannel(intent, data) {
+/**
+ * Cosa fa dispatch dopo la presa in carico (#2674): un no del server vuol dire che il ruolo non regge lo stato vero, e
+ * non si consegna. L'eccezione è la ripresa di un lavoro in verifica (rossi del ramo, risposta di processo, ramo vecchio
+ * sbloccato): lì `working` non si raggiunge per tabella, e la consegna in revisione il server la accetta. PURA.
+ * @returns {{ azione: 'lavora', statoVero?: string } | { azione: 'ferma', messaggio: string }}
+ */
+export function esitoDellaPresa(presa, { branch = '', ripresa = false } = {}) {
+  if (!presa || presa.outcome !== 'refused') return { azione: 'lavora' };
+  const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
+  if (presa.reason === 'branch_mismatch') {
+    return { azione: 'ferma', messaggio: `il server ha legato questo biglietto a un altro ramo e rifiuta la presa in carico su ${branch} (${motivo}): la consegna da qui verrebbe rifiutata, non si lavora` };
+  }
+  const daVerifica = /^(revision_capability|revision_security) → working$/.exec(String(presa.detail || '').trim());
+  if (ripresa && presa.reason === 'illegal_transition' && daVerifica) return { azione: 'lavora', statoVero: daVerifica[1] };
+  return { azione: 'ferma', messaggio: `il server rifiuta la presa in carico (${motivo}): il ruolo che dispatch consegnerebbe non regge lo stato vero del feedback, non si lavora` };
+}
+
+async function deliverToChannel(intent, data, { rifiutoAtteso = null } = {}) {
   const ticket = readRoutineTicket(ROOT);
   // Senza biglietto il server non viene nemmeno chiamato: dirlo con le parole
   // di un server giù ha già mandato un worker a diagnosticare per mezz'ora un
@@ -1451,7 +1468,7 @@ async function deliverToChannel(intent, data) {
     const r = await ch.deliver(ticket, intent, data);
     if (r.outcome === 'fault') {
       process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): la decisione NON è stata registrata\n`);
-    } else if (r.outcome === 'refused') {
+    } else if (r.outcome === 'refused' && !(rifiutoAtteso && rifiutoAtteso(r))) {
       process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${motivoRifiuto(r)}): non ripiego, la decisione non viene registrata\n`);
     }
     return r;
@@ -2746,15 +2763,19 @@ async function finalizeBucket(bucket, fromServer) {
   // il feedback è tornato `todo`, e senza questo passaggio la dashboard direbbe
   // «in coda» per tutta la lavorazione.
   const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa);
+  let statoVero = '';
   if (bucket.id && (bucket.role === 'new-work' || (bucket.role === 'fixer' && ripresa))) {
+    const opzioni = { branch: bucket.branch || '', ripresa: bucket.role === 'fixer' && ripresa };
     const presa = await deliverToChannel('status', {
       status: 'working', branch: bucket.branch || '',
       ...(bucket.ripartenzaPersa ? { notes: testoRipartenzaPersa(bucket.ripartenzaPersa), ripartenzaPersa: bucket.ripartenzaPersa.ramo } : {}),
-    });
-    // Il biglietto è legato a un altro ramo: la consegna da questo verrebbe rifiutata a lavoro finito (#1632).
-    if (presa.outcome === 'refused' && presa.reason === 'branch_mismatch') {
-      const motivo = unaRiga(motivoRifiuto(presa)).replace(/["`$\\]/g, "'");
-      return emitHalt('transient', `il server ha legato questo biglietto a un altro ramo e rifiuta la presa in carico su ${bucket.branch} (${motivo}): la consegna da qui verrebbe rifiutata, non si lavora`);
+    }, { rifiutoAtteso: (r) => !!esitoDellaPresa(r, opzioni).statoVero });
+    // Il biglietto legato a un altro ramo (#1632), o un ruolo che lo stato vero non ammette (#2674): non si lavora.
+    const esito = esitoDellaPresa(presa, opzioni);
+    if (esito.azione === 'ferma') return emitHalt('transient', esito.messaggio);
+    if (esito.statoVero) {
+      statoVero = esito.statoVero;
+      process.stderr.write(`[dispatch] ripresa di un lavoro in verifica (${statoVero}): la presa in carico non sposta lo stato, la consegna in revisione resta quella di sempre\n`);
     }
   }
 
@@ -2766,6 +2787,7 @@ async function finalizeBucket(bucket, fromServer) {
     if (!diff.ok) return emitHalt('transient', `il diff del ramo ${bucket.branch} non si calcola: ${diff.motivo}`);
   }
   const ctx = serverCtx(bucket, fromServer, diff);
+  if (statoVero && ctx.ripresa) ctx.ripresa = { ...ctx.ripresa, statoDelFeedback: statoVero };
   segnaRamoVuoto(bucket, ctx);
 
   emit(bucket, ctx);

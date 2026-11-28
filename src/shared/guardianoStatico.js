@@ -349,10 +349,14 @@
   const SP = '[^\\S\\n]+';
   const AUSILIARI = "è|e'|e’|é|era|sarà|sarebbe|fosse|sia|ha|aveva|avrà|has|had|have|was|is|will";
   const PARTICIPI = 'stat[ao]|diventat[ao]|divenut[ao]|rimast[ao]|restat[ao]|been|become';
-  const PASSATI = 'diventò|divenne|rimase|restò|became|become|remained|stayed';
+  const PASSATI_EN = 'became|become|remained|stayed';
+  const PASSATI = `diventò|divenne|rimase|restò|${PASSATI_EN}`;
   // Un elenco solo dei verbi di cambio, anche per il correttore (#1403.67): «sostituita con», «changé en», «cambiada a».
-  const CAMBI = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|sostituit[ao]|rimpiazzat[ao]|messa|messo'
-    + '|changed|set|updated|reset|replaced|chang[ée]e?|modifi[ée]e?|cambiad[ao]|modificad[ao]|actualizad[ao]|mudad[ao]';
+  // Italiano e inglese a parte perché la preposizione del valore nuovo è diversa («in»/«a», «to»): VERBI_CAMBIO.
+  const CAMBI_IT = 'cambiat[ao]|impostat[ao]|modificat[ao]|aggiornat[ao]|reimpostat[ao]|sostituit[ao]|rimpiazzat[ao]|settat[ao]'
+    + '|passat[ao]|messa|messo|cambia|cambiano|passa|passano';
+  const CAMBI_EN = 'changed|set|updated|reset|replaced';
+  const CAMBI = `${CAMBI_IT}|${CAMBI_EN}|chang[ée]e?|modifi[ée]e?|cambiad[ao]|modificad[ao]|actualizad[ao]|mudad[ao]`;
   // Dopo chi l'ha cambiata la preposizione porta al valore nuovo, anche «da … a …» e «con …»; in tedesco il verbo
   // viene dopo il valore («das Passwort in «…» geändert»).
   const VERSO = 'in|a|to|into|con|with|da|from|en|à|por';
@@ -381,6 +385,62 @@
     const t = String(s == null ? '' : s);
     return t.replace(AVVERBI_DOPO_ANNUNCIO, (_, a, resto) => a + (stessaLunghezza ? resto.replace(/\S/g, ' ') : ''));
   }
+  // Il valore nuovo detto da un verbo di cambio invece che da «è» («il pin diventa …», «è stata cambiata in …», «ho
+  // cambiato il pin in …»): #1403.67, #2714. Parole intere. Il valore detto dopo la domanda ha la regola sua, nel pavimento.
+  const VERBI_CAMBIO = Object.freeze({
+    diventa: Object.freeze(['diventa', 'diventano', 'diventerà', 'diventata', 'diventato', 'resta', 'resterà', 'rimane',
+      'rimarrà', 'rimasta', 'rimasto', 'becomes', 'became', 'become', 'remains', 'stays', 'will be']),
+    // I participi sono quelli di CAMBI_IT; in inglese (CAMBI_EN) il valore nuovo lo porta «to»: «changed my PIN in 2024» dice quando.
+    verso: Object.freeze(['in', 'a']),
+    versoInglese: Object.freeze(['to', 'into']),
+    // Il valore detto dopo il cambio, con «ora» o in una frase a parte: «il pin è ora …», «ho cambiato il pin, ora è …».
+    ora: Object.freeze(['ora', 'adesso', 'now']),
+    dopo: Object.freeze(['ora è', "ora e'", 'adesso è', "adesso e'", 'è ora', 'è adesso', 'è', "e'", 'il nuovo è',
+      'la nuova è', 'quello nuovo è', 'quella nuova è', 'now it is', "now it's", 'now it’s', 'now is', 'it is now',
+      "it's now", 'it is', "it's", 'the new one is']),
+  });
+  // CAMBIO_VALORE è il pezzo fra il nome del dato e il valore, spazi davanti compresi, per regex con o senza i flag `u` e `i`:
+  // una regola sola per pavimento, guardiano e uscite. «In», «a», «to» valgono solo con un participio di cambio prima,
+  // nella stessa frase: «manda la password a Luca» resta.
+  const FUORI_LATINO = '[A-Za-zÀ-ÿ]';
+  const intera = (xs) => `(?<!${FUORI_LATINO})(?:${xs.map((w) => w.replace(/ /g, '[ \\t]+')).join('|')})(?!${FUORI_LATINO})`;
+  const AUSILIARE_CAMBIO = `(?:${intera(['è', "e'", 'e’', 'é', 'era', 'sarà', 'ha', 'aveva', 'is', 'was', 'has', 'have', 'had'])}[ \\t]+)?`
+    + `(?:${intera(['stata', 'stato', 'been'])}[ \\t]+)?`;
+  const interaRe = (re) => `(?<!${FUORI_LATINO})(?:${re})(?!${FUORI_LATINO})`;
+  const PARTICIPIO_IT = interaRe(CAMBI_IT);
+  const PARTICIPIO_EN = interaRe(CAMBI_EN);
+  const PARTICIPIO_CAMBIO = interaRe(`${CAMBI_IT}|${CAMBI_EN}`);
+  const PASSO = `(?:${PARTICIPIO_IT}[ \\t]+${intera(VERBI_CAMBIO.verso)}|${PARTICIPIO_EN}[ \\t]+${intera(VERBI_CAMBIO.versoInglese)})`;
+  const CLITICO = `l['’][ \\t]*${intera(['ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno'])}[ \\t]+`;
+  const PRESENTE = intera(['è', "e'", 'e’', 'é', 'is']);
+  const ORA = intera(VERBI_CAMBIO.ora);
+  const E_POI = intera(['e', 'ed', 'and']);
+  const DOPO_IL_CAMBIO = `(?:[ \\t]*[,.;:][ \\t]*|[ \\t]+)(?:${E_POI}[ \\t]+)?${intera(VERBI_CAMBIO.dopo)}`;
+  // «il pin adesso diventa …», «ho cambiato il pin ed è diventato …».
+  const CAMBIO_VALORE = `(?:[ \\t]+(?:${E_POI}[ \\t]+)?(?:${ORA}[ \\t]+)?(?:${CLITICO})?${AUSILIARE_CAMBIO}(?:${intera(VERBI_CAMBIO.diventa)}|${PASSO})`
+    // Il participio si cerca all'indietro solo dopo la preposizione: un testo lungo non lo rilegge a ogni posizione.
+    + `|[ \\t]+(?:${intera(VERBI_CAMBIO.verso)}(?<=${PARTICIPIO_IT}[^\\n.!?:;,]{1,80})|${intera(VERBI_CAMBIO.versoInglese)}(?<=${PARTICIPIO_EN}[^\\n.!?:;,]{1,80}))`
+    + `|[ \\t]+(?:${ORA}[ \\t]+${PRESENTE}|${PRESENTE}[ \\t]+${ORA})`
+    // Dopo «ho cambiato il pin» il valore nella frase che segue: solo le forme che lo presentano, non una frase qualunque.
+    // Anche qui il participio si cerca all'indietro solo dopo la parola che presenta il valore: a ogni nome ripetuto
+    // costava sei volte main (pavimento.test.mjs, 120.000 caratteri).
+    + `|[ \\t]+(?:${CLITICO})?${AUSILIARE_CAMBIO}${PARTICIPIO_CAMBIO}${DOPO_IL_CAMBIO}`
+    + `|(?=${DOPO_IL_CAMBIO})(?<=${PARTICIPIO_CAMBIO}[^\\n.!?:;,]{0,60})${DOPO_IL_CAMBIO})`;
+  const CAMBIO_IN_CODA = new RegExp(`(?:${CAMBIO_VALORE})[ \\t]*["'«“‘„(]*[ \\t]*$`, 'i');
+  // Fra il nome e il verbo di cambio solo un complemento del nome («del cancello», «for my phone»): «il pin non funziona
+  // e il prezzo diventa 4821» parla d'altro, il primo verbo chiude il nome come per «è» (#2678.3).
+  const COMPLEMENTO_NOME = `(?:[ \\t]+(?:del|della|dello|dei|degli|delle|dell['’]|di|da|per|for|of|on)(?:[ \\t]*[^\\s\\d:=.,;!?|"'«“]{1,24}){1,3}?)`;
+  const SOLO_COMPLEMENTO = new RegExp(`^${COMPLEMENTO_NOME}?$`, 'i');
+  // Il verbo di cambio chiude `fra`, il testo fra il nome del dato e il valore; `prima` finisce col nome, e lì può stare
+  // il participio. `solo`: in `fra` c'è solo il verbo; senza, anche un complemento del nome prima, o quello che `testa`
+  // accetta (per il pavimento la cosa che si apre: «il codice che apre il cancello diventa …»).
+  function cambioFra(prima, fra, { solo = true, testa = null } = {}) {
+    const m = CAMBIO_IN_CODA.exec(prima + fra);
+    if (!m || m.index < prima.length) return false;
+    if (solo) return m.index === prima.length;
+    const davanti = fra.slice(0, m.index - prima.length);
+    return SOLO_COMPLEMENTO.test(davanti) || (!!testa && testa(davanti));
+  }
   // Le etichette fuori dall'alfabeto latino, e i verbi attaccati del cinese, giapponese, coreano e thai, sono quelli dei
   // campi segreti (#1403.8); i verbi che sono una parola stanno in ANNUNCI qui sopra.
   if (!global.SN_CAMPI_SEGRETI && typeof require === 'function') require('./campiSegreti.js');
@@ -391,7 +451,9 @@
   const SOLO_ATTACCO = new RegExp(`^\\s*(?:[:：=]|${ANNUNCI.join('|')})?\\s*$`, 'i');
   const ALTRA_FRASE = /[.!?]\s+[A-ZÀ-Ý]/;
   const APRE_IN_CODA = new RegExp(`(?:\\s*(?:\\d{1,3}[.)]|[•·*"«»“”(${NON_LATINI.APRE_VALORE}-]|(?<![A-Za-zÀ-ÿ])'))*\\s*$`);
-  function annunciato(fra, valore = '', { stretto = false } = {}) {
+  // `prima`: il testo fino alla parola, per i verbi di cambio (CAMBIO_VALORE), che possono stare prima di lei.
+  function annunciato(fra, valore = '', { stretto = false, prima = null } = {}) {
+    if (prima !== null && cambioFra(prima, fra)) return true;
     if (ALTRA_FRASE.test(fra) || /\/|\bwww\./i.test(fra)) return false;
     // L'apostrofo dopo una lettera è di «e'», non una virgoletta che apre il valore.
     const g = fra.replace(APRE_IN_CODA, '');
@@ -459,7 +521,8 @@
       const v = t[0].replace(/[.,;)»”"']+$/, '');
       if (!sembraPassword(v)) continue;
       const fra = finestra.slice(0, t.index);
-      if (annunciato(fra, v, { stretto }) || (polacco && TO_POLACCO.test(fra))) out.push({ valore: v, regola: 'password' });
+      const prima = s.slice(Math.max(0, fine - 120), fine);
+      if (annunciato(fra, v, { stretto, prima }) || (polacco && TO_POLACCO.test(fra))) out.push({ valore: v, regola: 'password' });
       return;
     }
   }
@@ -501,7 +564,10 @@
       const presi = [];
       let k = primo(fine);
       for (; k < tutti.length && tutti[k].i < fine + RAGGIO; k++) {
-        if (annunciato(s.slice(fine, tutti[k].i), tutti[k].v)) { presi.push(tutti[k]); break; }
+        if (annunciato(s.slice(fine, tutti[k].i), tutti[k].v, { prima: s.slice(Math.max(0, fine - 120), fine) })) {
+          presi.push(tutti[k]);
+          break;
+        }
       }
       if (!presi.length && PLURALE.test(parola[0])) {
         k = elencoDopo(s, fine, tutti, primo(fine));
@@ -552,8 +618,12 @@
   // `[{ valore, regola }]` con regola 'codice' | 'password' | 'chiave' | 'iban' | 'carta'. `saturo` sull'elenco: il
   // testo ne aveva più del tetto, o una chiave più lunga di MAX_TOKEN, e chi controlla un'uscita lì guarda la presenza
   // dei suoi pezzi (urlExfil.js).
+  // La password detta dopo il nome con un verbo di cambio o dopo la domanda la riconosce la regola delle uscite (#2714).
   function segretiNelTesto(testoLetto) {
-    return raccogli(testo(testoLetto), raccolta(), FORMA_LETTA);
+    const s = testo(testoLetto);
+    const out = raccolta();
+    for (const v of valoriDopoIlNome(s)) if (v.regola === 'password') out.push(v);
+    return raccogli(s, out, FORMA_LETTA);
   }
 
   // Quello che un'azione porterebbe fuori (autonomia.js): le stesse forme di segretiNelTesto, anche percent-codificate, più
@@ -571,12 +641,100 @@
   // Dopo il verbo anche l'articolo, come per il CVV: «il pin è il 4829».
   const ARTICOLO = '(?:(?:il|lo|la|el|le|die|der|das|the)\\s{1,8})?';
   const PIN_CHIUDE = `(?!(?:be|essere|here|ecco)(?![\\p{L}\\p{N}]))${ANNUNCIO}`;
-  const PIN_CON_COMPLEMENTO = new RegExp(`\\bpin\\b(?:\\s{1,8}(?!${PIN_CHIUDE})[^\\s\\d:=.,;!?|"'«“]{1,24}){1,5}?`
-    + `\\s{0,8}(?:[:=]|(?<![\\p{L}\\p{N}])(?:${ANNUNCIO_LARGO})(?=[\\s:=])(?:\\s{0,8}[:=])?)\\s{0,8}${ARTICOLO}["'«“]?(${cifre('codice')})(?!\\d)`, 'giu');
+  // Il verbo di cambio (CAMBIO_VALORE) si prova per primo, e solo dopo un complemento del nome: dopo «è» di «è diventata» il
+  // valore non c'è ancora, e «il pin non funziona e il prezzo diventa 4821» parla d'altro: lì chiude anche il soggetto nuovo.
+  // Un altro segreto come soggetto nuovo non chiude: «il pin e il puk sono 4821 e 12345678». Una regola sola per le uscite,
+  // per valoriDopoIlNome e per la finestra dei codici del pavimento.
+  const ALTRO_SEGRETO = '(?:pin|puk|cvv|cvc|otp|codic[ei]|codes?|password|passwd|pwd|passphrase)(?![\\p{L}\\p{N}])';
+  const NUOVO_SOGGETTO = `(?:e|ed|ma|and|but)\\s{1,8}(?:(?:il|lo|la|i|gli|le|uno?|una|the|an?|my|your)\\s|l['’])(?!\\s*${ALTRO_SEGRETO})`;
+  const PIN_CON_COMPLEMENTO = new RegExp(`\\bpin\\b(?:${COMPLEMENTO_NOME}${CAMBIO_VALORE}`
+    + `|(?:\\s{1,8}(?!${PIN_CHIUDE})(?!(?:${intera(VERBI_CAMBIO.diventa)})(?=\\s))(?!${NUOVO_SOGGETTO})[^\\s\\d:=.,;!?|"'«“]{1,24}){1,5}?`
+    + `\\s{0,8}(?:[:=]|(?<![\\p{L}\\p{N}])(?:${ANNUNCIO_LARGO})(?=[\\s:=])(?:\\s{0,8}[:=])?))`
+    + `\\s{0,8}${ARTICOLO}["'«“]?(${cifre('codice')})(?!\\d)`, 'giu');
   const PAROLA_PASSWORD = new RegExp(`(?:password|passwd|pwd|passphrase|parola\\s{1,8}d['’]ordine|chiave\\s{1,8}segreta|secret|${NON_LATINE})`
-    + `\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI})`
+    + `(?:${CAMBIO_VALORE}|\\s{0,8}(?:[:：=]|${ANNUNCIO}|${NON_LATINI.ANNUNCI_ATTACCATI}))`
     + `\\s{0,8}(?:["'«“]|[${APRE_VALORE}]\\s{0,8})?([^\\s"'»”,;&${FINE_VALORE}]{4,256})`, 'giu');
-  const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)[\\s:=]{0,8}(?:${ANNUNCIO}(?:\\s{1,8}|\\s{0,8}[:=]\\s{0,8})${ARTICOLO})?["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
+  const PAROLA_CODICE = new RegExp(`(?:\\botp\\b|\\b2fa\\b|\\bone[-\\s]?time\\b|\\bpin\\b|\\bcodic[ei]\\s{1,8}(?:di\\s{1,8})?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\\s+e\\s+getta|monouso|temporane[oi]|sms)\\b|\\b(?:recovery|backup|verification|security)\\s{1,8}codes?\\b)(?:${CAMBIO_VALORE}\\s{0,8}|[\\s:=]{0,8}(?:${ANNUNCIO}(?:\\s{1,8}|\\s{0,8}[:=]\\s{0,8})${ARTICOLO})?)["'«“]?(\\d[A-Za-z0-9]{3,256}|[A-Za-z0-9]{4,64}(?:[-\\s][A-Za-z0-9]{4,64}){1,9})`, 'giu');
+  // Il valore che segue il nome del dato (PIN, codice che apre, password) nella sua frase, o nella risposta dopo la sua
+  // domanda, presentato da una parola degli elenchi comuni (ANNUNCI, CAMBI, PARTICIPI, PASSATI, VERSO dopo un cambio):
+  // una regola sola per il pavimento e le uscite al posto dei casi (#2714 giro 7). Un altro soggetto («e il prezzo
+  // diventa 4821») chiude; una parola che dice com'è il dato («è giusto») toglie l'annuncio. Prove: tests/unit/cambioDelValore.test.mjs.
+  const NOME_DEL_VALORE = new RegExp('(?<![\\p{L}\\p{N}])(?:(pin)|(codic[ei]\\s+(?:del|della|dello|dell[\'’]\\s*)\\s*(?:cancello|portone|allarme|cassaforte|garage|box|lucchetto|porta|antifurto))'
+    + '|(password|passwd|pwd|passphrase|parola\\s+d[\'’]ordine))(?![\\p{L}\\p{N}])', 'giu');
+  const UN_ALTRO_SEGRETO = new RegExp(`^${ALTRO_SEGRETO}`, 'iu');
+  const intere = (re) => new RegExp(`^(?:${re})$`, 'iu');
+  const PRESENTA_VALORE = intere(`${ANNUNCI.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}|${CAMBI}|${PARTICIPI}|${PASSATI}`);
+  const UN_CAMBIO = intere(`${CAMBI}|${PARTICIPI}|${PASSATI}`);
+  const CAMBIO_INGLESE = intere(`${CAMBI_EN}|${PASSATI_EN}`);
+  const PONTE_DEL_CAMBIO = intere(VERSO);
+  // Parole che non spostano il valore e non lo descrivono: ausiliari, avverbi, negazioni, il pronome, «il nuovo».
+  const NEUTRA = intere(`${AVVERBIO}|${AVVERBI}|${MODALI}|non|più|piu|not|no|sì|si|yes|ok|okay|it|its|it's|that|lo|la|l|ho|hai|abbiamo|avete|hanno`
+    + '|ce|c|s|ha|has|have|had|quello|quella|nuovo|nuova|new|one|vecchio|vecchia|old|prima|poi|before|after|il|the|mio|mia|my|e|ed|and|ma|but');
+  const DETERMINANTE = /^(?:il|lo|la|l|i|gli|le|un|uno|una|the|a|an|my|your|his|her|our|their|mio|mia|tuo|tua|suo|sua)$/i;
+  const PREPOSIZIONE = /^(?:di|del|della|dello|dei|degli|delle|dell|per|for|of|on|su|sul|sulla|nel|nella|in|da|dal|dalla|con|with|a|al|alla|to)$/i;
+  const UNITA = /^(?:euro|eur|€|\$|usd|dollari|dollars?|km|kg|pagine|pagina|pages?|anni|giorni|ore|minuti|mesi|metri|persone|volte|cifre|caratteri|%)$/i;
+  const ANNO_VALORE = /^(?:19|20)\d\d$/;
+  const LUOGO_DEL_CAMBIO = /^(?:in|su|on|a)$/i;
+  // «con quella di Gmail2024»: dopo «di» c'è di chi è, non il valore.
+  const DI_CHI = /^(?:di|del|della|dello|dell|of|for|per)$/i;
+  const PREDEFINITO_DEL_VALORE = /(?<![\p{L}])(?:predefinit[oaie]|di\s+fabbrica|default|factory)(?![\p{L}])/iu;
+  function valoriDopoIlNome(testoIntero, { uscita = false } = {}) {
+    const s = testo(testoIntero);
+    const out = [];
+    for (const n of s.matchAll(NOME_DEL_VALORE)) {
+      const password = !!n[3];
+      const fine = n.index + n[0].length;
+      const clausola = s.slice(Math.max(0, n.index - 80), n.index).split(/[.!?;,](?:\s|$)|\n/).pop();
+      // Il PIN di fabbrica sta sul manuale: non apre niente di nessuno (come per il pavimento).
+      if (PREDEFINITO_DEL_VALORE.test(clausola + s.slice(fine, fine + 60).split(/[.!?;](?:\s|$)|\n/)[0])) continue;
+      let cambio = clausola.split(/[\s'’]+/).some((w) => UN_CAMBIO.test(w));
+      let inglese = clausola.split(/[\s'’]+/).some((w) => CAMBIO_INGLESE.test(w));
+      let presentato = false;
+      let passati = 0;
+      let parole = 0;
+      let prec = '';
+      const toks = [...s.slice(fine, fine + 200).matchAll(/[^\s'’]+['’]?/g)];
+      for (let k = 0; k < toks.length && parole < 16 && out.length < 40; k++) {
+        const grezzo = toks[k][0];
+        const nucleo = grezzo.replace(/^["'«“‘„(]+/, '').replace(/[.,;:!?)»”"'’]+$/, '');
+        const coda = /[.,;:!?)»”"'’]*$/.exec(grezzo)[0];
+        const parola = nucleo.toLowerCase();
+        parole++;
+        if (!nucleo) { /* solo punteggiatura */ } else if (/^\d+$/.test(nucleo)) {
+          const misura = MISURE_CIFRE.codice;
+          const dopo = toks[k + 1] ? toks[k + 1][0].replace(/[.,;:!?)»”"']+$/, '') : '';
+          if (password || !presentato || DI_CHI.test(prec) || nucleo.length < misura[0] || nucleo.length > misura[1] || UNITA.test(dopo) || /[%€$]/.test(coda)) break;
+          if (ANNO_VALORE.test(nucleo) && (/^(?:nel|dal|since)$/i.test(prec) || (inglese && /^in$/i.test(prec)))) break;
+          out.push({ valore: nucleo, regola: 'codice' });
+          presentato = true;
+        } else if (password && presentato && (uscita ? passwordInUscita(nucleo) : sembraPassword(nucleo))
+          && !(LUOGO_DEL_CAMBIO.test(prec) && /^\p{L}+$/u.test(nucleo)) && !DI_CHI.test(prec) && !PRESENTA_VALORE.test(parola)
+          && !NEUTRA.test(parola)) {
+          out.push({ valore: nucleo, regola: 'password' });
+        } else if (PRESENTA_VALORE.test(parola)) {
+          presentato = true;
+          if (UN_CAMBIO.test(parola)) cambio = true;
+          if (CAMBIO_INGLESE.test(parola)) inglese = true;
+        } else if (cambio && PONTE_DEL_CAMBIO.test(parola)) {
+          presentato = true;
+        } else if (DETERMINANTE.test(parola) && !PREPOSIZIONE.test(prec) && toks[k + 1] && /^\p{L}{2,}/u.test(toks[k + 1][0])
+          && !NEUTRA.test(toks[k + 1][0].replace(/[.,;:!?)»”"']+$/, '')) && !UN_ALTRO_SEGRETO.test(toks[k + 1][0])) {
+          break;
+        } else if (!NEUTRA.test(parola) && !PREPOSIZIONE.test(parola)) {
+          // «è giusto», «è scritta sul foglio»: dopo l'annuncio una parola che lo descrive, e il valore non c'è.
+          presentato = false;
+        }
+        prec = parola;
+        if (/[.!?;]$/.test(coda)) {
+          // Si passa una frase sola: la risposta dopo la domanda, o quella dopo «ho cambiato il pin».
+          if (passati || !(/\?$/.test(coda) || cambio)) break;
+          passati++;
+        }
+      }
+    }
+    return out;
+  }
+
   function segretiInUscita(testoUscente) {
     let s = testo(testoUscente);
     try { s = `${s}\n${decodeURIComponent(s.replace(/\+/g, ' '))}`; } catch (_) { /* un % che non codifica niente */ }
@@ -584,7 +742,13 @@
     if (senzaAvverbi !== s) s = `${s}\n${senzaAvverbi}`;
     const out = raccolta();
     raccogli(s, out, FORMA_USCENTE);
-    for (const m of s.matchAll(PAROLA_PASSWORD)) if (passwordInUscita(m[1])) out.push({ valore: m[1], regola: 'password' });
+    // «ho cambiato la password in PayPal» dice dove: dopo «in», «su» o «a» un nome di sole lettere non è il valore.
+    for (const m of s.matchAll(PAROLA_PASSWORD)) {
+      if (passwordInUscita(m[1]) && !(/^\p{L}+$/u.test(m[1]) && /(?:^|\s)(?:in|su|on|a)\s*$/i.test(m[0].slice(0, -m[1].length)))) {
+        out.push({ valore: m[1], regola: 'password' });
+      }
+    }
+    for (const v of valoriDopoIlNome(s, { uscita: true })) out.push(v);
     for (const m of s.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) out.push({ valore: m[1], regola: 'codice' });
     for (const m of s.matchAll(PIN_CON_COMPLEMENTO)) out.push({ valore: m[1], regola: 'codice' });
     for (const x of codiciDelPavimento(s)) out.push(x);
@@ -880,7 +1044,7 @@
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
     segretiNelTesto, segretiInUscita, codiciInElenco, MISURE_CIFRE, cifre, oscuraSegreti, trattiSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
     sembraPassword, indirizzoOEmail, ANNUNCI, ANNUNCIO_LARGO, AVVERBI, MODALI, COMPLEMENTO, CAMBI, PARTICIPI, PASSATI, PROPRIETA_PASSWORD,
-    AVVERBIO, avverbiComeSpazi,
+    AVVERBIO, avverbiComeSpazi, VERBI_CAMBIO, CAMBIO: CAMBIO_VALORE, cambioFra, valoriDopoIlNome, ALTRO_SEGRETO,
     ELENCO: { SEPARA, CONGIUNZIONE },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
