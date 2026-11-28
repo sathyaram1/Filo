@@ -29,10 +29,12 @@ async function apri(app, testServer, openTab, { modello = false } = {}) {
       correttore: { modelloErrori: modello, automatica: false },
     });
     globalThis.__rapide = [];
+    // Senza la lingua nel messaggio il modello finto fa quello che faceva il vero: traduce il refuso.
     const finto = async ({ messages }) => {
       const t = String(messages[messages.length - 1].content);
       globalThis.__rapide.push(t);
-      const text = t.includes('seeng') ? '[seeng][seeing][refuso][errore]' : 'NIENTE';
+      const corretta = t.includes('Il testo è scritto in inglese') ? 'seeing' : 'vedendo';
+      const text = t.includes('seeng') ? `[seeng][${corretta}][refuso][errore]` : 'NIENTE';
       return { text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
     };
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
