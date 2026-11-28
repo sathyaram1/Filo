@@ -41,6 +41,7 @@ test('le azioni della fila sono nella barra e agiscono sulla scheda davanti; il 
   await davanti.locator('#p').click({ button: 'right' });
   const menu = menuDi(davanti);
   await expect(menu.locator('.sn-menu').first()).toBeVisible();
+  console.log('DEBUG', JSON.stringify(await menu.locator('[data-sn-icon-id]').evaluateAll((els) => els.map((e) => [e.dataset.snIconId, e.getAttribute('aria-label')]))));
   await expect(menu.locator('[data-sn-icon-id]')).toHaveCount(0);
   await expect(menu.locator('.sn-menu-item', { hasText: /^Salva per dopo$|^Screenshot$|^QR code della pagina$/ })).toHaveCount(0);
   await davanti.keyboard.press('Escape');
