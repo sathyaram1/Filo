@@ -80,7 +80,7 @@ test('la parte fissa che conta il tetto è quella che la chat misura: strumenti,
   assert.equal(FC.tettoDelTratto(10000, 19000), FC.LIMITI.token[0], 'mai sotto il minimo del campo');
 });
 
-test('gli strumenti della chat stanno sotto gli 8.450 token', () => {
+test('gli strumenti della chat stanno sotto gli 8.500 token', () => {
   const t = token(JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()));
   assert.ok(t <= TETTO_STRUMENTI, `strumenti: circa ${t} token, il tetto è ${TETTO_STRUMENTI}`);
 });
