@@ -117,7 +117,7 @@
     },
     BLOCCA_SCHEDA: {
       via: ['scheda', 'blocca'],
-      description: 'blocca una scheda (senza scheda: questa): pulizie e chiusure di tutte o di un sito la lasciano.',
+      description: 'pulizie e chiusure in blocco la lasciano (senza scheda: questa).',
       properties: { scheda: I() }, required: [],
     },
     SBLOCCA_SCHEDA: {
