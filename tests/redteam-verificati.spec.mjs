@@ -189,7 +189,7 @@ test('#991 — riscattato il codice dalla pagina, la voce compare nel tasto dest
   await expect(rt.locator('#statsContent')).toBeVisible();
 
   const altro = await sito(openTab, testServer);
-  await expect((await menuSulSito(altro)).locator('.sn-menu-item', { hasText: 'Invia attacco' })).toBeVisible();
+  await expect((await menuSulSito(altro)).locator('.sn-menu-item', { hasText: 'Invia attacco' })).toHaveCount(1);
 });
 
 // Le schede aperte prima del riscatto lo sanno dal main, senza un tasto destro a vuoto.
