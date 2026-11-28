@@ -75,7 +75,7 @@ test('su un sistema italiano un testo inglese ha segni e proposte inglesi, e uno
   await page.locator('#it').click();
   await batti(page, 'sono andatto al mare con mia sorella e non abbiamo trovato posto ');
   await expect(errori.filter({ hasText: 'andatto' })).toHaveCount(1, { timeout: 5000 });
-  await expect(errori).toHaveCount(2);
+  for (const giusta of ['sono', 'mare', 'sorella', 'abbiamo', 'trovato', 'posto']) await expect(errori.filter({ hasText: giusta })).toHaveCount(0);
   await expect(await primaProposta(page, errori.filter({ hasText: 'andatto' }))).toHaveText(/andato/);
 });
 
@@ -83,15 +83,31 @@ test('il controllo rapido riceve solo la parola sbagliata del testo inglese, con
   const page = await apri(app, testServer, openTab, { modello: true });
   await page.locator('#en').click();
   const inizio = Date.now();
-  await batti(page, INGLESE.replace('improvemnts', 'improvements'));
+  await batti(page, 'I think the rate of improvement is seeng a slowdown, honestly. ');
   const segno = segniDi(page, '.sn-spell-overlay .sn-errore', { hasText: 'seeng' });
   await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 8000 });
   console.log(`[misura] segno confermato ${Date.now() - inizio} ms dopo l'inizio della scrittura`);
   const rapide = await app.evaluate(() => globalThis.__rapide);
   const domanda = rapide.find((t) => t.includes('seeng'));
   expect(domanda).toContain('Il testo è scritto in inglese');
-  const candidati = domanda.slice(domanda.indexOf('<candidati>'), domanda.indexOf('</candidati>'));
+  const candidati = rapide.map((t) => t.slice(t.indexOf('<candidati>'), t.indexOf('</candidati>'))).join('\n');
   expect(candidati).toContain('[seeng]');
-  for (const giusta of ['[the]', '[honestly]', '[comparison]', '[agriculture]']) expect(candidati).not.toContain(giusta);
+  for (const giusta of ['[rate]', '[improvement]', '[slowdown]', '[honestly]']) expect(candidati).not.toContain(giusta);
   await expect(await primaProposta(page, segno)).toHaveText(/seeing/);
+});
+
+// Il caso della segnalazione: «seeng» battuto per primo, da solo, quando la lingua non si sa ancora.
+test('un refuso giudicato prima che la lingua si capisca non riceve una traduzione come correzione', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, testServer, openTab, { modello: true });
+  await page.locator('#en').click();
+  await batti(page, 'seeng ');
+  const segno = segniDi(page, '.sn-spell-overlay .sn-errore', { hasText: 'seeng' });
+  await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 8000 });
+  const prima = (await app.evaluate(() => globalThis.__rapide)).find((t) => t.includes('seeng'));
+  expect(prima).toContain('La lingua del testo non si capisce ancora: un refuso si corregge nella lingua della parola, mai tradotto');
+  await batti(page, INGLESE.slice('seeng '.length).replace('improvemnts', 'improvements'));
+  const proposta = await primaProposta(page, segno);
+  await expect(proposta).not.toHaveText(/vedendo/);
+  await expect(proposta).not.toBeEmpty();
+  await page.screenshot({ path: 'tests/.shots/correttore-lingua-menu.png' });
 });
