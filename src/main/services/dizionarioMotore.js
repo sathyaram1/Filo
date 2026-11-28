@@ -86,12 +86,17 @@ async function carica(lingue) {
     }
   }
 
-  const conosciuta = (p) => motori.some(({ h }) => h.testSpelling(p));
+  // `lingue`: i codici da consultare (la lingua del testo, #2756); senza, o se nessuno è caricato, tutte.
+  const quali = (lingue) => {
+    const scelti = Array.isArray(lingue) ? motori.filter((m) => lingue.includes(m.lingua)) : [];
+    return scelti.length ? scelti : motori;
+  };
   // Come Chromium con più lingue: sbagliata solo se nessuna la conosce. Con l'apostrofo in fondo è giusta se lo è senza
   // («va'», «be'», «dell'») o se è un'elisione, cioè la parola intera meno la vocale finale («sant'», «quell'»).
-  function sbagliataGia(parola) {
+  function sbagliataGia(parola, usati = motori) {
     const p = normale(parola);
     if (!p.trim() || byte(p) > PAROLA_MAX_BYTE) return false;
+    const conosciuta = (x) => usati.some(({ h }) => h.testSpelling(x));
     try {
       if (conosciuta(p)) return false;
       const radice = /^(.*\p{L})'$/u.exec(p)?.[1];
@@ -102,18 +107,20 @@ async function carica(lingue) {
   return {
     lingue: motori.map((m) => m.lingua),
     errori,
-    sbagliate(parole) {
+    sbagliate(parole, lingue) {
       if (!motori.length || !Array.isArray(parole) || parole.length > RICHIESTA_MAX) return null;
-      return parole.map(sbagliataGia);
+      const usati = quali(lingue);
+      return parole.map((p) => sbagliataGia(p, usati));
     },
     // Le correzioni, alternate fra le lingue come fa Chromium.
-    proposte(parola) {
+    proposte(parola, lingue) {
       if (!motori.length) return null;
+      const usati = quali(lingue);
       const p = normale(parola);
-      if (!p.trim() || byte(p) > PROPOSTE_PAROLA_MAX_BYTE || !sbagliataGia(p)) return [];
+      if (!p.trim() || byte(p) > PROPOSTE_PAROLA_MAX_BYTE || !sbagliataGia(p, usati)) return [];
       const liste = [];
       try {
-        for (const { h } of motori) liste.push(h.getSpellingSuggestions(p).slice(0, PROPOSTE_MAX));
+        for (const { h } of usati) liste.push(h.getSpellingSuggestions(p).slice(0, PROPOSTE_MAX));
       } catch (_) { return []; }
       const out = [];
       const lunga = Math.max(0, ...liste.map((l) => l.length));
