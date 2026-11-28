@@ -92,7 +92,7 @@
       'them he she his her him what which who whom whose when where why how there here would could should will shall ' +
       'have has had having does did not but or if than then too very just about with from for on at by into out up over ' +
       'some any all more most other such only also because while think know get got like really much many well even ' +
-      'my me').replace(/\bme\b/, '').trim().split(/\s+/)),
+      'my').split(' ')),
   };
   const ELISIONE_IT = /^(?:l|un|dell|nell|all|dall|sull|c|d|s|m|t|v|n|quest|quell|anch|com|dov|nient|tutt)'\p{L}/iu;
   const CONTRAZIONE_EN = /\p{L}'(?:s|t|re|ve|ll|d|m)$/iu;
