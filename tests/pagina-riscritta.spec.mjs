@@ -73,7 +73,10 @@ for (const [nome, riscrivi] of Object.entries(RISCRITTURE)) {
     const menu = menuDi(page).locator('.sn-menu');
     await expect(menu, 'il tasto destro non apre il menu di Filo').toBeVisible();
     expect(await menu.evaluate((m) => getComputedStyle(m).position), 'il menu è senza il suo stile').toBe('fixed');
-    await menu.getByText(/Dimensione reale \(ora 120%\)/).click();
+    // A icone (#2555): l'icona col valore dietro il «+» apre i valori, e fra loro «Dimensione reale».
+    const m = menuDi(page);
+    await m.scegli(m.voce('Dimensione reale (ora 120%)').first());
+    await m.locator('.sn-menu-sub .sn-menu-item', { hasText: 'Dimensione reale' }).click();
     await expect.poll(async () => percentOf(app, page)).toBe(100);
   });
 }
