@@ -644,6 +644,8 @@ html,body{background:transparent;overflow:hidden;height:100%}
 }
 .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item.centered .lbl{flex:0 1 auto}
+.hint{flex:0 0 auto;color:var(--muted);font-size:12px;opacity:0;transition:opacity calc(100ms * var(--sn-motion, 1))}
+.item:hover .hint,.item:focus-visible .hint,.item.attiva .hint{opacity:1}
 .sep{height:1px;background:var(--border);margin:4px 8px}
 .row{display:flex;align-items:stretch}
 .row .item{flex:1;min-width:0}
