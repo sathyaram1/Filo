@@ -22,7 +22,8 @@ test('le icone del menu restano outline anche se il sito forza svg{fill:red}', a
   const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
-  const iconSvg = menu.locator('.sn-menu-item-icon svg').first();
+  // A icone (#2555): l'icona di una voce sta nella griglia.
+  const iconSvg = menu.locator('.sn-menu-griglia .sn-menu-row-btn:visible svg').first();
   await expect(iconSvg).toBeVisible();
 
   const fill = await iconSvg.evaluate((el) => getComputedStyle(el).fill);
