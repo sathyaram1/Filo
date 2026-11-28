@@ -25,6 +25,43 @@ const schedaFile = (app, fine) => app.evaluate(({ BrowserWindow }, fine) => {
 }, fine);
 const execAction = (app, action, opts) => app.evaluate((_e, { action, opts }) => globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
 
+test('la copia di un file sopravvive alla chiusura dell\'originale e alla ricarica; la copia di una foto aperta da sola si vede', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = join(cartellaTemporanea('esplora5b-'), 'Report');
+  mkdirSync(dir, { recursive: true });
+  copyFileSync(FOTO, join(dir, 'foto.png'));
+  copyFileSync(FOTO, join(dir, 'sola.png'));
+  writeFileSync(join(dir, 'r.html'), '<!doctype html><title>Rep</title><img id="i" src="foto.png">');
+  await home(app);
+  const tmEval = (fn, arg) => app.evaluate(({ BrowserWindow }, [src, a]) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    return (0, eval)(src)(tm, a);
+  }, [fn.toString(), arg]);
+  const file = join(dir, 'r.html');
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'r.html')), { timeout: 10_000 }).toBeTruthy();
+  await tmEval((tm, i) => tm.duplicateTab(i), id);
+  let copia = null;
+  await expect.poll(async () => (copia = await tmEval((tm, i) => { const t = tm.tabs.find((x) => x.id !== i && /r\.html$/.test(x.url || '')); return t ? t.id : null; }, id)), { timeout: 10_000 }).toBeTruthy();
+  await tmEval((tm, i) => tm.closeTab(i), id);
+  await new Promise((r) => setTimeout(r, 800));
+  await tmEval((tm, i) => { tm.activate(i); tm.tabs.find((x) => x.id === i).view.webContents.reload(); }, copia);
+  await new Promise((r) => setTimeout(r, 1500));
+  const pagina = await paginaDellaScheda(app, copia, (p) => p.url().startsWith('file:'));
+  await expect.poll(() => pagina.evaluate(() => document.getElementById('i') && document.getElementById('i').naturalWidth), { timeout: 10_000, message: 'la copia ricaricata vede ancora la foto' }).toBeGreaterThan(0);
+
+  const sola = join(dir, 'sola.png');
+  expect((await execAction(app, { type: 'NAVIGA', url: sola }, { parole: `aprimi ${sola}` })).executed).toBe(true);
+  let idf = null;
+  await expect.poll(async () => (idf = await schedaFile(app, 'sola.png')), { timeout: 10_000 }).toBeTruthy();
+  await tmEval((tm, i) => tm.duplicateTab(i), idf);
+  let copiaf = null;
+  await expect.poll(async () => (copiaf = await tmEval((tm, i) => { const t = tm.tabs.find((x) => x.id !== i && /sola\.png$/.test(x.url || '')); return t ? t.id : null; }, idf)), { timeout: 10_000 }).toBeTruthy();
+  const pf = await paginaDellaScheda(app, copiaf, (p) => p.url().startsWith('file:'));
+  await expect.poll(() => pf.evaluate(() => { const im = document.querySelector('img'); return im ? im.naturalWidth : 0; }), { timeout: 10_000, message: 'la copia della foto si vede' }).toBeGreaterThan(0);
+});
+
 test('fetch, XHR, import, tracce, audio, @import e stili non leggono i file accanto', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = join(cartellaTemporanea('esplora5-'), 'Scaricati');
