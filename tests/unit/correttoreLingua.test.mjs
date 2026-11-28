@@ -60,7 +60,7 @@ test('su un sistema italiano si carica anche l\'inglese, ma le lingue di serie r
   assert.deepEqual(D.stato().lingue, ['it-IT', 'en-US']);
   assert.deepEqual(D.stato().predefinite, ['it-IT']);
 
-  const parole = ['seeng', 'the', 'current', 'improvements', 'andatto', 'andato'];
+  const parole = ['seeng', 'the', 'honestly', 'improvements', 'andatto', 'andato'];
   assert.deepEqual(await D.sbagliate(parole, 'en'), [true, false, false, false, true, true], 'in inglese');
   assert.deepEqual(await D.sbagliate(parole, 'it'), [true, true, true, true, true, false], 'in italiano');
   assert.deepEqual(await D.sbagliate(parole), [true, true, true, true, true, false], 'senza lingua: l\'italiano di serie, come prima');
