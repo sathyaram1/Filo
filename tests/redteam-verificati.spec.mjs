@@ -159,9 +159,10 @@ test('#991 — con il codice la voce c’è, apre il riquadro senza l’avviso; 
   expect(await entra(app)).toBe(true);
 
   const page = await sito(openTab, testServer);
+  // A icone (#2555) «Invia attacco» sta dietro il «+», per scelta dell'owner.
   const voce = (await menuSulSito(page)).locator('.sn-menu-item', { hasText: 'Invia attacco' });
-  await expect(voce).toBeVisible();
-  await voce.click();
+  await expect(voce).toHaveCount(1);
+  await menuDi(page).scegli(voce);
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-attack'))?.visibile).toBe(true);
   // L'avviso è per chi non ha il codice: nemmeno dopo la risposta del main.
   await page.waitForTimeout(500);
