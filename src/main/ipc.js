@@ -836,9 +836,11 @@ function registerIpcHandlers() {
     const { origine, scelte } = Permessi.scelteDi(wc);
     return { scelte: scelte.map(({ parte, si }) => ({ parte, si })), ...(origine ? Permessi.nomeDaMostrare(origine) : {}) };
   });
-  ipcMain.handle('tabs:permessi-dimentica', (event, { id } = {}) => {
+  // `parte`: la riga cliccata nel menu della scheda toglie quella scelta sola (#2087).
+  ipcMain.handle('tabs:permessi-dimentica', (event, { id, parte } = {}) => {
     const wc = paginaDiScheda(event, id);
-    return wc ? require('./services/permessiPagine').dimentica(wc) : { tolte: 0, cera: false };
+    const una = typeof parte === 'string' && parte ? parte.slice(0, 40) : undefined;
+    return wc ? require('./services/permessiPagine').dimentica(wc, una) : { tolte: 0, cera: false };
   });
   ipcMain.handle('tabs:open-blocked-popup', (event, { url, apriComunque, daScheda } = {}) => {
     const win = winFor(event);
