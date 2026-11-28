@@ -2969,7 +2969,7 @@
     state.ignorate.set(`${ig.fonte}\u0001${String(ig.segment).toLowerCase()}`, ig);
     renderOverlayContent(state);
     const parola = String(segno.segment || '').trim();
-    if (segno.segno === 'errore' && A() && parolaImparabile(parola)) {
+    if (segno.segno === 'errore' && A() && parolaImparabile(parola, linguaNelCampo(el, segno.start))) {
       aggiungiImparata(formaDaImparare(parola, A().inizioDiFrase(getEditableText(el), segno.start)));
     }
   }
