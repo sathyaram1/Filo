@@ -203,7 +203,7 @@ test('l\'Aiuto trascrive l\'immagine indicata, e una porzione la fa scegliere al
 
 async function trascriviDalTastoDestro(app, page, sel = '#foto') {
   await page.locator(sel).click({ button: 'right', position: { x: 10, y: 10 } });
-  await menuDi(page).locator('.sn-menu button', { hasText: 'Trascrivi' }).first().click();
+  await menuDi(page).scegli(menuDi(page).locator('.sn-menu button', { hasText: 'Trascrivi' }).first());
   return paginaDelloStrato(app, page);
 }
 
@@ -321,7 +321,7 @@ test('nessun testo nell\'immagine: il riquadro lo dice e non offre niente da cop
   const { page } = await apri(app, openTab, testServer);
   await lettoreFinto(app, []);
   await page.locator('#foto').click({ button: 'right', position: { x: 300, y: 80 } });
-  await menuDi(page).locator('.sn-menu button', { hasText: 'Trascrivi' }).first().click();
+  await menuDi(page).scegli(menuDi(page).locator('.sn-menu button', { hasText: 'Trascrivi' }).first());
   const strato = await paginaDelloStrato(app, page);
   await expect(strato.locator('.sn-tr-stato')).toHaveText('Nessun testo nell\'immagine', { timeout: 10_000 });
   await expect(strato.locator('.sn-tr-copia')).toHaveCount(0);
