@@ -15,6 +15,10 @@ async function ricorda(app, scelte) {
   }, scelte);
 }
 
+// «Resta connesso qui» dipende dalla privacy di serie, non da questo lavoro: le prove guardano il resto, e il suo posto.
+const CONNESSO = /^(Resta connesso qui|Non restare connesso)$/;
+const senzaConnesso = (voci) => voci.map((x) => x.testo).filter((t) => !CONNESSO.test(t));
+
 const ricordate = (shell) => shell.evaluate(async () => {
   const r = await window.filoShell.message({ type: 'permessi_siti_get' });
   return (r && r.scelte ? r.scelte : []).map((s) => `${s.parte}:${s.si}`).sort();
