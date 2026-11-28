@@ -577,7 +577,9 @@
   const NOME_CORTO = /^(?:password|passwd|pwd|pass|otp)$/i;
   const INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`)\]]+/gi;
   // Un pezzo d'indirizzo senza lo schema («?q=password%3A%20…», «www.x.it/la%20password…»); con lo schema è un INDIRIZZO.
-  const CODIFICATO = /[^\s<>"'`()[\]«»]*%[0-9A-Fa-f]{2}[^\s<>"'`()[\]«»]*/g;
+  // Comincia solo in testa alla parola: da ogni posto di una parola lunga senza «%» rileggeva la parola fino in fondo, e
+  // un testo di un milione di cifre fermava Filo per minuti (#2754).
+  const CODIFICATO = /(?<![^\s<>"'`()[\]«»])[^\s<>"'`()[\]«»]*%[0-9A-Fa-f]{2}[^\s<>"'`()[\]«»]*/g;
   // Le password accanto a un'etichetta. La regola generale è il posto del valore (alPostoDelValore): dopo il separatore o
   // il verbo che chiude l'etichetta, subito dopo di lei, sulla riga sotto. Mai il resto della riga: «la password di
   // Office365», un nome utente, un indirizzo di campo o una riga di codice vicini all'etichetta non sono il valore.
@@ -1131,6 +1133,10 @@
     return INIZIO_SPIEGAZIONE.test(parole[0]) || /^(?:(?:cambiat|modificat|aggiornat|scadut|reimpostat|resettat)[aoie]|scad(?:e|ono)|clicca|premi|click)$/i.test(parole[0])
       || (parole.some((x) => /\d/.test(x)) && parole.some((x) => MISURA.test(x) || TEMPO.test(x)));
   }
+  // Una barra protetta («\|») sta dentro la cella, come nel Markdown: «| mario | Nyckel\|2024 |» ha due celle, e la
+  // password è la seconda intera (#2673.29). Ogni lettura delle celle a barre passa di qui.
+  const BARRA_DI_CELLA = /(?<!\\)\|/;
+  const celleFraBarre = (riga) => riga.trim().replace(/^\||(?<!\\)\|$/g, '').split(BARRA_DI_CELLA);
   function etichette(s, out) {
     alPostoDelValore(s, out);
     fraseDopo(s, out);
@@ -1180,14 +1186,14 @@
       o += riga.length + 1;
       const barre = /^\s*\|/.test(riga);
       const tab = !barre && riga.includes('\t');
-      const celle = barre ? riga.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
+      const celle = barre ? celleFraBarre(riga).map((c) => c.trim())
         : tab ? riga.split('\t').map((c) => c.trim()) : null;
       if (!celle || (col >= 0 && sep !== (barre ? '|' : '\t'))) { col = -1; continue; }
       if (col >= 0) {
         if (celle.every((c) => !c || /^:?-{2,}:?$/.test(c))) continue;
         const v = valorePassword(celle[col]);
         if (v) {
-          const parti = riga.split(sep);
+          const parti = riga.split(barre ? BARRA_DI_CELLA : sep);
           const k = barre ? col + 1 : col;
           const prima = parti.slice(0, k).reduce((n, p) => n + p.length + 1, 0);
           out.push(alPosto(v, inizioRiga + prima, parti[k]));
@@ -1364,7 +1370,7 @@
       // Anche la tabella senza la barra in testa («CVV: | 123»), come per la password.
       if (riga.length > 2000 || !/^[ \t]*\||^[^|]{1,80}[:：=][ \t]*\|/.test(riga)) return riga;
       let r = riga.replace(/(?<=[:：=][ \t]*)\|(?=[ \t]*[^|\s])/g, ' ');
-      const celle = r.trim().replace(/^\||\|$/g, '').split('|');
+      const celle = celleFraBarre(r);
       const piene = celle.filter((c) => c.trim());
       const nome = celle[0].trim();
       // La password nuda ha già la regola della sua cella, che sa quando la cella dopo la spiega.

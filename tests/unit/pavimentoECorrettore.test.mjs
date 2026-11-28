@@ -236,10 +236,25 @@ test('una password di più parole in un blocco di codice dopo una riga vuota non
 // lunghezza: un controllo all'indietro davanti a una parola rileggeva tutta la fila a ogni posto (secondi invece di ms).
 test('righe lunghe di segni Markdown o di spazi non fermano il cancello dei modelli', () => {
   for (const testo of [`x\n${'\n- '.repeat(4000)}`, `x\n${'- '.repeat(4000)}x`, `x\n${'> '.repeat(4000)}x`,
-    `Password:\n${'```\n'.repeat(2000)}`, `Password:\n${'> ```\n'.repeat(2000)}`, `${'   \n'.repeat(4000)}x`,
-    `${' '.repeat(12000)}x`]) {
-    const c = costoInUnita(() => P.oscura(testo), { tetto: TETTO_FILE_DI_SPAZI });
-    assert.ok(c.entro, `${JSON.stringify(testo.slice(0, 12))}: ${c.come}`);
+    `Password:\n${'```\n'.repeat(4000)}`, `Password:\n${'> ```\n'.repeat(4000)}`, `${'```\n'.repeat(4000)}`,
+    `${'> ```\n'.repeat(4000)}`, `${'   \n'.repeat(4000)}x`, `${' '.repeat(12000)}x`]) {
+    for (const [cancello, fn] of [['pavimento', P.oscura], ['correttore', alCorrettore]]) {
+      const c = costoInUnita(() => fn(testo), { tetto: TETTO_FILE_DI_SPAZI });
+      assert.ok(c.entro, `${cancello} ${JSON.stringify(testo.slice(0, 12))}: ${c.come}`);
+    }
+  }
+});
+
+// #2754, #2758, #2761 — una parola lunghissima, una fila di cifre o di «[» si leggono in un tempo che cresce con la
+// lunghezza: due letture ripartivano da ogni posto della parola o della fila e la rileggevano tutta (minuti su un milione
+// di cifre). Prima del rimedio queste misure valevano centinaia di unità.
+test('una parola lunghissima, una fila di cifre o di quadre aperte non fermano il cancello dei modelli', () => {
+  for (const testo of ['0123456789'.repeat(10_000), `Vedi ${'['.repeat(100_000)} fine della spiegazione`,
+    `${'a'.repeat(60_000)} SEGNO-DEL-MEZZO-77 ${'b'.repeat(60_000)}`, `x%41${'7'.repeat(100_000)}`]) {
+    for (const [cancello, fn] of [['pavimento', P.oscura], ['correttore', alCorrettore]]) {
+      const c = costoInUnita(() => fn(testo), { tetto: TETTO_FILE_DI_SPAZI });
+      assert.ok(c.entro, `${cancello} ${JSON.stringify(testo.slice(0, 12))}: ${c.come}`);
+    }
   }
 });
 
@@ -261,4 +276,26 @@ test('il blocco di codice citato, le righe vuote e le celle vuote non lasciano p
   for (const testo of ['Password:\n> ```\n> vedi sotto\n> ```','| Password: | | obbligatoria |', '| Password: | | |']) {
     assert.equal(P.oscura(testo), testo);
   }
+});
+
+// #2673.29 — la barra protetta vale come cella sola anche nella colonna «Password» sotto l'intestazione e nella coppia
+// nome-valore: si spezzava su ogni barra, e «|2024» partiva. L'etichetta in grassetto coi due punti, la forma delle
+// risposte dei modelli, copre la cella intera.
+test('nella colonna «Password» e nella cella dopo l\'etichetta in grassetto la password con una barra protetta parte intera coperta', () => {
+  for (const [testo, atteso] of [
+    ['| Utente | Password |\n|---|---|\n| mario | Nyckel\\|2024 |', `| Utente | Password |\n|---|---|\n| mario | ${S} |`],
+    ['| Utente | **Password** |\n| --- | --- |\n| mario | Nyckel\\|2024 |\n| anna | Faro7\\|Blu55 |',
+      `| Utente | **Password** |\n| --- | --- |\n| mario | ${S} |\n| anna | ${S} |`],
+    ['| Utente | Password | Sito |\n|---|---|---|\n| mar\\|io | Nyckel!2024 | posta |', null],
+    ['| login_password | Nyckel\\|2024 |', `| login_password | ${S} |`],
+    ['| **Password:** | Nyckel!2024 |', `| **Password:** | ${S} |`],
+    ['| **Password:** | Nyckel\\|2024 |', `| **Password:** | ${S} |`],
+  ]) {
+    for (const [cancello, fuori] of [['pavimento', P.oscura(testo)], ['correttore', alCorrettore(testo)]]) {
+      assert.doesNotMatch(fuori, /Nyckel|2024|Faro7|Blu55/, `${cancello}: ${testo}`);
+      if (atteso) assert.equal(fuori, atteso, `${cancello}: ${testo}`);
+    }
+  }
+  assert.equal(P.oscura('| Utente | Password |\n|---|---|\n| mar\\|io | Nyckel!2024 |'), `| Utente | Password |\n|---|---|\n| mar\\|io | ${S} |`,
+    'la barra protetta nel nome non sposta la colonna');
 });

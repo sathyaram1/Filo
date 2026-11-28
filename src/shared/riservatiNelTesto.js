@@ -223,9 +223,10 @@ function refusoDiPassword(w) {
 }
 
 // Il refuso letto come il nome, a parità di lunghezza: il pavimento ritrova i posti nel testo vero (#2678.21). Solo la
-// parola intera: «Pasword!77» è un valore, non il nome.
+// parola intera: «Pasword!77» è un valore, non il nome. Il controllo all'indietro lungo solo in testa a una parola: a ogni
+// posto di una fila di segni rileggeva tutta la fila, e duecentomila «[» fermavano Filo per secondi (#2761).
 function refusiComeNome(s) {
-  return s.replace(/(?<=(?:^|\s)[^\p{L}\p{N}\s]*)\p{L}{5,10}(?=[^\p{L}\p{N}\s]*(?:\s|$))/gu, (w) => {
+  return s.replace(/(?<![\p{L}\p{N}])(?=\p{L}{5})(?<=(?:^|\s)[^\p{L}\p{N}\s]*)\p{L}{5,10}(?=[^\p{L}\p{N}\s]*(?:\s|$))/gu, (w) => {
     if (!refusoDiPassword(w.toLowerCase())) return w;
     const nome = w.length >= 8 ? 'password' : w.length >= 6 ? 'passwd' : 'pass';
     return nome + ' '.repeat(w.length - nome.length);

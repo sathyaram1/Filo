@@ -239,9 +239,10 @@ test('il contenuto di un file letto nel turno non esce da un link senza un OK', 
     await page.locator('#sendBtn').click();
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco fatto.' })).toBeVisible({ timeout: 20_000 });
 
-    // La lettura nella cartella personale è partita da sola: il modello ha il testo.
+    // La lettura nella cartella personale è partita da sola: il modello ha il testo, meno il codice del portone, che il
+    // pavimento copre come ogni codice con la sua etichetta (#2757).
     const calls = await app.evaluate(() => globalThis.__exfilCalls);
-    expect(JSON.stringify(calls[1] || []), 'il cat nella cartella personale doveva partire').toContain('7F3K-99QX-LM20');
+    expect(JSON.stringify(calls[1] || []), 'il cat nella cartella personale doveva partire').toContain('wifi di casa: girasole-antico-2026');
 
     // Il link con dentro 40 caratteri del file NON si è aperto: resta un bottone
     // che chiede un OK, con l'indirizzo per intero.
