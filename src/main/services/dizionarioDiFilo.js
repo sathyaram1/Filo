@@ -16,22 +16,36 @@ const CARICA_MAX_MS = 60_000;
 const CORPO_THREAD = `
 const { parentPort, workerData } = require('node:worker_threads');
 require(workerData.motore).carica(workerData.lingue).then((m) => {
-  parentPort.on('message', ({ id, tipo, dato }) => {
+  parentPort.on('message', ({ id, tipo, dato, lingue }) => {
     let res = null;
-    try { res = tipo === 'proposte' ? m.proposte(dato) : m.sbagliate(dato); } catch (_) {}
+    try { res = tipo === 'proposte' ? m.proposte(dato, lingue) : m.sbagliate(dato, lingue); } catch (_) {}
     parentPort.postMessage({ id, res });
   });
   parentPort.postMessage({ pronto: { lingue: m.lingue, errori: m.errori } });
 });
 `;
 
+/** Le lingue di serie, come il correttore del browser: valgono quando la lingua del testo non si sa. */
 function scegli(locale) {
   if (!globalThis.SN_SPELL_LANG) require('../../shared/spellLanguages.js');
   return globalThis.SN_SPELL_LANG.select(Motore.LINGUE, locale, Motore.LINGUE);
 }
 
-const stato = { fase: 'spento', lingue: [], errori: [], dove: '' };
-// (tipo, dato) → Promise della risposta, finché il dizionario è pronto.
+const base = (l) => String(l || '').toLowerCase().split('-')[0];
+// Si carica anche l'inglese, anche su un sistema italiano: un testo scritto in inglese si controlla in inglese (#2756).
+function daCaricare(locale) {
+  const inglese = scegli(/^en(?:[-_]|$)/i.test(String(locale || '')) ? locale : 'en-US').find((l) => base(l) === 'en');
+  const serie = scegli(locale);
+  return inglese && !serie.includes(inglese) ? [...serie, inglese] : serie;
+}
+
+const stato = { fase: 'spento', lingue: [], predefinite: [], errori: [], dove: '' };
+// I codici da consultare per la lingua di un testo ('it', 'en'); senza, o una che non c'è, quelli di serie.
+function codiciPer(lingua) {
+  const scelti = typeof lingua === 'string' && lingua ? stato.lingue.filter((l) => base(l) === lingua.toLowerCase()) : [];
+  return scelti.length ? scelti : stato.predefinite;
+}
+// (tipo, dato, lingue) → Promise della risposta, finché il dizionario è pronto.
 let chiedi = null;
 let promessa = null;
 let programmato = null;
