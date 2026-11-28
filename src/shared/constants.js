@@ -2254,7 +2254,7 @@
           : `La pagina intorno al campo non ha altro testo.\n\n`;
       // Il campo arriva intero; «prima» e «dopo» ci sono solo se chi chiama ne manda una parte.
       return `Oggi è ${GIORNI[d.getDay()]} ${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()} (orologio del computer dell'utente): serve per «domani», «venerdì prossimo» e simili.\n` +
-        (l.sito ? `Si scrive sul sito ${unaRigaDiDati(l.sito, 120)}.\n` : '') + `\n` +
+        (l.sito ? `Si scrive sul sito ${unaRigaDiDati(l.sito, 120)}.\n` : '') + rigaDellaLingua(lingua) + `\n` +
         pagina +
         (String(prima || '') ? `Testo del campo prima, già riletto (solo contesto):\n${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: String(prima), conIntestazione: true, max: 20000 })}\n` : '') +
         `TESTO DA RILEGGERE:\n${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: String(nuovo || ''), conIntestazione: !String(prima || ''), max: 20000 })}\n` +
