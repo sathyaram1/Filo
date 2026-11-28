@@ -46,7 +46,7 @@
     'segnalazione_automatica', 'segnalazione_in_attesa', 'segnalazione_non_ritirata', 'filo_spento_sito', 'menu_del_sito',
     'aiuto_spento', 'pagine_salvate_tetto', 'download_avviato', 'download_finito', 'download_nome_dato', 'download_senza_nome', 'nome_rimesso',
     'file_ritrovato',
-    'resta_connesso_proposta', 'resta_connesso_rientro', 'resta_connesso_scelta', 'permessi_azzerati', 'aperta_da_paese',
+    'resta_connesso_proposta', 'resta_connesso_rientro', 'resta_connesso_scelta', 'permessi_azzerati', 'permesso_tolto', 'scheda_bloccata', 'aperta_da_paese',
     'indirizzo_fermato', 'riordino_schede', 'scheda_ponte_chiusa', 'sito_bloccato', 'popup_bloccato', 'aggiornamento',
     'proposta_email_spenta', 'dati_avviso', 'filo_illeggibile', 'filo_pesante', 'cancella_tutto', 'riordino_mancato',
     'nessuna_chiusa', 'giudici_fermi', 'sito_fidato', 'altre_schede_restano', 'blocco_youtube_ripiego',
