@@ -782,12 +782,6 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     return !!(win && await win._filoTabs.ciSonoChiuse());
   });
-  ipcMain.handle('tabs:chiudi-altre', async (event, { id } = {}) => {
-    const win = finestraDellaBarra(event.sender);
-    if (!win) return { ok: false, chiuse: 0, restano: [] };
-    const r = await gesto(win, 'close-tab', () => win._filoTabs.chiudiLeAltre(id));
-    return { ok: true, chiuse: r.chiuse.length, restano: r.restano };
-  });
   ipcMain.handle('tabs:scrivi-indirizzo', async (event, { id } = {}) => {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false };
