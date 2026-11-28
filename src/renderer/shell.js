@@ -1506,8 +1506,15 @@
     }
     if (p.permessi) disegnaSegni(p.permessi, d.permessi);
 
+    // #2086 — la bloccata ha il lucchetto al posto della X: il clic, come la X, dice che è bloccata e offre di chiuderla.
+    const bloccata = !!d.bloccata;
+    if (p.close.classList.contains('bloccata') !== bloccata) {
+      p.close.classList.toggle('bloccata', bloccata);
+      const icona = bloccata ? ICONS.lock : ICONS.close;
+      if (typeof icona === 'function') p.close.innerHTML = icona(12);
+    }
     // La scorciatoia chiude la scheda attiva: sulle altre la croce non la promette.
-    p.close.dataset.tip = d.attiva ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
+    p.close.dataset.tip = bloccata ? 'Bloccata' : d.attiva ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
   }
 
   // Prima si tolgono i nodi che non restano, poi si mettono in ordine: un nodo che resta non si stacca mai.
