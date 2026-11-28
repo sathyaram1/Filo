@@ -425,8 +425,28 @@ async function azioneTraduciPagina(action, { sender }) {
 
 async function azioneChiudiSchede(action, { sender }) {
   const tm = winOf(sender)?._filoTabs;
-  const chiuse = tm ? tm.chiudiSchede(action._targetIds) : [];
-  return { executed: chiuse.length > 0, kept: false, output: { chiuse: chiuse.length, ...contoRestano(action._restano) } };
+  const ids = Array.isArray(action._targetIds) ? action._targetIds : [];
+  const bloccate = tm ? tm.tabs.filter((t) => t.bloccata && ids.includes(t.id)).map((t) => t.id) : [];
+  const chiuse = tm ? tm.chiudiSchede(ids) : [];
+  const nBloccate = bloccate.filter((id) => chiuse.includes(id)).length;
+  return {
+    executed: chiuse.length > 0, kept: false,
+    output: { chiuse: chiuse.length, ...(nBloccate ? { bloccate: nBloccate } : {}), ...contoRestano(action._restano) },
+  };
+}
+
+// #2086 — «blocca questa scheda», «sblocca la terza»: quello che fanno Blocca e Sblocca nel menu della linguetta.
+async function azioneBloccaScheda(action, { sender, schedeViste }, on) {
+  const tm = winOf(sender)?._filoTabs;
+  if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
+  const b = await schedaDaBloccare(tm, action, schedeViste, sender);
+  if (!b || b.errore) return { executed: false, kept: true, output: { error: (b && b.errore) || 'numero di scheda non valido' } };
+  const titolo = (await nomeDellaScheda())(b.tab);
+  const gia = !!b.tab.bloccata === on;
+  if (tm.bloccaScheda(b.tab.id, on) === null) {
+    return { executed: false, kept: true, output: { error: 'questa scheda è un passaggio di Filo e non si blocca', titolo } };
+  }
+  return { executed: true, kept: true, output: { titolo, ...(gia ? { gia: true } : {}) } };
 }
 
 module.exports = {
