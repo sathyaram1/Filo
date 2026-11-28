@@ -302,7 +302,10 @@
       const o = a._output || {};
       const n = Number(o.chiuse) || 0;
       const parti = restanoAperte(o);
-      const resto = parti ? ` · ${parti}` : '';
+      // #2086 — una bloccata chiusa perché chiesta per numero.
+      const b = Number(o.bloccate) || 0;
+      const sblocco = !b ? '' : n === 1 ? ' · era bloccata' : ` · ${b === 1 ? 'una era bloccata' : `${b} erano bloccate`}`;
+      const resto = `${sblocco}${parti ? ` · ${parti}` : ''}`;
       if (!n) return { icon: '✕', text: `Nessuna scheda chiusa${resto}`, failed: true };
       return { icon: '✕', text: `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}${resto}` };
     },
