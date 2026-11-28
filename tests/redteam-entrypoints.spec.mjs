@@ -88,11 +88,12 @@ test('il menu tasto destro ha "Invia attacco" che apre il pannello con i due cam
   await expect(menu).toBeVisible();
 
   // La voce "Invia attacco (Red-team)" esiste.
+  // A icone (#2555) sta dietro il «+», per scelta dell'owner.
   const item = menu.locator('.sn-menu-item', { hasText: 'Invia attacco' });
-  await expect(item).toBeVisible();
+  await expect(item).toHaveCount(1);
 
   // Click → apre il pannello con i due campi separati (su un sito, in uno shadow root chiuso: #1071).
-  await item.click();
+  await menuDi(page).scegli(item);
   const visibile = async (sel) => !!(await statoDi(app, page, sel))?.visibile;
   await expect.poll(() => visibile('.sn-rt-overlay .sn-rt-attack'), { timeout: 4000 }).toBe(true);
   expect(await visibile('.sn-rt-overlay .sn-rt-desc')).toBe(true);
