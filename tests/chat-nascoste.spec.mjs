@@ -284,6 +284,7 @@ const vociDelMenu = (page) => menuDi(page).valuta(() => [...document.querySelect
   .map((b) => ({
     id: `menu:${(b.getAttribute('aria-label') || b.title || (b.querySelector('.sn-menu-label') || b).textContent || '').trim()}`,
     scritta: ((b.querySelector('.sn-menu-label') || b).textContent || '').trim(),
+    tasto: b.dataset.snTasto || '',
   })));
 const normale = (t) => t.replace(/^menu:/, '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
