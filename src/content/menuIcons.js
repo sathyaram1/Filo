@@ -190,7 +190,7 @@
       const oggetto = a.fraseOggetto || fraseOggetto(a.oggetto);
       // `verbo` è l'azione dell'elenco; `azione` quella del catalogo delle capacità, che il menu misura (#1461).
       const v = {
-        id, verbo: d.azione, icon: I(icona), nome, oggetto, tasto: Disp.VERBI[d.azione]?.tasto || '',
+        id, verbo: d.azione, icon: I(icona), nome, oggetto, oggettoChiave: a.oggetto, tasto: Disp.VERBI[d.azione]?.tasto || '',
         label: a.label || nomeConOggetto(nome, oggetto), onClick: a.onClick, tieneAperto: !!a.tieneAperto,
         disabled: !!a.disabled, draggable: true, bersaglio: a.bersaglio || bersaglioDi(a.oggetto),
       };
