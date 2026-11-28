@@ -99,7 +99,7 @@ test('il modello riceve la lingua nel messaggio, mai nel system che va in cache;
     const t = PROMPTS.spellcheckErrori({ nuovo: 'seeng', lingua: strano });
     assert.doesNotMatch(t, /Il testo è scritto in/, String(strano));
     assert.match(t, /La lingua del testo non si capisce ancora: un refuso si corregge nella lingua della parola, mai tradotto/, String(strano));
-    assert.ok(!t.includes(String(strano)) || !strano || strano === 'xx', 'il valore della pagina non entra');
+    if (strano) assert.ok(!t.includes(strano), 'il valore della pagina non entra');
   }
   assert.doesNotMatch(PROMPTS.spellcheckErroriSistema(), /scritto in inglese|non si capisce ancora/);
   const oggi = new Date(2026, 10, 28);
