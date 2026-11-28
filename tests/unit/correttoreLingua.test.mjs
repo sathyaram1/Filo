@@ -94,13 +94,17 @@ test('il modello riceve la lingua nel messaggio, mai nel system che va in cache;
   const en = PROMPTS.spellcheckErrori({ nuovo: INGLESE, candidati: [{ pezzo: 'seeng', perche: 'x' }], lingua: 'en' });
   assert.match(en, /Il testo è scritto in inglese: le correzioni restano in inglese, mai una parola tradotta/);
   assert.match(PROMPTS.spellcheckErrori({ nuovo: ITALIANO, lingua: 'it' }), /scritto in italiano/);
+  // Senza lingua (il primo «seeng» battuto da solo) il modello non deve tradurre il refuso.
   for (const strano of [undefined, null, '', 'xx', '<b>', '__proto__', 'toString']) {
-    assert.doesNotMatch(PROMPTS.spellcheckErrori({ nuovo: 'ciao', lingua: strano }), /Il testo è scritto in/, String(strano));
+    const t = PROMPTS.spellcheckErrori({ nuovo: 'seeng', lingua: strano });
+    assert.doesNotMatch(t, /Il testo è scritto in/, String(strano));
+    assert.match(t, /La lingua del testo non si capisce ancora: un refuso si corregge nella lingua della parola, mai tradotto/, String(strano));
+    assert.ok(!t.includes(String(strano)) || !strano || strano === 'xx', 'il valore della pagina non entra');
   }
-  assert.doesNotMatch(PROMPTS.spellcheckErroriSistema(), /scritto in inglese/);
+  assert.doesNotMatch(PROMPTS.spellcheckErroriSistema(), /scritto in inglese|non si capisce ancora/);
   const oggi = new Date(2026, 10, 28);
   assert.match(PROMPTS.spellcheckSuggerimenti({ nuovo: INGLESE, lingua: 'en', oggi }), /Il testo è scritto in inglese/);
-  assert.doesNotMatch(PROMPTS.spellcheckSuggerimenti({ nuovo: INGLESE, oggi }), /Il testo è scritto in/);
+  assert.match(PROMPTS.spellcheckSuggerimenti({ nuovo: INGLESE, oggi }), /non si capisce ancora/);
 });
 
 test('la lingua parte con il controllo rapido, quello ragionato e quello chiesto col tasto destro', async () => {
