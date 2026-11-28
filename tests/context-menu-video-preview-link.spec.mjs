@@ -147,7 +147,7 @@ test('copertina stesa sopra il link (immagine, non filmato): stesse due famiglie
   const menu = await openMenuOn(page, '#cover');
 
   await haVoce('Salva immagine come');
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
@@ -221,7 +221,7 @@ test('velo trasparente, anteprima ferma: il menu è quello della scheda, non vuo
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
@@ -416,7 +416,7 @@ test('sfumatura sul titolo (solo il fondo della copertina): il menu resta quello
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
@@ -487,7 +487,7 @@ test('scheda con imbottitura, anteprima ferma: la copertina dà lo stesso menu',
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
@@ -545,7 +545,7 @@ test('copertina ferma dentro il collegamento, striscia del titolo sopra: idem', 
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
