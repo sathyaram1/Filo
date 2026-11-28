@@ -34,6 +34,35 @@ const ICON_PATHS = {
   lock:
     '<rect x="5" y="11" width="14" height="9" rx="1.5"/>' +
     '<path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  lockOpen:
+    '<rect x="5" y="11" width="14" height="9" rx="1.5"/>' +
+    '<path d="M8 11V8a4 4 0 0 1 7.6-1.7"/>',
+
+  // Le righe dei permessi del sito nel menu della scheda (#2087): le icone dei segni sulla linguetta (SN_PERMESSI_SCHEDA).
+  mic:
+    '<rect x="9" y="3.5" width="6" height="10" rx="3"/>' +
+    '<path d="M6 11.5a6 6 0 0 0 12 0"/><path d="M12 17.5v3"/><path d="M9 20.5h6"/>',
+  camera:
+    '<rect x="3" y="8" width="18" height="12" rx="2"/>' +
+    '<path d="M8 8l1.5-2.5h5L16 8"/><circle cx="12" cy="14" r="3.2"/>',
+  location:
+    '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  windowFrame:
+    '<rect x="3" y="4.5" width="18" height="15" rx="2"/>' +
+    '<path d="M3 9h18"/><path d="M6 6.75h.01"/><path d="M8.5 6.75h.01"/>',
+  bell:
+    '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  clipboard:
+    '<rect x="5" y="5" width="14" height="16" rx="2"/>' +
+    '<path d="M9 3.5h6v3H9z"/><path d="M9 12h6"/><path d="M9 15.5h4"/>',
+  readAloud:
+    '<path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z"/>' +
+    '<path d="M15.5 9.5a4 4 0 0 1 0 5"/><path d="M18 7a7.5 7.5 0 0 1 0 10"/>',
+  wifi:
+    '<path d="M2.5 9a14 14 0 0 1 19 0"/><path d="M5.5 12.5a9.5 9.5 0 0 1 13 0"/>' +
+    '<path d="M8.75 15.75a4.75 4.75 0 0 1 6.5 0"/><path d="M12 19.25h.01"/>',
+  pencil:
+    '<path d="M4 20l4.5-1L19 8.5a2 2 0 0 0-3-3L5.5 15.5z"/><path d="M14 7.5l3 3"/>',
 
   transparency:
     '<path d="M12 6.6C10.4 5.1 8.3 4.6 4 4.6v12.6c4.3 0 6.4.5 8 2 1.6-1.5 3.7-2 8-2V4.6c-4.3 0-6.4.5-8 2z"/>' +
