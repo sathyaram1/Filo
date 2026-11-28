@@ -243,7 +243,7 @@ test('velo trasparente sopra un collegamento qualsiasi: le voci del link restano
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
-  await menu.locator('button', { hasText: 'Copia URL' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
