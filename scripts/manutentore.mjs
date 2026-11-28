@@ -856,7 +856,7 @@ export function righePause(pause, voci) {
   ];
   const perche = Object.entries(voci || {}).filter(([, v]) => v && v.perche);
   righe.push(`Ultimo giro per voce: ${perche.map(([voce, v]) => `${unaRiga(voce)} ${unaRiga(v.perche)} dal ${istanteIso(v.percheMs)}`).join('; ') || 'nessuno scritto'}.`);
-  for (const [voce, v] of perche) if (v.conto && typeof v.conto === 'object') righe.push(rigaConto(voce, v.conto, v.contoMs));
+  for (const [voce, v] of perche) if (v.conto && typeof v.conto === 'object') righe.push(rigaPostiDellaVoce(voce, v.conto, v.contoMs));
   return righe;
 }
 
