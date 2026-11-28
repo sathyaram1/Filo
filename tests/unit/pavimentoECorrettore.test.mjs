@@ -264,3 +264,25 @@ test('il blocco di codice citato, le righe vuote e le celle vuote non lasciano p
     assert.equal(P.oscura(testo), testo);
   }
 });
+
+// #2673.29 — la barra protetta vale come cella sola anche nella colonna «Password» sotto l'intestazione e nella coppia
+// nome-valore: si spezzava su ogni barra, e «|2024» partiva. L'etichetta in grassetto coi due punti, la forma delle
+// risposte dei modelli, copre la cella intera.
+test('nella colonna «Password» e nella cella dopo l\'etichetta in grassetto la password con una barra protetta parte intera coperta', () => {
+  for (const [testo, atteso] of [
+    ['| Utente | Password |\n|---|---|\n| mario | Nyckel\\|2024 |', `| Utente | Password |\n|---|---|\n| mario | ${S} |`],
+    ['| Utente | **Password** |\n| --- | --- |\n| mario | Nyckel\\|2024 |\n| anna | Faro7\\|Blu55 |',
+      `| Utente | **Password** |\n| --- | --- |\n| mario | ${S} |\n| anna | ${S} |`],
+    ['| Utente | Password | Sito |\n|---|---|---|\n| mar\\|io | Nyckel!2024 | posta |', null],
+    ['| login_password | Nyckel\\|2024 |', `| login_password | ${S} |`],
+    ['| **Password:** | Nyckel!2024 |', `| **Password:** | ${S} |`],
+    ['| **Password:** | Nyckel\\|2024 |', `| **Password:** | ${S} |`],
+  ]) {
+    for (const [cancello, fuori] of [['pavimento', P.oscura(testo)], ['correttore', alCorrettore(testo)]]) {
+      assert.doesNotMatch(fuori, /Nyckel|2024|Faro7|Blu55/, `${cancello}: ${testo}`);
+      if (atteso) assert.equal(fuori, atteso, `${cancello}: ${testo}`);
+    }
+  }
+  assert.equal(P.oscura('| Utente | Password |\n|---|---|\n| mar\\|io | Nyckel!2024 |'), `| Utente | Password |\n|---|---|\n| mar\\|io | ${S} |`,
+    'la barra protetta nel nome non sposta la colonna');
+});
