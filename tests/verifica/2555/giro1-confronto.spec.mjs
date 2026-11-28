@@ -84,4 +84,5 @@ test(`voci del tasto destro (${LATO})`, async ({ openTab, testServer }) => {
     await page.evaluate(() => getSelection().removeAllRanges());
   }
   writeFileSync(resolve(SHOTS, `verifica-2555-voci-${LATO}.json`), JSON.stringify(risultato, null, 1));
+  if (process.env.V2555_OUT) writeFileSync(resolve(process.env.V2555_OUT, `voci-${LATO}.json`), JSON.stringify(risultato, null, 1));
 });
