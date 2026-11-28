@@ -10,7 +10,7 @@ const { chiediAllaPagina } = require('../domandaAllaPagina');
 const { getEffectiveSettings } = require('../impostazioniEffettive');
 const { contaZoomDallaChat, contaPaginaDallaChat, dallaChat } = require('../autonomiaFonti');
 const {
-  schedeChiusePerChat, voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, bersaglioPausa, bersaglioAudio, salvatePerChat,
+  schedeChiusePerChat, voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, schedaDaBloccare, bersaglioPausa, bersaglioAudio, salvatePerChat,
   apriPaginaSalvata, leggiPaginaDa, contoRestano,
 } = require('../osservazioniPerModello');
 
