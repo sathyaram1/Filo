@@ -1210,7 +1210,7 @@ class TabManager {
     if (adotta) {
       const wc = view.webContents;
       AzioniContate.scheda(wc);
-      wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view === view) this.closeTab(tab.id, { daSola: true }); }));
+      wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view === view) this.closeTab(tab.id, { daSola: true, sblocca: true }); }));
       wc.on('did-start-navigation', (e) => this._chiestaPerNome(tab, wc, e));
     }
     if (activate) {
