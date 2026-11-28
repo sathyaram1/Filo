@@ -627,9 +627,13 @@
   // «Pass:», «pw:» sono anche altro («Green pass: valido»): contano solo davanti a un valore con la forma di una password.
   const ETICHETTA_CORTA = '\\b(?:pass|pw)\\b';
   // Fra etichetta e valore anche una parentesi («Password del router (admin): x») e un trattino o una freccia
-  // circondati da spazi; il valore sotto l'etichetta anche dopo una riga vuota (due paragrafi), ma da solo sulla riga,
+  // circondati da spazi; il valore sotto l'etichetta anche dopo righe vuote (VUOTE_SOTTO), ma da solo sulla riga,
   // coi due punti o senza: «Wi-Fi password:» a capo vale quanto «Password:» a capo (#2673.3).
   const PRIMA = '(?:^|[\\n|\\t])[^\\n|\\t:：=.!?;,]{0,30}?';
+  // Le righe vuote che il valore sotto l'etichetta sola può avere sopra, un conto solo per la parola, la frase e la
+  // riga sotto (rigaSotto): fra due paragrafi del Markdown se ne trovano anche tre (#2673.10).
+  const VUOTE_SOTTO = 3;
+  const A_CAPO_SOTTO = `\\n(?:[ \\t]*\\n){0,${VUOTE_SOTTO}}`;
   // Fra etichetta e separatore niente virgolette, uguali o parentesi di codice: in `"Password" :: #c` o in
   // `password" id="pwd1"` quello che segue è di un altro campo.
   const ACCANTO = '(?:(?!\\s(?:o|e|né|ne|or|and|nor|ma|but)\\s)[^\\n:：|=\\t?!.,;\\[\\]«»"<>{}$]){0,40}?';
@@ -638,11 +642,12 @@
   // perché «Account -> Password -> Cambia» è un percorso di menu (#2678.7).
   const FRECCIA = '(?:-{1,2}>|=>|[⇒➔➜])';
   const UNA_FRECCIA = new RegExp(`^(?:${FRECCIA}|[-–—→])$`);
-  // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra.
-  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*(${FRECCIA}|[:：=][ \\t]*\\||[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*([^\\n|\\t]*)`, 'gid');
+  // Nella cella coi due punti il valore sta nella cella dopo («| Password: | x |»), e vale tutta come dopo la sola barra;
+  // le celle vuote in mezzo si saltano, e una barra protetta («\|») è della password (#2673.10).
+  const ACCANTO_FORTE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ ]*(${FRECCIA}|[:：=][ \\t]*\\|(?:[ \\t]*\\|)*|[:：=|\\t]|[-–—→](?=[ \\t]))[ \\t]*((?:\\\\\\||[^\\n|\\t])*)`, 'gid');
   // Il verbo di cambio vale quanto «è» («la password diventa …», «ho cambiato la password in …», #2714).
   const ACCANTO_DEBOLE = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}(?:(?:[ \\t]+|${VIRGOLA_CEST})${VERBO_PASSWORD}[ \\t]+|${ANNUNCI_NON_LATINI}[ \\t]*|${CAMBIO}[ \\t]*)([^\\s|\\[]{4,64})`, 'gi');
-  const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=]?[ \\t]*\\n(?:[ \\t]*\\n)?[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
+  const SOTTO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=]?[ \\t]*${A_CAPO_SOTTO}[ \\t]*([^\\s|\\[]{4,64})[ \\t]*(?=\\n|$)`, 'gi');
   // Dentro una frase, senza i due punti («utente mario, password Mela!Verde77»): solo un valore che non può essere una
   // parola, con lettere e cifre o un simbolo da password.
   const QUALIFICA = '(?:[ \\t]+(?:provvisori[ao]|temporane[ao]|iniziale|nuova|attuale|new|temporary|initial|current))?';
@@ -785,7 +790,7 @@
   // «Copia», «••••»), che le pagine mettono fra l'etichetta e la password. `saltate`: quante righe piene ha scavalcato.
   const SOLO_BOTTONI = /^(?:[\s•*·●]|mostra|nascondi|copia|copy|show|hide|reveal|rivela|visualizza|view|modifica|edit|cambia|change|accedi|entra|login|log\s+in|sign\s+in|invia|continua|avanti|next|ok|annulla|cancel|registrati|sign\s+up|register)*$/i;
   function rigaSotto(righe, i) {
-    for (let j = i + 1, vuote = 0, bottoni = 0; j < righe.length && vuote <= 2 && bottoni <= 2; j++) {
+    for (let j = i + 1, vuote = 0, bottoni = 0; j < righe.length && vuote <= VUOTE_SOTTO && bottoni <= 2; j++) {
       if (!righe[j].trim()) { vuote++; continue; }
       if (SOLO_BOTTONI.test(righe[j])) { bottoni++; continue; }
       return { riga: righe[j], j, saltate: bottoni };
@@ -848,7 +853,7 @@
   // modem», «vedi email»), anche dopo un articolo («la stessa di prima»), o che misura la password («min. 8 caratteri»)
   // dice dove trovarla o come sceglierla, e resta. Il tetto in caratteri tiene fuori un paragrafo intero. Così sulla riga
   // sotto l'etichetta sola, se non è un altro campo né un bottone (#2673.14).
-  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*(\\n(?:[ \\t]*\\n)?[ \\t]*)?([^\\n|\\t]{3,160}?)[ \\t]*(?=\\n|$)`, 'gi');
+  const FRASE_DOPO = new RegExp(`${PRIMA}${ETICHETTA}${ACCANTO}[ \\t]*[:：=][ \\t]*(${A_CAPO_SOTTO}[ \\t]*)?([^\\n|\\t]{3,160}?)[ \\t]*(?=\\n|$)`, 'gi');
   const CAMPO_IN_TESTA = /^[^\s:：]{1,30}[:：](?:\s|$)/;
   const INIZIO_SPIEGAZIONE = /^(?:a|al|allo|alla|ai|agli|alle|da|dal|dallo|dalla|dai|dagli|dalle|in|nel|nello|nella|nei|negli|nelle|su|sul|sullo|sulla|sui|sugli|sulle|presso|tra|fra|con|senza|dentro|sotto|sopra|dietro|at|on|from|under|behind|inside|with|see|ask|check|contact|available|provided|sent|printed|same|vedi|vedere|guarda|chiedere|richiedi|richiedila|contatta|rivolgiti|disponibile|disponibili|fornita|fornito|inviata|inviato|stampata|scritta|indicata|riportata|deve|devono|può|must|should|can|minimo|min|massimo|max|stessa|stesso|quella|quello|uguale|identica|come|vuota|nessuna|nessuno|scegli|sceglila|usa|use|cambiata|cambiato|modificata|modificato|aggiornata|aggiornato|scaduta|scaduto|scade|scadrà|changed|updated|expired|expires|не|нет|должен|должна|должно|см|смотрите|спросите|минимум|максимум|от|из|на|в|у|при|без|πρέπει|δείτε)$/i;
   const MISURA = /^(?:caratter[ei]|characters?|chars?|cifre|digits?|lettere|letters?|simboli|symbols?|символ(?:а|ов)?|знак(?:а|ов)?|цифр(?:а|ы)?|букв(?:а|ы)?|χαρακτήρες)[.,;:]?$/i;
@@ -1408,9 +1413,9 @@
     const R = global.SN_RISERVATI_TESTO;
     const copia = aCapo(vero);
     const piano = copia ? copia.piano : vero;
-    // L'enfasi del Markdown e i tag HTML fra etichetta e valore («**Password:** …», «<b>PIN:</b> …») si leggono come
-    // spazi; un commento HTML in due letture, con e senza il suo testo (riservatiNelTesto.js).
-    // Un avverbio fra il verbo e il valore («il pin è ancora 4821») si legge come spazi, come l'enfasi (guardianoStatico.js).
+    // L'enfasi e i segni di blocco del Markdown e i tag HTML fra etichetta e valore («**Password:** …», «- …» o «```»
+    // sotto l'etichetta, «<b>PIN:</b> …») si leggono come spazi; un commento HTML in due letture, con e senza il suo
+    // testo (riservatiNelTesto.js). Un avverbio fra il verbo e il valore («il pin è ancora 4821») anche (guardianoStatico.js).
     if (!global.SN_GUARDIANO_STATICO && typeof require === 'function') require('./guardianoStatico.js');
     const G = global.SN_GUARDIANO_STATICO;
     // Un refuso del nome («pasword») o del verbo («diventta») si legge giusto, alla stessa lunghezza, e un inciso fra nome

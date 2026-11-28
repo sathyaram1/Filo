@@ -117,16 +117,28 @@ const senzaTag = (s) => s.replace(COMMENTO, (c, apre, dentro, fine) => ' '.repea
   })
   .replace(SPAZIO_HTML, (e) => ' '.repeat(e.length))
   .replace(DUE_PUNTI_HTML, (e) => ':' + ' '.repeat(e.length - 1));
+// I segni di blocco in testa alla riga (citazione, voce d'elenco, titolo, definizione) si leggono come spazi: «Password:»
+// e sotto «- x», «> x» o «: x» vale «Password:» e sotto «x»; la riga citata vuota («>») è una riga vuota (#2673.10).
+// Le righe di sola struttura (apertura o chiusura di un blocco di codice, riga di separazione, sottolineatura di un
+// titolo) si attaccano alla riga sopra: non sono righe fra l'etichetta e il valore. «```Nyckel2024» non è un'apertura.
+const SEGNO_BLOCCO = '(?:>[ \\t]*|(?:[-*+•](?:[ \\t]+|$)|\\d{1,9}[.)][ \\t]+)(?:\\[[ xX]\\][ \\t]+)?|#{1,6}(?:[ \\t]+|$)|:[ \\t]+)';
+const LINGUAGGIO = '(?:[a-z][a-z+#-]{0,19}|[A-Z][A-Z+#-]{0,19})\\d?(?:[ \\t][^\\n]*)?|\\{[^\\n]*';
+const STRUTTURA = `(?:(?:\`{3,}|~{3,})[ \\t]*(?:${LINGUAGGIO})?|(?:-[ \\t]*){3,}|(?:\\*[ \\t]*){3,}|(?:_[ \\t]*){3,}|=+)[ \\t]*`;
+// I segni in testa presi tutti e una volta sola (il gruppo atomico): «- - - … x» si dividerebbe fra voci e riga di
+// separazione in tutti i modi, e una riga lunga fermerebbe Filo.
+const RIGA_DI_STRUTTURA = new RegExp(`(\\n?)^((?=([ \\t]*${SEGNO_BLOCCO}*))\\3${STRUTTURA})$`, 'gmu');
+const BLOCCO = new RegExp(`^([ \\t]*)(${SEGNO_BLOCCO}+)`, 'gmu');
+const spazi = (s) => ' '.repeat(s.length);
+const senzaBlocchi = (s) => (/[-*+•>#`~.):=_]/.test(s)
+  ? s.replace(RIGA_DI_STRUTTURA, (_, aCapo, riga) => (aCapo ? ' ' : '') + spazi(riga))
+    .replace(BLOCCO, (_, rientro, segno) => rientro + spazi(segno))
+  : s);
 // Enfasi prima e dopo i tag: «**<b>CVV:</b>**» (#2695.7) la vuole prima, «&lt;b&gt;**PIN:**&lt;/b&gt;» dopo.
-const togliEnfasi = (s) => (/[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => ' '.repeat(segno.length) + dentro + ' '.repeat(segno.length)) : s);
-// Così i segni in testa alla riga, la citazione e il punto d'elenco: «Password:» a capo «- x», «> x», «1. x» vale
-// «Password:» a capo «x», con ogni a capo (#2673.14).
-const SEGNI_DI_RIGA = /^[ \t]*(?:>[ \t]*)*(?:(?:[-*+•]|\d{1,3}[.)])(?=[ \t]))?/gm;
-const togliSegni = (s) => (/[>*+•\-.)]/.test(s) ? s.replace(SEGNI_DI_RIGA, (segni) => segni.replace(/[^ \t]/g, ' ')) : s);
+const togliEnfasi = (s) => (/[*_]/.test(s) ? s.replace(ENFASI, (_, segno, dentro) => spazi(segno) + dentro + spazi(segno)) : s);
 const senzaEnfasi = (t) => {
   const s = String(t == null ? '' : t);
-  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(togliSegni(s));
-  return togliEnfasi(togliSegni(senzaTag(togliEnfasi(s))));
+  if (!s.includes('<') && !s.includes('&')) return togliEnfasi(senzaBlocchi(s));
+  return togliEnfasi(senzaBlocchi(senzaTag(togliEnfasi(s))));
 };
 const vistePerLeRegole = (t) => {
   const s = String(t == null ? '' : t);

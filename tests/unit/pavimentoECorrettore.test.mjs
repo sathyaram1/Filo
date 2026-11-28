@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
@@ -12,6 +13,9 @@ require('../../src/shared/urlExfil.js');
 const P = require('../../src/shared/pavimento.js');
 const R = require('../../src/main/services/correttoreRiservati.js');
 const S = P.SEGNAPOSTO;
+// In unità di riferimento: la lettura giusta ne costa al più una decina, quella che rilegge all'indietro le file di
+// spazi da 200 a 1.800.
+const TETTO_FILE_DI_SPAZI = 60;
 const alCorrettore = (campo) => R.richiestaSenzaRiservati({ prima: '', nuovo: campo, dopo: '', campo, campoDa: 0 }).nuovo;
 
 test('nella riga di una tabella il valore nella cella dopo l\'etichetta coi due punti non arriva al modello', () => {
@@ -170,5 +174,91 @@ test('#2695.7: l\'etichetta in grassetto, in corsivo o fra tag HTML, coi due pun
     '<p>Ciao <b>Mario</b>, ci vediamo alle 5</p>']) {
     assert.equal(P.oscura(testo), testo, `pavimento: ${testo}`);
     assert.equal(alCorrettore(testo), testo, `correttore: ${testo}`);
+  }
+});
+
+// #2673.10 — sotto l'etichetta il valore stava in una voce d'elenco o in un blocco di codice: il segno del blocco era
+// letto come la riga sotto, e la password partiva (al posto suo si copriva «```»).
+test('sotto l\'etichetta un valore in una voce d\'elenco, una citazione o un blocco di codice non arriva al modello', () => {
+  for (const v of ['Nyckel!2024', 'gattonero']) {
+    for (const [testo, atteso] of [
+      [`Password:\n- ${v}`, `Password:\n- ${S}`],
+      [`**Password:**\n- ${v}`, `**Password:**\n- ${S}`],
+      [`- **Password:**\n  - ${v}`, `- **Password:**\n  - ${S}`],
+      [`Password:\n* ${v}`, `Password:\n* ${S}`],
+      [`Password:\n1. ${v}`, `Password:\n1. ${S}`],
+      [`Password:\n> ${v}`, `Password:\n> ${S}`],
+      [`Password:\n\`\`\`\n${v}\n\`\`\``, `Password:\n\`\`\`\n${S}\n\`\`\``],
+      [`**Password:**\n\`\`\`text\n${v}\n\`\`\``, `**Password:**\n\`\`\`text\n${S}\n\`\`\``],
+      [`Password:\n~~~\n${v}\n~~~`, `Password:\n~~~\n${S}\n~~~`],
+    ]) {
+      assert.equal(P.oscura(testo), atteso, 'pavimento');
+      assert.equal(alCorrettore(testo), atteso, 'correttore');
+    }
+  }
+  // Un elenco sotto l'etichetta che dice com'è la password resta intero.
+  for (const testo of ['Requisiti della password:\n- almeno 8 caratteri\n- una maiuscola', 'Password:\n- obbligatoria',
+    '## Password\nPer cambiarla vai nelle impostazioni', 'Password:\n```\nvedi sotto\n```']) {
+    assert.equal(P.oscura(testo), testo, 'pavimento');
+    assert.equal(alCorrettore(testo), testo, 'correttore');
+  }
+});
+
+// Giro 4: la riga citata vuota, la riga di separazione, il titolo sottolineato e la definizione fra etichetta e valore;
+// la password che comincia coi segni di un blocco non è un'apertura, e resta coperta come prima.
+test('una riga di sola struttura Markdown fra etichetta e valore non prende il posto della password', () => {
+  for (const testo of ['Password:\n>\n> Nyckel!2024', '> **Password:**\n>\n> Nyckel!2024', '> Password:\n> \n> Nyckel!2024',
+    '>> Password:\n>>\n>> Nyckel!2024', '> PIN:\n>\n> 4821', 'Password:\n~~~Nyckel2024', 'Password:\n```Nyckel2024',
+    'Password:\n---\nNyckel!2024', 'Password:\n___\nNyckel!2024', 'Password:\n* * *\nNyckel!2024',
+    '**Password:**\n\n---\n\nNyckel!2024', 'Password\n========\nNyckel!2024', 'Password:\n: Nyckel!2024',
+    'Password:\r\n>\r\n> Nyckel!2024', 'Password:\r\n---\r\nNyckel!2024', 'Password:\n\n---\n\n```bash\nNyckel!2024\n```',
+    '| **Password:** | Nyckel!2024 |']) {
+    assert.doesNotMatch(P.oscura(testo), /Nyckel|4821/, `pavimento: ${testo}`);
+    assert.doesNotMatch(alCorrettore(testo), /Nyckel|4821/, `correttore: ${testo}`);
+  }
+  assert.equal(P.oscura('Password:\n---\nNyckel!2024'), `Password:\n---\n${S}`);
+  for (const testo of ['# Titolo\n\n---\n\nTesto normale qui', 'Password:\n\n---\n\nLa trovi nel cassetto']) {
+    assert.equal(P.oscura(testo), testo);
+  }
+});
+
+// Le righe di apertura e chiusura di un blocco non contano come righe vuote: le righe vuote fra etichetta e valore sono
+// le stesse per la parola sola e per la frase.
+test('una password di più parole in un blocco di codice dopo una riga vuota non arriva al modello', () => {
+  for (const testo of ['Password:\n\n```\ncasa mia al mare 2019\n```', 'Password:\n```\ncasa mia al mare 2019\n```',
+    'Password:\n\n\n\ncasa mia al mare 2019', 'Password:\n\n\n\nNyckel!2024']) {
+    assert.doesNotMatch(P.oscura(testo), /casa mia|Nyckel/, `pavimento: ${testo}`);
+    assert.doesNotMatch(alCorrettore(testo), /casa mia|Nyckel/, `correttore: ${testo}`);
+  }
+});
+
+// Una fila lunga di spazi, scritti o nati dai segni Markdown letti come spazi, si legge in un tempo che cresce con la
+// lunghezza: un controllo all'indietro davanti a una parola rileggeva tutta la fila a ogni posto (secondi invece di ms).
+test('righe lunghe di segni Markdown o di spazi non fermano il cancello dei modelli', () => {
+  for (const testo of [`x\n${'\n- '.repeat(4000)}`, `x\n${'- '.repeat(4000)}x`, `x\n${'> '.repeat(4000)}x`,
+    `Password:\n${'```\n'.repeat(2000)}`, `Password:\n${'> ```\n'.repeat(2000)}`, `${'   \n'.repeat(4000)}x`,
+    `${' '.repeat(12000)}x`]) {
+    const c = costoInUnita(() => P.oscura(testo), { tetto: TETTO_FILE_DI_SPAZI });
+    assert.ok(c.entro, `${JSON.stringify(testo.slice(0, 12))}: ${c.come}`);
+  }
+});
+
+// Le forme più rare dello stesso valore: il blocco di codice citato, più righe vuote, una cella vuota o una barra
+// protetta in tabella. Il pavimento le copre come il correttore.
+test('il blocco di codice citato, le righe vuote e le celle vuote non lasciano passare il valore sotto l\'etichetta', () => {
+  for (const [testo, atteso] of [
+    ['Password:\n> ```\n> Nyckel!2024\n> ```', `Password:\n> \`\`\`\n> ${S}\n> \`\`\``],
+    ['> Password:\n> ```\n> Nyckel!2024\n> ```', `> Password:\n> \`\`\`\n> ${S}\n> \`\`\``],
+    ['Password:\n\n\n\n- Nyckel!2024', `Password:\n\n\n\n- ${S}`],
+    ['Password:\n\n\n```\nNyckel!2024\n```', `Password:\n\n\n\`\`\`\n${S}\n\`\`\``],
+    ['| Password: | | Nyckel!2024 |', `| Password: | | ${S} |`],
+    ['| Password: | Nyckel\\|2024 |', `| Password: | ${S} |`],
+  ]) {
+    assert.equal(P.oscura(testo), atteso, 'pavimento');
+    assert.doesNotMatch(alCorrettore(testo), /Nyckel|2024/, 'correttore');
+  }
+  // Il testo che resta è uno che anche fuori dal blocco non è un valore: più parole sotto l'etichetta ora si coprono (#2714).
+  for (const testo of ['Password:\n> ```\n> vedi sotto\n> ```','| Password: | | obbligatoria |', '| Password: | | |']) {
+    assert.equal(P.oscura(testo), testo);
   }
 });

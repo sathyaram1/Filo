@@ -83,8 +83,8 @@ function spiega(parole, k) {
 }
 
 function riservati(grezzo) {
-  // L'enfasi del Markdown e i tag HTML fra etichetta e valore («__Password:__ …») si leggono come spazi, e un commento
-  // HTML in due letture, come nel pavimento.
+  // L'enfasi e i segni di blocco del Markdown e i tag HTML fra etichetta e valore («__Password:__ …», «- …» sotto
+  // l'etichetta) si leggono come spazi, e un commento HTML in due letture, come nel pavimento.
   return RT().vistePerLeRegole(grezzo).flatMap(riservatiIn);
 }
 
