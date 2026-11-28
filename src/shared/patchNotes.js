@@ -11,6 +11,7 @@
     {
       version: '0.2.310', date: '2026-11-28',
       fixes: [
+        { testo: 'Il correttore capisce se scrivi in inglese, anche su un computer in italiano: segna solo le parole davvero sbagliate e le corregge in inglese, senza tradurle.', segnalazione: 2756 },
         { testo: 'Un messaggio lunghissimo incollato, una pagina con un campo pieno di cifre o una risposta con una lunga fila di parentesi quadre non bloccano più Filo per secondi o minuti.', segnalazione: [2754, 2758, 2761] },
         { testo: 'In una tabella con la colonna «Password», una password che contiene una barra verticale non arriva più a metà ai modelli.', segnalazione: 2673 },
       ],
