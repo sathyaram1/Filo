@@ -5063,6 +5063,7 @@ class TabManager {
             ids.push(idRimettibile(savedIds[i]));
             letture.push(letturaValida(savedLetture[i]) || null);
             visioni.push(letturaValida(savedVisioni[i]) || null);
+            bloccate.push(savedBloccate[i] === true);
           }
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
