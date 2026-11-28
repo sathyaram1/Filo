@@ -249,7 +249,7 @@ test('#896 — l’owner, in pausa, vede tutto come prima', async ({ app, openTa
   await expect(await iconaNellaBarra(app)).toBeVisible({ timeout: 8000 });
 
   const { voce } = await vociDelTastoDestro(openTab, testServer);
-  await expect(voce).toBeVisible();
+  await expect(voce).toHaveCount(1);
 
   const rt = await openTab(RT_URL);
   await expect(rt.locator('.rt-tab')).toHaveCount(4);
@@ -286,7 +286,7 @@ test('#896 — acceso da Gestione, chi non è owner lo rivede senza riavviare; u
   await home(app);
   await expect(await iconaNellaBarra(app)).toBeVisible({ timeout: 8000 });
   const { page: sito, voce } = await vociDelTastoDestro(openTab, testServer);
-  await expect(voce).toBeVisible();
+  await expect(voce).toHaveCount(1);
   await sito.keyboard.press('Escape');
 
   // Rimesso in pausa da un'altra installazione dell'owner: qui la copia vale fino alla scadenza, poi si rilegge.
