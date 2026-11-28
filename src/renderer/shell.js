@@ -1201,7 +1201,7 @@
       else if (action === 'tab-cookies-auto') api.tabs.cookieBanners(id, false);
       else if (action === 'tab-connesso-si') restaConnesso(id, true);
       else if (action === 'tab-connesso-no') restaConnesso(id, false);
-      else if (action === 'tab-permessi-azzera') azzeraPermessi(id);
+      else if (action.startsWith(PERMESSO)) togliPermesso(id, action.slice(PERMESSO.length));
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
   }
