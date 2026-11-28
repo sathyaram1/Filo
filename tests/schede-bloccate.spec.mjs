@@ -108,7 +108,7 @@ test('«chiudile tutte» in chat lascia la bloccata e lo dice; chiesta per numer
   expect(popup).toContain('Beta');
   expect(popup).toContain('L\'avevi bloccata');
   await expect.poll(() => titoli(shell), { timeout: 10_000 }).toEqual([]);
-  expect(await esitoPerIlModello(app, 'n1')).toContain('Era bloccata');
+  await expect.poll(async () => JSON.stringify((await chiamateAlModello(app))[3] || ''), { timeout: 10_000 }).toContain('Era bloccata');
   await expect(page.locator('.dash-activity').last()).toContainText('era bloccata');
   await page.screenshot({ path: 'tests/.shots/schede-bloccate-chat.png' });
   await ripristina(app);
