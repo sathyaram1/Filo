@@ -117,6 +117,7 @@ test('X, clic centrale e Ctrl+W non chiudono la bloccata: l\'avviso offre «Sblo
   const vista = await (async () => { await lucchetto.click(); return avvisi(); })();
   const avviso = vista.locator('.shell-notif', { hasText: 'Scheda bloccata' });
   await expect(avviso).toBeVisible({ timeout: 8_000 });
+  await avviso.screenshot({ path: 'tests/.shots/scheda-bloccata-avviso.png' });
   await linguetta.click({ button: 'middle' });
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
