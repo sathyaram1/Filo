@@ -3035,6 +3035,7 @@
     const payload = {
       ...pezziDa(testo, wordCtx.start, wordCtx.end, sopraIlCampo(el)),
       candidati: [{ pezzo: wordCtx.word, perche: t('spell_perche_chiesta') }],
+      lingua: linguaDelPezzo(testo, wordCtx.start, wordCtx.end),
     };
     let res;
     try { res = await chiediERipeti(ACTIONS.SPELLCHECK_SEMANTIC, payload, { suRichiesta: true }); } catch (_) { return null; }
