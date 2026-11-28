@@ -146,7 +146,7 @@ test('copertina stesa sopra il link (immagine, non filmato): stesse due famiglie
   </body></html>`);
   const menu = await openMenuOn(page, '#cover');
 
-  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  await haVoce('Salva immagine come');
   await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
@@ -217,7 +217,7 @@ test('velo trasparente, anteprima ferma: il menu è quello della scheda, non vuo
   const menu = await openMenuOn(page, '#velo');
   await page.screenshot({ path: 'tests/.shots/context-menu-velo-anteprima-ferma.png' }).catch(() => {});
 
-  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  await haVoce('Salva immagine come');
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
@@ -412,7 +412,7 @@ test('sfumatura sul titolo (solo il fondo della copertina): il menu resta quello
   </body></html>`);
   const menu = await openMenuOn(page, '#sfumatura');
 
-  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  await haVoce('Salva immagine come');
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
@@ -483,7 +483,7 @@ test('scheda con imbottitura, anteprima ferma: la copertina dà lo stesso menu',
   ));
   const menu = await openMenuOn(page, '#cover');
 
-  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  await haVoce('Salva immagine come');
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
@@ -541,7 +541,7 @@ test('copertina ferma dentro il collegamento, striscia del titolo sopra: idem', 
   ));
   const menu = await openMenuOn(page, '#striscia');
 
-  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  await haVoce('Salva immagine come');
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
