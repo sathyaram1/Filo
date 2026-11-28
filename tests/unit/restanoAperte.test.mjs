@@ -1,5 +1,5 @@
-// SN_RESTANO_APERTE (#1695): il conto e la frase delle schede rimaste aperte, uguali nel diario della chat (#413) e
-// nell'avviso di «Chiudi le altre schede».
+// SN_RESTANO_APERTE (#1695, #2086): il conto e la frase delle schede rimaste aperte dopo una chiusura in blocco chiesta
+// in chat, uguali nel diario (#413) e nella riga che il modello legge dopo un OK.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
