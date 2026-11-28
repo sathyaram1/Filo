@@ -312,10 +312,11 @@
     if (!el || !apritoreDi(el)) return [];
     const I = global.SN_ICONS || {};
     const icona = (n) => (typeof I[n] === 'function' ? I[n](16) : '');
+    // `elemento`: l'etichetta, più stretta del messaggio che la contiene: il clic dell'icona va a lei (#2555).
     return [
-      { type: 'item', icon: icona('copy'), label: 'Copia la citazione', onClick: () => { copia(el.dataset.fonteCitazione || ''); } },
-      { type: 'item', icon: icona('link'), label: 'Copia l’indirizzo', onClick: () => { copia(el.dataset.fonteUrl || ''); } },
-      { type: 'item', icon: icona('openTab'), label: 'Apri la pagina sulla frase', onClick: () => apriEtichetta(el) },
+      { type: 'item', icon: icona('copy'), label: 'Copia la citazione', elemento: el, onClick: () => { copia(el.dataset.fonteCitazione || ''); } },
+      { type: 'item', icon: icona('link'), label: 'Copia l’indirizzo', elemento: el, onClick: () => { copia(el.dataset.fonteUrl || ''); } },
+      { type: 'item', icon: icona('openTab'), label: 'Apri la pagina sulla frase', elemento: el, onClick: () => apriEtichetta(el) },
     ];
   }
 
