@@ -1405,31 +1405,38 @@ class TabManager {
     return chiuse.map((t) => t.id);
   }
 
-  // «Chiudi le altre schede» del menu della linguetta (#1695): è «tutte tranne questa» della chat, con la stessa scelta
-  // di chi resta. La tenuta diventa l'attiva prima, così nessuna delle chiuse passa davanti. Torna { chiuse, restano }.
-  async chiudiLeAltre(id, { via = 'tasto_destro_scheda' } = {}) {
-    const tab = this.tabs.find((t) => t.id === id);
-    if (!tab) return { chiuse: [], restano: [] };
-    const motivo = await this.motiviPerRestare();
-    if (!this.tabs.includes(tab)) return { chiuse: [], restano: [] };
-    const viste = this.tabs.map((t) => t.id);
-    const scelta = ChiudiSchede.risolvi({ tutte: true, tranne: [viste.indexOf(id) + 1] },
-      { schede: this.tabs, viste, numerate: viste.length, resta: (t) => motivo(t) });
-    if (scelta.errore) return { chiuse: [], restano: [] };
-    if (this.activeId !== id) this.activate(id);
-    const chiuse = this.chiudiSchede(scelta.chiudere.map((t) => t.id), { via });
-    return { chiuse, restano: scelta.restano.map((x) => x.perche) };
-  }
-
-  // A «chiudile tutte» chiesto in chat (#413) restano il testo scritto e non inviato e i siti tenuti sempre aperti:
-  // la funzione che torna dice 'testo', 'sempre' o '' (si chiude).
+  // A «chiudile tutte» chiesto in chat (#413) restano le bloccate (#2086), il testo scritto e non inviato e i siti
+  // tenuti sempre aperti: la funzione che torna dice 'bloccata', 'testo', 'sempre' o '' (si chiude).
   async motiviPerRestare() {
     await this._caricaSempreAperte();
     return (tab) => {
       if (!tab) return '';
+      if (tab.bloccata) return 'bloccata';
       if (tab.formDirty || this._invioNonTenuto(tab)) return 'testo';
       return this._sempreAperta(tab) ? 'sempre' : '';
     };
+  }
+
+  // #2086 — blocca o sblocca. Torna lo stato nuovo, o null se la scheda non c'è (o non si blocca: le pagine di servizio).
+  bloccaScheda(id, on) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab || tab._sorvegliante) return null;
+    const v = on === true;
+    if (tab.bloccata !== v) {
+      tab.bloccata = v;
+      this._broadcast();
+    }
+    return v;
+  }
+
+  // Un gesto di chiusura su una bloccata (X, clic centrale, Ctrl+W, la pagina, un'estensione): resta, e lo si dice.
+  _avvisaBloccata(tab) {
+    try {
+      this.win.webContents.send('shell:toast', {
+        text: 'Scheda bloccata',
+        opts: { tipo: 'scheda_bloccata', unica: `scheda-bloccata:${tab.id}`, actions: [{ label: 'Sblocca e chiudi', sbloccaEChiudi: tab.id }] },
+      });
+    } catch (_) {}
   }
 
   // Quello che ogni chiusura chiesta fa a una scheda prima di toglierla dall'elenco.
