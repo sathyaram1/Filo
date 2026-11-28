@@ -566,7 +566,7 @@
     const parola = w.parola;
     if (parola.replace(/['’-]/g, '').length < 2 || isInDictionary(parola) || nomeNoto(parola)) return;
     if (state.contate.some((x) => x.start === w.start && x.end === w.end)) return;
-    if (!parolaImparabile(parola)) return;
+    if (!parolaImparabile(parola, R().linguaIn(R().lingueDelTesto(testo), w.start))) return;
     state.contate = [...state.contate, { id: ++progressivo, start: w.start, end: w.end, segment: parola }].slice(-AUTOMATICHE_MAX);
     const inizioFrase = A().inizioDiFrase(testo, w.start);
     impara({ passo: 'riscritta', parola, inizioFrase }, (r) => {
