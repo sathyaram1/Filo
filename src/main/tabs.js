@@ -4963,9 +4963,11 @@ class TabManager {
     // Lo 0 non si scrive: «scroll 0%» direbbe al riordino «letta in parte», e terrebbe la pagina mai cominciata.
     const letture = kept.map((t) => letturaValida(letturaNota(t)) || null);
     const visioni = kept.map((t) => letturaValida(visioneNota(t)) || null);
+    // #2086 — il blocco sopravvive al riavvio.
+    const bloccate = kept.map((t) => (t.bloccata ? true : null));
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, aperte, pagine, usate, ids, audio, letture, visioni, activeIndex };
+    return { tabs, colors, aperte, pagine, usate, ids, audio, letture, visioni, bloccate, activeIndex };
   }
 
   _sessionKey() {
