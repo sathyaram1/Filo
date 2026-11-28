@@ -38,7 +38,7 @@ async function apri(app, testServer, openTab, { modello = false } = {}) {
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
   }, modello);
-  await expect.poll(() => app.evaluate(() => globalThis.__filoDizionarioDiFilo.prepara() && globalThis.__filoDizionarioDiFilo.stato()), { timeout: 20_000 })
+  await expect.poll(() => app.evaluate(() => globalThis.__filoDizionarioDiFilo.stato()), { timeout: 20_000 })
     .toMatchObject({ fase: 'pronto', predefinite: ['it-IT'], lingue: expect.arrayContaining(['it-IT', 'en-US']) });
   const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
