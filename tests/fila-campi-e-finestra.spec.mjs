@@ -132,10 +132,10 @@ test('su un filmato o un audio icona e voce si chiamano allo stesso modo, e fann
   await expect.poll(() => page.evaluate(() => document.getElementById('aud').loop)).toBe(true);
   await page.locator('#aud').click({ button: 'right' });
   await expect(menu.voce('Non ripetere')).toHaveCount(1);
-  await menu.piu.click();
   const ripeti = menu.locator('.sn-menu-altro [data-sn-icon-id="media:loop"]');
   await expect(ripeti).toHaveAttribute('aria-label', 'Non ripetere');
-  await ripeti.click();
+  // Dal «+» come l'utente: scegli aspetta che l'icona appena scoperta conti il clic (vistoDavvero.js).
+  await menu.scegli(ripeti);
   await expect.poll(() => page.evaluate(() => document.getElementById('aud').loop)).toBe(false);
 });
 
