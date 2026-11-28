@@ -258,7 +258,7 @@
       const stessa = s.verbo && tutte.find((v) => v.verbo === s.verbo);
       if (!stessa) { restano.push(s); continue; }
       const scritta = { label: s.label, onClick: s.onClick, bersaglio: s.bersaglio, ...misura(s) };
-      if (stessa.oggettoChiave === 'selezione' || stessa.valore || stessa.cronologia) {
+      if (stessa.oggettoChiave === 'selezione' || stessa.valore || stessa.cronologia || typeof stessa.acceso === 'boolean') {
         stessa.varianti = [...(stessa.varianti || []), scritta, ...(s.varianti || [])];
         continue;
       }
