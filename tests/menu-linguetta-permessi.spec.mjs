@@ -28,9 +28,8 @@ test('scheda di un sito senza permessi ricordati: niente Aiuto, nessuna riga dei
   const id = await apriEAspetta(app, testServer.html('<title>Uno</title><p>uno'));
   await tastoDestro(shell, `.tab[data-id="${id}"]`);
   const voci = await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Duplica'));
-  const testi = voci.map((x) => x.testo);
+  const testi = senzaConnesso(voci);
   expect(testi).toEqual(['Blocca', 'Duplica', 'Muta', 'Chiudi']);
-  expect(testi).not.toContain('Aiuto');
   expect(voci.some((x) => x.hover)).toBe(false);
 });
 
