@@ -90,10 +90,13 @@ test('una domanda in smistamento si risponde: l’opzione parte, la domanda esce
   await tab(page, 'domande-smistamento').click();
   await expect(tab(page, 'domande-smistamento')).toHaveText('In smistamento (2)');
   await riga(page, 'D-54').click({ button: 'right' });
-  const menu = page.locator('.mg-ctxmenu, .sn-select-pop').last();
-  await expect(menu).toContainText('Applica il consiglio');
-  await expect(menu).not.toContainText('Discutiamo');
-  await page.keyboard.press('Escape');
+  // A icone (#2555): le voci sono icone o varianti nel menu di un'icona.
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  const voci = await menu.vociScritte();
+  expect(voci.some((v) => v.includes('Applica il consiglio'))).toBe(true);
+  expect(voci.some((v) => v.includes('Discutiamo'))).toBe(false);
+  await expect.poll(async () => { await page.keyboard.press('Escape'); return menu.pannelli.count(); }).toBe(0);
   await riga(page, 'D-54').click();
   const s = dq(page, 'D-54');
   await expect(s.locator('.mg-dq-applica')).toBeVisible();
