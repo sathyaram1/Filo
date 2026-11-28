@@ -51,9 +51,9 @@ for (const [caso, csp] of Object.entries(CSP)) {
   test(`Trusted Types (${caso}): il tasto destro apre il menu di Filo, e la sua voce apre il riquadro`, async ({ app, openTab, testServer }) => {
     const page = await apri(openTab, testServer, csp);
     await tastoDestroSullaFrase(page.locator('#paragraph'));
-    const menu = menuDi(page).locator('.sn-menu');
+    const menu = menuDi(page);
     await menuCompleto(menu);
-    await menu.getByText('Invia feedback', { exact: true }).click();
+    await menu.scegli('Invia feedback');
     await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.visibile ?? false).toBe(true);
   });
 
