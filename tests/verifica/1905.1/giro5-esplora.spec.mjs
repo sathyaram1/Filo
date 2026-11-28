@@ -70,6 +70,37 @@ test('la copia di un file sopravvive alla chiusura dell\'originale e alla ricari
   await expect.poll(async () => { const s = await stato(copiaf); console.log('COPIA', s); return Number(s.split(' ').pop()); }, { timeout: 10_000, message: 'la copia della foto si vede' }).toBeGreaterThan(0);
 });
 
+test('una pagina salvata col suo font, una cornice accanto e la memoria locale funziona come in un browser', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = join(cartellaTemporanea('esplora5c-'), 'Salvata');
+  mkdirSync(join(dir, 'font'), { recursive: true });
+  copyFileSync('/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf', join(dir, 'font', 'f.ttf'));
+  writeFileSync(join(dir, 'stile.css'), '@font-face{font-family:Mio;src:url(font/f.ttf)} #t{font-family:Mio}');
+  writeFileSync(join(dir, 'cornice.html'), '<!doctype html><title>C</title><p id="c">dentro la cornice</p>');
+  writeFileSync(join(dir, 'p.html'), `<!doctype html><meta charset="utf-8"><title>Salvata</title><link rel="stylesheet" href="stile.css">
+<body><h1 id="t">Titolo</h1><iframe id="f" src="cornice.html"></iframe><script>
+const e = {};
+window.addEventListener('load', async () => {
+  try { localStorage.setItem('k', 'v'); e.ls = localStorage.getItem('k'); } catch (x) { e.ls = 'NO:' + x.name; }
+  try { await new Promise((ok, ko) => { const r = indexedDB.open('db'); r.onsuccess = ok; r.onerror = () => ko(r.error); }); e.idb = 'si'; } catch (x) { e.idb = 'NO:' + (x && x.name); }
+  try { await document.fonts.load('16px Mio'); e.font = [...document.fonts].map((f) => f.family + ':' + f.status).join(','); } catch (x) { e.font = 'NO:' + x.name; }
+  e.fine = 1; document.body.dataset.esito = JSON.stringify(e);
+});
+</script></body>`);
+  await home(app);
+  const file = join(dir, 'p.html');
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'p.html')), { timeout: 10_000 }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activate(i), id);
+  const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
+  await expect.poll(async () => JSON.parse((await pagina.locator('body').getAttribute('data-esito')) || '{}').fine, { timeout: 20_000 }).toBe(1);
+  const e = JSON.parse(await pagina.locator('body').getAttribute('data-esito'));
+  const cornice = await pagina.frameLocator('#f').locator('#c').textContent({ timeout: 5000 }).catch((x) => 'NO ' + x.message.slice(0, 60));
+  console.log('ESITO', JSON.stringify(e), 'CORNICE', cornice);
+  expect({ font: e.font, cornice }).toEqual({ font: 'Mio:loaded', cornice: 'dentro la cornice' });
+});
+
 test('fetch, XHR, import, tracce, audio, @import e stili non leggono i file accanto', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = join(cartellaTemporanea('esplora5-'), 'Scaricati');
