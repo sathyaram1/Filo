@@ -374,8 +374,9 @@ function registerIpcHandlers() {
     try { p = chiedi(require('./services/dizionarioDiFilo')); } catch (_) {}
     Promise.resolve(p).catch(() => null).then((out) => { try { event.returnValue = out ?? null; } catch (_) {} });
   };
-  ipcMain.on('filo:dizionario-sbagliate', (event, parole) => dalDizionario(event, (D) => D.sbagliate(parole)));
-  ipcMain.on('filo:dizionario-proposte', (event, parola) => dalDizionario(event, (D) => D.proposte(parola)));
+  // `lingua`: quella del testo che la pagina ha riconosciuto (#2756); una che il dizionario non ha vale le lingue di serie.
+  ipcMain.on('filo:dizionario-sbagliate', (event, parole, lingua) => dalDizionario(event, (D) => D.sbagliate(parole, lingua)));
+  ipcMain.on('filo:dizionario-proposte', (event, parola, lingua) => dalDizionario(event, (D) => D.proposte(parola, lingua)));
 
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
