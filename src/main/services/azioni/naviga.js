@@ -470,4 +470,6 @@ module.exports = {
   ZOOM_PAGINA: azioneZoomPagina,
   TRADUCI_PAGINA: azioneTraduciPagina,
   CHIUDI_SCHEDE: azioneChiudiSchede,
+  BLOCCA_SCHEDA: (action, ctx) => azioneBloccaScheda(action, ctx, true),
+  SBLOCCA_SCHEDA: (action, ctx) => azioneBloccaScheda(action, ctx, false),
 };
