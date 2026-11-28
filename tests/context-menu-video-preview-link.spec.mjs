@@ -73,10 +73,10 @@ test('anteprima video stesa sopra la scheda: il menu tiene sia il filmato sia il
   await page.screenshot({ path: 'tests/.shots/context-menu-video-preview-link.png' }).catch(() => {});
 
   for (const label of MEDIA_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
 });
 
@@ -110,7 +110,7 @@ test('filmato dentro un componente web, collegamento in chiaro: le voci del link
   const menu = await openMenuOn(page, 'video-preview');
 
   for (const label of MEDIA_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
   await expect
@@ -129,10 +129,10 @@ test('scheda a strati (velo sopra, filmato e link sotto): il menu è quello dell
   const menu = await openMenuOn(page, '#velo');
 
   for (const label of MEDIA_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
 });
 
@@ -183,10 +183,10 @@ test('scheda-componente con link e anteprima impilati: le voci del collegamento 
   const menu = await openMenuOn(page, 'video-card');
 
   for (const label of MEDIA_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
 });
 
@@ -219,7 +219,7 @@ test('velo trasparente, anteprima ferma: il menu è quello della scheda, non vuo
 
   await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
   await expect
@@ -241,7 +241,7 @@ test('velo trasparente sopra un collegamento qualsiasi: le voci del link restano
   const menu = await openMenuOn(page, '#velo');
 
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   await menu.locator('button', { hasText: 'Copia URL' }).first().click();
   await expect
@@ -414,7 +414,7 @@ test('sfumatura sul titolo (solo il fondo della copertina): il menu resta quello
 
   await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
   await expect
@@ -454,10 +454,10 @@ test('scheda con imbottitura attorno alla copertina: l\'anteprima porta anche le
   await page.screenshot({ path: 'tests/.shots/context-menu-scheda-con-imbottitura.png' }).catch(() => {});
 
   for (const label of MEDIA_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
 });
 
@@ -485,7 +485,7 @@ test('scheda con imbottitura, anteprima ferma: la copertina dà lo stesso menu',
 
   await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
   await expect
@@ -522,10 +522,10 @@ test('copertina dentro il collegamento, striscia del titolo sopra: le voci del c
   await page.screenshot({ path: 'tests/.shots/context-menu-striscia-titolo.png' }).catch(() => {});
 
   for (const label of MEDIA_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
   await expect
@@ -543,7 +543,7 @@ test('copertina ferma dentro il collegamento, striscia del titolo sopra: idem', 
 
   await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
   await expect
@@ -613,10 +613,10 @@ test('riga di risultati con miniatura piccola: sull\'anteprima ci sono ANCHE i c
   await page.screenshot({ path: 'tests/.shots/context-menu-riga-risultato.png' }).catch(() => {});
 
   for (const label of MEDIA_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
 });
 
@@ -644,10 +644,10 @@ test('riga di risultati, anteprima ferma: la miniatura dà le voci dell\'immagin
   const menu = await rightClickAt(page, p.x, p.y);
 
   for (const label of IMG_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
 });
 
@@ -769,10 +769,10 @@ test('collegamento steso con uno pseudo-elemento: la miniatura resta nel menu', 
   const menu = await rightClickAt(page, p.x, p.y);
 
   for (const label of MEDIA_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
   await expect
