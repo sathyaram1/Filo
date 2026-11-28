@@ -50,9 +50,14 @@ test('il menu del tasto destro nomina i tasti di CHI legge', async ({ app, openT
   // Le voci del menu chiedono il nome alla regola invece di scriverlo: se la
   // regola non arrivasse fin dentro la pagina, la voce non si costruirebbe
   // affatto e queste due scritte non ci sarebbero.
-  const scorciatoie = await menu.locator('.sn-menu-shortcut').allTextContents();
-  expect(scorciatoie).toContain(atteso.incolla);
-  expect(scorciatoie).toContain(atteso.aiuto);
+  // A icone (#2555) la scorciatoia sta sotto il nome, nella riga del nome, passando sull'icona.
+  const m = menuDi(page);
+  for (const [verbo, tasti] of [['paste', atteso.incolla], ['help', atteso.aiuto]]) {
+    const icona = m.icona(verbo).first();
+    if (!(await icona.isVisible())) await m.piu.click();
+    await icona.hover();
+    await expect(m.nome).toContainText(tasti);
+  }
 });
 
 test('il suggerimento della barra nomina i tasti di CHI legge', async ({ shell }) => {
