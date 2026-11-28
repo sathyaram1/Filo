@@ -80,9 +80,11 @@ test('link dentro uno shadow root: il menu offre le azioni sul link, come in lig
 test('immagine dentro uno shadow root: il menu offre le azioni sull\'immagine', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, pageHtml());
 
-  const menu = await openMenuOn(page, '#s-img');
+  await openMenuOn(page, '#s-img');
+  // A icone (#2555): un'icona, dietro il «+» o una variante nel menu dell'icona dello stesso verbo.
+  const m = menuDi(page);
   for (const label of ['Copia immagine', 'Salva immagine come', 'Copia URL immagine', 'Cerca immagine']) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    expect(await m.haVoce(label), label).toBe(true);
   }
 });
 
