@@ -48,9 +48,21 @@ function overlayPreviewHtml(linkHref) {
   </body></html>`;
 }
 
+// A icone (#2555): un'azione è un'icona della griglia, dietro il «+» o una variante nel menu di un'icona dello stesso
+// verbo. `aperto` è il menu aperto per ultimo.
+let aperto = null;
+const haVoce = async (label) => expect(await aperto.haVoce(label), label).toBe(true);
+// «Copia URL» del collegamento: l'icona Copia, o una sua variante se il clic copia il filmato o l'immagine.
+async function copiaUrlDelLink() {
+  const icona = aperto.icona('copy').first();
+  if (/^Copia URL$/.test(String(await icona.getAttribute('aria-label')).trim())) return aperto.scegli(icona);
+  return aperto.variante(icona, /^\s*Copia URL\s*$/);
+}
+
 async function openMenuOn(page, selector, position) {
   await page.locator(selector).click({ button: 'right', ...(position ? { position } : {}) });
-  const menu = menuDi(page).locator('.sn-menu');
+  aperto = menuDi(page);
+  const menu = aperto.locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }
