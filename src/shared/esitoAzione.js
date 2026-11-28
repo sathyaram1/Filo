@@ -100,7 +100,7 @@
     return s.length > max ? `${s.slice(0, max - 1)}…` : s;
   };
 
-  // Perché qualche scheda non si è chiusa (#413): la frase è quella di SN_RESTANO_APERTE, uguale nel menu della linguetta.
+  // Perché qualche scheda non si è chiusa (#413): la frase è quella di SN_RESTANO_APERTE, uguale nel diario.
   function restanoAperte(o) {
     const R = global.SN_RESTANO_APERTE || (typeof require === 'function' ? require('./restanoAperte.js') : null);
     return R ? R.frase(o) : '';
