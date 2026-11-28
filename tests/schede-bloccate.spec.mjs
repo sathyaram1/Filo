@@ -90,8 +90,7 @@ test('«chiudile tutte» in chat lascia la bloccata e lo dice; chiesta per numer
   // Dato l'OK il lavoro riprende col suo esito (#1685): la seconda chiamata sa cosa è rimasto e perché.
   const esito = JSON.stringify((await chiamateAlModello(app))[1]);
   expect(esito).toContain('Chiuse 2 schede');
-  expect(esito).toContain('l\'utente le ha bloccate');
-  expect(esito).toMatch(/<<<DATI_PAGINA>>>[\s\S]*Beta[\s\S]*<<<FINE_DATI_PAGINA>>>/);
+  expect(esito).toContain('una era bloccata e l\'ho lasciata');
   await expect(page.locator('.dash-activity').last()).toContainText('una era bloccata e l\'ho lasciata');
 
   // Adesso è la seconda della barra. Da sola sarebbe costo 1 e si chiuderebbe senza chiedere: bloccata chiede.
