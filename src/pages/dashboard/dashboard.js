@@ -1058,6 +1058,8 @@
     RIPRENDI_AUDIO: 'Faccio ripartire la musica…',
     PAUSA_AUDIO: 'Metto in pausa…',
     MOSTRA_SCHEDA: 'Ti porto sulla scheda…',
+    BLOCCA_SCHEDA: 'Blocco la scheda…',
+    SBLOCCA_SCHEDA: 'Sblocco la scheda…',
     SALVA_PER_DOPO: 'Salvo la pagina per dopo…',
     CERCA_IMMAGINE: 'Cerco l\'immagine…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
