@@ -55,9 +55,10 @@ test('#583 chi non gestisce i feedback non trova l\'icona che porta alla loro po
 test('#583 mandare un feedback resta nel menu, per chiunque', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('p').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  // A icone (#2555): un'icona della griglia o dietro il «+».
+  await expect(menu.voce('Invia feedback')).toHaveCount(1);
 });
 
 test('click su Impostazioni apre la pagina Opzioni', async ({ openTab, testServer, app }) => {
