@@ -136,10 +136,9 @@ test('chiudi la scheda dell\'editor a metà animazione', async ({ app }) => {
   console.log('chiusa a meta: campo', JSON.stringify(campo), 'schede', JSON.stringify(s));
   // il testo non deve essere perso: o nel campo o in un documento
   await page.waitForTimeout(1500);
-  const docs = await app.evaluate(async ({ app: a }) => {
-    const fs = require('node:fs'); const p = require('node:path');
-    try { return fs.readFileSync(p.join(a.getPath('userData'), 'storage.json'), 'utf8').includes('Chiudo a metà'); } catch (e) { return 'err ' + e.message; }
-  });
+  const ud = await app.evaluate(({ app: a }) => a.getPath('userData'));
+  let docs;
+  try { docs = readFileSync(join(ud, 'storage.json'), 'utf8').includes('Chiudo a metà'); } catch (e) { docs = 'err ' + e.message; }
   console.log('nel salvato?', docs);
   const velo = await page.evaluate(() => [...document.querySelectorAll('body > *')].filter((e) => getComputedStyle(e).position === 'fixed' && e.getBoundingClientRect().width > 300).map((e) => e.className || e.id));
   console.log('elementi fissi grandi', JSON.stringify(velo));
