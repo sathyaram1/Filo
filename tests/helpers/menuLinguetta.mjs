@@ -20,10 +20,12 @@ function nelMenu(app, js) {
   }, js);
 }
 
-// [{ testo, spenta, icona }] del menu in vista, o null se nessun menu è aperto.
+// [{ testo, spenta, icona, hover }] del menu in vista, o null se nessun menu è aperto. `hover`: le parole che la riga
+// mostra al passaggio (le righe dei permessi, #2087), fuori dal testo.
 export async function vociDelMenu(app) {
   const s = await nelMenu(app, `JSON.stringify([...document.querySelectorAll('.item')]
-    .map((e) => ({ testo: e.textContent.trim(), spenta: e.classList.contains('disabled'), icona: !!e.querySelector('svg') })))`);
+    .map((e) => ({ testo: (e.querySelector('.lbl') || e).textContent.trim(), spenta: e.classList.contains('disabled'),
+      icona: !!e.querySelector('svg'), ...(e.querySelector('.hint') ? { hover: e.querySelector('.hint').textContent.trim() } : {}) })))`);
   return s ? JSON.parse(s) : null;
 }
 
