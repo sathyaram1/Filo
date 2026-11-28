@@ -1007,7 +1007,7 @@
   // Sentinella: tests/unit/capacitaStrumenti.test.mjs (ogni voce ne ha uno, e lo strumento esiste).
   const SOLO_A_MANO = 'filo_su_di_se(capacita)';
   const STRUMENTO = Object.freeze({
-    'new-tab': 'scheda(apri)', 'close-tab': 'scheda(chiudi)', 'reopen-closed-tab': 'scheda(riapri)',
+    'new-tab': 'scheda(apri)', 'close-tab': 'scheda(chiudi)', 'reopen-closed-tab': 'scheda(riapri)', 'lock-tab': 'scheda(blocca)',
     'navigate-back-forward': SOLO_A_MANO, 'switch-tab-by-number': 'scheda(mostra)', 'switch-tab-next-prev': 'scheda(mostra)',
     reload: SOLO_A_MANO, home: 'scheda(finestra)', 'address-bar': 'scheda(apri)', 'open-local-file': 'scheda(apri)', incognito: SOLO_A_MANO,
     fullscreen: 'scheda(finestra)', sidebar: 'scheda(finestra)', 'fila-tasto-destro': 'home(icona)',
