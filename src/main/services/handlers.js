@@ -195,10 +195,11 @@ async function eseguiAzioneFilo(action, {
     const b = tm ? await bersaglioAudio(tm, action, schedeViste) : null;
     if (b && (b.tab || b.chiusa)) action._titolo = (await nomeDellaScheda())(b.tab || { url: b.chiusa.url, title: b.chiusa.titolo });
   }
-  if (type === 'PAUSA_AUDIO' || type === 'MOSTRA_SCHEDA' || type === 'SALVA_PER_DOPO') {
+  if (type === 'PAUSA_AUDIO' || type === 'MOSTRA_SCHEDA' || type === 'SALVA_PER_DOPO' || type === 'BLOCCA_SCHEDA' || type === 'SBLOCCA_SCHEDA') {
     const tm = winOf(sender)?._filoTabs;
     const b = !tm ? null : type === 'PAUSA_AUDIO' ? await bersaglioPausa(tm, action, schedeViste)
       : type === 'MOSTRA_SCHEDA' ? await schedaDaMostrare(tm, action, schedeViste)
+      : type === 'BLOCCA_SCHEDA' || type === 'SBLOCCA_SCHEDA' ? await schedaDaBloccare(tm, action, schedeViste, sender)
         : action.scheda != null ? await schedaPerNumero(tm, action, schedeViste) : { tab: require('./handlersComuni').targetWebTab(sender).tab };
     const tabs = b ? (b.tabs || (b.tab ? [b.tab] : [])) : [];
     if (tabs.length) { const nome = await nomeDellaScheda(); action._titolo = tabs.map(nome).join(', '); }
