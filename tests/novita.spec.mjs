@@ -153,7 +153,7 @@ test('una riga con più segnalazioni: un numero per ognuna delle tue, e il tasto
   const r = riga(page, 'Il menu si apre al primo clic.');
   await expect(r.locator('.nv-segn')).toHaveText(['#4343'], { timeout: 8_000 });
   await r.click({ button: 'right' });
-  await expect(menuDi(page).voce('Apri la tua segnalazione')).toBeVisible();
+  expect(await menuDi(page).haVoce('Apri la tua segnalazione')).toBe(true);
   await page.keyboard.press('Escape');
 
   await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.registra({ id: 'fb-4242', testo: 'Menu lento', creataIl: '2026-11-02T10:00:00Z', stato: 'inviata', num: '4242' }));
