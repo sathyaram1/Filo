@@ -31,9 +31,11 @@
   // Una scheda spostata a mano entro questo tempo da un riordino per colore disfa il riordino.
   const SPOSTATA_MS = 60 * 1000;
   const FASCE_DISTANZA = Object.freeze([['d1', 1], ['d2_3', 3], ['d4_10', 10], ['oltre', Infinity]]);
-  // Le voci del tasto destro su una scheda (src/renderer/shell.js); «Chiudi» lo conta la chiusura.
+  // Le voci del tasto destro su una scheda (src/shared/menuLinguetta.js); «Chiudi» lo conta la chiusura. `tab-help` e
+  // `tab-permessi-azzera` non sono più nel menu (#2087) ma restano: le versioni già uscite le mandano ancora.
   const VOCI_MENU_SCHEDA = Object.freeze(['tab-duplicate', 'tab-mute', 'tab-help', 'tab-proxy-pick', 'tab-proxy-clear',
-    'tab-proxy-default', 'tab-cookies-auto', 'tab-cookies-show', 'tab-connesso-si', 'tab-connesso-no', 'tab-permessi-azzera']);
+    'tab-proxy-default', 'tab-cookies-auto', 'tab-cookies-show', 'tab-connesso-si', 'tab-connesso-no', 'tab-permessi-azzera',
+    'tab-blocca', 'tab-sblocca', 'tab-permesso-togli']);
   // «vecchia»: la foto c'è ma la scheda ne aspetta una più nuova (è cambiata, o era a metà caricamento).
   const STATI_FOTO = Object.freeze(['pronta', 'vecchia', 'assente']);
   const ESITI_ANTEPRIMA = Object.freeze(['clic_sulla_scheda', 'via']);
