@@ -32,14 +32,15 @@ test('la voce "Leggi" usa un\'icona SVG, non un\'emoji', async ({ openTab, testS
     sel.addRange(range);
   });
   await page.locator('#target').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
 
-  // L'item "Leggi" ha un'icona SVG e la sua etichetta NON contiene emoji.
-  const readItem = menu.locator('.sn-menu-item', { hasText: 'Leggi' }).first();
+  // L'icona "Leggi" (#2555: il menu è a icone) è un SVG e il suo nome NON contiene emoji.
+  const readItem = menu.voce('Leggi').first();
+  if (!(await readItem.isVisible())) await menu.piu.click();
   await expect(readItem).toBeVisible();
-  await expect(readItem.locator('.sn-menu-item-icon svg')).toBeVisible();
-  const label = await readItem.locator('.sn-menu-label').innerText();
+  await expect(readItem.locator('svg')).toBeVisible();
+  const label = await readItem.getAttribute('aria-label');
   expect(label.trim()).toBe('Leggi');
   expect(label).not.toMatch(/[\u{1F500}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
 });
