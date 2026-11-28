@@ -2416,6 +2416,7 @@
       segnaposti: segnapostiAttivi(),
       ...(soloSegnaposti ? { soloSegnaposti: true } : {}),
       luogo: { sito: sitoDellaPagina() },
+      lingua: linguaDelPezzo(d.testo, g.start, g.end),
     };
     const [regioneCampo, nuovoCampo] = d.riporta([{ start: g.start, end: g.end }, g.nuovo]);
     const viaggio = {
