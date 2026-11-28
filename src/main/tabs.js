@@ -2483,9 +2483,11 @@ class TabManager {
       if (k && t.identityColor && !noti.has(k)) noti.set(k, t.identityColor);
     }
     const colore = (t) => t.identityColor || (!t._identitaNota && noti.get(chiaveColore(t.url))) || null;
-    const withIdx = before.map((t, i) => ({ t, i, c: colore(t) }));
+    // Le bloccate restano al loro posto (#2086): si riordinano le altre, negli spazi che lasciano.
+    const withIdx = before.map((t, i) => ({ t, i, c: colore(t) })).filter((x) => !x.t.bloccata);
     withIdx.sort((a, b) => compareRainbow(a.c, b.c) || a.i - b.i);
-    const next = withIdx.map((x) => x.t);
+    const sciolte = withIdx.map((x) => x.t);
+    const next = before.map((t) => (t.bloccata ? t : sciolte.shift()));
     const changed = next.some((t, i) => t !== before[i]);
     this.tabs = next;
     return changed;
