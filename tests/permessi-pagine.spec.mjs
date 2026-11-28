@@ -484,11 +484,11 @@ test('la riga «Microfono: negato» nel menu della scheda toglie il no: la pagin
   let menu = null;
   await expect.poll(async () => {
     for (const w of app.windows()) {
-      try { if (await w.evaluate(() => /Azzera i permessi del sito/.test(document.body.innerText))) { menu = w; return true; } } catch (_) {}
+      try { if (await w.evaluate(() => /Microfono: negato/.test(document.body.innerText))) { menu = w; return true; } } catch (_) {}
     }
     return false;
   }, { timeout: 8_000 }).toBe(true);
-  await menu.evaluate(() => [...document.querySelectorAll('button.item')].find((b) => /Azzera i permessi/.test(b.textContent)).click());
+  await menu.evaluate(() => [...document.querySelectorAll('button.item')].find((b) => /Microfono: negato/.test(b.textContent)).click());
 
   await paginaDi(origine).reload();
   await expect(barra()).toBeVisible({ timeout: 10_000 });
