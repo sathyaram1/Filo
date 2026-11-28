@@ -96,9 +96,16 @@ window.addEventListener('load', async () => {
   const pagina = await paginaDellaScheda(app, id, (p) => p.url().startsWith('file:'));
   await expect.poll(async () => JSON.parse((await pagina.locator('body').getAttribute('data-esito')) || '{}').fine, { timeout: 20_000 }).toBe(1);
   const e = JSON.parse(await pagina.locator('body').getAttribute('data-esito'));
-  const cornice = await pagina.frameLocator('#f').locator('#c').textContent({ timeout: 5000 }).catch((x) => 'NO ' + x.message.slice(0, 60));
+  const cornice = await app.evaluate(async ({ BrowserWindow }, i) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((x) => x.id === i).view.webContents;
+    const fr = wc.mainFrame.frames;
+    const out = [];
+    for (const f of fr) { try { out.push(f.url + ' => ' + await f.executeJavaScript('document.body ? document.body.innerText : "senza body"')); } catch (x) { out.push(f.url + ' err ' + x.message); } }
+    return out.join(' | ') || 'nessuna cornice';
+  }, id);
   console.log('ESITO', JSON.stringify(e), 'CORNICE', cornice);
-  expect({ font: e.font, cornice }).toEqual({ font: 'Mio:loaded', cornice: 'dentro la cornice' });
+  expect({ font: e.font, ls: e.ls, cornice: /dentro la cornice/.test(cornice) }).toEqual({ font: 'Mio:loaded', ls: 'v', cornice: true });
 });
 
 test('fetch, XHR, import, tracce, audio, @import e stili non leggono i file accanto', async ({ app }) => {
