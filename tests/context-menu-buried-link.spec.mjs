@@ -175,11 +175,9 @@ test('controprova: velo sfumato dentro il collegamento, copertina ferma — le v
       <span id="scrim" style="position:absolute;inset:0;${SCRIM};color:#fff;display:flex;align-items:flex-end">Il titolo</span>
     </a>
   </body></html>`);
-  const menu = await openMenuOn(page, '#scrim');
-  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
-  for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
-  }
+  await openMenuOn(page, '#scrim');
+  const m = menuDi(page);
+  for (const label of ['Salva immagine come', ...LINK_LABELS]) expect(await m.haVoce(label), label).toBe(true);
 });
 
 test('controprova: la sfumatura INTERAMENTE coprente invece nasconde (tutti i colori pieni)', async ({ openTab, testServer }) => {
