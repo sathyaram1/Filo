@@ -5036,6 +5036,7 @@ class TabManager {
     const ids = [];
     const letture = [];
     const visioni = [];
+    const bloccate = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
