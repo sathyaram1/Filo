@@ -122,7 +122,7 @@
     },
     SBLOCCA_SCHEDA: {
       via: ['scheda', 'sblocca'],
-      description: 'sblocca una scheda bloccata (senza scheda: questa).',
+      description: 'toglie il blocco.',
       properties: { scheda: I() }, required: [],
     },
     CHIUDI_SCHEDE: {
