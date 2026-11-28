@@ -132,16 +132,24 @@ test('chat e tasti sono lo stesso zoom: il tasto riparte da dove l\'ha lasciato 
 });
 
 test('lo zoom chiesto in chat resta sul sito: una scheda nuova sullo stesso sito nasce zoomata', async ({ app, openTab, testServer }) => {
-  // Passava solo perché openTab tornava la scheda vecchia (#877): né la chat né i tasti ricordano lo zoom per sito.
-  test.fail(true, 'manca la memoria dello zoom per sito: la scheda nuova nasce al 100%');
+  const contaSchede = () => app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.length);
   const page = await testServer.openReady(openTab, PAGINA);
   await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 150 });
   await expect.poll(async () => percentOf(app, page)).toBe(150);
 
   // Stessa origine, scheda nuova: la memoria per sito è quella dei tasti, e
-  // vale anche per lo zoom chiesto a parole.
+  // vale anche per lo zoom chiesto a parole. Una scheda vecchia riusata farebbe passare la prova a vuoto (#877).
+  const prima = await contaSchede();
   const seconda = await testServer.openReady(openTab, PAGINA.replace('<h1>', '<h1 id="due">'));
+  expect(await contaSchede()).toBe(prima + 1);
+  await expect(seconda.locator('h1#due')).toBeVisible();
   await expect.poll(async () => percentOf(app, seconda)).toBe(150);
+
+  // Resta sul sito, non sull'app: un altro sito in una scheda nuova nasce al 100%.
+  const altroSito = await testServer.openReady(openTab, PAGINA, { pubblico: true });
+  await expect.poll(async () => percentOf(app, altroSito)).toBe(100);
+  expect(await percentOf(app, seconda)).toBe(150);
 });
 
 test('lo stato della chat porta il livello di zoom della scheda davanti', async ({ app, openTab, testServer }) => {
