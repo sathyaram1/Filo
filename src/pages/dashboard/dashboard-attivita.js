@@ -608,6 +608,8 @@
     RIPRENDI_AUDIO: () => 'fatto ripartire la musica',
     PAUSA_AUDIO: () => 'messo in pausa la musica',
     MOSTRA_SCHEDA: () => 'portato su una scheda',
+    BLOCCA_SCHEDA: (n) => (n > 1 ? `bloccato ${n} schede` : 'bloccato una scheda'),
+    SBLOCCA_SCHEDA: (n) => (n > 1 ? `sbloccato ${n} schede` : 'sbloccato una scheda'),
     SALVA_PER_DOPO: (n) => (n > 1 ? `salvato ${n} pagine per dopo` : 'salvato una pagina per dopo'),
     CERCA_IMMAGINE: (n) => (n > 1 ? `cercato ${n} immagini` : 'cercato un\'immagine'),
     RINOMINA_FILE: () => 'dato un nome ai file',
