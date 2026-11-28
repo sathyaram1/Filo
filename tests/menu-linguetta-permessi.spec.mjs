@@ -48,6 +48,12 @@ test('microfono consentito e notifiche negate: due righe, il clic su una toglie 
   expect(voci.filter((x) => x.hover).map((x) => x.hover)).toEqual(['Togli', 'Togli']);
   expect(voci.find((x) => x.testo === 'Microfono: consentito').icona).toBe(true);
   await fotoDelMenu(app, 'tests/.shots/menu-linguetta-permessi.png');
+  // La riga sotto il mouse (o scelta da tastiera) mostra «Togli».
+  await app.evaluate(({ BrowserWindow }) => {
+    const m = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.isVisible() && w.webContents.getURL().startsWith('data:text/html'));
+    return m.webContents.executeJavaScript(`[...document.querySelectorAll('button.item')].find((b) => /Notifiche/.test(b.textContent)).classList.add('attiva')`);
+  });
+  await fotoDelMenu(app, 'tests/.shots/menu-linguetta-permessi-hover.png');
   await scegli(app, 'Notifiche: negate');
 
   await expect.poll(() => ricordate(shell), { timeout: 8_000 }).toEqual(['audio:true', 'video:true']);
