@@ -713,7 +713,7 @@ test('scheda con copertina ferma: il riquadro parla dell\'immagine da qualunque 
   const p = await centroDi(page, '#fascia');
   const menuFascia = await rightClickAt(page, p.x, p.y);
   for (const label of IMG_LABELS) {
-    await expect(menuFascia.getByText(label, { exact: false }).first()).toBeVisible();
+    await haVoce(label);
   }
   expect(await argomentoDelRiquadro(menuFascia)).toBe('image');
 });
