@@ -78,7 +78,7 @@ test('Trusted Types: il tasto destro dentro un riquadro della pagina apre il men
   const page = await apri(openTab, testServer, csp, HTML.replace('</body>', `<iframe id="embed" src="${figlio}" width="500" height="200"></iframe></body>`));
   const frame = page.frameLocator('#embed');
   await tastoDestroSullaFrase(frame.locator('#inner'));
-  await menuCompleto(menuDi(frame).locator('.sn-menu'));
+  await menuCompleto(menuDi(frame));
 });
 
 test('Trusted Types: la spiegazione di una parola si apre e mostra la risposta formattata', async ({ app, openTab, testServer }) => {
