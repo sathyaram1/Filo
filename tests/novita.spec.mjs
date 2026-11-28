@@ -131,7 +131,7 @@ test('tasto destro su una riga: «Copia il testo» la copia; la segnalazione si 
   // A pagina aperta: il numero compare senza ricaricare.
   await expect(page.locator('.nv-segn')).toHaveText('#4242');
   await riga(page, 'Le novità si cercano').click({ button: 'right' });
-  await menuDi(page).voce('Apri la tua segnalazione').click();
+  await menuDi(page).scegli('Apri la tua segnalazione');
   const bacheca = await aspettaFinestra(app, (w) => w.url().startsWith('filo://board/board.html#segnalazione=4242'),
     'la bacheca non si è aperta sulla segnalazione');
   const sua = bacheca.locator('.bd-mia', { hasText: '#4242' });
