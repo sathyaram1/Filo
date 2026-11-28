@@ -144,9 +144,10 @@ test.describe('nel sito', () => {
     const delCampo = () => app.evaluate(() => globalThis.__mandato.filter((m) => m.includes('Domani vado al mare')).length);
     expect(await delCampo(), 'il correttore non manda niente da solo').toBe(0);
     await scrivi.locator('#t').click({ button: 'right' });
-    const controlla = menuDi(scrivi).voce('Controlla');
-    await expect(controlla).toBeVisible({ timeout: 10_000 });
-    await controlla.click();
+    // A icone (#2555): un'icona della griglia o dietro il «+».
+    const menu = menuDi(scrivi);
+    await expect(menu.voce('Controlla')).toHaveCount(1, { timeout: 10_000 });
+    await menu.scegli('Controlla');
     await expect.poll(delCampo, { timeout: 10_000 }).toBeGreaterThan(0);
   });
 
