@@ -155,7 +155,7 @@ function chiaveSchermo(sender) {
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, indirizzo: action._indirizzoSistema, finestra: action._finestra, file: action._file };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, restano: action._restano, proposte: action._proposte, nome: action._nomeSistema, indirizzo: action._indirizzoSistema, finestra: action._finestra, file: action._file };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
