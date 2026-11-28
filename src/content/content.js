@@ -2007,9 +2007,11 @@
   function vociErrore(editableEl, errore) {
     const parola = { word: errore.segment, start: errore.start, end: errore.end };
     // Le proposte del dizionario: quelle che il browser ha mandato col tasto destro, o chieste adesso; arrivate dopo
-    // l'apertura del menu, prendono il posto di quelle chieste.
-    const mandate = unaParola(errore.segment) ? SpellCheck.getNativeSuggestions(errore.segment) : [];
-    let native = mandate.length ? mandate : (unaParola(errore.segment) ? SpellCheck.proposteDelBrowser(errore.segment) : []);
+    // l'apertura del menu, prendono il posto di quelle chieste. Con la lingua del campo riconosciuta valgono solo quelle
+    // del dizionario di Filo in quella lingua: il browser propone nelle sue (#2756).
+    const lingua = SpellCheck.linguaNelCampo ? SpellCheck.linguaNelCampo(editableEl, errore.start) : '';
+    const mandate = unaParola(errore.segment) && !lingua ? SpellCheck.getNativeSuggestions(errore.segment) : [];
+    let native = mandate.length ? mandate : (unaParola(errore.segment) ? SpellCheck.proposteDelBrowser(errore.segment, lingua) : []);
     let giudicato = null;
     const proposta = (s) => (s.correzioni && s.correzioni.length ? s.correzioni[0] : (s.dubbio ? native[0] : undefined));
     const etichetta = (s, c) => (c === '' ? I18n.t('spell_togli', s.segment.trim()) : c);
