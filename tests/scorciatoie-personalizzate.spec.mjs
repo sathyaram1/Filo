@@ -178,10 +178,14 @@ test('il menu del tasto destro e Altro dicono il tasto scelto; un tasto preso ch
 
   const page = await testServer.openReady(openTab, TESTO);
   await page.locator('#testo').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  await expect(menu.locator('.sn-menu-shortcut', { hasText: 'Alt+Shift+K' })).toHaveCount(1);
-  await expect(menu.locator('.sn-menu-shortcut', { hasText: /^Alt\+H$/ })).toHaveCount(0);
+  // A icone (#2555): la scorciatoia di Aiuto sta sotto il nome, nella riga del nome, passando sull'icona.
+  const menu = menuDi(page);
+  await expect(menu.principale).toBeVisible();
+  const aiuto = menu.voce('Aiuto').first();
+  if (!(await aiuto.isVisible())) await menu.piu.click();
+  await aiuto.hover();
+  await expect(menu.nome).toContainText('Alt+Shift+K');
+  await expect(menu.nome).not.toContainText('Alt+H');
   await page.keyboard.press('Escape');
 
   await premi(app, 'K', ['alt', 'shift']);
