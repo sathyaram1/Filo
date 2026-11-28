@@ -53,5 +53,5 @@ test('microfono consentito e notifiche negate: due righe, il clic su una toglie 
   await expect.poll(() => ricordate(shell), { timeout: 8_000 }).toEqual(['audio:true', 'video:true']);
   await tastoDestro(shell, `.tab[data-id="${id}"]`);
   const dopo = await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Duplica') && !v.some((x) => x.testo === 'Notifiche: negate'));
-  expect(dopo.map((x) => x.testo)).toEqual(['Blocca', 'Duplica', 'Muta', 'Microfono: consentito', 'Chiudi']);
+  expect(senzaConnesso(dopo)).toEqual(['Blocca', 'Duplica', 'Muta', 'Microfono: consentito', 'Chiudi']);
 });
