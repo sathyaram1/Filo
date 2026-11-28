@@ -222,8 +222,8 @@ test('#991 — riscattato il codice, «Invia attacco» scelto dentro un riquadro
   const fr = page.frameLocator('#f');
   await fr.locator('#t').click({ button: 'right' });
   const voce = menuDi(fr).voce('Invia attacco');
-  await expect(voce).toBeVisible();
-  await voce.click();
+  await expect(voce).toHaveCount(1);
+  await menuDi(fr).scegli(voce);
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-attack'))?.visibile, { timeout: 5000 }).toBe(true);
 });
 
