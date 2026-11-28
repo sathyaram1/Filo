@@ -381,9 +381,6 @@ test('editor: il tasto destro dice il livello del foglio e lo riporta alla dimen
   // Prima il menu taceva: leggeva il livello della finestra, fermo al 100%,
   // mentre la chat diceva 150%. Due strade per la stessa cosa, due risposte.
   await page.locator('#doc').click({ button: 'right' });
-  const voce = menuDi(page).locator('.sn-menu').getByText(/Dimensione reale \(ora 150%\)/);
-  await expect(voce).toBeVisible();
-
-  await voce.click();
+  await riportaAlReale(page, 150);
   await expect.poll(async () => page.evaluate(() => document.getElementById('doc').style.zoom)).toBe('');
 });
