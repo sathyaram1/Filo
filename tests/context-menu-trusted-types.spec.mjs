@@ -39,11 +39,12 @@ async function tastoDestroSullaFrase(frase) {
   await frase.click({ button: 'right', position: { x: 20, y: 8 } });
 }
 
+// `menu`: menuDi(...). A icone (#2555): la voce è un'icona della griglia o dietro il «+».
 async function menuCompleto(menu) {
-  await expect(menu).toBeVisible();
-  await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  await expect(menu.principale).toBeVisible();
+  await expect(menu.voce('Invia feedback')).toHaveCount(1);
   // Le icone delle voci sono SVG costruite da stringa: devono esserci davvero, non riquadri vuoti.
-  await expect(menu.locator('.sn-menu-item-icon svg').first()).toBeVisible();
+  await expect(menu.locator('.sn-menu-griglia .sn-menu-row-btn:visible svg').first()).toBeVisible();
 }
 
 for (const [caso, csp] of Object.entries(CSP)) {
