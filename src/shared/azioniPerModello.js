@@ -21,6 +21,8 @@
     RIPRENDI_AUDIO: ['_titolo'],
     PAUSA_AUDIO: ['_titolo'],
     MOSTRA_SCHEDA: ['_titolo'],
+    BLOCCA_SCHEDA: ['_titolo'],
+    SBLOCCA_SCHEDA: ['_titolo'],
     TOGLI_CHAT: ['_titolo'],
     RIMETTI_CHAT: ['_titolo'],
   };
