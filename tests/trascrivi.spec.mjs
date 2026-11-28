@@ -172,7 +172,7 @@ test('nell\'Editor: tasto destro su un\'immagine, «Trascrivi», e una parola so
   await editor.waitForFunction(() => document.getElementById('foto').complete);
   const box = await editor.locator('#foto').boundingBox();
   await editor.locator('#foto').click({ button: 'right', position: { x: 300, y: 80 } });
-  await menuDi(editor).locator('.sn-menu button', { hasText: 'Trascrivi' }).first().click();
+  await menuDi(editor).scegli(menuDi(editor).locator('.sn-menu button', { hasText: 'Trascrivi' }).first());
   await expect(editor.locator('.sn-tr-overlay.sn-tr-pronto')).toBeVisible({ timeout: 10_000 });
   await editor.mouse.dblclick(box.x + parola.x, box.y + parola.y);
   await editor.keyboard.press('ControlOrMeta+c');
