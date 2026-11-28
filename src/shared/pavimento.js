@@ -1191,7 +1191,7 @@
         if (celle.every((c) => !c || /^:?-{2,}:?$/.test(c))) continue;
         const v = valorePassword(celle[col]);
         if (v) {
-          const parti = riga.split(sep);
+          const parti = riga.split(barre ? BARRA_DI_CELLA : sep);
           const k = barre ? col + 1 : col;
           const prima = parti.slice(0, k).reduce((n, p) => n + p.length + 1, 0);
           out.push(alPosto(v, inizioRiga + prima, parti[k]));
