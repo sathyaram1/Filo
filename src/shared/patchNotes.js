@@ -16,9 +16,6 @@
     },
     {
       version: '0.2.308', date: '2026-11-27',
-      features: [
-        { testo: 'Il tasto destro ora è una griglia di icone: ogni azione si fa con un clic, il nome compare in una riga del menu col suo tasto, e sulla pagina si illumina la cosa su cui agisce. Le azioni rare stanno dietro il «+», e col tasto destro su un\'icona trovi le sue varianti, come copiare il collegamento invece dell\'immagine.', segnalazione: 2555 },
-      ],
       fixes: [
         { testo: 'Una password detta nella frase dopo, senza nominarla di nuovo, come «la password scade, la nuova è …», «è sbagliata, prova …» o «the password expired, new one …», non arriva più ai modelli che correggono quello che scrivi; con numeri o simboli non arriva a nessun modello.', segnalazione: 2695 },
         { testo: 'Il codice del cancello, della porta o della cassaforte scritto come «è sempre 4829», «is now 4829» o «e 4829» senza accento non arriva più a nessun modello, come già quello del telefono. Lo stesso per il PIN: «il pin è sempre 4829».', segnalazione: 1403 },
