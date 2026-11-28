@@ -266,7 +266,7 @@ test('su una pagina dove Filo chiede prima il controllo aspetta «Controlla», e
   await page.waitForTimeout(4500);
   expect(await chiamate(app), 'mentre si scrive non parte niente').toBe(0);
   await page.locator('#ta').click({ button: 'right' });
-  await menuDi(page).voce('Controlla').click();
+  await menuDi(page).scegli('Controlla');
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBe(1);
   const [prompt] = await app.evaluate(() => globalThis.__ocra);
   expect(prompt).not.toContain('porto io i biglietti');
@@ -611,7 +611,7 @@ test('su una pagina delicata gli anni della pagina non partono col controllo del
   await page.waitForTimeout(4500);
   expect(await chiamate(app), 'mentre si scrive non parte niente').toBe(0);
   await page.locator('#ta').click({ button: 'right' });
-  await menuDi(page).voce('Controlla').click();
+  await menuDi(page).scegli('Controlla');
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBeGreaterThan(0);
   const [prompt] = await app.evaluate(() => globalThis.__ocra);
   expect(prompt).toContain('certo, martedì 9 ottobre, pioveva.');
