@@ -304,7 +304,7 @@ async function expectNessunaVoceDelLink(menu) {
 async function rightClickAt(page, x, y) {
   await page.mouse.click(x, y, { button: 'right' });
   aperto = menuDi(page);
-  const menu = aperto.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }
