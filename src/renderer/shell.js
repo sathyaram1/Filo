@@ -1177,7 +1177,7 @@
   // Il canale è globale: qui si prendono solo le azioni `tab-…`.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
-      // Dal menu della linguetta o del «+»: non riguarda una scheda.
+      // Dal menu del «+»: non riguarda una scheda.
       if (action === 'reopen-closed-tab') { api.tabs.riapriChiusa('menu'); return; }
       const id = ctxTabId;
       if (!id) return;
