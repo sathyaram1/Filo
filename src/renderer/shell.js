@@ -1182,14 +1182,18 @@
       const id = ctxTabId;
       if (!id) return;
       // Quale voce si sceglie (#1470); le chiusure le conta la chiusura, e il paese scelto non esce.
+      // Di una riga dei permessi si conta la voce, non quale permesso.
+      const PERMESSO = 'tab-permesso-togli:';
       if (/^tab-/.test(action) && !/^tab-close/.test(action) && !action.startsWith('tab-proxy-go:')) {
-        try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'voce-menu-scheda', id: action })).catch(() => {}); } catch (_) {}
+        const voce = action.startsWith(PERMESSO) ? 'tab-permesso-togli' : action;
+        try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'voce-menu-scheda', id: voce })).catch(() => {}); } catch (_) {}
       }
       if (action === 'tab-duplicate') api.tabs.duplicate(id);
       else if (action === 'tab-mute') api.tabs.setMuted(id);
-      else if (action === 'tab-help') api.tabs.help(id);
+      else if (action === 'tab-blocca') api.tabs.blocca(id, true);
+      else if (action === 'tab-sblocca') api.tabs.blocca(id, false);
       else if (action === 'tab-close') api.tabs.close(id, 'tasto_destro_scheda');
-      else if (action === 'tab-close-others') chiudiLeAltre(id);
+      else if (action === 'tab-close-sblocca') api.tabs.blocca(id, false, true);
       else if (action === 'tab-proxy-default') proxyTab(id);
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
