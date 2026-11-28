@@ -764,7 +764,15 @@ rispondere.
   rete per un guasto che colpisce il compito stesso: un compito che non può
   girare non trattiene una domanda per sempre. Esce com'è, col segno, anche
   quando nessun agente la prende: a routine spente al giro dopo del
-  pacemaker, a routine accese dopo 12 ore senza un biglietto vivo.
+  pacemaker, a routine accese dopo 12 ore senza un biglietto vivo, contate
+  da quando il compito aspetta (nascita o ultimo biglietto chiuso). Anche
+  quando il suo compito non riesce a nascere, dopo 12 ore dall'ultimo cambio.
+- **Biglietto morto** (#2762). A ogni giro la rete dello smistamento, e
+  quella della risposta, chiudono i biglietti dei loro compiti che il canale
+  rifiuterebbe (rilasciati, mai ritirati nella finestra, semaforo caduto o
+  d'altri, legati senza la loro riga) e rimettono il compito in attesa, senza
+  aspettare il controllo orario dei compiti. Ogni biglietto chiuso così è un
+  tentativo.
 - **Migrazione.** Un'operazione del server idempotente (`smista_aperte`),
   lanciata una volta dal pacemaker dopo il deploy, apre il compito per ogni
   domanda oggi `aperta`, destinata all'owner e senza turni dell'owner in
