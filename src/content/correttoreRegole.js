@@ -114,9 +114,10 @@
     const s = String(testo ?? '');
     const tutto = linguaDi(s);
     const out = [];
-    for (const m of s.matchAll(/[^\n]*/g)) {
-      if (m.index > 0 && s[m.index - 1] !== '\n') continue;
-      out.push({ start: m.index, end: m.index + m[0].length, lingua: linguaDi(m[0]) || tutto });
+    let start = 0;
+    for (const riga of s.split('\n')) {
+      out.push({ start, end: start + riga.length, lingua: linguaDi(riga) || tutto });
+      start += riga.length + 1;
     }
     return out;
   }
