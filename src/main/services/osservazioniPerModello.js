@@ -1273,8 +1273,8 @@ function esitoChiusuraPerModello(action, o) {
     const nomi = restano.filter((x) => x.perche === p).map((x) => `- ${E.neutralizza(String(x.nome || ''), { unaRiga: true })}`);
     return nomi.length ? `${PERCHE_RESTA_APERTA[p]}:\n${E.imbusta({ tipo: 'DATI_PAGINA', testo: nomi.join('\n') })}` : '';
   }).filter(Boolean);
-  const insiste = restano.some((x) => x.perche === 'testo' || x.perche === 'sempre')
-    ? '\nSe l\'utente vuole chiudere anche quelle col testo o dei siti sempre aperti, chiudile col loro numero.' : '';
+  const insiste = restano.some((x) => x.perche === 'testo' || x.perche === 'sempre' || x.perche === 'bloccata')
+    ? '\nSe l\'utente vuole chiudere anche quelle bloccate, col testo o dei siti sempre aperti, chiudile col loro numero.' : '';
   const coda = `${gruppi.length ? `\n${gruppi.join('\n')}${insiste}` : ''}\nDillo all'utente in una riga.`;
   const n = Number(o.chiuse) || 0;
   if (!n) {
