@@ -864,7 +864,7 @@ export function righePause(pause, voci) {
  * I numeri che decidono il perché di una voce (#2770), come li scrive il pacemaker: chi tiene un posto, la sessione fra
  * due biglietti, le accensioni in viaggio, N e i posti che lascia. Un numero che manca è un trattino. PURA.
  */
-export function rigaConto(voce, c, contoMs) {
+export function rigaPostiDellaVoce(voce, c, contoMs) {
   const n = (x) => (Number.isFinite(Number(x)) && x !== null && x !== '' ? String(Number(x)) : '-');
   const chi = (Array.isArray(c.chi) ? c.chi : []).map((l) => `${unaRiga(l && (l.numero || l.risorsa)) || '?'}${l && l.ruolo ? ` ${unaRiga(l.ruolo)}` : ''}, battito ${istanteIso(l && l.battitoMs)}`);
   const attese = (Array.isArray(c.attese) ? c.attese : []).map((a) => `${unaRiga(a && a.account) || '?'}${a && a.numero ? ` #${unaRiga(a.numero).replace(/^#/, '')}` : ''} accesa ${istanteIso(a && a.ms)}`);
