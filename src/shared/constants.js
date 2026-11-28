@@ -2170,12 +2170,13 @@
     // Il messaggio del banco: <testo_prima> (il paragrafo in corso e quello prima), <testo_nuovo>, <candidati>. Dentro
     // i tag il testo resta imbustato, perché è contenuto della pagina. In fondo il nome di Filo (#1655): qui e non nel
     // system, che è il testo misurato.
-    spellcheckErrori: ({ prima = '', nuovo = '', candidati = [] } = {}) => {
+    spellcheckErrori: ({ prima = '', nuovo = '', candidati = [], lingua } = {}) => {
       const lista = (Array.isArray(candidati) ? candidati : []).slice(0, 40)
         .map((c) => `[${String((c && c.pezzo) || '').slice(0, 120)}]${c && c.perche ? ` ${String(c.perche).slice(0, 80)}` : ''}`);
       return `<testo_prima>\n${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: String(prima || ''), conIntestazione: true, max: 20000 })}\n</testo_prima>\n` +
         `<testo_nuovo>\n${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: String(nuovo || ''), max: 20000 })}\n</testo_nuovo>\n` +
-        `<candidati>\n${lista.length ? `${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: lista.join('\n') })}\n` : ''}</candidati>\n${NOME_DI_FILO}`;
+        `<candidati>\n${lista.length ? `${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: lista.join('\n') })}\n` : ''}</candidati>\n` +
+        `${rigaDellaLingua(lingua)}${NOME_DI_FILO}`;
     },
 
     // Il secondo controllo, ragionato: suggerimenti, che decide l'utente, e i fatti. Una contraddizione porta la frase
