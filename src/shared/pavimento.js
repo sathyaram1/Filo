@@ -577,7 +577,9 @@
   const NOME_CORTO = /^(?:password|passwd|pwd|pass|otp)$/i;
   const INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`)\]]+/gi;
   // Un pezzo d'indirizzo senza lo schema («?q=password%3A%20…», «www.x.it/la%20password…»); con lo schema è un INDIRIZZO.
-  const CODIFICATO = /[^\s<>"'`()[\]«»]*%[0-9A-Fa-f]{2}[^\s<>"'`()[\]«»]*/g;
+  // Comincia solo in testa alla parola: da ogni posto di una parola lunga senza «%» rileggeva la parola fino in fondo, e
+  // un testo di un milione di cifre fermava Filo per minuti (#2754).
+  const CODIFICATO = /(?<![^\s<>"'`()[\]«»])[^\s<>"'`()[\]«»]*%[0-9A-Fa-f]{2}[^\s<>"'`()[\]«»]*/g;
   // Le password accanto a un'etichetta. La regola generale è il posto del valore (alPostoDelValore): dopo il separatore o
   // il verbo che chiude l'etichetta, subito dopo di lei, sulla riga sotto. Mai il resto della riga: «la password di
   // Office365», un nome utente, un indirizzo di campo o una riga di codice vicini all'etichetta non sono il valore.
