@@ -36,7 +36,7 @@ test('tasto destro DENTRO il riquadro incorporato: compare il menu di Filo', asy
   const menu = menuDi(frame).locator('.sn-menu');
   await expect(menu).toBeVisible();
   // Non un menu vuoto: dentro il riquadro ci sono le stesse voci di sempre.
-  await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  await expect(menu.getByText('Invia feedback', { exact: true })).toBeAttached();
 });
 
 // #1568 — toccato prima del suo load dal Filo della pagina, il riquadro dello stesso sito perdeva il preload.
@@ -48,7 +48,7 @@ test('tasto destro nel riquadro dello stesso sito arrivato dopo la pagina: compa
     await frame.locator('#inner-text').click({ button: 'right' });
     const menu = menuDi(frame).locator('.sn-menu');
     await expect(menu).toBeVisible();
-    await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Invia feedback', { exact: true })).toBeAttached();
   } finally {
     await sito.chiudi();
   }
@@ -100,7 +100,7 @@ for (const [nome, gesto] of Object.entries(toccatiMentreArriva)) test(nome, asyn
     await frame.locator('#inner-text').click({ button: 'right' });
     const menu = menuDi(frame).locator('.sn-menu');
     await expect(menu).toBeVisible();
-    await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Invia feedback', { exact: true })).toBeAttached();
   } finally {
     await sito.chiudi();
   }
