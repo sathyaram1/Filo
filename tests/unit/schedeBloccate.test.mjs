@@ -131,9 +131,10 @@ test('le chiusure in blocco della chat saltano la bloccata, quella per numero la
 });
 
 test('chiudere proprio la bloccata costa 2, una scheda qualunque 1; il conto delle rimaste lo dice', () => {
-  assert.equal(L.costoFor('CHIUDI_SCHEDE', { _targets: ['Verde'], _targetIds: ['verde'], _bloccate: 1 }), 2);
-  assert.equal(L.costoFor('CHIUDI_SCHEDE', { _targets: ['Verde'], _targetIds: ['verde'], _bloccate: 0 }), 1);
-  assert.equal(L.costoFor('BLOCCA_SCHEDA', {}), 1);
-  assert.equal(L.costoFor('SBLOCCA_SCHEDA', {}), 1);
+  const chiudi = (extra) => ({ type: 'CHIUDI_SCHEDE', _targets: ['Verde'], _targetIds: ['verde'], ...extra });
+  assert.equal(L.costoFor(chiudi({ _bloccate: 1 })), 2);
+  assert.equal(L.costoFor(chiudi({ _bloccate: 0 })), 1);
+  assert.equal(L.costoFor({ type: 'BLOCCA_SCHEDA' }), 1);
+  assert.equal(L.costoFor({ type: 'SBLOCCA_SCHEDA', scheda: 3 }), 1);
   assert.equal(R.frase(R.conto(['bloccata'])), 'una era bloccata e l\'ho lasciata');
 });
