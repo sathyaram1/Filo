@@ -2184,8 +2184,10 @@
   // nascosta, o la proposta del dizionario se il dizionario non la conosce.
   async function openSpellWordMenu(editableEl, wordCtx, mouseEvent, sito = null) {
     const items = await buildBaseItemsAt(mouseEvent);
-    let native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
-    if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word)) native = SpellCheck.proposteDelBrowser(wordCtx.word);
+    // Con la lingua del campo riconosciuta, le proposte del dizionario di Filo in quella lingua (#2756).
+    const lingua = SpellCheck.linguaNelCampo ? SpellCheck.linguaNelCampo(editableEl, wordCtx.start) : '';
+    let native = (!lingua && SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
+    if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word, lingua)) native = SpellCheck.proposteDelBrowser(wordCtx.word, lingua);
     let updateCorrection = null;
     // La proposta del menu, per i contatori (#1461): chi l'ha fatta, e cosa ne ha fatto la persona.
     const chiave = `${wordCtx.word}|${wordCtx.start}`;
