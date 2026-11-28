@@ -147,24 +147,26 @@ function avviaSeAtteso() {
   if (!promessa && atteso) prepara({ locale: atteso.locale });
 }
 
-function domanda(tipo, dato) {
+function domanda(tipo, dato, lingua) {
   if (!chiedi) { avviaSeAtteso(); return Promise.resolve(null); }
-  return chiedi(tipo, dato);
+  return chiedi(tipo, dato, codiciPer(lingua));
 }
 
-/** Per ogni parola, se nessuna lingua la conosce; `null` finché il dizionario non è pronto (o non si è caricato). */
-function sbagliate(parole) {
+/** Per ogni parola, se nessuna lingua la conosce (`lingua`: quella del testo); `null` finché il dizionario non è pronto. */
+function sbagliate(parole, lingua) {
   if (!Array.isArray(parole) || parole.length > Motore.RICHIESTA_MAX) return Promise.resolve(null);
-  return domanda('sbagliate', parole);
+  return domanda('sbagliate', parole, lingua);
 }
 
 /** Le correzioni, alternate fra le lingue come fa Chromium; `null` finché il dizionario non è pronto. */
-function proposte(parola) {
-  return domanda('proposte', parola);
+function proposte(parola, lingua) {
+  return domanda('proposte', parola, lingua);
 }
 
 function descrivi() {
-  return { fase: stato.fase, lingue: stato.lingue.slice(), errori: stato.errori.slice(), dove: stato.dove };
+  return {
+    fase: stato.fase, lingue: stato.lingue.slice(), predefinite: stato.predefinite.slice(), errori: stato.errori.slice(), dove: stato.dove,
+  };
 }
 
 module.exports = { prepara, sbagliate, proposte, stato: descrivi, scegli, LINGUE: Motore.LINGUE };
