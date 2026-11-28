@@ -236,10 +236,12 @@ test('una password di più parole in un blocco di codice dopo una riga vuota non
 // lunghezza: un controllo all'indietro davanti a una parola rileggeva tutta la fila a ogni posto (secondi invece di ms).
 test('righe lunghe di segni Markdown o di spazi non fermano il cancello dei modelli', () => {
   for (const testo of [`x\n${'\n- '.repeat(4000)}`, `x\n${'- '.repeat(4000)}x`, `x\n${'> '.repeat(4000)}x`,
-    `Password:\n${'```\n'.repeat(2000)}`, `Password:\n${'> ```\n'.repeat(2000)}`, `${'   \n'.repeat(4000)}x`,
-    `${' '.repeat(12000)}x`]) {
-    const c = costoInUnita(() => P.oscura(testo), { tetto: TETTO_FILE_DI_SPAZI });
-    assert.ok(c.entro, `${JSON.stringify(testo.slice(0, 12))}: ${c.come}`);
+    `Password:\n${'```\n'.repeat(4000)}`, `Password:\n${'> ```\n'.repeat(4000)}`, `${'```\n'.repeat(4000)}`,
+    `${'> ```\n'.repeat(4000)}`, `${'   \n'.repeat(4000)}x`, `${' '.repeat(12000)}x`]) {
+    for (const [cancello, fn] of [['pavimento', P.oscura], ['correttore', alCorrettore]]) {
+      const c = costoInUnita(() => fn(testo), { tetto: TETTO_FILE_DI_SPAZI });
+      assert.ok(c.entro, `${cancello} ${JSON.stringify(testo.slice(0, 12))}: ${c.come}`);
+    }
   }
 });
 
