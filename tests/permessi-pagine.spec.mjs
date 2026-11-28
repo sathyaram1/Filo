@@ -469,7 +469,7 @@ test('la domanda aspetta chi risponde con calma: dopo quindici secondi Consenti 
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['concesso:audio']);
 });
 
-test('«Azzera i permessi del sito» nel menu della scheda toglie un no: la pagina può chiedere di nuovo', async () => {
+test('la riga «Microfono: negato» nel menu della scheda toglie il no: la pagina può chiedere di nuovo', async () => {
   test.setTimeout(60_000);
   await apri('/microfono');
   await expect(barra()).toBeVisible({ timeout: 10_000 });
