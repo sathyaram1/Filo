@@ -196,59 +196,86 @@
 
   // Il dizionario del browser, ricordato per pagina. Finché non ha caricato le sue lingue ogni parola risulta giusta:
   // quella risposta non si ricorda, se no una parola sbagliata scritta nel primo secondo resterebbe giusta per sempre.
+  // `lingua` ('it', 'en', o niente per le lingue di serie) è quella del testo intorno alla parola (#2756): «the» è giusta
+  // in inglese e sbagliata in italiano, quindi il parere si ricorda per lingua.
   const parereDizionario = new Map();
   let dizionarioPronto = false;
+  const chiaveParere = (k, lingua) => (lingua ? `${lingua}\u0000${k}` : k);
   function ricorda(k, v) {
     if (parereDizionario.size >= DIZIONARIO_MAX) parereDizionario.clear();
     parereDizionario.set(k, v);
   }
-  function sbagliataPerIlBrowser(parola) {
+  function sbagliataPerIlBrowser(parola, lingua) {
     const D = global.SN_DIZIONARIO;
     if (!D) return false;
-    const k = String(parola || '');
+    const p = String(parola || '');
+    const k = chiaveParere(p, lingua);
     if (parereDizionario.has(k)) return parereDizionario.get(k);
     if (!dizionarioPronto) dizionarioPronto = D.sbagliata('qzxwvkjh');
-    const v = D.sbagliata(k);
+    const v = D.sbagliata(p, lingua || undefined);
     if (dizionarioPronto) ricorda(k, v);
     return v;
   }
 
-  // Le parole nuove di un testo si chiedono insieme: il dizionario sta nel processo principale, e una domanda per parola
-  // costerebbe un viaggio ciascuna (#1585). I pareri valgono per questo testo anche oltre il tetto della memoria.
+  // Le parole nuove di un testo si chiedono insieme, una domanda per lingua: il dizionario sta nel processo principale, e
+  // una domanda per parola costerebbe un viaggio ciascuna (#1585). I pareri valgono per questo testo anche oltre il tetto
+  // della memoria. Ritorna `(parola, start) → sbagliata`, con la lingua della riga di `start`.
   const PARERI_PER_DOMANDA = 5000;
   function pareriDelTesto(testo) {
     const D = global.SN_DIZIONARIO;
     const pareri = new Map();
-    if (!D || typeof D.sbagliate !== 'function') return pareri;
-    const nuove = [];
-    for (const { parola } of R().parole(testo)) {
-      const k = parola.replace(/’/g, "'");
+    const tratti = R().lingueDelTesto(testo);
+    const linguaDi = (start) => R().linguaIn(tratti, start) || '';
+    const sbagliata = (parola, start) => {
+      const lingua = linguaDi(start);
+      const k = chiaveParere(String(parola || '').replace(/’/g, "'"), lingua);
+      return pareri.has(k) ? pareri.get(k) : sbagliataPerIlBrowser(parola, lingua);
+    };
+    if (!D || typeof D.sbagliate !== 'function') return sbagliata;
+    const nuove = new Map(); // lingua → parole
+    for (const { parola, start } of R().parole(testo)) {
+      const p = parola.replace(/’/g, "'");
+      const lingua = linguaDi(start);
+      const k = chiaveParere(p, lingua);
       if (pareri.has(k)) continue;
-      if (parereDizionario.has(k)) pareri.set(k, parereDizionario.get(k));
-      else { pareri.set(k, false); nuove.push(k); }
+      if (parereDizionario.has(k)) { pareri.set(k, parereDizionario.get(k)); continue; }
+      pareri.set(k, false);
+      if (!nuove.has(lingua)) nuove.set(lingua, []);
+      nuove.get(lingua).push(p);
     }
-    if (!nuove.length) return pareri;
+    if (!nuove.size) return sbagliata;
     if (!dizionarioPronto) dizionarioPronto = D.sbagliata('qzxwvkjh');
-    for (let i = 0; i < nuove.length; i += PARERI_PER_DOMANDA) {
-      const pezzo = nuove.slice(i, i + PARERI_PER_DOMANDA);
-      const v = D.sbagliate(pezzo);
-      pezzo.forEach((k, j) => {
-        pareri.set(k, v[j] === true);
-        if (dizionarioPronto) ricorda(k, v[j] === true);
-      });
+    for (const [lingua, lista] of nuove) {
+      for (let i = 0; i < lista.length; i += PARERI_PER_DOMANDA) {
+        const pezzo = lista.slice(i, i + PARERI_PER_DOMANDA);
+        const v = D.sbagliate(pezzo, lingua || undefined);
+        pezzo.forEach((p, j) => {
+          const k = chiaveParere(p, lingua);
+          pareri.set(k, v[j] === true);
+          if (dizionarioPronto) ricorda(k, v[j] === true);
+        });
+      }
     }
-    return pareri;
+    return sbagliata;
   }
 
   // Una parola che il dizionario dice giusta, solo a dizionario carico: prima ogni parola risulta giusta.
-  function giustaPerIlBrowser(parola) {
-    const v = sbagliataPerIlBrowser(parola);
+  function giustaPerIlBrowser(parola, lingua) {
+    const v = sbagliataPerIlBrowser(parola, lingua);
     return dizionarioPronto && !v;
   }
 
-  function proposteDelBrowser(parola) {
+  function proposteDelBrowser(parola, lingua) {
     const D = global.SN_DIZIONARIO;
-    try { return D ? D.proposte(String(parola || '')).filter((p) => p && p !== parola) : []; } catch (_) { return []; }
+    try { return D ? D.proposte(String(parola || ''), lingua || undefined).filter((p) => p && p !== parola) : []; } catch (_) { return []; }
+  }
+
+  // La lingua del campo nel punto `pos` (coordinate del testo del campo), per il menu e per ciò che Filo impara.
+  function linguaNelCampo(el, pos) {
+    try {
+      const testo = getEditableText(el);
+      return R().linguaIn(R().lingueDelTesto(testo), Number(pos) || 0) || '';
+    } catch (_) { return ''; }
   }
 
   // ============================================================================
