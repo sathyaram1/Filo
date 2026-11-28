@@ -107,7 +107,8 @@ test('#991 — senza codice la voce non c’è nel tasto destro; il bottone dell
 
   const page = await sito(openTab, testServer);
   const menu = await menuSulSito(page);
-  await expect(menu.locator('.sn-menu-item', { hasText: 'Invia feedback' })).toBeVisible();
+  // A icone (#2555): «Invia feedback» c'è (dietro il «+»), «Invia attacco» no.
+  await expect(menu.locator('.sn-menu-item', { hasText: 'Invia feedback' })).toHaveCount(1);
   await expect(menu.locator('.sn-menu-item', { hasText: 'Invia attacco' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   // Anche al secondo tasto destro, quando la risposta del main è di sicuro arrivata.
