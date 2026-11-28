@@ -314,9 +314,12 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
 
     // Il tasto destro copia il numero; «Rileggi» chiede di nuovo, e un guasto è un trattino che dice perché.
     await riquadri.nth(1).click({ button: 'right' });
-    await expect(page.locator('.sn-wallet-ctx .sn-select-option')).toHaveText(['Copia il numero', 'Apri i contatori', 'Rileggi']);
+    // A icone (#2555): le voci sono icone o varianti nel menu di un'icona.
+    const menu = menuDi(page);
+    await expect(menu.principale).toBeVisible();
+    expect(await menu.vociScritte()).toEqual(['Copia il numero', 'Apri i contatori', 'Rileggi']);
     await app.evaluate(() => { globalThis.__installazioniGuaste = true; });
-    await page.locator('.sn-wallet-ctx .sn-select-option', { hasText: 'Rileggi' }).click();
+    await menu.scegli('Rileggi');
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-valore')).toHaveText('—', { timeout: 5_000 });
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-nota')).toHaveText('non letti');
     const meseDiOggi = new Date().toLocaleDateString('it-IT', { month: 'long' });
