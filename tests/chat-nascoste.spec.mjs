@@ -352,12 +352,12 @@ test('il menu di una conversazione del filo si apre con Shift+F10 e si usa tutto
   expect(nomi.filter((n) => ordine.includes(n.replace(/^menu:/, '')))).toEqual(ordine.map((n) => `menu:${n}`));
   await provaMenu(home, 'Modifica', 'bolla:c-epicuro');
 
-  // La prima lettera porta alla voce della conversazione, e Invio sceglie: si nasconde e il fuoco passa a «Rimetti».
+  // Il tasto singolo dell'icona (#2555) la sceglie: si nasconde e il fuoco passa a «Rimetti».
   await home.keyboard.press('Shift+F10');
   await expect.poll(() => fuoco(home)).toBe('menu:Modifica');
-  await home.keyboard.press('n');
-  expect(await fuoco(home)).toBe('menu:Nascondi la conversazione');
-  await home.keyboard.press('Enter');
+  const nascondi = (await vociDelMenu(home)).find((v) => v.id === 'menu:Nascondi la conversazione');
+  expect(nascondi.tasto, 'l’icona ha il suo tasto').toMatch(/^[a-z0-9]$/);
+  await home.keyboard.press(nascondi.tasto);
   await expect(home.locator('.dash-nascosta')).toBeVisible({ timeout: 10_000 });
   expect((await inVista(app)).map((c) => c.id)).not.toContain('c-epicuro');
   await expect.poll(() => fuoco(home)).toMatch(/^button\.dash-nascosta-rimetti/);
