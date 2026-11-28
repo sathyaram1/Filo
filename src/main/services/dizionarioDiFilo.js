@@ -169,4 +169,4 @@ function descrivi() {
   };
 }
 
-module.exports = { prepara, sbagliate, proposte, stato: descrivi, scegli, LINGUE: Motore.LINGUE };
+module.exports = { prepara, sbagliate, proposte, stato: descrivi, scegli, daCaricare, LINGUE: Motore.LINGUE };
