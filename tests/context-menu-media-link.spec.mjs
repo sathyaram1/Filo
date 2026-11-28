@@ -46,29 +46,32 @@ async function openMenuOn(page, selector, position = { x: 20, y: 20 }) {
 
 const LINK_LABELS = ['Apri in nuova tab', 'Copia URL', 'Salva link per dopo', 'Condividi link'];
 
+// A icone (#2555): «Copia URL» del collegamento è l'icona Copia, o una sua variante se il clic copia il filmato.
+async function copiaUrlDelLink(page) {
+  const m = menuDi(page);
+  const icona = m.icona('copy').first();
+  if (/^Copia URL$/.test(String(await icona.getAttribute('aria-label')).trim())) return m.scegli(icona);
+  return m.variante(icona, /^\s*Copia URL\s*$/);
+}
+
 test('tasto destro su un video dentro un link: compaiono sia le azioni del video sia quelle del link', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, cardHtml('https://example.com/articolo'));
-  const menu = await openMenuOn(page, '#clip');
+  await openMenuOn(page, '#clip');
   await page.screenshot({ path: 'tests/.shots/context-menu-media-link.png' }).catch(() => {});
 
-  // Famiglia media (era già presente).
-  for (const label of ['Riproduci', 'Velocità', 'Ripeti in continuo', 'Copia URL video', 'Salva video come']) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
-  }
-  // Famiglia link (prima del fix spariva del tutto).
-  for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  // A icone (#2555): un'icona della griglia, dietro il «+» o variante nel menu di un'icona.
+  const m = menuDi(page);
+  // Famiglia media (era già presente), poi quella del link (prima del fix spariva del tutto).
+  for (const label of ['Riproduci', 'Velocità', 'Ripeti in continuo', 'Copia URL video', 'Salva video come', ...LINK_LABELS]) {
+    expect(await m.haVoce(label), label).toBe(true);
   }
 });
 
 test('tasto destro su un audio dentro un link: le azioni del collegamento restano raggiungibili', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, cardHtml('https://example.com/serie'));
-  const menu = await openMenuOn(page, '#pod');
-
-  await expect(menu.getByText('Copia URL audio', { exact: false }).first()).toBeVisible();
-  for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
-  }
+  await openMenuOn(page, '#pod');
+  const m = menuDi(page);
+  for (const label of ['Copia URL audio', ...LINK_LABELS]) expect(await m.haVoce(label), label).toBe(true);
 });
 
 test('"Copia URL" su un video-link copia l\'href del COLLEGAMENTO, non quello del filmato', async ({ app, openTab, testServer }) => {
