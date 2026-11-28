@@ -1184,7 +1184,7 @@
       o += riga.length + 1;
       const barre = /^\s*\|/.test(riga);
       const tab = !barre && riga.includes('\t');
-      const celle = barre ? riga.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
+      const celle = barre ? celleFraBarre(riga).map((c) => c.trim())
         : tab ? riga.split('\t').map((c) => c.trim()) : null;
       if (!celle || (col >= 0 && sep !== (barre ? '|' : '\t'))) { col = -1; continue; }
       if (col >= 0) {
