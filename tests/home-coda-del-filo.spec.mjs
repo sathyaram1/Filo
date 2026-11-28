@@ -703,8 +703,8 @@ test('una pagina con l’indirizzo tagliato alla misura si apre dal suo sito, no
   await expect(pagina).toHaveAttribute('href', `${origine}/`);
   await pagina.click({ button: 'right' });
   const menu = menuDi(page);
-  // «Apri il sito» ha lo stesso verbo di «Apri in nuova tab»: è una variante nel menu della sua icona (#2555).
-  await expect(menu.principale.locator('.sn-menu-griglia')).toBeVisible();
+  // A icone (#2555): «Apri il sito» della pagina del filo è l'icona Apri, e il collegamento nudo una sua variante.
+  await expect(menu.voce('Apri il sito')).toHaveCount(1);
   expect(await menu.haVoce('Riapri la pagina')).toBe(false);
   await menu.scegli('Apri il sito');
   const schede = async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.map((t) => String(t.url));
