@@ -10,6 +10,9 @@
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
       version: '0.2.309', date: '2026-11-27',
+      features: [
+        { testo: 'Il tasto destro ora è una griglia di icone: ogni azione si fa con un clic, il nome compare in una riga del menu col suo tasto, e sulla pagina si illumina la cosa su cui agisce. Le azioni rare stanno dietro il «+», e col tasto destro su un\'icona trovi le sue varianti, come copiare il collegamento invece dell\'immagine.', segnalazione: 2555 },
+      ],
       fixes: [
         { testo: 'Una password scritta con un errore di battitura, come «la pasword è …», «la password e …» senza accento o «la password, che era vecchia, è …», non arriva più a nessun modello.', segnalazione: 2678 },
       ],
