@@ -122,7 +122,7 @@ function prepara({ locale = '', dopoMs = 0 } = {}) {
   programmato = null;
   stato.fase = 'in caricamento';
   promessa = (async () => {
-    const lingue = scegli(locale);
+    const lingue = daCaricare(locale);
     let r = await nelThread(lingue).catch((e) => ({ lingue: [], errori: [e.message] }));
     stato.errori.push(...r.errori);
     stato.dove = 'thread';
@@ -130,11 +130,12 @@ function prepara({ locale = '', dopoMs = 0 } = {}) {
       // Senza il thread il motore si carica qui: meglio il processo fermo un decimo di secondo che nessun dizionario.
       const m = await Motore.carica(lingue);
       stato.errori.push(...m.errori);
-      r = { lingue: m.lingue, chiedi: async (tipo, dato) => (tipo === 'proposte' ? m.proposte(dato) : m.sbagliate(dato)) };
+      r = { lingue: m.lingue, chiedi: async (tipo, dato, codici) => (tipo === 'proposte' ? m.proposte(dato, codici) : m.sbagliate(dato, codici)) };
       stato.dove = 'processo';
     }
     chiedi = r.lingue.length ? r.chiedi : null;
     stato.lingue = r.lingue.slice();
+    stato.predefinite = scegli(locale).filter((l) => stato.lingue.includes(l));
     stato.fase = r.lingue.length ? 'pronto' : 'guasto';
     if (stato.errori.length) console.warn('[Filo] dizionario del correttore:', stato.errori.join('; '));
     return stato.fase === 'pronto';
