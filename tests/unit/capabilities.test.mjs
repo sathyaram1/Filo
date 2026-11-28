@@ -496,8 +496,9 @@ function menuVoiceLabels() {
       if (f.endsWith('.js')) pages += '\n' + readFileSync(join(d, f), 'utf8');
     }
   }
-  // E il menu del tasto destro sulle schede, che sta nella cornice.
+  // E il menu del tasto destro sulle schede, che sta nella cornice e compone le voci della linguetta col modulo condiviso.
   pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'menuLinguetta.js'), 'utf8');
   // E la voce «Dai un nome sensato», che più pagine prendono dallo stesso modulo condiviso.
   pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'rinominaUi.js'), 'utf8');
   // E il menu di riserva, che il tasto destro apre dove quello di Filo non parte (Filo spento sul sito, #843).
