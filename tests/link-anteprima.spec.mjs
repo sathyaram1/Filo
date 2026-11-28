@@ -166,9 +166,11 @@ test('la zona di una mappa d\'immagine verso un sosia: voci del link e dell\'imm
   await page.locator('#mappa').click({ button: 'right', position: { x: 40, y: 40 } });
   const menu = menuDi(page);
   await expect(menu.principale).toBeVisible();
-  await expect(menu.voce('Apri in nuova tab')).toBeVisible();
-  await expect(menu.voci.filter({ hasText: /^Copia URL$/ })).toBeVisible();
-  await expect(menu.voce('Copia immagine')).toBeVisible();
+  // A icone (#2555): un'icona, o una variante nel menu dell'icona dello stesso verbo.
+  for (const v of ['Apri in nuova tab', 'Copia URL', 'Copia immagine']) expect(await menu.haVoce(v), v).toBe(true);
+  // Le varianti si chiudono con la freccia a sinistra: l'avviso sta nel menu principale.
+  const sub = menu.locator('.sn-menu-sub .sn-menu-item').first();
+  if (await sub.isVisible().catch(() => false)) await sub.press('ArrowLeft');
   const avviso = menu.locator('.sn-menu .sn-menu-inline[data-subject="link"] .sn-menu-link-warn');
   await expect(avviso).toBeVisible({ timeout: 3000 });
   await expect(avviso).toContainText('paypal.com');
