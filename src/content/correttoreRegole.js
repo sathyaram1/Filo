@@ -79,9 +79,55 @@
     return out;
   }
 
-  // `sbagliata(parola)`: il dizionario del browser; `nota(parola)`: le parole che Filo sa giuste (dizionario personale,
-  // scarti del modello). Una parola attaccata a cifre («2m», «x86») non si chiede. `attende`: il candidato parte verso il
-  // modello ma non si disegna finché il modello non lo conferma.
+  // La lingua di un testo dalle sue parole grammaticali (#2756): il dizionario e il modello correggono l'inglese in
+  // inglese anche su un sistema italiano. Fuori le parole delle due lingue («a», «i», «in», «come», «no», «so»).
+  const SPIE = {
+    it: new Set(('il lo la gli le di da del dello della dei degli delle nel nello nella nei negli nelle al allo alla ai ' +
+      'agli alle dal dallo dalla dai dagli dalle sul sulla sui che è e ed non un una uno sono abbiamo hanno questo questa ' +
+      'questi queste quello quella anche ma più però perché perche cosa sei siamo sia essere fare stato stata molto tutto ' +
+      'tutti tutte ancora già poi quando chi cui tra fra con per se mi ti si ci io tu lui lei noi voi loro mio mia tuo tua ' +
+      'suo sua così bene grazie ciao sì era erano fatto fa va sta qui qua adesso ora oggi domani ieri niente nulla qualcosa ' +
+      'sempre mai quindi allora invece dopo senza').split(' ')),
+    en: new Set(('the and of to is are was were be been being that this these those it its you your we our they their ' +
+      'them he she his her him what which who whom whose when where why how there here would could should will shall ' +
+      'have has had having does did not but or if than then too very just about with from for on at by into out up over ' +
+      'some any all more most other such only also because while think know get got like really much many well even ' +
+      'my me').replace(/\bme\b/, '').trim().split(/\s+/)),
+  };
+  const ELISIONE_IT = /^(?:l|un|dell|nell|all|dall|sull|c|d|s|m|t|v|n|quest|quell|anch|com|dov|nient|tutt)'\p{L}/iu;
+  const CONTRAZIONE_EN = /\p{L}'(?:s|t|re|ve|ll|d|m)$/iu;
+  function linguaDi(testo) {
+    let it = 0;
+    let en = 0;
+    for (const { parola } of parole(testo)) {
+      const p = parola.replace(/’/g, "'").toLowerCase();
+      if (SPIE.it.has(p) || ELISIONE_IT.test(p)) it++;
+      else if (SPIE.en.has(p) || CONTRAZIONE_EN.test(p)) en++;
+    }
+    if (it >= 2 && it >= 2 * en) return 'it';
+    if (en >= 2 && en >= 2 * it) return 'en';
+    return null;
+  }
+  // Una lingua per riga, perché una citazione può stare in un'altra; la riga che non lo dice prende quella del testo
+  // intero, e `null` vuol dire le lingue di serie del dizionario.
+  function lingueDelTesto(testo) {
+    const s = String(testo ?? '');
+    const tutto = linguaDi(s);
+    const out = [];
+    for (const m of s.matchAll(/[^\n]*/g)) {
+      if (m.index > 0 && s[m.index - 1] !== '\n') continue;
+      out.push({ start: m.index, end: m.index + m[0].length, lingua: linguaDi(m[0]) || tutto });
+    }
+    return out;
+  }
+  function linguaIn(tratti, pos) {
+    const t = (Array.isArray(tratti) ? tratti : []).find((x) => pos >= x.start && pos <= x.end);
+    return t ? t.lingua : null;
+  }
+
+  // `sbagliata(parola, start)`: il dizionario, nella lingua del punto; `nota(parola)`: le parole che Filo sa giuste
+  // (dizionario personale, scarti del modello). Una parola attaccata a cifre («2m», «x86») non si chiede. `attende`: il
+  // candidato parte verso il modello ma non si disegna finché il modello non lo conferma.
   function candidatiDizionario(testo, { sbagliata, nota = () => false } = {}) {
     if (typeof sbagliata !== 'function') return [];
     const fuori = zoneEscluse(testo);
