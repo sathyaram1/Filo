@@ -856,7 +856,23 @@ export function righePause(pause, voci) {
   ];
   const perche = Object.entries(voci || {}).filter(([, v]) => v && v.perche);
   righe.push(`Ultimo giro per voce: ${perche.map(([voce, v]) => `${unaRiga(voce)} ${unaRiga(v.perche)} dal ${istanteIso(v.percheMs)}`).join('; ') || 'nessuno scritto'}.`);
+  for (const [voce, v] of perche) if (v.conto && typeof v.conto === 'object') righe.push(rigaConto(voce, v.conto, v.contoMs));
   return righe;
+}
+
+/**
+ * I numeri che decidono il perché di una voce (#2770), come li scrive il pacemaker: chi tiene un posto, la sessione fra
+ * due biglietti, le accensioni in viaggio, N e i posti che lascia. Un numero che manca è un trattino. PURA.
+ */
+export function rigaConto(voce, c, contoMs) {
+  const n = (x) => (Number.isFinite(Number(x)) && x !== null && x !== '' ? String(Number(x)) : '-');
+  const chi = (Array.isArray(c.chi) ? c.chi : []).map((l) => `${unaRiga(l && (l.numero || l.risorsa)) || '?'}${l && l.ruolo ? ` ${unaRiga(l.ruolo)}` : ''}, battito ${istanteIso(l && l.battitoMs)}`);
+  const attese = (Array.isArray(c.attese) ? c.attese : []).map((a) => `${unaRiga(a && a.account) || '?'}${a && a.numero ? ` #${unaRiga(a.numero).replace(/^#/, '')}` : ''} accesa ${istanteIso(a && a.ms)}`);
+  const elenco = (xs) => (xs.length ? ` (${xs.join('; ')})` : '');
+  return `- ${unaRiga(voce)}, i numeri del perché dal ${istanteIso(contoMs)}: al lavoro ${n(c.alLavoro)}${elenco(chi)}; `
+    + `fra due biglietti ${n(c.traBiglietti)}${Number(c.traBiglietti) ? ` (rilascio ${istanteIso(c.rilascioMs)})` : ''}; in viaggio ${n(c.inViaggio)}${elenco(attese)}; `
+    + `N ${n(c.n)}, posti di N ${n(c.postiN)} (priorità 3 pronte ${n(c.urgenti)}, al lavoro ${n(c.urgentiVive)}); tetto ${n(c.tetto)}`
+    + `${Number(c.oltre) ? `; altre ${n(c.oltre)} non elencate` : ''}.`;
 }
 
 /** Le corse di Actions in coda senza lavori oltre la soglia (#2417), come le legge il server. PURA. */
