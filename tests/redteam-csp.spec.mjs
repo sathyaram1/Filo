@@ -45,13 +45,14 @@ test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è 
   });
   expect(linkBloccato).toBe(true);
 
+  // A icone (#2555): «Invia attacco» sta dietro il «+», per scelta dell'owner.
   const voce = menuDi(page).voce('Invia attacco').first();
   await expect.poll(async () => {
     await page.keyboard.press('Escape');
     await page.locator('#p').click({ button: 'right', position: { x: 200, y: 120 } });
-    return voce.isVisible();
-  }, { timeout: 10_000 }).toBe(true);
-  await voce.click();
+    return voce.count();
+  }, { timeout: 10_000 }).toBe(1);
+  await menuDi(page).scegli(voce);
 
   // Sui siti il pannello sta nello strato sopra la scheda (#1509.1): la CSP del sito non lo tocca.
   await expect.poll(async () => !!(await statoDi(app, page, '.sn-rt-overlay .sn-rt-modal'))?.visibile, { timeout: 5000 }).toBe(true);
