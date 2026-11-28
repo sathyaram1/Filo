@@ -62,6 +62,12 @@
       doesNot: 'Non riapre una scheda che hai cancellato dall’archivio o dalle pagine visitate. In incognito riapre solo le schede chiuse in quella finestra, finché resta aperta. Una home vuota non conta come scheda chiusa. Tenendo premuti i tasti riapre una scheda sola, non a raffica. Senza niente da riaprire te lo dice con un avviso, e la voce del tasto destro è spenta.',
     },
     {
+      id: 'lock-tab', title: 'Blocca una scheda', category: 'navigation',
+      desc: 'Una scheda bloccata resta aperta: la pulizia delle schede (a tempo, alla riapertura o chiesta a Filo) non la tocca, il riordino per colore non la sposta, e chiudendo tutte le schede o quelle di un sito Filo la lascia e te lo dice. Al posto della X ha un lucchetto. Il blocco resta dopo un riavvio.',
+      invoke: 'Tasto destro sulla scheda → «Blocca» (su una bloccata «Sblocca»), oppure chiedilo a Filo in chat: «blocca questa scheda», «sblocca la terza».',
+      doesNot: 'Non la sposta e non la restringe. La X, il clic centrale e Ctrl+W (Cmd+W su Mac) non la chiudono: compare l’avviso «Scheda bloccata» con «Sblocca e chiudi», e nel tasto destro «Chiudi» diventa «Sblocca e chiudi». Chiesta a Filo per numero o per nome si chiude, ma prima di farlo te lo chiede; poi la ritrovi nel filo della home come le altre. Un duplicato nasce sbloccato. È diverso da «tieni sempre aperto», che vale per ogni scheda di un sito.',
+    },
+    {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
       desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda. Sui pulsanti della barra laterale il tasto destro elenca le pagine della scheda, dalla più vicina, e ci salta con un clic.',
       invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore; su Mac anche Cmd+\u2190 e Cmd+\u2192, ma solo quando non stai scrivendo in un campo di testo, dove portano il cursore a inizio o fine riga), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: i pulsanti "Indietro" e "Avanti" in cima alla barra laterale, spenti quando non c\u2019\u00e8 dove andare, e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',
