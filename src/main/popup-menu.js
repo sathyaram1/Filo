@@ -199,7 +199,8 @@ function computeMenuWidth(entries) {
     const charW = fontPx * 0.6;
     const hasIcon = !!e.icon && ICON_PATHS[e.icon];
     const SUB_COL = e.subAction ? 30 : 0;
-    const w = H_PADDING + (hasIcon ? ICON_COL : 0) + SUB_COL + Math.ceil(label.length * charW);
+    const HINT_COL = e.hint ? 10 + Math.ceil(String(e.hint).length * 12 * 0.6) : 0;
+    const w = H_PADDING + (hasIcon ? ICON_COL : 0) + SUB_COL + HINT_COL + Math.ceil(label.length * charW);
     if (w > needed) needed = w;
   }
   return Math.min(MENU_MAX_W, needed);
