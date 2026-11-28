@@ -1117,16 +1117,6 @@
     api.popupMenu([vocePerRiaprire(chiuse)], Math.round(x), Math.round(y));
   }
 
-  async function chiudiLeAltre(id) {
-    let r = null;
-    try { r = await api.tabs.chiudiAltre(id); } catch (_) { r = null; }
-    const R = window.SN_RESTANO_APERTE;
-    const resto = r && R ? R.frase(R.conto(r.restano)) : '';
-    if (!resto) return;
-    const n = Number(r.chiuse) || 0;
-    showToast(`${n ? (n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`) : 'Nessuna scheda chiusa'}: ${resto}.`, 'altre_schede_restano');
-  }
-
   // `sito`: la proposta dopo un accesso, che vale per il sito dove l'accesso è avvenuto anche se la scheda è andata altrove.
   async function restaConnesso(id, on, sito) {
     let r = null;
