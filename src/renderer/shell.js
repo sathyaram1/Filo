@@ -1092,67 +1092,17 @@
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
     // Le domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
-    const [proxy, permessi, impostazioni, chiuse] = await Promise.all([
+    const [proxy, permessi] = await Promise.all([
       senzaErrore(() => api.tabs.proxyStatus()),
       senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
-      senzaErrore(() => api.message({ type: 'get_settings' })),
-      senzaErrore(() => api.tabs.ciSonoChiuse()),
     ]);
     // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
     if (mio !== ctxGiro) return;
     ctxProxyStatus = proxy;
-    const entries = [
-      { label: 'Duplica', icon: 'duplicate', action: 'tab-duplicate' },
-      t.muted
-        ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
-        : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
-    ];
-    // L'Aiuto spento (#841) non ha la sua voce.
-    const ff = impostazioni && impostazioni.settings && impostazioni.settings.featureFlags;
-    if (!(ff && ff.help === false)) entries.push({ label: 'Aiuto', icon: 'help', action: 'tab-help' });
-    // "Apri da un altro paese" (proxy per-tab): solo se un endpoint è
-    // configurato — una voce che non può funzionare non deve comparire.
-    // Il click diretto usa il default (ultima location usata, altrimenti USA);
-    // la freccia apre la lista paesi. Su tab già proxata: "Torna in Italia".
-    if (ctxProxyStatus && ctxProxyStatus.configured) {
-      if (t.proxy) {
-        // "Cambia paese" c'è perché senza si dovrebbe prima tornare in Italia
-        // e poi ripartire: un giro in più per niente.
-        entries.push({ label: 'Cambia paese', icon: 'globe', action: 'tab-proxy-pick' });
-        entries.push({ label: 'Torna in Italia', icon: 'globe', action: 'tab-proxy-clear' });
-      } else {
-        entries.push({
-          label: 'Apri da un altro paese', icon: 'globe',
-          action: 'tab-proxy-default', subAction: 'tab-proxy-pick',
-        });
-      }
-    }
-    // #754 — cosa ha fatto Filo col banner dei cookie di questo sito, e la strada per rivederlo.
-    const ck = t.cookies;
-    const cookieVoci = [];
-    if (ck && ck.shown) {
-      cookieVoci.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
-    } else if (ck && (ck.rejected || ck.hidden)) {
-      if (ck.rejected) cookieVoci.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
-      if (ck.hidden) cookieVoci.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
-      cookieVoci.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
-    }
-    // #759 — con la privacy massima l'accesso al sito si perde alla chiusura, se non resta connesso.
-    if (t.connesso) {
-      cookieVoci.push(t.connesso.fidato
-        ? { label: 'Non restare connesso', icon: 'key', action: 'tab-connesso-no' }
-        : { label: 'Resta connesso qui', icon: 'key', action: 'tab-connesso-si' });
-    }
-    if (cookieVoci.length) entries.push({ type: 'separator' }, ...cookieVoci);
-    // Un sì o un no dato nella domanda dei permessi si toglie da qui, per il sito della scheda.
-    if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
-      entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
-    }
-    entries.push({ type: 'separator' }, { label: 'Chiudi', icon: 'close', action: 'tab-close' });
-    // #1695 — con una scheda sola non c'è niente da chiudere; senza chiuse la voce resta, spenta, dove la si cerca.
-    if (state.tabs.length > 1) entries.push({ label: 'Chiudi le altre schede', icon: 'tabs', action: 'tab-close-others' });
-    entries.push(vocePerRiaprire(chiuse));
-    api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+    // Lo stato di adesso, non quello del tasto destro: un blocco cambiato mentre il menu si preparava vale.
+    const ora = (state.tabs || []).find((x) => x.id === t.id) || t;
+    const scelte = permessi && Array.isArray(permessi.scelte) ? permessi.scelte : [];
+    api.popupMenu(window.SN_MENU_LINGUETTA.voci(ora, { proxy, permessi: scelte }), ctxMenuPos.x, ctxMenuPos.y);
   }
 
   const vocePerRiaprire = (ci) => (ci
