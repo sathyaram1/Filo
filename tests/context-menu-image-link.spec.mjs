@@ -51,11 +51,12 @@ test('tasto destro su una miniatura-link: compaiono sia le azioni immagine sia q
 test('"Copia URL" su una miniatura-link copia l\'href del COLLEGAMENTO, non quello dell\'immagine', async ({ app, openTab, testServer }) => {
   const linkHref = 'https://example.com/articolo-di-prova';
   const page = await testServer.openReady(openTab, pageHtml(linkHref));
-  const menu = await openMenuOn(page, '#thumb');
+  await openMenuOn(page, '#thumb');
 
   // Prima del fix questa voce non esisteva sul menu di un'immagine-link → il click
-  // non troverebbe nulla e il test fallirebbe.
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  // non troverebbe nulla e il test fallirebbe. A icone (#2555) è una variante dell'icona Copia, che copia l'immagine.
+  const m = menuDi(page);
+  await m.variante(m.icona('copy').first(), /^\s*Copia URL\s*$/);
 
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
