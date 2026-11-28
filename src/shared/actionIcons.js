@@ -30,6 +30,8 @@
     RIPRENDI_AUDIO: 'volume',
     PAUSA_AUDIO: 'volume',
     MOSTRA_SCHEDA: 'openTab',
+    BLOCCA_SCHEDA: 'lock',
+    SBLOCCA_SCHEDA: 'lockOpen',
     SALVA_PER_DOPO: 'saveForLater',
     CERCA_IMMAGINE: 'search',
     ONBOARDING: 'checklist',
