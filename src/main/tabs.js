@@ -5108,6 +5108,7 @@ class TabManager {
         nata._salvataPer = url;
         nata._dallaSessione = true;
         nata.paginaDal = pagine[i] || null;
+        nata.bloccata = bloccate[i];
         nate.push(nata);
         return nata;
       });
