@@ -246,15 +246,28 @@
     });
   }
 
-  // Un verbo che c'è già nella griglia prende la voce scritta come variante (con una selezione «Copia» copia la
-  // selezione, e «Copia il messaggio» sta nel suo menu); le altre voci scritte vengono prima, sono dell'elemento.
+  // Un verbo che c'è già nella griglia diventa un'icona sola con la voce scritta. Con una selezione il clic resta alla
+  // selezione («Copia il messaggio» sta nel menu dell'icona); senza, la voce della pagina di Filo conosce il suo elemento
+  // meglio dell'azione generica («Riapri la pagina» del filo, non il collegamento nudo): prende lei il clic e il suo
+  // posto fra le voci scritte, che vengono prima, e l'azione generica passa fra le varianti.
   function unisci(scritte, inFila, inAltro) {
     const tutte = [...inFila, ...inAltro];
     const restano = [];
+    const misura = (x) => (x.azione ? { azione: x.azione } : {});
     for (const s of scritte) {
       const stessa = s.verbo && tutte.find((v) => v.verbo === s.verbo);
       if (!stessa) { restano.push(s); continue; }
-      stessa.varianti = [...(stessa.varianti || []), { label: s.label, onClick: s.onClick, bersaglio: s.bersaglio, ...(s.azione ? { azione: s.azione } : {}) }, ...(s.varianti || [])];
+      const scritta = { label: s.label, onClick: s.onClick, bersaglio: s.bersaglio, ...misura(s) };
+      if (stessa.oggettoChiave === 'selezione' || stessa.valore || stessa.cronologia) {
+        stessa.varianti = [...(stessa.varianti || []), scritta, ...(s.varianti || [])];
+        continue;
+      }
+      const generica = { label: stessa.label, onClick: stessa.onClick, bersaglio: stessa.bersaglio, disabled: !!stessa.disabled, ...misura(stessa) };
+      for (const lista of [inFila, inAltro]) { const i = lista.indexOf(stessa); if (i >= 0) lista.splice(i, 1); }
+      restano.push({
+        ...stessa, ...scritta, ...(s.azione ? {} : { azione: undefined }), oggetto: s.oggetto || '', oggettoChiave: 'scritta',
+        disabled: !!s.disabled, tieneAperto: false, nota: s.nota || '', varianti: [generica, ...(stessa.varianti || []), ...(s.varianti || [])],
+      });
     }
     return restano;
   }
