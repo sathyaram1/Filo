@@ -101,7 +101,7 @@ window.addEventListener('load', async () => {
     const wc = tm.tabs.find((x) => x.id === i).view.webContents;
     const fr = wc.mainFrame.frames;
     const out = [];
-    for (const f of fr) { try { out.push(f.url + ' => ' + await f.executeJavaScript('document.body ? document.body.innerText : "senza body"')); } catch (x) { out.push(f.url + ' err ' + x.message); } }
+    for (const f of fr) { try { out.push(f.url + ' => ' + await f.executeJavaScript('document.documentElement.outerHTML.slice(0, 200)')); } catch (x) { out.push(f.url + ' err ' + x.message); } }
     return out.join(' | ') || 'nessuna cornice';
   }, id);
   console.log('ESITO', JSON.stringify(e), 'CORNICE', cornice);
