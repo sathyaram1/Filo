@@ -17,7 +17,7 @@ test('su un sito appena aperto il riquadro della segnalazione arriva alla prima 
   await page.locator('#p').click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.principale).toBeVisible({ timeout: 8_000 });
-  await menu.voce('Invia feedback').first().click();
+  await menu.scegli('Invia feedback');
   await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.visibile ?? false, { timeout: 8_000 }).toBe(true);
   expect(await inAttesa(page), 'chiesto, il riquadro è stato caricato').not.toContain('SN_FEEDBACK_UI');
 });
