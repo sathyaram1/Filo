@@ -242,7 +242,7 @@ test('tasto destro su una foto trovata: salva il file, copia e cerca l\'indirizz
   const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR || '');
   expect(dir).not.toBe('');
   await imgs.first().click({ button: 'right' });
-  await menu.voce('Salva immagine come').click();
+  await menu.scegli('Salva immagine come');
   const salvate = () => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.png$/i.test(f)) : []);
   await expect.poll(() => salvate().length, { timeout: 15_000 }).toBeGreaterThan(0);
   expect(fs.statSync(`${dir}/${salvate()[0]}`).size).toBeGreaterThan(100);
