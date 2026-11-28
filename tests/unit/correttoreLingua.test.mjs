@@ -26,7 +26,7 @@ test('la lingua di un testo dalle sue parole grammaticali; troppo poco o metà e
   assert.equal(R.linguaDi('Ciao Marco!'), null);
   assert.equal(R.linguaDi('ok'), null);
   assert.equal(R.linguaDi(''), null);
-  assert.equal(R.linguaDi('the cat e il cane'), null, 'metà e metà');
+  assert.equal(R.linguaDi('the cat and il cane e'), null, 'metà e metà');
   // Le parole che le due lingue hanno in comune non contano: «a», «in», «come», «no», «so».
   assert.equal(R.linguaDi('a in come no so a in'), null);
 });
