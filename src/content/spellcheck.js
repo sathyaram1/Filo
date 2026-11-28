@@ -334,9 +334,10 @@
   }
 
   // Si impara una parola fuori dizionario che non è il refuso di una parola vera («ciuruglio» sì, «propio» no).
-  function parolaImparabile(parola) {
+  // Nella lingua del testo: una parola inglese scritta in inglese non è una parola nuova da imparare (#2756).
+  function parolaImparabile(parola, lingua) {
     const p = String(parola || '').replace(/’/g, "'");
-    return !!p && !/\s/.test(p) && sbagliataPerIlBrowser(p) && A().imparabile(p, proposteDelBrowser(p));
+    return !!p && !/\s/.test(p) && sbagliataPerIlBrowser(p, lingua) && A().imparabile(p, proposteDelBrowser(p, lingua));
   }
   // La forma da imparare: a inizio frase la maiuscola non dice niente.
   function formaDaImparare(parola, inizioFrase) {
