@@ -133,7 +133,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, indirizzo: action._indirizzoSistema, finestra: action._finestra, file: action._file },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, restano: action._restano, proposte: action._proposte, nome: action._nomeSistema, indirizzo: action._indirizzoSistema, finestra: action._finestra, file: action._file },
   });
 }
 function consumePendingConfirm(sender, action) {
