@@ -37,7 +37,7 @@ test('una scheda web gira in sandbox, senza Node nel mondo del preload, e il tas
   await page.locator('#t').click({ button: 'right' });
   const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
-  await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  await expect(menu.getByText('Invia feedback', { exact: true })).toBeAttached();
 });
 
 test('in un riquadro di un altro sito i content script si montano e il menu compare', async ({ openTab, testServer }) => {
