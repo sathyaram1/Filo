@@ -32,14 +32,6 @@ async function tornaAllaHome(shell) {
   return h.id;
 }
 
-const esitoPerIlModello = async (app, id) => {
-  for (const msgs of await chiamateAlModello(app)) {
-    const m = msgs.find((x) => x.role === 'tool' && x.tool_call_id === id);
-    if (m) return String(m.content);
-  }
-  return '';
-};
-
 async function okAlPopup(page) {
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   await scrollConfirmToEnd(page).catch(() => {});
