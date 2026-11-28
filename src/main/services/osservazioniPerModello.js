@@ -423,6 +423,17 @@ async function schedaPerNumero(tm, action, schedeViste) {
   return tab ? { tab } : { errore: `nell'elenco TAB APERTE non c'è la scheda numero ${numero}` };
 }
 
+// #2086 — la scheda che BLOCCA_SCHEDA / SBLOCCA_SCHEDA toccano: col numero, o senza quella della conversazione
+// («blocca questa scheda»), o la davanti se la chat non sta in una scheda. { tab } o { errore }.
+async function schedaDaBloccare(tm, action, schedeViste, sender) {
+  const perNumero = await schedaPerNumero(tm, action, schedeViste);
+  if (perNumero) return perNumero;
+  if (action.scheda != null || action.numero != null) return { errore: 'numero di scheda non valido' };
+  const id = sender && sender.tab ? sender.tab.id : null;
+  const tab = tm.tabs.find((t) => t.id === id) || tm.tabs.find((t) => t.id === tm.activeId);
+  return tab ? { tab } : { errore: 'nessuna scheda aperta' };
+}
+
 // Cosa ferma «metti in pausa»: la scheda col suo numero, o tutte quelle che suonano.
 async function bersaglioPausa(tm, action, schedeViste) {
   const perNumero = await schedaPerNumero(tm, action, schedeViste);
