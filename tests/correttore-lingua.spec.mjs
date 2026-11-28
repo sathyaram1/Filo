@@ -78,6 +78,8 @@ test('su un sistema italiano un testo inglese ha segni e proposte inglesi, e uno
   await expect(errori.filter({ hasText: 'andatto' })).toHaveCount(1, { timeout: 5000 });
   for (const giusta of ['sono', 'mare', 'sorella', 'abbiamo', 'trovato', 'posto']) await expect(errori.filter({ hasText: giusta })).toHaveCount(0);
   await expect(await primaProposta(page, errori.filter({ hasText: 'andatto' }))).toHaveText(/andato/);
+  expect(await app.evaluate(() => globalThis.__filoDizionarioDiFilo.stato()))
+    .toMatchObject({ predefinite: ['it-IT'], lingue: expect.arrayContaining(['it-IT', 'en-US']) });
 });
 
 test('il controllo rapido riceve solo la parola sbagliata del testo inglese, con la lingua, e la correzione è inglese', async ({ app, openTab, testServer }) => {
