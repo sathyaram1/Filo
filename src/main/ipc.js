@@ -791,7 +791,7 @@ function registerIpcHandlers() {
   ipcMain.handle('tabs:help', (event, { id } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) {
-      // La voce «Aiuto» del menu della scheda (#1468); sotto l'avviso del sito è la domanda dell'avviso.
+      // L'Aiuto aperto su una scheda precisa (gli spec lo aprono così); sotto l'avviso del sito è la domanda dell'avviso.
       const tm = win._filoTabs;
       const tab = tm.tabs.find((t) => t.id === id);
       const incognito = !!win._filoIncognito;
