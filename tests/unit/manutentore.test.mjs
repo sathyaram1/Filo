@@ -1090,7 +1090,7 @@ test('#2770: accanto al perché di una voce lo stato dice i numeri che lo decido
     + 'in viaggio 1 (server #2769 accesa 2026-11-28T12:50:00.000Z); N 2, posti di N 0 (priorità 3 pronte 0, al lavoro 0); tetto 9.');
   assert.ok(!righe.some((r) => r.startsWith('- server, i numeri')), 'una voce senza numeri non ne inventa');
   // Senza N i posti di N non si sanno: trattino, non zero. Un testo del server con un a capo resta su una riga.
-  const senzaN = M.rigaConto('server', { alLavoro: 0, traBiglietti: 0, inViaggio: 0, n: null, postiN: null, tetto: 9, chi: [{ risorsa: 'probe:ab\n## x', ruolo: '' }], attese: [], oltre: 3 }, ms('13:00'));
+  const senzaN = M.rigaPostiDellaVoce('server', { alLavoro: 0, traBiglietti: 0, inViaggio: 0, n: null, postiN: null, tetto: 9, chi: [{ risorsa: 'probe:ab\n## x', ruolo: '' }], attese: [], oltre: 3 }, ms('13:00'));
   assert.match(senzaN, /N -, posti di N - .*; altre 3 non elencate\.$/);
   assert.ok(!senzaN.includes('\n'));
 });
