@@ -105,6 +105,38 @@ test('«chiudile tutte» in chat lascia la bloccata e lo dice; chiesta per numer
   await ripristina(app);
 });
 
+test('dalla chat «blocca la seconda» e «sblocca la seconda» fanno quello che fa il menu; «/clear all» lascia la bloccata', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await openTab(testServer.html('<title>Alfa</title><p>alfa'));
+  await openTab(testServer.html('<title>Beta</title><p>beta'));
+  await tornaAllaHome(shell);
+  const alfa = () => schede(shell).then((s) => s.find((t) => t.title === 'Alfa')?.bloccata);
+
+  // Nella barra: 1 la home, 2 Alfa, 3 Beta. Un comando riuscito chiude il turno con una chiamata.
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'b1', name: 'BLOCCA_SCHEDA', arguments: JSON.stringify({ scheda: 2 }) }] },
+    { text: '', toolCalls: [{ id: 's1', name: 'SBLOCCA_SCHEDA', arguments: JSON.stringify({ scheda: 2 }) }] },
+    { text: '', toolCalls: [{ id: 'b2', name: 'BLOCCA_SCHEDA', arguments: JSON.stringify({ scheda: 2 }) }] },
+  ]);
+  const fermo = () => expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await chiedi(page, 'blocca la seconda');
+  await expect.poll(alfa, { timeout: 10_000 }).toBe(true);
+  await expect(shell.locator('.tab', { hasText: 'Alfa' }).locator('.close.bloccata')).toBeVisible();
+  await expect(page.locator('.dash-activity').last()).toContainText('Bloccata');
+  await fermo();
+  await chiedi(page, 'sblocca la seconda');
+  await expect.poll(alfa, { timeout: 10_000 }).toBe(false);
+  await fermo();
+  await chiedi(page, 'bloccala di nuovo');
+  await expect.poll(alfa, { timeout: 10_000 }).toBe(true);
+  await fermo();
+  await ripristina(app);
+
+  await chiedi(page, '/clear all');
+  await expect.poll(() => schede(shell).then((s) => s.map((t) => t.title)), { timeout: 10_000 }).toEqual(['Alfa']);
+});
+
 test('X, clic centrale e Ctrl+W non chiudono la bloccata: l\'avviso offre «Sblocca e chiudi», che la chiude', async ({ app, shell, avvisi, testServer }) => {
   const id = await apriEAspetta(app, testServer.html('<title>Tenuta</title><p>tenuta'));
   await bloccaDalMenu(app, shell, id);
