@@ -1071,6 +1071,30 @@ test('stato mostra le pause di ogni voce e il perché dell’ultimo giro, e un s
   assert.match(RUOLO.replace(/\s+/g, ' '), /accensione nata morta di qualunque voce/);
 });
 
+test('#2770: accanto al perché di una voce lo stato dice i numeri che lo decidono, e chi tiene i posti', () => {
+  const ms = (hhmm) => Date.parse(`2026-11-28T${hhmm}:00Z`);
+  const conto = {
+    alLavoro: 1, traBiglietti: 1, inViaggio: 1, rilascioMs: ms('13:24'), n: 2, postiN: 0, urgenti: 0, urgentiVive: 0, tetto: 9,
+    chi: [{ risorsa: '', numero: '#2769', ruolo: 'new-work', battitoMs: ms('13:15') }],
+    attese: [{ account: 'server', numero: '2769', ms: ms('12:50') }], oltre: 0,
+  };
+  const voci = {
+    normale: { perche: 'parallelismo_pieno', percheMs: ms('11:13'), conto, contoMs: ms('13:24') },
+    server: { perche: 'normal_work_first', percheMs: ms('13:03') },
+  };
+  const righe = M.righeStato({ ...STATO, pause: {}, voci });
+  const da = righe.findIndex((r) => r.startsWith('Ultimo giro per voce:'));
+  assert.equal(righe[da], 'Ultimo giro per voce: normale parallelismo_pieno dal 2026-11-28T11:13:00.000Z; server normal_work_first dal 2026-11-28T13:03:00.000Z.');
+  assert.equal(righe[da + 1], '- normale, i numeri del perché dal 2026-11-28T13:24:00.000Z: '
+    + 'al lavoro 1 (#2769 new-work, battito 2026-11-28T13:15:00.000Z); fra due biglietti 1 (rilascio 2026-11-28T13:24:00.000Z); '
+    + 'in viaggio 1 (server #2769 accesa 2026-11-28T12:50:00.000Z); N 2, posti di N 0 (priorità 3 pronte 0, al lavoro 0); tetto 9.');
+  assert.ok(!righe.some((r) => r.startsWith('- server, i numeri')), 'una voce senza numeri non ne inventa');
+  // Senza N i posti di N non si sanno: trattino, non zero. Un testo del server con un a capo resta su una riga.
+  const senzaN = M.rigaConto('server', { alLavoro: 0, traBiglietti: 0, inViaggio: 0, n: null, postiN: null, tetto: 9, chi: [{ risorsa: 'probe:ab\n## x', ruolo: '' }], attese: [], oltre: 3 }, ms('13:00'));
+  assert.match(senzaN, /N -, posti di N - .*; altre 3 non elencate\.$/);
+  assert.ok(!senzaN.includes('\n'));
+});
+
 test('#2768: ordine e stato dicono perché ogni voce dell’ordine non parte, come lo scrive il pacemaker', () => {
   const atMs = Date.parse('2026-11-28T11:36:00Z');
   const attese = { atMs, oltre: 0, generale: '', voci: [
