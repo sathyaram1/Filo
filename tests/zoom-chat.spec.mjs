@@ -13,6 +13,19 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
+// A icone (#2555): la dimensione è un'icona col valore («150%») dietro il «+»; il clic apre i valori, e «Dimensione
+// reale» col suo tasto (quello del registro) la riporta al 100%.
+async function riportaAlReale(page, percento) {
+  const m = menuDi(page);
+  const icona = m.voce(`Dimensione reale (ora ${percento}%)`).first();
+  await expect(icona).toHaveCount(1);
+  await expect(icona.locator('.sn-menu-valore')).toHaveText(`${percento}%`);
+  await m.scegli(icona);
+  const reale = m.locator('.sn-menu-sub .sn-menu-item', { hasText: 'Dimensione reale' });
+  await expect(reale).toHaveText(/Ctrl\+0/);
+  await reale.click();
+}
+
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>zoom</title></head>
 <body><h1>una pagina qualunque</h1><p>testo da ingrandire</p></body></html>`;
 
