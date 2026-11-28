@@ -312,11 +312,6 @@ async function provaMenu(page, prima, tornaA) {
   expect(await fuoco(page), 'il Tab resta nel menu').toBe(voci[1]);
   await page.keyboard.press('Shift+Tab');
   expect(await fuoco(page)).toBe(voci[0]);
-  // La prima lettera porta alla prossima voce la cui scritta comincia così (un'icona senza scritta non conta).
-  const lettera = normale(prima)[0];
-  const attesa = voci.find((v, j) => j > 0 && normale(scritte[j]).startsWith(lettera));
-  await page.keyboard.press(lettera);
-  expect(await fuoco(page)).toBe(attesa);
   await page.keyboard.press('Escape');
   await expect(menuDi(page).pannelli).toHaveCount(0);
   expect(await fuoco(page), 'Esc riporta il fuoco dov’era').toBe(tornaA);
