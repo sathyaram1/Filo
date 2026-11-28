@@ -1381,9 +1381,9 @@ class TabManager {
     this._broadcast();
   }
 
-  // Più schede in un colpo, dalla chat (#413) o da «Chiudi le altre schede» (#1695): come closeTab per ognuna, con una
-  // sola attivazione alla fine, così una scheda che sta per chiudersi non si carica solo per passarci sopra.
-  // `via` come in closeTab. Torna gli id chiusi davvero.
+  // Più schede in un colpo, dalla chat (#413): come closeTab per ognuna, con una sola attivazione alla fine, così una
+  // scheda che sta per chiudersi non si carica solo per passarci sopra. Le bloccate qui sono già state scelte apposta
+  // (CHIUDI_SCHEDE per numero, a costo 2): chi sceglie gli id le toglie dalle chiusure in blocco. Torna gli id chiusi.
   chiudiSchede(ids, { via = 'chat' } = {}) {
     const prese = new Set(Array.isArray(ids) ? ids : []);
     const chiuse = this.tabs.filter((t) => prese.has(t.id));
