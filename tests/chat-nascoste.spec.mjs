@@ -293,16 +293,18 @@ async function provaMenu(page, prima, tornaA) {
   await expect.poll(() => fuoco(page), { message: 'da tastiera il fuoco parte dalla prima voce che riguarda l’elemento' }).toBe(`menu:${prima}`);
   const elenco = await vociDelMenu(page);
   const voci = elenco.map((v) => v.id);
-  const scritte = elenco.map((v) => v.scritta);
   const i = voci.indexOf(`menu:${prima}`);
   expect(i).toBeGreaterThanOrEqual(0);
-  await page.keyboard.press('ArrowDown');
+  // A icone (#2555): nella griglia le frecce di lato passano all'icona accanto.
+  await page.keyboard.press('ArrowRight');
   expect(await fuoco(page)).toBe(voci[(i + 1) % voci.length]);
-  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowLeft');
   expect(await fuoco(page)).toBe(voci[i]);
+  // Il tasto singolo dell'icona col fuoco sta nella riga del nome.
+  if (elenco[i].tasto) await expect(menuDi(page).nome).toContainText(elenco[i].tasto.toUpperCase());
   await page.keyboard.press('End');
   expect(await fuoco(page)).toBe(voci[voci.length - 1]);
-  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
   expect(await fuoco(page), 'le frecce girano in tondo').toBe(voci[0]);
   await page.keyboard.press('Home');
   expect(await fuoco(page)).toBe(voci[0]);
