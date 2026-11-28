@@ -271,7 +271,7 @@ test('un filmato a tutta pagina non si porta dietro le voci di un link che gli p
   // Il clic destro cade sul filmato, proprio sopra al link che gli sta sotto.
   const menu = await openMenuOn(page, '#pieno', { x: 60, y: 48 });
 
-  await expect(menu.getByText('Salva video come', { exact: false }).first()).toBeVisible();
+  await haVoce('Salva video come');
   for (const label of LINK_LABELS) {
     await expect(menu.getByText(label, { exact: true })).toHaveCount(0);
   }
