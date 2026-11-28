@@ -159,12 +159,15 @@ test('una riga con più segnalazioni: un numero per ognuna delle tue, e il tasto
   await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.registra({ id: 'fb-4242', testo: 'Menu lento', creataIl: '2026-11-02T10:00:00Z', stato: 'inviata', num: '4242' }));
   await expect(r.locator('.nv-segn')).toHaveText(['#4242', '#4343']);
   await r.click({ button: 'right' });
-  await expect(menuDi(page).voce('Apri la tua segnalazione #4242')).toBeVisible();
-  await expect(menuDi(page).voce('Apri la tua segnalazione #4343')).toBeVisible();
-  await expect(menuDi(page).voce('Apri la tua segnalazione #4444')).toHaveCount(0);
+  // A icone (#2555): una segnalazione è l'icona, l'altra una variante nel suo menu.
+  expect(await menuDi(page).haVoce('Apri la tua segnalazione #4242')).toBe(true);
+  expect(await menuDi(page).haVoce('Apri la tua segnalazione #4343')).toBe(true);
+  expect(await menuDi(page).haVoce('Apri la tua segnalazione #4444')).toBe(false);
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: `${SHOTS}/novita-piu-segnalazioni.png` });
-  await menuDi(page).voce('Apri la tua segnalazione #4343').click();
+  await page.keyboard.press('Escape');
+  await r.click({ button: 'right' });
+  await menuDi(page).scegli('Apri la tua segnalazione #4343');
   await aspettaFinestra(app, (w) => w.url().startsWith('filo://board/board.html#segnalazione=4343'), 'la bacheca non si è aperta sulla #4343');
 });
 
