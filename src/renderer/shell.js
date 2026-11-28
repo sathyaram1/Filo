@@ -2220,6 +2220,11 @@
               }).catch(() => {}),
             };
           }
+          // #2086 — «Sblocca e chiudi» sull'avviso di una chiusura fermata dal blocco.
+          if (a && a.sbloccaEChiudi != null && !a.onClick && api.tabs.blocca) {
+            const id = a.sbloccaEChiudi;
+            return { label: a.label, onClick: () => api.tabs.blocca(id, false, true) };
+          }
           // #2390 — «Ferma» sull'avviso del timer scaduto: quello che fa il pulsante della suoneria nella fila di schede.
           if (a && typeof a.fermaTimer === 'string' && !a.onClick && MSG_FILO.FILO_STOP_TIMER_ALARM) {
             const id = a.fermaTimer;
