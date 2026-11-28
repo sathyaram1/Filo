@@ -3061,7 +3061,8 @@
     try { res = await chiediERipeti(ACTIONS.SPELLCHECK_SEMANTIC, payload, { suRichiesta: true }); } catch (_) { return null; }
     if (!res || !res.ok || typeof res.text !== 'string') return null;
     const { segni } = R().segniDaRisposta(res.text, testo, { fonte: 'rapido', nuovo: { start: wordCtx.start, end: wordCtx.end } });
-    const e = segni.find((s) => s.start < wordCtx.end && s.end > wordCtx.start);
+    const trovato = segni.find((s) => s.start < wordCtx.end && s.end > wordCtx.start);
+    const e = trovato && nellaSuaLingua(testo)(trovato);
     if (!e) return { errore: false };
     // Il modello va ai contatori del correttore, con la proposta che ne esce (#1461).
     return { errore: true, start: e.start, end: e.end, segment: e.segment, correzione: e.correzioni[0] ?? '', motivo: e.motivo, modello: String(res.model || '') };
