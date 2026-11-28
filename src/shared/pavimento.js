@@ -1131,6 +1131,10 @@
     return INIZIO_SPIEGAZIONE.test(parole[0]) || /^(?:(?:cambiat|modificat|aggiornat|scadut|reimpostat|resettat)[aoie]|scad(?:e|ono)|clicca|premi|click)$/i.test(parole[0])
       || (parole.some((x) => /\d/.test(x)) && parole.some((x) => MISURA.test(x) || TEMPO.test(x)));
   }
+  // Una barra protetta («\|») sta dentro la cella, come nel Markdown: «| mario | Nyckel\|2024 |» ha due celle, e la
+  // password è la seconda intera (#2673.29). Ogni lettura delle celle a barre passa di qui.
+  const BARRA_DI_CELLA = /(?<!\\)\|/;
+  const celleFraBarre = (riga) => riga.trim().replace(/^\||(?<!\\)\|$/g, '').split(BARRA_DI_CELLA);
   function etichette(s, out) {
     alPostoDelValore(s, out);
     fraseDopo(s, out);
