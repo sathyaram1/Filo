@@ -3938,6 +3938,7 @@
     controllaOra,
     proposteDelBrowser,
     sbagliataPerIlBrowser,
+    linguaNelCampo,
     contestoDelCampo,
     getWordAt,
     getInputWordAt,
