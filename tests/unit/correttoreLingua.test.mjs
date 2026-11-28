@@ -34,7 +34,7 @@ test('la lingua di un testo dalle sue parole grammaticali; troppo poco o metà e
 test('una lingua per riga: la riga che non decide prende quella del testo intero', () => {
   const testo = `${ITALIANO}\nok\n${INGLESE}`;
   const tratti = R.lingueDelTesto(testo);
-  assert.deepEqual(tratti.map((t) => t.lingua), ['it', null, 'en'].map((l, i) => (i === 1 ? R.linguaDi(testo) : l)));
+  assert.deepEqual(tratti.map((t) => t.lingua), ['it', null, 'en'], 'il testo intero, metà e metà, non decide per «ok»');
   assert.equal(R.linguaIn(tratti, 0), 'it');
   assert.equal(R.linguaIn(tratti, testo.indexOf('seeng')), 'en');
   assert.equal(R.linguaIn(tratti, testo.length), 'en');
