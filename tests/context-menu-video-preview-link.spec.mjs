@@ -85,7 +85,7 @@ test('"Copia URL" sull\'anteprima copia l\'indirizzo della SCHEDA, non quello de
   const page = await testServer.openReady(openTab, overlayPreviewHtml(linkHref));
   const menu = await openMenuOn(page, '#clip');
 
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink();
 
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
@@ -112,7 +112,7 @@ test('filmato dentro un componente web, collegamento in chiaro: le voci del link
   for (const label of MEDIA_LABELS) {
     await haVoce(label);
   }
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
@@ -195,7 +195,7 @@ test('scheda-componente impilata: "Copia URL" copia l\'indirizzo della scheda', 
   const page = await testServer.openReady(openTab, stackedInComponentHtml(linkHref));
   const menu = await openMenuOn(page, 'video-card');
 
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink();
 
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
@@ -469,7 +469,7 @@ test('scheda con imbottitura: "Copia URL" copia l\'indirizzo della scheda', asyn
   ));
   const menu = await openMenuOn(page, '#clip');
 
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
@@ -527,7 +527,7 @@ test('copertina dentro il collegamento, striscia del titolo sopra: le voci del c
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
@@ -629,7 +629,7 @@ test('riga di risultati: i comandi del filmato agiscono sul filmato, «Copia URL
   const p = await centroDi(page, '#clip');
   const menu = await rightClickAt(page, p.x, p.y);
 
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
@@ -774,7 +774,7 @@ test('collegamento steso con uno pseudo-elemento: la miniatura resta nel menu', 
   for (const label of LINK_LABELS) {
     await haVoce(label);
   }
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink();
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
