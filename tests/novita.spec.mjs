@@ -108,15 +108,18 @@ test('tasto destro su una riga: «Copia il testo» la copia; la segnalazione si 
   await expect(page.locator('.nv-segn')).toHaveCount(0);
 
   await riga(page, 'Le novità si cercano').click({ button: 'right' });
+  // A icone (#2555): le due copie sono un'icona sola, e la seconda una variante nel suo menu.
   const menu = menuDi(page);
   await expect(menu.voce('Copia il testo')).toBeVisible();
-  await expect(menu.voce('Copia tutta la versione')).toBeVisible();
-  await expect(menu.voce('Apri la tua segnalazione')).toHaveCount(0);
-  await menu.voce('Copia il testo').click();
+  expect(await menu.haVoce('Copia tutta la versione')).toBe(true);
+  expect(await menu.haVoce('Apri la tua segnalazione')).toBe(false);
+  await page.keyboard.press('Escape');
+  await riga(page, 'Le novità si cercano').click({ button: 'right' });
+  await menu.scegli('Copia il testo');
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Le novità si cercano mentre scrivi.');
 
   await riga(page, 'riordinano per colore').click({ button: 'right' });
-  await menu.voce('Copia tutta la versione').click();
+  await menu.scegli('Copia tutta la versione');
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe(
     'Filo 0.0.2 (15 settembre 2026)\n\nNuove funzioni:\n• Le schede si riordinano per colore.\n\nCorrezioni:\n'
     + '• L\'aggiornamento non chiude più le finestre aperte.');
