@@ -2182,9 +2182,29 @@
       ...codice.filter((c) => c.segno === k && (c.dubbio || c.svanisce)),
     ].filter(tieni);
     return [
-      ...(erroriAttivi() ? Rg.senzaSovrapposti(ordina('errore')) : []),
+      ...(erroriAttivi() ? Rg.senzaSovrapposti(ordina('errore')).map(nellaSuaLingua(testo)) : []),
       ...Rg.senzaSovrapposti(ordina('suggerimento').filter((x) => (x.tipo === 'segnaposto' ? segnapostiAttivi() : suggerimentiAttivi()))),
     ];
+  }
+
+  // Una correzione che è una parola dell'altra lingua, in una riga di lingua nota, è una traduzione («seeng» → «vedendo»,
+  // #2756): non si propone, e al suo posto vanno le proposte del dizionario in quella lingua. Nomi e sigle che nessun
+  // dizionario conosce restano.
+  const ALTRA_LINGUA = { it: 'en', en: 'it' };
+  function nellaSuaLingua(testo) {
+    const tratti = R().lingueDelTesto(testo);
+    return (x) => {
+      if (!Array.isArray(x.correzioni) || !x.correzioni.length) return x;
+      const lingua = R().linguaIn(tratti, x.start);
+      if (!ALTRA_LINGUA[lingua]) return x;
+      const tradotta = (c) => {
+        const p = String(c || '').trim().replace(/’/g, "'");
+        return !!p && !/\s/.test(p) && sbagliataPerIlBrowser(p, lingua) && giustaPerIlBrowser(p, ALTRA_LINGUA[lingua]);
+      };
+      const correzioni = x.correzioni.filter((c) => !tradotta(c));
+      if (correzioni.length === x.correzioni.length) return x;
+      return { ...x, correzioni: correzioni.length ? correzioni : proposteDelBrowser(x.segment, lingua).slice(0, 3) };
+    };
   }
 
   function avvisaAscoltatori(state) {
