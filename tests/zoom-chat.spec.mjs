@@ -179,16 +179,10 @@ test('tasto destro: quando la pagina non è al 100% il menu lo dice e riporta al
   await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 150 });
   await expect.poll(async () => percentOf(app, page)).toBe(150);
 
+  // La scorciatoia accanto a «Dimensione reale» è quella vera, chiesta al registro dei tasti, e il clic la riporta
+  // davvero al 100%: la voce è anche la via d'uscita.
   await page.locator('h1').click({ button: 'right' });
-  const voce = menuDi(page).locator('.sn-menu').getByText(/Dimensione reale \(ora 150%\)/);
-  await expect(voce).toBeVisible();
-  // La scorciatoia accanto alla voce è quella vera, chiesta al registro dei
-  // tasti: due strade per la stessa cosa devono dirsi anche con lo stesso nome.
-  const riga = menuDi(page).locator('.sn-menu-item', { hasText: 'Dimensione reale' });
-  await expect(riga.locator('.sn-menu-shortcut')).toHaveText(/Ctrl\+0/);
-
-  // E il clic la riporta davvero al 100%: la voce è anche la via d'uscita.
-  await voce.click();
+  await riportaAlReale(page, 150);
   await expect.poll(async () => percentOf(app, page)).toBe(100);
 });
 
