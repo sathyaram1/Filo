@@ -44,7 +44,7 @@ test('una parola sbagliata solo in italiano: «andatto» sì, «andato» no', as
   const D = await dizionario('it-IT');
   // L'inglese è caricato per i testi scritti in inglese (#2756, correttoreLingua.test.mjs): senza lingua vale l'italiano.
   assert.deepEqual(D.stato().predefinite, ['it-IT']);
-  assert.deepEqual(await D.sbagliate(['andatto', 'andato', 'quseta', 'questa', 'qzxwvkjh', 'house']), [true, false, true, false, true, true]);
+  assert.deepEqual(await D.sbagliate(['andatto', 'andato', 'quseta', 'questa', 'qzxwvkjh', 'honestly']), [true, false, true, false, true, true]);
   assert.ok((await D.proposte('andatto')).includes('andato'), JSON.stringify(await D.proposte('andatto')));
   assert.deepEqual(await D.proposte('andato'), []);
 });
