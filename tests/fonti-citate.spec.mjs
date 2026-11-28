@@ -125,11 +125,13 @@ test('la frase presa da una pagina letta porta il nome del sito: passaggio, clic
 
   // Tasto destro: copia la citazione, copia l'indirizzo, apri.
   await buona.click({ button: 'right' });
+  // A icone (#2555): un'icona, o una variante nel menu dell'icona dello stesso verbo.
   const menu = menuDi(page);
-  await expect(menu.voce('Copia la citazione')).toBeVisible({ timeout: 10_000 });
-  await expect(menu.voce('Copia l’indirizzo')).toBeVisible();
-  await expect(menu.voce('Apri la pagina sulla frase')).toBeVisible();
-  await menu.voce('Copia la citazione').first().click();
+  await expect(menu.principale).toBeVisible({ timeout: 10_000 });
+  for (const voce of ['Copia la citazione', 'Copia l’indirizzo', 'Apri la pagina sulla frase']) expect(await menu.haVoce(voce), voce).toBe(true);
+  await page.keyboard.press('Escape');
+  await buona.click({ button: 'right' });
+  await menu.scegli('Copia la citazione');
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8_000 })
     .toBe('Il ponte di Calatrava fu inaugurato il 16 giugno 2015');
 
