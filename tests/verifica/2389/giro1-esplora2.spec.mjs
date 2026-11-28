@@ -1,6 +1,6 @@
 // Verifica #2389 giro 1: esplorazione, seconda parte.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
