@@ -364,7 +364,9 @@ async function eseguiAzioneFilo(action, {
     const nome = await nomeDellaScheda();
     action._targets = scelta.chiudere.map((t) => (t.id === chat ? 'questa scheda, con la conversazione' : nome(t)));
     action._targetIds = scelta.chiudere.map((t) => t.id);
-    action._restano = scelta.restano.map((x) => ({ nome: x.tab ? nome(x.tab) : `la numero ${x.numero}`, perche: x.perche }));
+    // Le bloccate qui ci sono solo se chieste per numero: alzano il costo (actionLevels) e la risposta lo dice (#2086).
+    action._bloccate = scelta.chiudere.filter((t) => t.bloccata).length;
+    action._restano =scelta.restano.map((x) => ({ nome: x.tab ? nome(x.tab) : `la numero ${x.numero}`, perche: x.perche }));
     action._inIncognito = !!tm.incognito;
     if (!scelta.chiudere.length) {
       const nessuna = scelta.restano.length ? '' : (scelta.sito && !scelta.tutte ? 'sito' : 'niente');
