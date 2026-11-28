@@ -58,8 +58,16 @@ test('la copia di un file sopravvive alla chiusura dell\'originale e alla ricari
   await tmEval((tm, i) => tm.duplicateTab(i), idf);
   let copiaf = null;
   await expect.poll(async () => (copiaf = await tmEval((tm, i) => { const t = tm.tabs.find((x) => x.id !== i && /sola\.png$/.test(x.url || '')); return t ? t.id : null; }, idf)), { timeout: 10_000 }).toBeTruthy();
-  const pf = await paginaDellaScheda(app, copiaf, (p) => p.url().startsWith('file:'));
-  await expect.poll(() => pf.evaluate(() => { const im = document.querySelector('img'); return im ? im.naturalWidth : 0; }), { timeout: 10_000, message: 'la copia della foto si vede' }).toBeGreaterThan(0);
+  await tmEval((tm, i) => tm.activate(i), copiaf);
+  const stato = (i) => app.evaluate(async ({ BrowserWindow }, i) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const t = tm.tabs.find((x) => x.id === i);
+    const wc = t && t.view && t.view.webContents;
+    if (!wc) return 'senza vista';
+    try { return wc.getURL() + ' ' + await wc.executeJavaScript('(()=>{const im=document.querySelector("img");return im?im.naturalWidth:-1})()'); } catch (e) { return 'err ' + e.message; }
+  }, i);
+  console.log('ORIG', await stato(idf));
+  await expect.poll(async () => { const s = await stato(copiaf); console.log('COPIA', s); return Number(s.split(' ').pop()); }, { timeout: 10_000, message: 'la copia della foto si vede' }).toBeGreaterThan(0);
 });
 
 test('fetch, XHR, import, tracce, audio, @import e stili non leggono i file accanto', async ({ app }) => {
