@@ -134,8 +134,9 @@ test('Ctrl+Shift+T sul file cancellato intanto: cosa vede l\'utente', async ({ a
     }
     return out;
   });
+  console.log('STATO', JSON.stringify(stato, null, 1));
   const toast = await (await avvisi()).locator('.shell-notif.show').allTextContents().catch(() => []);
-  console.log('STATO', JSON.stringify(stato, null, 1), 'TOAST', JSON.stringify(toast));
+  console.log('TOAST', JSON.stringify(toast));
 });
 
 test('fetch, XHR, import, tracce, audio, @import e stili non leggono i file accanto', async ({ app }) => {
