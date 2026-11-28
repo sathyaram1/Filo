@@ -350,10 +350,15 @@ async function eseguiAzioneFilo(action, {
     if (!tm) return { executed: false, kept: false, output: { error: 'nessuna finestra con schede' } };
     const chat = sender?.tab?.id ?? null;
     let scelta;
+    // Dopo l'OK restano quelle che il popup lasciava fuori: senza, il modello non sa della bloccata o della bozza lasciate.
+    let restanoMostrate = null;
     if (confirmed) {
       const visti = bersagliMostrati(sender, action);
       const ids = visti && Array.isArray(visti.targetIds) ? visti.targetIds : [];
       scelta = { chiudere: tm.tabs.filter((t) => ids.includes(t.id)), restano: [] };
+      restanoMostrate = (visti && Array.isArray(visti.restano) ? visti.restano : []).slice(0, 100)
+        .filter((x) => x && typeof x.perche === 'string')
+        .map((x) => ({ nome: String(x.nome || '').slice(0, 300), perche: x.perche.slice(0, 20) }));
     } else {
       const viste = await schedeNumerate(winOf(sender), schedeViste);
       const motivo = await tm.motiviPerRestare();
