@@ -1368,6 +1368,7 @@
     d.paese = t.proxy && t.proxy.country ? String(t.proxy.country).toUpperCase() : '';
     d.titolo = tabLabel(t);
     d.audio = t.muted ? 'muta' : suona ? 'suona' : '';
+    if (t.bloccata) d.bloccata = true;
     const pm = t.permessi;
     if (pm && ((pm.usati && pm.usati.length) || (pm.negati && pm.negati.length))) {
       d.permessi = { usati: [...(pm.usati || [])].sort(), negati: [...(pm.negati || [])].sort() };
