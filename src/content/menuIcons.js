@@ -246,10 +246,12 @@
     });
   }
 
-  // Un verbo che c'è già nella griglia diventa un'icona sola con la voce scritta. Con una selezione il clic resta alla
-  // selezione («Copia il messaggio» sta nel menu dell'icona); senza, la voce della pagina di Filo conosce il suo elemento
-  // meglio dell'azione generica («Riapri la pagina» del filo, non il collegamento nudo): prende lei il clic e il suo
-  // posto fra le voci scritte, che vengono prima, e l'azione generica passa fra le varianti.
+  // Un verbo che c'è già nella griglia diventa un'icona sola con la voce scritta. Il clic va all'oggetto più stretto:
+  // la selezione, o l'elemento della griglia se la voce scritta agisce su chi lo contiene («Copia il messaggio» sotto
+  // «Copia immagine»). Se la voce della pagina di Filo agisce sullo stesso elemento lo conosce meglio dell'azione
+  // generica («Riapri la pagina» del filo, non il collegamento nudo): prende lei il clic e il suo posto fra le voci
+  // scritte, che vengono prima, e l'azione generica passa fra le varianti.
+  const area = (rr) => (Array.isArray(rr) ? rr.reduce((n, r) => n + (Number(r && r.w) || 0) * (Number(r && r.h) || 0), 0) : 0);
   function unisci(scritte, inFila, inAltro) {
     const tutte = [...inFila, ...inAltro];
     const restano = [];
