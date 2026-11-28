@@ -38,7 +38,7 @@ export async function aspettaMenu(app, vale, message = 'il menu non si è aperto
 
 export async function scegli(app, testo) {
   const ok = await nelMenu(app, `(() => {
-    const b = [...document.querySelectorAll('button.item')].find((x) => x.textContent.trim() === ${JSON.stringify(testo)});
+    const b = [...document.querySelectorAll('button.item')].find((x) => (x.querySelector('.lbl') || x).textContent.trim() === ${JSON.stringify(testo)});
     if (!b) return false;
     b.click();
     return true;
