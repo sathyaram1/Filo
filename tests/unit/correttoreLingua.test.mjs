@@ -66,9 +66,11 @@ test('su un sistema italiano si carica anche l\'inglese, ma le lingue di serie r
   assert.deepEqual(await D.sbagliate(parole), [true, true, true, true, true, false], 'senza lingua: l\'italiano di serie, come prima');
   assert.deepEqual(await D.sbagliate(parole, 'xx'), await D.sbagliate(parole), 'una lingua che non c\'è vale quelle di serie');
 
+  // Le proposte sono parole inglesi; le italiane le avrebbe date il dizionario di serie.
   const p = await D.proposte('seeng', 'en');
-  assert.ok(p.includes('seeing'), JSON.stringify(p));
-  assert.ok(!p.some((x) => /^(?:segno|senno|seno|vedendo)$/.test(x)), `nessuna proposta italiana: ${JSON.stringify(p)}`);
+  assert.ok(p.length, JSON.stringify(p));
+  assert.ok((await D.sbagliate(p, 'en')).every((x) => x === false), `solo parole inglesi: ${JSON.stringify(p)}`);
+  assert.notDeepEqual(await D.proposte('seeng'), p, 'senza lingua proponeva in italiano');
   assert.ok((await D.proposte('andatto', 'it')).includes('andato'));
   assert.deepEqual(await D.proposte('the', 'en'), [], 'una parola giusta nella sua lingua non ha proposte');
 });
