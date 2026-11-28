@@ -24,9 +24,13 @@ quello degli altri sistemi e che nessuna prova può guardare: anche lì vale que
 
 Le sorgenti sono le stesse ovunque: l'italiano da `assets/dizionari/sorgenti` (Latin-9 con CRLF, convertito al
 caricamento, più il delta che Chromium aggiunge al suo `.bdic`), l'inglese dai pacchetti `dictionary-en` e
-`dictionary-en-gb`. Le lingue le sceglie `spellLanguages.js` come per il browser: l'italiano sempre, l'inglese se è
-la lingua del sistema. I limiti di parola sono quelli di Chromium (64 byte per il controllo, 24 per le proposte, al
-più cinque proposte alternate fra le lingue).
+`dictionary-en-gb`. Le lingue di serie le sceglie `spellLanguages.js` come per il browser: l'italiano sempre, l'inglese
+se è la lingua del sistema. L'inglese però si carica sempre (#2756): la pagina riconosce la lingua di ogni riga dalle
+parole grammaticali (`lingueDelTesto` in `src/content/correttoreRegole.js`) e chiede al dizionario in quella sola
+lingua, proposte comprese; le lingue di serie valgono quando la riga e il testo non lo dicono. La stessa lingua va al
+modello del correttore, e una correzione che è una parola dell'altra lingua non si propone (`nellaSuaLingua`). Prove:
+`tests/unit/correttoreLingua.test.mjs`, `tests/correttore-lingua.spec.mjs`. I limiti di parola sono quelli di Chromium
+(64 byte per il controllo, 24 per le proposte, al più cinque proposte alternate fra le lingue).
 
 Il correttore chiede le parole nuove di un testo in un viaggio solo (`pareriDelTesto` in `src/content/spellcheck.js`):
 con una domanda sincrona per parola, il primo ingresso in un campo lungo fermerebbe la pagina per centinaia di viaggi.
