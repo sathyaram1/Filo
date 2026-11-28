@@ -2348,6 +2348,7 @@
     const payload = {
       ...pezziDa(d.testo, g.start, g.end, sopraIlCampo(state.el)),
       candidati: candidati.slice(0, 40).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
+      lingua: linguaDelPezzo(d.testo, g.start, g.end),
     };
     const [regioneCampo, contestoCampo] = d.riporta([{ start: g.start, end: g.end }, { start: payload.campoDa, end: g.end }]);
     const viaggio = {
