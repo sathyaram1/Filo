@@ -1434,6 +1434,13 @@
   const FATTORI_UNITA = '1 mi = 1.609 km, 1 ft = 0.3048 m, 1 in = 2.54 cm, 1 yd = 0.9144 m, 1 mi² = 2.59 km², 1 acre = 4046.86 m², 1 lb = 0.4536 kg, 1 oz = 28.35 g, 1 gal (US) = 3.785 L, 1 fl oz (US) = 29.57 mL, °C = (°F-32)*5/9';
   // Per i due controlli del correttore (#1655): il nome dell'app, che a metà frase sembra il filo da cucire scritto maiuscolo.
   const NOME_DI_FILO = 'Filo è il nome del browser in cui la persona scrive, e filo.red il suo sito: «Filo» con la maiuscola e filo.red non sono errori.';
+  // La lingua che la pagina ha riconosciuto nel testo (#2756): una parola inglese corretta in italiano è una traduzione.
+  // Solo i nomi qui: il valore arriva dalla pagina.
+  const NOMI_LINGUE = { it: 'italiano', en: 'inglese' };
+  const rigaDellaLingua = (lingua) => {
+    const nome = Object.prototype.hasOwnProperty.call(NOMI_LINGUE, lingua) ? NOMI_LINGUE[lingua] : '';
+    return nome ? `Il testo è scritto in ${nome}: le correzioni restano in ${nome}, mai una parola tradotta in un'altra lingua. Il motivo resta in italiano.\n` : '';
+  };
 
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
