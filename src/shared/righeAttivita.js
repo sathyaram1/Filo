@@ -504,6 +504,7 @@
     SCHEDE_CHIUSE: 'Ricerca fra le schede chiuse non riuscita', RIAPRI_SCHEDA: 'Scheda non riaperta',
     RIPRENDI_AUDIO: 'Musica non ripartita',
     PAUSA_AUDIO: 'Niente messo in pausa', MOSTRA_SCHEDA: 'Scheda non trovata',
+    BLOCCA_SCHEDA: 'Scheda non bloccata', SBLOCCA_SCHEDA: 'Scheda non sbloccata',
     SALVA_PER_DOPO: 'Pagina non salvata', CERCA_IMMAGINE: 'Immagine non cercata',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     LEGGI_MEMORIA: 'Memoria non letta', TOGLI_PERMESSO_SITO: 'Permesso non tolto',
