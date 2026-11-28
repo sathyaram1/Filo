@@ -71,7 +71,7 @@ test('dal menu del tasto destro: Filo si spegne sul sito, la scheda aperta segue
 test('«Annulla» nell\'avviso rimette Filo com\'era', async ({ app, openTab, testServer, avvisi }) => {
   const page = await apriSu(openTab, testServer, SITO);
   await tastoDestro(page);
-  await menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' }).click();
+  await menuDi(page).scegli(menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' }));
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual([SITO]);
   const vista = await avvisi();
   await vista.locator('.shell-notif.show', { hasText: `Filo è spento su ${SITO}` }).locator('button', { hasText: 'Annulla' }).click();
