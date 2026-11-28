@@ -1738,6 +1738,23 @@
         return a && a.verso === 'prima' ? 'Portarti sulla scheda prima' : 'Portarti su una scheda aperta';
       },
     },
+    // #2086 — come la voce del menu della linguetta; si disfano l'una con l'altra. Costo 1.
+    BLOCCA_SCHEDA: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Bloccare ', cit(t), ': le pulizie non la chiudono'] : 'Bloccare questa scheda: le pulizie non la chiudono';
+      },
+    },
+    SBLOCCA_SCHEDA: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Sbloccare ', cit(t)] : 'Sbloccare questa scheda';
+      },
+    },
     // Come Alt+S: la pagina resta in «Aperti per dopo», da dove si riapre con un clic. Costo 1.
     SALVA_PER_DOPO: {
       costo: 1,
