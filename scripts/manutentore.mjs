@@ -267,6 +267,24 @@ export function rigaPronti(p) {
     : `ORDINE CORTO: pronti ${n}, ne servono almeno ${p.servono} (2×N)${elenco}. Allungalo coi criteri del mattino.`;
 }
 
+/**
+ * Perché ogni voce dell'ordine che l'ultimo giro non ha acceso non parte, come lo scrive il pacemaker con le sue regole
+ * (#2768): senza, un pronto che non parte per ore è muto. Chi è al lavoro o acceso non ha una riga. PURA.
+ */
+export function righeAttese(a) {
+  if (a === undefined) return ['Perché non partono: il server non lo dice ancora.'];
+  if (!a || typeof a !== 'object') return ['Perché non partono: il pacemaker non l\'ha ancora scritto.'];
+  const dal = `dal giro delle ${istanteIso(a.atMs)}`;
+  if (a.generale) return [`Perché non partono (${dal}): ${unaRiga(a.generale)}.`];
+  const voci = Array.isArray(a.voci) ? a.voci : [];
+  if (!voci.length) return [`Perché non partono (${dal}): niente, ogni voce aperta dell'ordine è al lavoro o accesa.`];
+  return [
+    `Perché non partono (${dal}):`,
+    ...voci.map((v) => `- #${unaRiga(v && v.numero)} ${unaRiga(v && v.motivo)}`),
+    ...(Number(a.oltre) > 0 ? [`- e altre ${Number(a.oltre)} voci, oltre le prime ${voci.length}`] : []),
+  ];
+}
+
 const STATI_CHE_FERMANO = Object.freeze({ aperta: 'aspetta l\'owner', in_smistamento: 'in smistamento' });
 
 /**
