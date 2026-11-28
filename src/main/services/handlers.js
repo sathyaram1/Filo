@@ -372,7 +372,7 @@ async function eseguiAzioneFilo(action, {
     action._targetIds = scelta.chiudere.map((t) => t.id);
     // Le bloccate qui ci sono solo se chieste per numero: alzano il costo (actionLevels) e la risposta lo dice (#2086).
     action._bloccate = scelta.chiudere.filter((t) => t.bloccata).length;
-    action._restano =scelta.restano.map((x) => ({ nome: x.tab ? nome(x.tab) : `la numero ${x.numero}`, perche: x.perche }));
+    action._restano = restanoMostrate || scelta.restano.map((x) => ({ nome: x.tab ? nome(x.tab) : `la numero ${x.numero}`, perche: x.perche }));
     action._inIncognito = !!tm.incognito;
     if (!scelta.chiudere.length) {
       const nessuna = scelta.restano.length ? '' : (scelta.sito && !scelta.tutte ? 'sito' : 'niente');
