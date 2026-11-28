@@ -69,12 +69,12 @@ function nelThread(lingue) {
     let pronto = false;
     let finito = false;
     const limite = setTimeout(() => { w.terminate().catch(() => {}); }, CARICA_MAX_MS);
-    const domanda = (tipo, dato) => new Promise((ok) => {
+    const domanda = (tipo, dato, codici) => new Promise((ok) => {
       if (finito) { ok(null); return; }
       const id = prossimo++;
       const timer = setTimeout(() => { attese.delete(id); ok(null); }, RISPOSTA_MAX_MS);
       attese.set(id, { ok, timer });
-      try { w.postMessage({ id, tipo, dato }); } catch (_) { clearTimeout(timer); attese.delete(id); ok(null); }
+      try { w.postMessage({ id, tipo, dato, lingue: codici }); } catch (_) { clearTimeout(timer); attese.delete(id); ok(null); }
     });
     const fine = (motivo) => {
       if (finito) return;
