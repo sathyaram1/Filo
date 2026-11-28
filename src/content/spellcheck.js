@@ -2085,12 +2085,12 @@
     const segnaposti = segnapostiAttivi() ? Rg.segnaposti(testo) : [];
     const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
     const perDizionario = soloDellUtente(state, d, { ripetute: false });
-    const pareri = erroriAttivi() ? pareriDelTesto(perDizionario) : null;
-    const errori = pareri ? Rg.senzaSovrapposti([
+    const sbagliata = erroriAttivi() ? pareriDelTesto(perDizionario) : null;
+    const errori = sbagliata ? Rg.senzaSovrapposti([
       ...Rg.erroriFissi(testo),
       ...(ripetizioniAttive() ? Rg.ripetizioni(testo) : []),
       ...Rg.candidatiDizionario(perDizionario, {
-        sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
+        sbagliata,
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]).filter(libero) : [];
