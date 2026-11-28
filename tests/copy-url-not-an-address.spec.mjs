@@ -35,17 +35,18 @@ function readClipboard(app) {
 
 async function openMenuOn(page, selector) {
   await page.locator(selector).click({ button: 'right', position: { x: 8, y: 8 } });
-  const menu = menuDi(page).locator('.sn-menu');
-  await expect(menu).toBeVisible();
+  const menu = menuDi(page);
+  await expect(menu.locator('.sn-menu')).toBeVisible();
   return menu;
 }
 
 // Clicca la voce "Copia URL …" chiedendo l'etichetta esatta (le voci del link e
-// quelle dell'immagine convivono nello stesso menu).
+// quelle dell'immagine convivono nello stesso menu). A icone (#2555) è l'icona Copia o una sua variante.
 async function clickCopyUrl(menu, { exclude } = {}) {
-  let item = menu.locator('button', { hasText: 'Copia URL' });
-  if (exclude) item = item.filter({ hasNotText: exclude });
-  await item.first().click();
+  const vuole = exclude ? /^\s*Copia URL\s*$/ : /^\s*Copia URL\b/;
+  const icona = menu.icona('copy').first();
+  if (vuole.test(String(await icona.getAttribute('aria-label')))) return menu.scegli(icona);
+  return menu.variante(icona, vuole);
 }
 
 test('#437 "Copia URL" su un link javascript: non riempie gli appunti e avvisa', async ({ app, openTab, testServer }) => {
