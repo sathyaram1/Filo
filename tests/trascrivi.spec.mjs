@@ -127,7 +127,8 @@ test('tasto destro su un\'immagine: «Trascrivi» apre lo stesso riquadro sopra 
   await page.locator('#foto').click({ button: 'right', position: { x: 300, y: 80 } });
   const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
-  await menu.locator('button', { hasText: 'Trascrivi' }).first().click();
+  // A icone (#2555): un'icona della griglia o dietro il «+».
+  await menuDi(page).scegli(menu.locator('button', { hasText: 'Trascrivi' }).first());
 
   const strato = await paginaDelloStrato(app, page);
   await expect(strato.locator('.sn-tr-stato')).toContainText('Leggo il testo', { timeout: 5000 });
