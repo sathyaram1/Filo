@@ -1284,7 +1284,10 @@ function esitoChiusuraPerModello(action, o) {
   }
   const dove = action._inIncognito ? 'In incognito non restano nel filo della home.'
     : 'Le pagine restano nel filo della home: se l\'utente vuole riaprirne una, trovala con scheda(chiuse) e riaprila con scheda(riapri).';
-  return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}. ${dove}${coda}`;
+  // #2086 — una bloccata chiusa per numero: la risposta lo dice.
+  const b = Number(o.bloccate) || 0;
+  const bloccate = !b ? '' : n === 1 ? ' Era bloccata: dillo all\'utente.' : ` ${b === 1 ? 'Una era bloccata' : `${b} erano bloccate`}: dillo all'utente.`;
+  return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}.${bloccate} ${dove}${coda}`;
 }
 
 // Quello che un pulsante delle Preferenze premuto dalla chat lascia da dire all'utente (#1619).
