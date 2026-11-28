@@ -134,6 +134,8 @@ del mattino (decisione incrementale, scala delle classi, classe ereditata da chi
 riscrivi l'ordine. La spesa si regola con N, non svuotando l'ordine. Lo annoti nel taccuino, e il recap del giorno dopo
 lo racconta. Un ordine senza lavori pronti con la quota che avanza sono ore di lavoro perse fino al rinnovo (06/11:
 quattordici). In una giornata a secco no.
+Sotto, «Perché non partono» dice per ogni voce dell'ordine che l'ultimo giro non ha acceso il motivo del pacemaker:
+un pronto che resta lì per ore senza posto è un segnale da seguire, non un pronto in più.
 
 ## La sessione accesa dal pacemaker
 
