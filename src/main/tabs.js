@@ -5051,6 +5051,7 @@ class TabManager {
         const savedIds = Array.isArray(saved.ids) ? saved.ids : [];
         const savedLetture = Array.isArray(saved.letture) ? saved.letture : [];
         const savedVisioni = Array.isArray(saved.visioni) ? saved.visioni : [];
+        const savedBloccate = Array.isArray(saved.bloccate) ? saved.bloccate : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
             urls.push(u);
