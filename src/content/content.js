@@ -2222,7 +2222,7 @@
       updateCorrection(riga(corr, alts));
       SpellCheck.propostaMostrata?.(editableEl, 'ortografia', chiave, modello);
     };
-    if (!mostrata) {
+    if (!mostrata && !lingua) {
       SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => { if (!mostrata && sugg?.length) mostra(sugg[0], sugg.slice(1)); });
     }
     const giudizio = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
