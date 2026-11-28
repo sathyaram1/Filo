@@ -196,6 +196,69 @@ test('riduzione del movimento: nessuna animazione', async ({ app }) => {
   await expect.poll(() => testoDoc(ed), { timeout: 8000 }).toContain('Movimento ridotto');
 });
 
+test('primo uso: quanti documenti nascono', async ({ app }) => {
+  const page = await home(app);
+  await page.locator('#input').fill('Riga uno\n\nRiga tre');
+  await page.locator('#tieni .dash-carta[data-tipo="editor"] .dash-carta-az.principale').click();
+  const ed = await finestraCon(app, 'filo://editor/editor.html');
+  await expect.poll(() => testoDoc(ed), { timeout: 8000 }).toContain('Riga tre');
+  await page.waitForTimeout(1500);
+  console.log('paragrafi', await ed.locator('#doc > *').count(), JSON.stringify(await ed.locator('#doc').innerHTML()));
+  const coll = await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.get ? null : null;
+    return s;
+  });
+  await ed.locator('#docSwitcher, .ed-doc-switcher, [data-ruolo="documenti"]').first().click().catch(() => {});
+  await ed.waitForTimeout(500);
+  await ed.screenshot({ path: join(SHOTS, 'primo-uso-documenti.png') });
+});
+
+test('riscrivilo più breve sul paragrafo selezionato', async ({ app }) => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const P = globalThis.SN_PROVIDERS;
+    globalThis.__visti = [];
+    const risposta = (attempts, messages) => {
+      globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
+      const testo = JSON.stringify(messages);
+      let text = '{"message":"Ciao.","suggestions":[]}';
+      if (testo.includes('scritto in un campo editabile')) text = '{"issues":[]}';
+      else if (testo.includes('riscrivilo')) text = JSON.stringify({ text: 'Fatto.', status: 'done', formatta: [{ op: 'riscrivi', target: 'selection', testo: 'Breve.' }] });
+      return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+    P.completeWithFallback = async ({ attempts, messages }) => risposta(attempts, messages);
+    P.streamCompleteWithFallback = async ({ attempts, messages }) => risposta(attempts, messages);
+  });
+  const page = await home(app);
+  await page.locator('#input').fill('Primo paragrafo lungo, molto lungo, da accorciare.\nSecondo paragrafo che resta.');
+  await page.locator('#tieni .dash-carta[data-tipo="editor"] .dash-carta-az.principale').click();
+  const ed = await finestraCon(app, 'filo://editor/editor.html');
+  await expect.poll(() => testoDoc(ed), { timeout: 8000 }).toContain('Secondo paragrafo');
+  await ed.waitForTimeout(1500);
+  const aiuto = await paginaDellAiuto(app, ed);
+  await expect(aiuto.locator('.sn-sidebar')).toBeVisible();
+  await ed.locator('#doc p').first().click({ clickCount: 3 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'riscrivilo più breve');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
+  await expect.poll(() => testoDoc(ed), { timeout: 15000 }).toContain('Breve.');
+  const t = await testoDoc(ed);
+  console.log('dopo riscrittura:', JSON.stringify(t));
+  expect(t).not.toContain('Primo paragrafo');
+  expect(t).toContain('Secondo paragrafo che resta.');
+  const visti = await app.evaluate(() => JSON.stringify(globalThis.__visti.filter((m) => JSON.stringify(m).includes('riscrivilo'))));
+  expect(visti).toContain('Primo paragrafo lungo, molto lungo, da accorciare.');
+  // chiudi e riapri la colonna
+  await aiuto.locator('.sn-sidebar-close').click();
+  await expect(aiuto.locator('.sn-sidebar')).toBeHidden({ timeout: 5000 });
+  await ed.screenshot({ path: join(SHOTS, 'editor-chat-chiusa.png') });
+});
+
 test('chat di lato nell\'editor nato dal campo', async ({ app }) => {
   const page = await home(app);
   await page.locator('#input').fill('Primo paragrafo lungo da accorciare.');
