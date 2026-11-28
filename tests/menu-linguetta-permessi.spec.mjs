@@ -41,8 +41,10 @@ test('microfono consentito e notifiche negate: due righe, il clic su una toglie 
 
   await tastoDestro(shell, `.tab[data-id="${id}"]`);
   const voci = await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Duplica'));
-  const testi = voci.map((x) => x.testo);
-  expect(testi).toEqual(['Blocca', 'Duplica', 'Muta', 'Microfono: consentito', 'Notifiche: negate', 'Chiudi']);
+  expect(senzaConnesso(voci)).toEqual(['Blocca', 'Duplica', 'Muta', 'Microfono: consentito', 'Notifiche: negate', 'Chiudi']);
+  const tutte = voci.map((x) => x.testo);
+  const connesso = tutte.findIndex((t) => CONNESSO.test(t));
+  if (connesso >= 0) expect(connesso).toBeLessThan(tutte.indexOf('Microfono: consentito'));
   expect(voci.filter((x) => x.hover).map((x) => x.hover)).toEqual(['Togli', 'Togli']);
   expect(voci.find((x) => x.testo === 'Microfono: consentito').icona).toBe(true);
   await fotoDelMenu(app, 'tests/.shots/menu-linguetta-permessi.png');
