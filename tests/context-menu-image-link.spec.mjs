@@ -35,13 +35,16 @@ test('tasto destro su una miniatura-link: compaiono sia le azioni immagine sia q
   const menu = await openMenuOn(page, '#thumb');
   await page.screenshot({ path: 'tests/.shots/context-menu-image-link.png' }).catch(() => {});
 
+  // A icone (#2555): ogni azione è un'icona, dietro il «+», o una variante nel menu dell'icona dello stesso verbo.
+  await expect(menu).toBeVisible();
+  const m = menuDi(page);
   // Famiglia immagine (era già presente).
   for (const label of ['Copia immagine', 'Salva immagine come', 'Copia URL immagine', 'Cerca immagine']) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    expect(await m.haVoce(label), label).toBe(true);
   }
   // Famiglia link (prima del fix spariva del tutto).
   for (const label of ['Apri in nuova tab', 'Copia URL', 'Salva link per dopo', 'Condividi link']) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+    expect(await m.haVoce(label), label).toBe(true);
   }
 });
 
