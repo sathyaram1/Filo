@@ -119,7 +119,8 @@ scheda, un segnale o una sezione del taccuino che non c'è non è cambiata, e se
   la pausa finisce al più al rinnovo, quindi una `quota` non chiede niente), domanda di
   processo di un worker, richiesta dell'owner dalla chat, richiesta L5 o controllo bocciato su un lavoro fidato
   (`approvazione`). `stato` dice quale voce è in pausa fino a quando e perché ogni voce non ha acceso all'ultimo giro
-  (`no_work`, `sessions_full`, `parallelismo_pieno`, `server_paused`…);
+  (`no_work`, `sessions_full`, `parallelismo_pieno`, `server_paused`…), e accanto ai perché dei posti la riga dei
+  numeri che li decidono: chi è al lavoro col suo ultimo battito, il rilascio recente, le accensioni in viaggio, N;
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
 
 A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, decidi le
