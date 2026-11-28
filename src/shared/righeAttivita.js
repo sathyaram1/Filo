@@ -215,6 +215,14 @@
       const o = a._output || {};
       return aPezzi('↗', ['Ti ho portato su ', fra(o.titolo || a._titolo) || '«la scheda»']);
     },
+    BLOCCA_SCHEDA: (a) => {
+      const o = a._output || {};
+      return aPezzi('🔒', [o.gia ? 'Era già bloccata ' : 'Bloccata ', fra(o.titolo || a._titolo) || '«la scheda»']);
+    },
+    SBLOCCA_SCHEDA: (a) => {
+      const o = a._output || {};
+      return aPezzi('🔓', [o.gia ? 'Non era bloccata ' : 'Sbloccata ', fra(o.titolo || a._titolo) || '«la scheda»']);
+    },
     SALVA_PER_DOPO: (a) => {
       const o = a._output || {};
       return aPezzi('🔖', ['Salvata per dopo ', fra(o.titolo || a._titolo) || '«la pagina»']);
