@@ -77,11 +77,11 @@ test('tasto destro su un audio dentro un link: le azioni del collegamento restan
 test('"Copia URL" su un video-link copia l\'href del COLLEGAMENTO, non quello del filmato', async ({ app, openTab, testServer }) => {
   const linkHref = 'https://example.com/video-di-prova';
   const page = await testServer.openReady(openTab, cardHtml(linkHref));
-  const menu = await openMenuOn(page, '#clip');
+  await openMenuOn(page, '#clip');
 
   // Prima del fix questa voce non esisteva sul menu di un video-link → il click
   // non troverebbe nulla e il test fallirebbe.
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink(page);
 
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
