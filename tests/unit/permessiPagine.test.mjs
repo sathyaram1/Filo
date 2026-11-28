@@ -345,6 +345,24 @@ test('le scelte ricordate per un sito si leggono e si azzerano; dopo si torna a 
   assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [], 'si chiede di nuovo');
 });
 
+// #2087 — la riga del menu della scheda toglie quella scelta sola.
+test('una scelta sola si toglie e le altre del sito restano', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://riunione.example/stanza');
+  wc.session = ses;
+  Permessi.seguiGesti(wc);
+  chiedi(ses, wc, 'media', { mediaTypes: ['audio'] });
+  Permessi.rispondi(ses.avvisi.filter((a) => a.evento === 'chiedi').at(-1).dati.id, true);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  chiedi(ses, wc, 'notifications');
+  Permessi.rispondi(ses.avvisi.filter((a) => a.evento === 'chiedi').at(-1).dati.id, false);
+  assert.deepEqual(Permessi.scelteDi(wc).scelte.map((s) => s.parte).sort(), ['audio', 'notifiche']);
+  assert.deepEqual(Permessi.dimentica(wc, 'notifiche'), { tolte: 1, ricarica: true });
+  assert.deepEqual(Permessi.scelteDi(wc).scelte, [{ parte: 'audio', si: true }]);
+  assert.deepEqual(Permessi.dimentica(wc, 'notifiche'), { tolte: 0, ricarica: false }, 'già tolta');
+  assert.deepEqual(chiedi(ses, wc, 'media', { mediaTypes: ['audio'] }), [true], 'il sì al microfono resta');
+});
+
 test('la domanda nomina il dominio registrato: la parte davanti la sceglie chi ha il sito', () => {
   assert.deepEqual(Permessi.nomeDaMostrare('https://meet.google.com.verifica-sessione.attacco.example:8443'),
     { sotto: 'meet.google.com.verifica-sessione', dominio: 'attacco.example:8443' });
