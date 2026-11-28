@@ -25,7 +25,9 @@ Gestione).
   i valori, la rotella lo cambia. Acceso o spento (l'audio, ripeti) si vede sull'icona.
 - **Le voci scritte delle pagine di Filo** (`SN_VOCI_PAGINA`, i menu propri) passano da `SN_MENU_ICONS.apriVoci` o
   dal menu generale: il verbo lo prende la prima parola dell'etichetta, il resto è l'oggetto. Una voce che nessun
-  verbo riconosce avrebbe l'icona generica: si aggiunge il verbo, non si lascia.
+  verbo riconosce avrebbe l'icona generica: si aggiunge il verbo, non si lascia. Se il verbo c'è già nella griglia
+  (il collegamento di una pagina del filo, «Riapri la pagina» contro «Apri in nuova tab») la voce della pagina prende
+  il clic, e l'azione generica passa nel menu dell'icona; con una selezione il clic resta alla selezione.
 
 ## Dove sta
 
