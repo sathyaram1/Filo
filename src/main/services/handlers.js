@@ -50,7 +50,7 @@ const {
   ingressiContati,
 } = require('./autonomiaFonti');
 const {
-  voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, bersaglioPausa, bersaglioAudio, apriPaginaSalvata, contoRestano,
+  voceChiusa, schedeNumerate, schedaPerNumero, schedaDaMostrare, schedaDaBloccare, bersaglioPausa, bersaglioAudio, apriPaginaSalvata, contoRestano,
 } = require('./osservazioniPerModello');
 const { handleAIRequest, handleStream, maybeRunCompactor, stimaSogliaCompattazione } = require('./chiamateModello');
 const {
