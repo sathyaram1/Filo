@@ -702,10 +702,10 @@ test('una pagina con l’indirizzo tagliato alla misura si apre dal suo sito, no
   const pagina = riga.locator('.dash-pagina', { hasText: 'Pagina lunghissima' });
   await expect(pagina).toHaveAttribute('href', `${origine}/`);
   await pagina.click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu');
-  await expect(menu.getByText('Apri il sito', { exact: true })).toBeVisible();
-  await expect(menu.getByText('Riapri la pagina', { exact: true })).toHaveCount(0);
-  await menu.getByText('Apri il sito', { exact: true }).click();
+  const menu = menuDi(page);
+  await expect(menu.voce('Apri il sito')).toHaveCount(1);
+  await expect(menu.voce('Riapri la pagina')).toHaveCount(0);
+  await menu.scegli('Apri il sito');
   const schede = async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.map((t) => String(t.url));
   await expect.poll(async () => (await schede()).some((u) => u.replace(/^https?:\/\//, '').replace(/\/$/, '') === new URL(origine).host)).toBe(true);
   expect((await schede()).some((u) => u.includes('xxxx'))).toBe(false);
