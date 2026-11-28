@@ -233,7 +233,8 @@
     }
     return [...perVerbo.entries()].map(([verbo, voci]) => {
       const d = Disp.VERBI[verbo] || null;
-      const [a, ...altre] = voci;
+      // Il clic all'oggetto più stretto: l'etichetta di una fonte prima del messaggio che la contiene.
+      const [a, ...altre] = [...voci].sort((p, q) => area(p.bersaglio) - area(q.bersaglio));
       const nome = d ? d.nome : a.label;
       const misura = (x) => (typeof x.azione === 'string' && x.azione ? { azione: x.azione } : {});
       return {
