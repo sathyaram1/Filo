@@ -1360,10 +1360,12 @@ class TabManager {
   // `via`: come la si chiude, per i contatori della finestra (#1470). `daSola`: chiusa senza che la persona o la pulizia
   // l'abbiano chiesto (la pagina stessa, un'estensione, un crash).
   // `strada`: da dove parte la chiusura fra le strade delle azioni (#1468), quando `via` non lo dice.
-  closeTab(id, { via = 'altro', daSola = false, strada = '' } = {}) {
+  // `sblocca`: chiude anche una scheda bloccata (#2086); senza, la bloccata resta e l'avviso offre «Sblocca e chiudi».
+  closeTab(id, { via = 'altro', daSola = false, strada = '', sblocca = false } = {}) {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
+    if (tab.bloccata && !sblocca) { this._avvisaBloccata(tab); return; }
     ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
     const s = strada || STRADA_DELLA_CHIUSURA[via];
     if (s) Strade.misura('azione', 'closeTab', s, { incognito: this.incognito });
