@@ -928,15 +928,22 @@ function scelteDi(wc) {
 }
 
 // La pagina già aperta tiene quello che ha ottenuto, e un no alle notifiche lo legge finché non si ricarica.
-function dimentica(wc) {
-  const { origine, scelte } = scelteDi(wc);
+// Con `parte` toglie quella scelta sola (le righe del menu della scheda, #2087), senza tutte.
+function dimentica(wc, parte) {
+  const { origine, scelte: tutte } = scelteDi(wc);
+  const scelte = parte ? tutte.filter((s) => s.parte === parte) : tutte;
   if (!scelte.length) return { tolte: 0, ricarica: false };
-  wc._filoScaricamentiNoAlle = 0;
-  schedeFerme.delete(wc);
+  if (!parte || parte === SCARICAMENTI) {
+    wc._filoScaricamentiNoAlle = 0;
+    schedeFerme.delete(wc);
+  }
   const mappa = sceltePer(wc.session);
   for (const s of scelte) if (!s.scheda) mappa.delete(s.chiave || `${origine}|${s.parte}`);
   if (mappa === sceltePersistenti) salva();
-  if (wc._filoSegni && wc._filoSegni.negati.size) { wc._filoSegni.negati.clear(); try { aggiornaScheda(wc); } catch (_) {} }
+  const negati = wc._filoSegni && wc._filoSegni.negati;
+  if (negati && negati.size && (parte ? negati.delete(parte) : (negati.clear(), true))) {
+    try { aggiornaScheda(wc); } catch (_) {}
+  }
   return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
 }
 
