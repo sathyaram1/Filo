@@ -172,7 +172,9 @@ Testi, note, rapporti e taccuino arrivano filtrati per fiducia, in qualunque amb
 (un feedback non fidato, le note che un biglietto sporco ha scritto, il rapporto di una sessione sporca, un taccuino
 scritto prima che fossi fidato) arrivano vuoti e segnati `nonFidato`; il motivo dello stato che un biglietto sporco ha
 scritto su un feedback fidato arriva vuoto con `motivoNonFidato`. Non si chiedono in un altro modo: lavori coi
-numeri e, se serve una decisione, la chiedi all'owner. Lo stesso nel censimento delle schede: una scheda o un testo non
+numeri e, se serve una decisione, la chiedi all'owner. Il rapporto non fidato porta però `sporcatoDa`: motivo e ora di
+ogni sporcatura, con `fratello` (biglietto e motivo) quando lo sporco viene da un altro biglietto della sessione; di
+un'autodichiarazione resta solo che c'è stata. Da lì distingui un falso positivo da un'iniezione. Lo stesso nel censimento delle schede: una scheda o un testo non
 fidato arrivano come `schedaNonFidata` o `testiNonFidati`, senza contenuto, e di quel feedback decide la perizia. Un
 taccuino `nonFidato` arriva con accanto le indicazioni
 dell'owner accodate da allora: lo riscrivi da capo con la sua versione, portandole dentro (il testo di prima resta a
