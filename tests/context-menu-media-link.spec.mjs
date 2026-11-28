@@ -100,15 +100,13 @@ test('le azioni del video funzionano ancora: "Ripeti in continuo" agisce davvero
 test('player con overlay: il video sotto e il link intorno convivono nello stesso menu', async ({ app, openTab, testServer }) => {
   const linkHref = 'https://example.com/video-con-overlay';
   const page = await testServer.openReady(openTab, overlayCardHtml(linkHref));
-  const menu = await openMenuOn(page, '#overlay');
+  await openMenuOn(page, '#overlay');
 
   // Il filmato è coperto dall'overlay: prima del fix il ramo link vinceva e le
   // azioni sul video sparivano.
-  for (const label of ['Riproduci', 'Velocità', 'Salva video come']) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
-  }
+  for (const label of ['Riproduci', 'Velocità', 'Salva video come']) expect(await menuDi(page).haVoce(label), label).toBe(true);
   // E le azioni del collegamento restano.
-  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await copiaUrlDelLink(page);
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
