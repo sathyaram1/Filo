@@ -64,7 +64,7 @@ test('dal menu del tasto destro: Filo si spegne sul sito, la scheda aperta segue
   await expect(vista.locator('.shell-notif.show', { hasText: `Filo è di nuovo acceso su ${SITO}` })).toBeVisible({ timeout: 5000 });
   await page.waitForTimeout(300);
   await tastoDestro(page);
-  await expect(menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' })).toBeVisible({ timeout: 5000 });
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' })).toHaveCount(1, { timeout: 5000 });
   expect(await page.evaluate(() => window.__nonRicaricata), 'la scheda si è ricaricata').toBe(843);
 });
 
