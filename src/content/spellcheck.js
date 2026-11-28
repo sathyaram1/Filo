@@ -2304,6 +2304,11 @@
 
   const sopraIlCampo = (el) => contestoDelCampo(el, { soloPrima: CONVERSAZIONE_MAX }).prima;
 
+  // La lingua del pezzo che parte, o del campo intero: il modello corregge in quella lingua e non traduce (#2756).
+  function linguaDelPezzo(testo, start, end) {
+    return R().linguaDi(testo.slice(start, end)) || R().linguaDi(testo) || undefined;
+  }
+
   // Il sito dove si scrive, per il ragionato: il main lo rimette comunque col suo.
   function sitoDellaPagina() {
     try { return location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) { return ''; }
