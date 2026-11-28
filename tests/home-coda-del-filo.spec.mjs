@@ -703,6 +703,8 @@ test('una pagina con l’indirizzo tagliato alla misura si apre dal suo sito, no
   await expect(pagina).toHaveAttribute('href', `${origine}/`);
   await pagina.click({ button: 'right' });
   const menu = menuDi(page);
+  await page.waitForTimeout(1500);
+  console.log('DEBUG', JSON.stringify(await menu.nomi()), await menu.principale.count(), await page.url());
   await expect(menu.voce('Apri il sito')).toHaveCount(1);
   await expect(menu.voce('Riapri la pagina')).toHaveCount(0);
   await menu.scegli('Apri il sito');
