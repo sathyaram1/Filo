@@ -379,7 +379,7 @@ test('il menu di un risultato della ricerca nel filo si apre da tastiera, e il p
   await expect(menuDi(home).pannelli).toBeVisible({ timeout: 5_000 });
   await expect.poll(() => fuoco(home)).toBe('menu:Vai a questo punto del filo');
   expect(await menuDi(home).voci.count(), 'il menu del risultato, non quello del campo').toBe(2);
-  await home.keyboard.press('ArrowDown');
+  await home.keyboard.press('ArrowRight');
   expect(await fuoco(home)).toBe('menu:Copia il testo');
   await home.keyboard.press('Escape');
   await expect(menuDi(home).pannelli).toHaveCount(0);
