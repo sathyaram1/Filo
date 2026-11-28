@@ -1378,20 +1378,15 @@
 
   // Il segno di cosa il sito della scheda ha avuto in questa pagina o si è visto negare (#586): icone piccole prima della
   // croce. Se lo usa ancora lo sa solo la pagina, e la pagina può mentire: le frasi dicono cosa ha avuto, non «adesso».
-  const SEGNI_PERMESSI = {
-    audio: ['mic', 'Ha avuto il microfono in questa pagina', 'Microfono negato'],
-    video: ['camera', 'Ha avuto la fotocamera in questa pagina', 'Fotocamera negata'],
-    posizione: ['location', 'Ha saputo dove ti trovi in questa pagina', 'Posizione negata'],
-    schermo: ['windowFrame', 'Ha visto il tuo schermo in questa pagina', 'Schermo negato'],
-    notifiche: ['bell', '', 'Notifiche negate'],
-    appunti: ['clipboard', '', 'Appunti negati'],
-    schermi: ['windowFrame', '', 'Schermi negati'],
-    presenza: ['user', '', 'Presenza al computer negata'],
-    strumenti: ['readAloud', '', 'Strumenti musicali negati'],
-    rete: ['wifi', '', 'Rete locale negata'],
-    file: ['pencil', '', 'Modifica dei file negata'],
-    scaricamenti: ['download', '', 'Scaricamenti senza un tuo clic negati'],
+  // Icona e nome di ogni parte sono quelli delle righe del menu della scheda (SN_MENU_LINGUETTA.PARTI).
+  const FRASI_USATO = {
+    audio: 'Ha avuto il microfono in questa pagina',
+    video: 'Ha avuto la fotocamera in questa pagina',
+    posizione: 'Ha saputo dove ti trovi in questa pagina',
+    schermo: 'Ha visto il tuo schermo in questa pagina',
   };
+  const SEGNI_PERMESSI = Object.fromEntries(Object.entries(window.SN_MENU_LINGUETTA.PARTI)
+    .map(([k, p]) => [k, [p.icona, FRASI_USATO[k] || '', `${p.nome} ${window.SN_MENU_LINGUETTA.esito(k, false)}`]]));
   // Il primo segno è il più delicato: sulla scheda più stretta del suo contenuto resta solo lui (shell.css), la frase li dice tutti.
   const PESO_SEGNO = ['schermo', 'video', 'audio', 'posizione'];
   const pesoSegno = (x) => { const i = PESO_SEGNO.indexOf(x); return i < 0 ? PESO_SEGNO.length : i; };
