@@ -33,8 +33,8 @@ test('la voce feedback è "Invia feedback" senza emoji né "(alpha)"', async ({ 
   await page.locator('#paragraph').click({ button: 'right' });
   const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
-  // La voce esiste con l'etichetta pulita…
-  await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  // La voce esiste con l'etichetta pulita (a icone, #2555: il nome dell'icona, anche dietro il «+»)…
+  await expect(menuDi(page).locator('.sn-menu-griglia .sn-menu-row-btn[aria-label="Invia feedback"]')).toHaveCount(1);
   // …e NON contiene più l'emoji o il suffisso "(alpha)".
   const txt = (await menu.textContent()) || '';
   expect(txt).not.toContain('💬');
