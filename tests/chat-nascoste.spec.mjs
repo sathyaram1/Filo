@@ -417,7 +417,7 @@ test('il menu di una scheda chiusa nel filo si usa da tastiera', async ({ app, o
   // Invio su «Copia l’indirizzo» la copia davvero.
   await home.keyboard.press('Shift+F10');
   await expect.poll(() => fuoco(home)).toBe('menu:Riapri la pagina');
-  await home.keyboard.press('ArrowDown');
+  await home.keyboard.press('ArrowRight');
   expect(await fuoco(home)).toBe('menu:Copia l’indirizzo');
   await home.keyboard.press('Enter');
   await expect(menuDi(home).pannelli).toHaveCount(0);
