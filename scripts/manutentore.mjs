@@ -1517,7 +1517,9 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     case 'ordine': {
       const [st, sc] = await Promise.all([chiama(cred, 'stato', { pronti: true }), tutteLeSchede(cred)]);
       if (st.ok === false) return esito(st);
-      return esito(st, () => `${rigaOrdine(st.ordine || [], sc.ok === false ? [] : indiceDalServer(sc.schede), st.pronti)}\nParallelismo: N ${st.parallelismo ?? 'non scritto'}, vale ${st.parallelismoEffettivo} sotto il freno dell'owner (${st.freno}).`);
+      return esito(st, () => [rigaOrdine(st.ordine || [], sc.ok === false ? [] : indiceDalServer(sc.schede), st.pronti),
+        ...((st.ordine || []).length ? righeAttese(st.attese) : []),
+        `Parallelismo: N ${st.parallelismo ?? 'non scritto'}, vale ${st.parallelismoEffettivo} sotto il freno dell'owner (${st.freno}).`].join('\n'));
     }
     case 'accendi': {
       let numeri = [];
