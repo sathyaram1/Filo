@@ -1455,6 +1455,15 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (o.error) return `Scheda NON mostrata: ${o.error}.`;
     return conTitolo('L\'utente adesso ha davanti la scheda. Dillo in una riga.', o.titolo);
   }
+  if ((type === 'BLOCCA_SCHEDA' || type === 'SBLOCCA_SCHEDA') && res.output && !res.needsConfirm) {
+    const o = res.output;
+    const blocca = type === 'BLOCCA_SCHEDA';
+    if (o.error) return `Scheda NON ${blocca ? 'bloccata' : 'sbloccata'}: ${o.error}.`;
+    if (o.gia) return conTitolo(`La scheda ${blocca ? 'era già bloccata' : 'non era bloccata'}. Dillo in una riga.`, o.titolo);
+    return conTitolo(blocca
+      ? 'Scheda bloccata: le pulizie e le chiusure di tutte o di un sito la lasciano, e per chiuderla a mano l\'utente sceglie «Sblocca e chiudi». Dillo in una riga.'
+      : 'Scheda sbloccata: si chiude come le altre. Dillo in una riga.', o.titolo);
+  }
   if (type === 'RIAPRI_SCHEDA' && res.output && !res.needsConfirm && !res.output.nonRaggiungibile && !res.output.tagliato) {
     const o = res.output;
     if (o.trovata === false) return 'Scheda NON riaperta: quell\'id non è fra le schede chiuse. Cercala con scheda(chiuse) e usa l\'id che ti torna.';
