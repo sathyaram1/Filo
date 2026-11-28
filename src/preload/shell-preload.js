@@ -69,7 +69,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     microfonoDati: (id, dati) => ipcRenderer.send('shell:microfono-dati', { id, dati }),
     microfonoFine: (id) => ipcRenderer.send('shell:microfono-fine', { id }),
     permessi: (id) => ipcRenderer.invoke('tabs:permessi', { id }),
-    dimenticaPermessi: (id) => ipcRenderer.invoke('tabs:permessi-dimentica', { id }),
+    dimenticaPermessi: (id, parte) => ipcRenderer.invoke('tabs:permessi-dimentica', { id, parte }),
     // Proxy per-tab ("Apri da un altro paese") + stato (configurato, location).
     setProxy: (id, country, tier) => ipcRenderer.invoke('tabs:set-proxy', { id, country, tier }),
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),
