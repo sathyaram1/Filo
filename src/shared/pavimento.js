@@ -1368,7 +1368,7 @@
       // Anche la tabella senza la barra in testa («CVV: | 123»), come per la password.
       if (riga.length > 2000 || !/^[ \t]*\||^[^|]{1,80}[:：=][ \t]*\|/.test(riga)) return riga;
       let r = riga.replace(/(?<=[:：=][ \t]*)\|(?=[ \t]*[^|\s])/g, ' ');
-      const celle = r.trim().replace(/^\||\|$/g, '').split('|');
+      const celle = celleFraBarre(r);
       const piene = celle.filter((c) => c.trim());
       const nome = celle[0].trim();
       // La password nuda ha già la regola della sua cella, che sa quando la cella dopo la spiega.
