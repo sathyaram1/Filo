@@ -276,27 +276,24 @@ test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avvi
   const a = await avviso.boundingBox();
   // Il collegamento sta sotto l'avviso: il menu si apre verso l'alto e la sua ultima voce cade sull'avviso.
   await page.locator('#basso').click({ button: 'right' });
-  const voce = menuDi(page).voce('Invia feedback');
+  const menu = menuDi(page);
+  const voce = menu.voce('Invia feedback');
   await expect(voce).toHaveCount(1);
   // A icone (#2555): un'azione rara sta dietro il «+», che si apre nello stesso menu.
-  if (!(await voce.isVisible())) await menuDi(page).piu.click();
+  if (!(await voce.isVisible())) await menu.piu.click();
   await expect(voce).toBeVisible();
   // La spiegazione del collegamento cambia l'altezza del menu appena arriva: si misura a menu fermo.
-  let v = null;
+  let m = null;
   await expect.poll(async () => {
-    const prima = JSON.stringify(v);
-    v = await voce.boundingBox();
-    return prima === JSON.stringify(v);
+    const prima = JSON.stringify(m);
+    m = await menu.principale.boundingBox();
+    return prima === JSON.stringify(m);
   }, { intervals: [300] }).toBe(true);
-  console.log('DEBUG', JSON.stringify({ a, v, m: await menuDi(page).principale.boundingBox(), vp: page.viewportSize() }));
-  const x = Math.max(a.x, v.x) + 6;
-  const y = (Math.max(a.y, v.y) + Math.min(a.y + a.height, v.y + v.height)) / 2;
-  expect(x < Math.min(a.x + a.width, v.x + v.width) && y > a.y && y < a.y + a.height, 'la voce non cade sull’avviso').toBe(true);
+  // Il fondo del menu (la riga del nome e la spiegazione) cade sull'avviso, e il menu gli sta sopra.
+  expect(m.y + m.height > a.y && m.y < a.y + a.height && m.x < a.x + a.width && m.x + m.width > a.x, 'il menu non cade sull’avviso').toBe(true);
   await expect.poll(() => vociCoperte(page), { message: 'l’avviso copre il menu' }).toEqual([]);
   await shot(page, 'avviso-1453-menu-accanto-all-avviso');
-  await page.mouse.move(x, y, { steps: 3 });
-  await page.waitForTimeout(150);
-  await page.mouse.click(x, y);
+  await menu.scegli(voce);
   await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.visibile ?? false).toBe(true);
   await expect(page.locator('.sn-toast', { hasText: 'Il menu era coperto' })).toHaveCount(0);
 });
