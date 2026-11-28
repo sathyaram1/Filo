@@ -4889,6 +4889,7 @@ class TabManager {
         canBack: t.canBack,
         canFwd: t.canFwd,
         muted: !!t.muted,
+        bloccata: !!t.bloccata,
         color: t.color || null,
         identityColor: t.identityColor || null,
         openedAt: t.openedAt || null,
