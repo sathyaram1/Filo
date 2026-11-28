@@ -1114,6 +1114,9 @@ class TabManager {
       canBack: false,
       canFwd: false,
       muted: false,
+      // #2086 — bloccata dall'utente: pulizie e chiusure in blocco la lasciano, i gesti a mano non la chiudono.
+      // Torna con la sessione (restoreSession); un duplicato nasce sbloccato.
+      bloccata: false,
       isInternal,
       openedAt: new Date().toISOString(),
       // Aperta da Filo, non dalla pagina che l'ha chiesta con window.open: per il filo è un gesto (#1525).
