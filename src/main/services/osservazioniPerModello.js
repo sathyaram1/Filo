@@ -1255,6 +1255,7 @@ const LEGACY_CONTINUE_NUDGE =
 
 // I nomi delle schede li scrivono i siti: tornano recintati, coi perché di Filo fuori dal recinto.
 const PERCHE_RESTA_APERTA = {
+  bloccata: 'Lasciate aperte perché l\'utente le ha bloccate',
   testo: 'Lasciate aperte perché hanno del testo scritto e non ancora inviato',
   sempre: 'Lasciate aperte perché sono di siti che l\'utente tiene sempre aperti',
   chiusa: 'Non c\'erano più',
