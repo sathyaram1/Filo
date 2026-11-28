@@ -108,6 +108,36 @@ window.addEventListener('load', async () => {
   expect({ font: e.font, ls: e.ls, cornice: /dentro la cornice/.test(cornice) }).toEqual({ font: 'Mio:loaded', ls: 'v', cornice: true });
 });
 
+test('Ctrl+Shift+T sul file cancellato intanto: cosa vede l\'utente', async ({ app, avvisi }) => {
+  test.setTimeout(60_000);
+  const dir = join(cartellaTemporanea('esplora5d-'), 'Report');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'via.html'), '<!doctype html><title>Via</title><p>x</p>');
+  await home(app);
+  const file = join(dir, 'via.html');
+  expect((await execAction(app, { type: 'NAVIGA', url: file }, { parole: `aprimi ${file}` })).executed).toBe(true);
+  let id = null;
+  await expect.poll(async () => (id = await schedaFile(app, 'via.html')), { timeout: 10_000 }).toBeTruthy();
+  await app.evaluate(({ BrowserWindow }, i) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.closeTab(i), id);
+  await new Promise((r) => setTimeout(r, 800));
+  const { rmSync } = await import('node:fs');
+  rmSync(file);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riapriChiusa({ tasto: 'ctrl_shift_t' }));
+  await new Promise((r) => setTimeout(r, 2500));
+  const stato = await app.evaluate(async ({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const out = [];
+    for (const t of tm.tabs) {
+      let testo = '';
+      try { testo = (await t.view.webContents.executeJavaScript('document.title + " / " + (document.body ? document.body.innerText.slice(0, 160) : "")')); } catch (e) { testo = 'err ' + e.message; }
+      out.push({ url: t.url, wc: t.view && t.view.webContents.getURL(), testo, attiva: tm.activeId === t.id });
+    }
+    return out;
+  });
+  const toast = await (await avvisi()).locator('.shell-notif.show').allTextContents().catch(() => []);
+  console.log('STATO', JSON.stringify(stato, null, 1), 'TOAST', JSON.stringify(toast));
+});
+
 test('fetch, XHR, import, tracce, audio, @import e stili non leggono i file accanto', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = join(cartellaTemporanea('esplora5-'), 'Scaricati');
