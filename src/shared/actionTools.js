@@ -115,9 +115,19 @@
       description: 'Google Lens: immagine N della chat, o scheda per la più grande della pagina; senza, l\'ultima della chat.',
       properties: { immagine: I(), scheda: I() }, required: [],
     },
+    BLOCCA_SCHEDA: {
+      via: ['scheda', 'blocca'],
+      description: 'blocca una scheda (senza scheda: questa): pulizie e chiusure di tutte o di un sito la lasciano.',
+      properties: { scheda: I() }, required: [],
+    },
+    SBLOCCA_SCHEDA: {
+      via: ['scheda', 'sblocca'],
+      description: 'sblocca una scheda bloccata (senza scheda: questa).',
+      properties: { scheda: I() }, required: [],
+    },
     CHIUDI_SCHEDE: {
       via: ['scheda', 'chiudi'],
-      description: 'chiude schede per numero, sito o tutte, meno tranne; tutte e sito lasciano aperta questa chat.',
+      description: 'chiude schede per numero, sito o tutte, meno tranne; tutte e sito lasciano aperta questa chat e le bloccate.',
       properties: { schede: LISTA(I()), sito: S(), tutte: B(), tranne: LISTA(I()) }, required: [],
     },
     PULISCI_TAB: {
