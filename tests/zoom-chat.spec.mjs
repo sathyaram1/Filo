@@ -239,9 +239,7 @@ test('anche una pagina di Filo si ingrandisce a parole, e il tasto destro ne mos
   await expect.poll(async () => percentOf(app, page)).toBe(150);
 
   await page.locator('body').click({ button: 'right', position: { x: 12, y: 12 } });
-  const voce = menuDi(page).locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
-  await expect(voce).toBeVisible();
-  await voce.click();
+  await riportaAlReale(page, 150);
   await expect.poll(async () => percentOf(app, page)).toBe(100);
 });
 
