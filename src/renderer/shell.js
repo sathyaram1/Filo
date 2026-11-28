@@ -1134,13 +1134,16 @@
         : `Su ${r.nome} l'accesso finisce qualche minuto dopo che ne chiudi l'ultima scheda.`)) + rientra, 'resta_connesso_scelta');
   }
 
-  async function azzeraPermessi(id) {
+  // Una riga dei permessi del sito (#2087): toglie quella scelta sola, e il sito la richiederà.
+  async function togliPermesso(id, parte) {
     let r = null;
-    try { r = await api.tabs.dimenticaPermessi(id); } catch (_) { r = null; }
+    try { r = await api.tabs.dimenticaPermessi(id, parte); } catch (_) { r = null; }
     if (!r || !r.tolte) return;
+    const p = window.SN_MENU_LINGUETTA.PARTI[parte];
+    const nome = p ? p.nome : 'Permesso';
     showToast(r.ricarica
-      ? 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo. Ricarica la pagina perché valga anche per quello che sta già usando.'
-      : 'Permessi del sito azzerati: alla prossima richiesta Filo ti chiede di nuovo.', 'permessi_azzerati');
+      ? `${nome}: scelta tolta, alla prossima richiesta Filo ti chiede di nuovo. Ricarica la pagina perché valga anche per quello che sta già usando.`
+      : `${nome}: scelta tolta, alla prossima richiesta Filo ti chiede di nuovo.`, 'permesso_tolto');
   }
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
