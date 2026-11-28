@@ -587,7 +587,9 @@ function vociHTML(entries) {
     }
     // `url` apre una scheda, `action` torna al chiamante: il prefisso le tiene distinte.
     const valore = e.action ? '@action:' + String(e.action) : String(e.url || '');
-    const main = `<button class="item" data-v="${testoHTML(valore)}">${icoSpan}<span class="lbl">${label}</span></button>`;
+    // `hint`: una o due parole su cosa fa il clic, scritte in fondo alla riga solo all'hover (le righe dei permessi, #2087).
+    const hint = e.hint ? `<span class="hint">${testoHTML(e.hint)}</span>` : '';
+    const main = `<button class="item" data-v="${testoHTML(valore)}">${icoSpan}<span class="lbl">${label}</span>${hint}</button>`;
     if (e.subAction) {
       // Voce a due zone: il corpo esegue `action`, la freccia manda `subAction` e il chiamante riapre col secondo livello.
       items += `<div class="row">${main}` +
