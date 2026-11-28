@@ -40,8 +40,9 @@ async function apri(app, testServer, openTab, { modello = false } = {}) {
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
   }, modello);
-  await expect.poll(() => app.evaluate(() => globalThis.__filoDizionarioDiFilo.stato()), { timeout: 20_000 })
-    .toMatchObject({ fase: 'pronto', predefinite: ['it-IT'], lingue: expect.arrayContaining(['it-IT', 'en-US']) });
+  await expect.poll(() => app.evaluate(() => globalThis.__filoDizionarioDiFilo.stato().fase), { timeout: 20_000 }).toBe('pronto');
+  // Il sistema è davvero italiano: di serie il dizionario aveva solo l'italiano.
+  expect(await app.evaluate(() => globalThis.__filoDizionarioDiFilo.scegli(require('electron').app.getLocale()))).toEqual(['it-IT']);
   const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   return page;
