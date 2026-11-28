@@ -86,7 +86,7 @@ test('«chiudile tutte» in chat lascia la bloccata e lo dice; chiesta per numer
   await chiedi(page, 'chiudile tutte');
   await okAlPopup(page);
   await expect.poll(() => titoli(shell), { timeout: 10_000 }).toEqual(['Beta']);
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'una era bloccata' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'una era bloccata' }).first()).toBeVisible({ timeout: 10_000 });
   // Dato l'OK il lavoro riprende col suo esito (#1685): la seconda chiamata sa cosa è rimasto e perché.
   const esito = JSON.stringify((await chiamateAlModello(app))[1]);
   expect(esito).toContain('Chiuse 2 schede');
