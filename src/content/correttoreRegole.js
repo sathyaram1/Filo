@@ -137,7 +137,7 @@
       if (parola.replace(/['’-]/g, '').length < 2) continue;
       if (diParola(testo[start - 1]) || diParola(testo[end])) continue;
       if (fuori.some(([a, b]) => start < b && end > a)) continue;
-      if (nota(parola) || !sbagliata(parola.replace(/’/g, "'"))) continue;
+      if (nota(parola) || !sbagliata(parola.replace(/’/g, "'"), start)) continue;
       out.push(segno(testo, start, end, { fonte: 'dizionario', tipo: 'ortografia', ...(minuscolaLatina(parola) ? {} : { attende: true }) }));
     }
     return out;
