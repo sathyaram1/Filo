@@ -2046,7 +2046,7 @@
           let stacca = null;
           if (errore.dubbio) {
             segui((nuovo) => { giudicato = nuovo; update(riga(nuovo)); });
-            if (!mandate.length && unaParola(errore.segment)) {
+            if (!mandate.length && !lingua && unaParola(errore.segment)) {
               stacca = SpellCheck.onNativeSuggestions(errore.segment, (sugg) => {
                 if (giudicato || !sugg || !sugg.length) return;
                 native = sugg;
