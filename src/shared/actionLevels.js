@@ -1028,9 +1028,14 @@
       describeDone: (a) => {
         const out = a && a._output;
         const n = out && Number.isFinite(Number(out.chiuse)) ? Number(out.chiuse) : targetList(a).length;
-        if (!n) return 'Nessuna scheda chiusa';
+        // Dopo un OK il modello legge questa riga: le bloccate chiuse e le rimaste aperte (#2086) devono esserci.
+        const R = global.SN_RESTANO_APERTE || (typeof require === 'function' ? require('./restanoAperte.js') : null);
+        const resto = R && out ? R.frase(out) : '';
+        if (!n) return `Nessuna scheda chiusa${resto ? `: ${resto}` : ''}`;
+        const b = Number(out && out.bloccate) || 0;
+        const bloccate = !b ? '' : n === 1 ? ' (era bloccata)' : ` (${b === 1 ? 'una era bloccata' : `${b} erano bloccate`})`;
         const dove = a && a._inIncognito ? '' : (n === 1 ? ': resta nel filo della home' : ': restano nel filo della home');
-        return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}${dove}`;
+        return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}${bloccate}${dove}${resto ? `; ${resto}` : ''}`;
       },
     },
     // Cancellare per sempre è costo 4 (#1312).
