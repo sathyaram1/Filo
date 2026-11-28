@@ -162,11 +162,10 @@ test('controprova: scheda a strati con velo sfumato in cima — il menu resta co
       <span id="scrim" style="position:absolute;inset:0;${SCRIM};color:#fff;display:flex;align-items:flex-end">Il titolo</span>
     </div>
   </body></html>`);
-  const menu = await openMenuOn(page, '#scrim');
-  await expect(menu.getByText('Riproduci', { exact: false }).first()).toBeVisible();
-  for (const label of LINK_LABELS) {
-    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
-  }
+  await openMenuOn(page, '#scrim');
+  // A icone (#2555): un'icona della griglia, dietro il «+» o variante nel menu di un'icona.
+  const m = menuDi(page);
+  for (const label of ['Riproduci', ...LINK_LABELS]) expect(await m.haVoce(label), label).toBe(true);
 });
 
 test('controprova: velo sfumato dentro il collegamento, copertina ferma — le voci dell\'immagine restano', async ({ openTab, testServer }) => {
