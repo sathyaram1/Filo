@@ -90,10 +90,10 @@ test('"Copia URL" su un video-link copia l\'href del COLLEGAMENTO, non quello de
 
 test('le azioni del video funzionano ancora: "Ripeti in continuo" agisce davvero sul filmato', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, cardHtml('https://example.com/articolo'));
-  const menu = await openMenuOn(page, '#clip');
+  await openMenuOn(page, '#clip');
 
   expect(await page.locator('#clip').evaluate((v) => v.loop)).toBe(false);
-  await menu.locator('button', { hasText: 'Ripeti in continuo' }).first().click();
+  await menuDi(page).scegli('Ripeti in continuo');
   await expect.poll(() => page.locator('#clip').evaluate((v) => v.loop)).toBe(true);
 });
 
