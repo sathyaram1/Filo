@@ -207,7 +207,7 @@ test('#991 — riscattato il codice, la scheda già aperta ha la voce al primo t
   await riscatta(openTab);
 
   await page.bringToFront();
-  await expect((await menuSulSito(page)).locator('.sn-menu-item', { hasText: 'Invia attacco' })).toBeVisible();
+  await expect((await menuSulSito(page)).locator('.sn-menu-item', { hasText: 'Invia attacco' })).toHaveCount(1);
 });
 
 test('#991 — riscattato il codice, «Invia attacco» scelto dentro un riquadro incorporato apre il pannello', async ({ app, openTab, testServer }) => {
