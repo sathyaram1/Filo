@@ -387,7 +387,7 @@ npm run manutentore -- novita | novita consegna <file.json>
 npm run manutentore -- chat                        # la chat dell'owner, col contesto intero
 npm run manutentore -- feedback "<titolo>" - [--priorita P] [--server]   # un feedback nuovo, testo da stdin (di norma a 1); --server se il codice sta in filo-security
 npm run manutentore -- domanda <file.json>         # una domanda all'owner, coi campi di SPEC-DOMANDE § 3.1
-npm run manutentore -- domanda-fine <ruolo> - | --togli   # la domanda di fine turno di un ruolo, da stdin: chi la riceve al rilascio esce non fidato e chiude la sua sessione
+npm run manutentore -- domanda-fine <ruolo> - | --togli   # la domanda di fine turno di un ruolo, da stdin: scritta da te fidato non sporca nessuno; se eri sporco, o ti sporchi dopo, chi la riceve al rilascio esce non fidato e chiude la sua sessione
 npm run manutentore -- registro <parole>           # i principi delle domande chiuse, prima di chiedere
 npm run manutentore -- spesa                       # la spesa della settimana per account
 npm run manutentore -- l5 | l5 approva <id>        # le richieste L5 dei lavori fidati; il tuo sì a una
