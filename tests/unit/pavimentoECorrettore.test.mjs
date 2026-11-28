@@ -245,6 +245,19 @@ test('righe lunghe di segni Markdown o di spazi non fermano il cancello dei mode
   }
 });
 
+// #2754, #2758, #2761 — una parola lunghissima, una fila di cifre o di «[» si leggono in un tempo che cresce con la
+// lunghezza: due letture ripartivano da ogni posto della parola o della fila e la rileggevano tutta (minuti su un milione
+// di cifre). Prima del rimedio queste misure valevano centinaia di unità.
+test('una parola lunghissima, una fila di cifre o di quadre aperte non fermano il cancello dei modelli', () => {
+  for (const testo of ['0123456789'.repeat(10_000), `Vedi ${'['.repeat(100_000)} fine della spiegazione`,
+    `${'a'.repeat(60_000)} SEGNO-DEL-MEZZO-77 ${'b'.repeat(60_000)}`, `x%41${'7'.repeat(100_000)}`]) {
+    for (const [cancello, fn] of [['pavimento', P.oscura], ['correttore', alCorrettore]]) {
+      const c = costoInUnita(() => fn(testo), { tetto: TETTO_FILE_DI_SPAZI });
+      assert.ok(c.entro, `${cancello} ${JSON.stringify(testo.slice(0, 12))}: ${c.come}`);
+    }
+  }
+});
+
 // Le forme più rare dello stesso valore: il blocco di codice citato, più righe vuote, una cella vuota o una barra
 // protetta in tabella. Il pavimento le copre come il correttore.
 test('il blocco di codice citato, le righe vuote e le celle vuote non lasciano passare il valore sotto l\'etichetta', () => {
