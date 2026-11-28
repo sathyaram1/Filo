@@ -62,7 +62,7 @@ async function copiaUrlDelLink() {
 async function openMenuOn(page, selector, position) {
   await page.locator(selector).click({ button: 'right', ...(position ? { position } : {}) });
   aperto = menuDi(page);
-  const menu = aperto.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }
