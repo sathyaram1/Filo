@@ -303,7 +303,8 @@ async function expectNessunaVoceDelLink(menu) {
 // elemento): serve perché il punto è scelto su ciò che sta SOTTO alla barra.
 async function rightClickAt(page, x, y) {
   await page.mouse.click(x, y, { button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu');
+  aperto = menuDi(page);
+  const menu = aperto.locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }
