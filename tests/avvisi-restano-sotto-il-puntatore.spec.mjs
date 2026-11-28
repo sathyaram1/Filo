@@ -277,6 +277,9 @@ test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avvi
   // Il collegamento sta sotto l'avviso: il menu si apre verso l'alto e la sua ultima voce cade sull'avviso.
   await page.locator('#basso').click({ button: 'right' });
   const voce = menuDi(page).voce('Invia feedback');
+  await expect(voce).toHaveCount(1);
+  // A icone (#2555): un'azione rara sta dietro il «+», che si apre nello stesso menu.
+  if (!(await voce.isVisible())) await menuDi(page).piu.click();
   await expect(voce).toBeVisible();
   // La spiegazione del collegamento cambia l'altezza del menu appena arriva: si misura a menu fermo.
   let v = null;
