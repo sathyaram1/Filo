@@ -235,7 +235,7 @@ test('tasto destro su una foto trovata: salva il file, copia e cerca l\'indirizz
     };
   });
   await imgs.first().click({ button: 'right' });
-  await menu.voce('Cerca immagine').click();
+  await menu.scegli('Cerca immagine');
   await expect.poll(() => app.evaluate(() => globalThis.__aperte), { timeout: 10_000, message: 'Google Lens non si è aperto' })
     .toEqual([`https://lens.google.com/uploadbyurl?url=${encodeURIComponent(originale)}`]);
 
