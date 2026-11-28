@@ -44,9 +44,10 @@ test('dal menu del tasto destro: Filo si spegne sul sito, la scheda aperta segue
   await page.evaluate(() => { window.__nonRicaricata = 843; });
 
   await tastoDestro(page);
+  // A icone (#2555) sta dietro il «+».
   const voce = menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Spegni Filo su questo sito' });
-  await expect(voce).toBeVisible({ timeout: 5000 });
-  await voce.click();
+  await expect(voce).toHaveCount(1, { timeout: 5000 });
+  await menuDi(page).scegli(voce);
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual(['banca-843.test', SITO]);
   const vista = await avvisi();
   await expect(vista.locator('.shell-notif.show', { hasText: `Filo è spento su ${SITO}` })).toBeVisible({ timeout: 5000 });
