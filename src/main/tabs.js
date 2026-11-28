@@ -1545,8 +1545,13 @@ class TabManager {
     return true;
   }
 
-  // Resta una scheda vuota: la finestra non si chiude da sé.
+  // Resta una scheda vuota: la finestra non si chiude da sé. Le bloccate restano, come a ogni chiusura in blocco (#2086).
   closeAllTabs() {
+    const restano = this.tabs.filter((t) => t.bloccata);
+    if (restano.length) {
+      this.chiudiSchede(this.tabs.filter((t) => !t.bloccata).map((t) => t.id), { via: 'chiudi_tutto' });
+      return;
+    }
     for (const tab of this.tabs) {
       ContatoriFinestra.misura('chiusa', tab, 'chiudi_tutto', { incognito: this.incognito });
       this._avvisaSorvegliante(tab, 'chiusa');
