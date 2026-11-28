@@ -9,13 +9,18 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.310', date: '2026-11-28',
+      fixes: [
+        { testo: 'Un messaggio lunghissimo incollato, una pagina con un campo pieno di cifre o una risposta con una lunga fila di parentesi quadre non bloccano più Filo per secondi o minuti.', segnalazione: [2754, 2758, 2761] },
+        { testo: 'In una tabella con la colonna «Password», una password che contiene una barra verticale non arriva più a metà ai modelli.', segnalazione: 2673 },
+      ],
+    },
+    {
       version: '0.2.309', date: '2026-11-27',
       fixes: [
         { testo: 'Una password scritta con un errore di battitura, come «la pasword è …», «la password e …» senza accento o «la password, che era vecchia, è …», non arriva più a nessun modello.', segnalazione: 2678 },
         { testo: 'Una password scritta sotto «Password:» come voce di un elenco, in una citazione o in un blocco di codice, come capita spesso negli appunti in Markdown, non arriva più a nessun modello, come quando sta da sola sulla riga.', segnalazione: 2673 },
         'Una pagina o un testo con lunghe file di spazi o di righe vuote non blocca più Filo per secondi prima di arrivare a un modello.',
-        { testo: 'Un messaggio lunghissimo incollato, una pagina con un campo pieno di cifre o una risposta con una lunga fila di parentesi quadre non bloccano più Filo per secondi o minuti.', segnalazione: [2754, 2758, 2761] },
-        { testo: 'In una tabella con la colonna «Password», una password che contiene una barra verticale non arriva più a metà ai modelli.', segnalazione: 2673 },
       ],
     },
     {
