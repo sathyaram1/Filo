@@ -1854,6 +1854,8 @@
     RIPRENDI_AUDIO: senza('nonPartita'),
     PAUSA_AUDIO: senza('nessuna'),
     MOSTRA_SCHEDA: fatta,
+    BLOCCA_SCHEDA: fatta,
+    SBLOCCA_SCHEDA: fatta,
     RIAPRI_SCHEDA: senza('nonRaggiungibile'),
     SALVA_PER_DOPO: fatta,
     CERCA_IMMAGINE: fatta,
