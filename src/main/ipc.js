@@ -770,6 +770,18 @@ function registerIpcHandlers() {
     const newId = await win._filoTabs.duplicateTab(id);
     return { ok: !!newId, id: newId };
   });
+  // #2086 — solo la cornice: il menu della linguetta e il tasto «Sblocca e chiudi» dell'avviso.
+  ipcMain.handle('tabs:blocca', (event, { id, on, chiudi } = {}) => {
+    const win = finestraDellaBarra(event.sender);
+    const tm = win && win._filoTabs;
+    if (!tm || !tm.tabs.some((t) => t.id === id)) return { ok: false };
+    if (chiudi === true) {
+      gesto(win, 'close-tab', () => tm.closeTab(id, { via: 'tasto_destro_scheda', sblocca: true }));
+      return { ok: true, chiusa: true };
+    }
+    const bloccata = tm.bloccaScheda(id, on === true);
+    return { ok: bloccata !== null, bloccata };
+  });
   // Ctrl/Cmd+Shift+T e Ctrl/Cmd+L con la barra a fuoco (#1476): solo la cornice. `via: 'menu'`: le voci dei menu
   // della linguetta e del «+» (#1695), che non sono il tasto.
   ipcMain.handle('tabs:riapri-chiusa', async (event, { via } = {}) => {
